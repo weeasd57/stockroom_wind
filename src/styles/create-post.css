@@ -1,0 +1,155 @@
+.create-post-container {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.create-post-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.create-post-form {
+  background-color: hsl(var(--background));
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+  padding: 1rem;
+}
+
+.create-post-textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.create-post-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.stock-search-container {
+  position: relative;
+  margin-top: 1rem;
+}
+
+.stock-search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.stock-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.stock-item:hover {
+  background-color: hsl(var(--muted));
+}
+
+.stock-info {
+  flex: 1;
+}
+
+.stock-symbol {
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.stock-name {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+}
+
+.stock-exchange {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  background-color: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+}
+
+.selected-stock {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+  background-color: hsl(var(--muted) / 0.3);
+}
+
+.price-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.strategy-section {
+  margin-top: 1rem;
+}
+
+.image-preview {
+  margin-top: 1rem;
+  border-radius: var(--radius);
+  overflow: hidden;
+  max-width: 100%;
+  height: auto;
+}
+
+.image-preview img {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+  border: 2px solid hsl(var(--border));
+  border-top-color: hsl(var(--primary));
+  border-radius: 50%;
+  width: 1rem;
+  height: 1rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Country selection styles */
+.country-select-container {
+  margin-bottom: 1rem;
+}
+
+.country-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.country-flag {
+  width: 1.33em;
+  height: 1em;
+  font-size: 1rem;
+  line-height: 1em;
+  border-radius: 2px;
+}
+
+.country-name {
+  flex: 1;
+}

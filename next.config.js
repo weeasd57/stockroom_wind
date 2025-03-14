@@ -7,10 +7,34 @@ const nextConfig = {
       'localhost', // Local development
       'firebasestorage.googleapis.com', // In case you use Firebase storage
       'storage.googleapis.com', // Google Cloud Storage
+      'jyoeecprvhpqfirxmpkx.supabase.co', // Supabase storage
+      'mfbgpnpgwmxgxpjnxzrb.supabase.co', // Additional Supabase storage
     ],
   },
   experimental: {
-    serverActions: true,
+    serverActions: {
+      allowedOrigins: ['localhost:3000', 'localhost:3001'],
+    },
+  },
+  // Disable React StrictMode to prevent double-rendering which can worsen hydration issues
+  reactStrictMode: false,
+  // Add custom headers to prevent translation extensions
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-Google-Translate',
+            value: 'nope',
+          },
+          {
+            key: 'x-translate',
+            value: 'no',
+          },
+        ],
+      },
+    ]
   },
 }
 

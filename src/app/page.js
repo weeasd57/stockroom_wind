@@ -1,17 +1,122 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from 'next/navigation';
+import { useAuth } from "@/hooks/useAuth";
 import Image from "next/image";
 import Link from "next/link";
-import { useAuth } from "@/hooks/useAuth";
+import { getPosts } from "@/utils/supabase";
+import PostCard from "@/components/posts/PostCard";
+import { Button } from "@/components/ui/button";
+import CreatePostButton from "@/components/posts/CreatePostButton";
 
 export default function Home() {
-  const { isAuthenticated } = useAuth();
+  const router = useRouter();
+  const { isAuthenticated, loading } = useAuth();
   const [isVisible, setIsVisible] = useState(false);
+  const [posts, setPosts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
+  // Fetch posts when authenticated
+  const fetchPosts = async (pageNum = 1) => {
+    try {
+      setIsLoading(true);
+      const { data, error, hasMorePages } = await getPosts(pageNum);
+      
+      if (error) {
+        console.error('Error fetching posts:', error);
+        return;
+      }
+      
+      if (pageNum === 1) {
+        setPosts(data || []);
+      } else {
+        setPosts(prev => [...prev, ...(data || [])]);
+      }
+      
+      setHasMore(hasMorePages || false);
+      setPage(pageNum);
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle new post creation
+  const handlePostCreated = (newPost) => {
+    setPosts(prevPosts => [newPost, ...(prevPosts || [])]);
+  };
+
+  // Handle load more
+  const handleLoadMore = () => {
+    if (hasMore && !isLoading) {
+      fetchPosts(page + 1);
+    }
+  };
+
+  useEffect(() => {
+    // Only fetch posts if authenticated
+    if (!loading && isAuthenticated) {
+      fetchPosts();
+    }
+  }, [isAuthenticated, loading]);
 
   useEffect(() => {
     setIsVisible(true);
   }, []);
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin h-8 w-8 border-t-2 border-b-2 border-primary rounded-full"></div>
+      </div>
+    );
+  }
+
+  // If user is authenticated, show posts feed
+  if (isAuthenticated) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold mb-6">Your Feed</h1>
+        
+        {/* Create post button */}
+        <div className="mb-8">
+          <CreatePostButton onPostCreated={handlePostCreated} />
+        </div>
+        
+        {/* Posts list */}
+        <div className="space-y-6">
+          {posts && posts.length === 0 && !isLoading ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No posts yet. Be the first to post!</p>
+            </div>
+          ) : (
+            posts && posts.map(post => (
+              <PostCard key={post.id} post={post} />
+            ))
+          )}
+          
+          {isLoading && (
+            <div className="flex justify-center py-4">
+              <div className="animate-spin h-6 w-6 border-t-2 border-b-2 border-primary rounded-full"></div>
+            </div>
+          )}
+          
+          {hasMore && !isLoading && posts && posts.length > 0 && (
+            <div className="flex justify-center py-4">
+              <Button onClick={handleLoadMore} variant="outline">
+                Load More
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const features = [
     {
@@ -91,26 +196,17 @@ export default function Home() {
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4 animate-fade-in-up animation-delay-450">
-                {isAuthenticated ? (
-                  <Link 
-                    href="/profile" 
-                    className="px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
-                  >
-                    Go to Profile
-                  </Link>
-                ) : (
-                  <Link 
-                    href="/login" 
-                    className="px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
-                  >
-                    Get Started
-                  </Link>
-                )}
                 <Link 
-                  href="/explore" 
+                  href="/login" 
+                  className="px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
+                >
+                  Get Started
+                </Link>
+                <Link 
+                  href="/traders" 
                   className="px-6 py-3 rounded-lg border border-border bg-background hover:bg-muted transition-colors font-medium"
                 >
-                  Explore Platform
+                  Explore Traders
                 </Link>
               </div>
             </div>
@@ -179,103 +275,19 @@ export default function Home() {
           <h2 className="text-3xl md:text-4xl font-bold mb-6 animate-fade-in-up">
             Ready to elevate your trading experience?
           </h2>
-          <p className="text-lg text-muted-foreground mb-8 animate-fade-in-up animation-delay-150">
-            Join thousands of traders who are already using StockRoom to connect, share insights, and make better trading decisions.
+          <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto animate-fade-in-up animation-delay-150">
+            Join thousands of traders who are already using StockRoom to make better investment decisions.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up animation-delay-300">
-            {isAuthenticated ? (
-              <Link 
-                href="/profile" 
-                className="px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
-              >
-                Go to Profile
-              </Link>
-            ) : (
-              <Link 
-                href="/login" 
-                className="px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
-              >
-                Sign Up Now
-              </Link>
-            )}
+          <div className="animate-fade-in-up animation-delay-300">
             <Link 
-              href="/explore" 
-              className="px-6 py-3 rounded-lg border border-border bg-background hover:bg-muted transition-colors font-medium"
+              href="/signup" 
+              className="px-8 py-4 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors text-lg"
             >
-              Learn More
+              Sign Up Now
             </Link>
           </div>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="py-12 px-6 border-t border-border">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center mb-6 md:mb-0">
-              <Image 
-                src="/logo.svg" 
-                alt="StockRoom Logo" 
-                width={32} 
-                height={32}
-                className="mr-2"
-              />
-              <span className="text-xl font-bold">StockRoom</span>
-            </div>
-            
-            <div className="flex flex-wrap gap-6 justify-center">
-              <Link href="/about" className="text-muted-foreground hover:text-foreground transition-colors">
-                About
-              </Link>
-              <Link href="/features" className="text-muted-foreground hover:text-foreground transition-colors">
-                Features
-              </Link>
-              <Link href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
-                Pricing
-              </Link>
-              <Link href="/blog" className="text-muted-foreground hover:text-foreground transition-colors">
-                Blog
-              </Link>
-              <Link href="/contact" className="text-muted-foreground hover:text-foreground transition-colors">
-                Contact
-              </Link>
-            </div>
-          </div>
-          
-          <div className="mt-8 pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center">
-            <p className="text-sm text-muted-foreground mb-4 md:mb-0">
-              {new Date().getFullYear()} StockRoom. All rights reserved.
-            </p>
-            
-            <div className="flex gap-4">
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
-                </svg>
-              </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"></path>
-                </svg>
-              </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                  <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                  <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-                </svg>
-              </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
-                  <rect x="2" y="9" width="4" height="12"></rect>
-                  <circle cx="4" cy="4" r="2"></circle>
-                </svg>
-              </a>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

@@ -1,372 +1,709 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import Image from 'next/image';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
-import { getUserProfile, updateUserProfile, getPosts, getFollowers, getFollowing } from '@/utils/supabase';
+import { useProfile } from '@/contexts/ProfileContext';
+import { 
+  supabase, 
+  getUserProfile, 
+  updateUserProfile, 
+  getPosts,
+  getFollowers,
+  getFollowing,
+  uploadImage
+} from '@/utils/supabase';
 import styles from '@/styles/profile.module.css';
 
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
-  const [profile, setProfile] = useState(null);
+  const { 
+    profile, 
+    loading: profileLoading, 
+    error: profileError,
+    avatarUrl: contextAvatarUrl,
+    backgroundUrl: contextBackgroundUrl,
+    updateProfile,
+    refreshProfile,
+    getEffectiveAvatarUrl,
+    getEffectiveBackgroundUrl
+  } = useProfile();
+  
   const [posts, setPosts] = useState([]);
   const [followers, setFollowers] = useState([]);
   const [following, setFollowing] = useState([]);
   const [activeTab, setActiveTab] = useState('posts');
-  const [isEditing, setIsEditing] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     bio: '',
-    trading_style: '',
-    experience_level: 'beginner',
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [backgroundFile, setBackgroundFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [backgroundPreview, setBackgroundPreview] = useState(null);
+  const [avatarSaving, setAvatarSaving] = useState(false);
+  const [backgroundSaving, setBackgroundSaving] = useState(false);
+  const [checkBucketsLogged, setCheckBucketsLogged] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(contextAvatarUrl || '/default-avatar.svg');
+  const [backgroundUrl, setBackgroundUrl] = useState(contextBackgroundUrl || '/profile-bg.jpg');
+  const fileInputRef = useRef(null);
+  const backgroundInputRef = useRef(null);
 
   useEffect(() => {
-    const fetchProfileData = async () => {
-      if (!user) return;
-      
-      try {
-        // Fetch user profile
-        const { data: profileData } = await getUserProfile(user.id);
-        setProfile(profileData || {});
-        
-        if (profileData) {
-          setFormData({
-            username: profileData.username || '',
-            bio: profileData.bio || '',
-            trading_style: profileData.trading_style || '',
-            experience_level: profileData.experience_level || 'beginner',
-          });
+    const loadProfileImages = async () => {
+      if (user) {
+        try {
+          await ensureStorageBucketsExist();
+          
+          // Use the cached images from context
+          setAvatarUrl(contextAvatarUrl || '/default-avatar.svg');
+          setBackgroundUrl(contextBackgroundUrl || '/profile-bg.jpg');
+        } catch (error) {
+          console.error('Error loading profile images:', error);
+          setAvatarUrl('/default-avatar.svg');
+          setBackgroundUrl('/profile-bg.jpg');
         }
-        
-        // Fetch user posts
-        const { data: postsData } = await getPosts(10, 0, user.id);
-        setPosts(postsData || []);
-        
-        // Fetch followers
-        const { data: followersData } = await getFollowers(user.id);
-        // Transform followers data to access profiles correctly
-        const transformedFollowers = followersData?.map(item => ({
-          id: item.follower_id,
-          profiles: item.profiles
-        })) || [];
-        setFollowers(transformedFollowers);
-        
-        // Fetch following
-        const { data: followingData } = await getFollowing(user.id);
-        // Transform following data to access profiles correctly
-        const transformedFollowing = followingData?.map(item => ({
-          id: item.following_id,
-          profiles: item.profiles
-        })) || [];
-        setFollowing(transformedFollowing);
-      } catch (error) {
-        console.error('Error fetching profile data:', error);
-      } finally {
-        setLoading(false);
+      } else {
+        setAvatarUrl('/default-avatar.svg');
+        setBackgroundUrl('/profile-bg.jpg');
       }
     };
     
-    fetchProfileData();
-  }, [user]);
+    loadProfileImages();
+  }, [user, contextAvatarUrl, contextBackgroundUrl]);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (user && !profileLoading) {
+        try {
+          // Ensure storage buckets exist
+          await ensureStorageBucketsExist();
+          
+          // Fetch avatar and background URLs directly from Supabase
+          const fetchedAvatarUrl = await getEffectiveAvatarUrl();
+          const fetchedBackgroundUrl = await getEffectiveBackgroundUrl();
+          
+          setAvatarUrl(fetchedAvatarUrl);
+          setBackgroundUrl(fetchedBackgroundUrl);
+          
+          // Initialize form data with profile data
+          if (profile) {
+            setFormData({
+              username: profile.username || '',
+              bio: profile.bio || '',
+            });
+          }
+          
+          // Fetch posts, followers, and following
+          const fetchedPosts = await getPosts(user.id);
+          const fetchedFollowers = await getFollowers(user.id);
+          const fetchedFollowing = await getFollowing(user.id);
+          
+          setPosts(fetchedPosts || []);
+          setFollowers(fetchedFollowers || []);
+          setFollowing(fetchedFollowing || []);
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        }
+      }
+    };
+    
+    fetchUserData();
+  }, [user, profile, profileLoading, getEffectiveAvatarUrl, getEffectiveBackgroundUrl]);
+
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        username: profile.username || '',
+        bio: profile.bio || '',
+      });
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    if (contextAvatarUrl) {
+      setAvatarUrl(contextAvatarUrl);
+    }
+  }, [contextAvatarUrl]);
+  
+  useEffect(() => {
+    if (contextBackgroundUrl) {
+      setBackgroundUrl(contextBackgroundUrl);
+    }
+  }, [contextBackgroundUrl]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+  };
+
+  const handleEditProfile = () => {
+    setShowEditModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowEditModal(false);
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    setBackgroundFile(null);
+    setBackgroundPreview(null);
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!user) return;
-    
-    try {
-      const { error } = await updateUserProfile(user.id, formData);
-      if (error) throw error;
-      
-      // Update local profile state
-      setProfile(prev => ({
-        ...prev,
-        ...formData
-      }));
-      
-      setIsEditing(false);
-    } catch (error) {
-      console.error('Error updating profile:', error);
+  const handleAvatarClick = () => {
+    fileInputRef.current.click();
+  };
+
+  const handleBackgroundClick = () => {
+    backgroundInputRef.current.click();
+  };
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  if (authLoading || loading) {
-    return (
-      <div className={styles.loadingContainer}>
-        <div className={styles.loadingSpinner}></div>
-        <p>Loading profile...</p>
-      </div>
-    );
+  const handleBackgroundChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setBackgroundFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setBackgroundPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadAvatar = async () => {
+    if (!avatarFile) return null;
+    
+    try {
+      setAvatarSaving(true);
+      console.log('Uploading avatar image...');
+      const { publicUrl, error } = await uploadImage(
+        avatarFile,
+        'avatars',
+        user.id,
+        'avatar'
+      );
+      
+      if (error) {
+        console.error('Error uploading avatar:', error);
+        throw error;
+      }
+      
+      console.log('Avatar uploaded successfully:', publicUrl);
+      return publicUrl;
+    } catch (error) {
+      console.error('Error in uploadAvatar:', error);
+      throw error;
+    } finally {
+      setAvatarSaving(false);
+    }
+  };
+
+  const uploadBackground = async () => {
+    if (!backgroundFile) return null;
+    
+    try {
+      setBackgroundSaving(true);
+      console.log('Uploading background image...');
+      const { publicUrl, error } = await uploadImage(
+        backgroundFile,
+        'backgrounds',
+        user.id,
+        'background'
+      );
+      
+      if (error) {
+        console.error('Error uploading background:', error);
+        throw error;
+      }
+      
+      console.log('Background uploaded successfully:', publicUrl);
+      return publicUrl;
+    } catch (error) {
+      console.error('Error in uploadBackground:', error);
+      throw error;
+    } finally {
+      setBackgroundSaving(false);
+    }
+  };
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    setSaveError(null);
+    
+    try {
+      setLoading(true);
+      
+      // Upload avatar and background in parallel if selected
+      const uploadPromises = [];
+      let newAvatarUrl = null;
+      let newBackgroundUrl = null;
+      
+      if (avatarFile) {
+        uploadPromises.push(
+          uploadAvatar()
+            .then(url => {
+              newAvatarUrl = url;
+              console.log('Avatar URL after upload:', newAvatarUrl);
+            })
+            .catch(error => {
+              console.error('Avatar upload failed:', error);
+              setSaveError(prev => prev || 'Failed to upload avatar image. Please try again.');
+            })
+        );
+      }
+      
+      if (backgroundFile) {
+        uploadPromises.push(
+          uploadBackground()
+            .then(url => {
+              newBackgroundUrl = url;
+              console.log('Background URL after upload:', newBackgroundUrl);
+            })
+            .catch(error => {
+              console.error('Background upload failed:', error);
+              setSaveError(prev => prev || 'Failed to upload background image. Please try again.');
+            })
+        );
+      }
+      
+      // Wait for all uploads to complete
+      if (uploadPromises.length > 0) {
+        await Promise.allSettled(uploadPromises);
+      }
+      
+      // Prepare update data
+      const updateData = {
+        ...formData
+      };
+      
+      // Only update avatar_url if a new file was uploaded successfully
+      if (newAvatarUrl) {
+        updateData.avatar_url = newAvatarUrl;
+      }
+      
+      // Add background URL if uploaded successfully
+      if (newBackgroundUrl) {
+        updateData.background_url = newBackgroundUrl;
+      }
+      
+      console.log('Updating profile with data:', updateData);
+      
+      // Update profile
+      const { success, error } = await updateProfile(updateData);
+      
+      if (!success) {
+        setSaveError('Failed to update profile information. Please try again.');
+        throw error || new Error('Failed to update profile');
+      }
+      
+      console.log('Profile updated successfully');
+      
+      // Close modal and reset files
+      handleCloseModal();
+      
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      setSaveError(saveError || 'Failed to update profile. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Ensure the required storage buckets exist
+  const ensureStorageBucketsExist = async () => {
+    try {
+      // Try to get the buckets' public URLs - this will help us check if they're accessible
+      // If these fail, it's likely the buckets don't exist, but we'll gracefully handle errors
+      // instead of trying to create them from the client side
+      
+      let avatarsAccessible = false;
+      let backgroundsAccessible = false;
+      
+      try {
+        // Check if we can access the avatars bucket
+        const { data: avatarsData, error: avatarsError } = await supabase.storage.from('avatars').list();
+        if (avatarsError) {
+          console.log('Note: Avatars bucket may not exist or is not accessible', avatarsError.message);
+          // Don't try to create it - this requires admin permissions
+        } else {
+          // Bucket is accessible, but no need to log it repeatedly
+          avatarsAccessible = true;
+        }
+      } catch (avatarCheckError) {
+        console.log('Could not check avatars bucket', avatarCheckError);
+      }
+
+      try {
+        // Check if we can access the backgrounds bucket
+        const { data: backgroundsData, error: backgroundsError } = await supabase.storage.from('backgrounds').list();
+        if (backgroundsError) {
+          console.log('Note: Backgrounds bucket may not exist or is not accessible', backgroundsError.message);
+          // Don't try to create it - this requires admin permissions
+        } else {
+          // Bucket is accessible, but no need to log it repeatedly
+          backgroundsAccessible = true;
+        }
+      } catch (backgroundCheckError) {
+        console.log('Could not check backgrounds bucket', backgroundCheckError);
+      }
+      
+      // Only log bucket status once when component mounts
+      if (!checkBucketsLogged) {
+        if (avatarsAccessible && backgroundsAccessible) {
+          console.log('Storage buckets check: Both avatars and backgrounds buckets are accessible');
+        } else {
+          console.log('Storage buckets check:', 
+            avatarsAccessible ? 'Avatars bucket is accessible.' : 'Avatars bucket is not accessible.',
+            backgroundsAccessible ? 'Backgrounds bucket is accessible.' : 'Backgrounds bucket is not accessible.');
+        }
+        // Set flag to prevent logging again
+        setCheckBucketsLogged(true);
+      }
+      
+      // If we're here and buckets don't exist or aren't accessible,
+      // inform the user that admin needs to create these buckets
+      // Alternatively, we'll just continue with default avatars/backgrounds
+    } catch (error) {
+      console.error('Error checking storage buckets:', error);
+      // Continue with the app, just without custom avatar/background functionality
+    }
+  };
+
+  if (authLoading || profileLoading) {
+    return <div className={styles.loading}>Loading...</div>;
   }
 
   if (!isAuthenticated) {
     return (
-      <div className={styles.unauthorizedContainer}>
-        <h1>Unauthorized</h1>
-        <p>Please sign in to view your profile</p>
-        <Link href="/login" className={styles.loginButton}>
-          Go to Login
-        </Link>
+      <div className={styles.notAuthenticated}>
+        <h1>Not Authenticated</h1>
+        <p>Please <Link href="/login">login</Link> to view your profile.</p>
       </div>
     );
   }
 
   return (
-    <div className={styles.container}>
-      <div className={styles.profileHeader}>
-        <div className={styles.coverPhoto}>
-          <div className={styles.avatarContainer}>
-            <Image 
-              src={profile?.avatar_url || '/default-avatar.svg'} 
-              alt="Profile" 
-              width={120} 
-              height={120}
-              className={styles.avatar}
-            />
-          </div>
-        </div>
-        
-        <div className={styles.profileInfo}>
-          <div className={styles.nameSection}>
-            <h1 className={styles.profileName}>{profile?.username || 'Trader'}</h1>
-            {!isEditing && (
-              <button 
-                onClick={() => setIsEditing(true)} 
-                className={styles.editButton}
-              >
-                Edit Profile
-              </button>
-            )}
-          </div>
-          
-          <p className={styles.profileBio}>{profile?.bio || 'No bio yet'}</p>
-          
-          <div className={styles.profileStats}>
-            <div className={styles.statItem}>
-              <span className={styles.statValue}>{posts.length}</span>
-              <span className={styles.statLabel}>Posts</span>
+    <div className={styles.profileContainer}>
+      {/* Profile Header with Background */}
+      <div 
+        className={styles.profileHeader}
+        style={{ 
+          backgroundImage: `url(${backgroundUrl})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          transition: 'background-image 0.3s ease-in-out'
+        }}
+      >
+        <div className={styles.profileHeaderOverlay}>
+          <div className={styles.profileInfo}>
+            {/* Avatar with overlay for editing */}
+            <div className={styles.profileAvatar} onClick={showEditModal ? handleAvatarClick : undefined}>
+              {showEditModal && (
+                <div className={styles.avatarOverlay}>
+                  <span>Change</span>
+                </div>
+              )}
+              <img
+                src={avatarUrl}
+                alt={profile?.username || 'User'}
+                width={100}
+                height={100}
+                className={styles.avatar}
+              />
             </div>
-            <div className={styles.statItem}>
-              <span className={styles.statValue}>{followers.length}</span>
-              <span className={styles.statLabel}>Followers</span>
-            </div>
-            <div className={styles.statItem}>
-              <span className={styles.statValue}>{following.length}</span>
-              <span className={styles.statLabel}>Following</span>
-            </div>
-          </div>
-          
-          <div className={styles.tradingInfo}>
-            <div className={styles.tradingInfoItem}>
-              <span className={styles.tradingInfoLabel}>Trading Style:</span>
-              <span className={styles.tradingInfoValue}>{profile?.trading_style || 'Not specified'}</span>
-            </div>
-            <div className={styles.tradingInfoItem}>
-              <span className={styles.tradingInfoLabel}>Experience:</span>
-              <span className={styles.tradingInfoValue}>
-                {profile?.experience_level === 'beginner' && 'Beginner'}
-                {profile?.experience_level === 'intermediate' && 'Intermediate'}
-                {profile?.experience_level === 'advanced' && 'Advanced'}
-                {profile?.experience_level === 'professional' && 'Professional'}
-                {!profile?.experience_level && 'Not specified'}
-              </span>
+            
+            {/* User info section */}
+            <div className={styles.nameSection}>
+              <h1 className={styles.profileName}>{profile?.username || 'Trader'}</h1>
+              <p className={styles.profileBio}>{profile?.bio || 'No bio yet'}</p>
+              
+              {!showEditModal && (
+                <button 
+                  onClick={handleEditProfile} 
+                  className={styles.editButton}
+                >
+                  Edit Profile
+                </button>
+              )}
             </div>
           </div>
         </div>
       </div>
       
-      {isEditing ? (
-        <div className={styles.editProfileSection}>
-          <h2>Edit Profile</h2>
-          <form onSubmit={handleSubmit} className={styles.editForm}>
-            <div className={styles.formGroup}>
-              <label htmlFor="username">Username</label>
-              <input
-                type="text"
-                id="username"
-                name="username"
-                value={formData.username}
-                onChange={handleInputChange}
-                className={styles.input}
-              />
-            </div>
-            
-            <div className={styles.formGroup}>
-              <label htmlFor="bio">Bio</label>
-              <textarea
-                id="bio"
-                name="bio"
-                value={formData.bio}
-                onChange={handleInputChange}
-                className={styles.textarea}
-                rows={3}
-              />
-            </div>
-            
-            <div className={styles.formGroup}>
-              <label htmlFor="trading_style">Trading Style</label>
-              <input
-                type="text"
-                id="trading_style"
-                name="trading_style"
-                value={formData.trading_style}
-                onChange={handleInputChange}
-                className={styles.input}
-                placeholder="e.g., Day Trading, Swing Trading, Value Investing"
-              />
-            </div>
-            
-            <div className={styles.formGroup}>
-              <label htmlFor="experience_level">Experience Level</label>
-              <select
-                id="experience_level"
-                name="experience_level"
-                value={formData.experience_level}
-                onChange={handleInputChange}
-                className={styles.select}
-              >
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-                <option value="professional">Professional</option>
-              </select>
-            </div>
-            
-            <div className={styles.formActions}>
-              <button type="submit" className={styles.saveButton}>Save Changes</button>
-              <button 
-                type="button" 
-                onClick={() => setIsEditing(false)} 
-                className={styles.cancelButton}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+      {/* Trading Statistics */}
+      <div className={styles.tradingInfo}>
+        <div className={styles.tradingInfoItem}>
+          <span className={styles.tradingInfoLabel}>Experience:</span>
+          <span className={styles.tradingInfoValue}>
+            {profile?.experience_level ? 
+              profile.experience_level.charAt(0).toUpperCase() + profile.experience_level.slice(1) : 
+              'Beginner'}
+          </span>
         </div>
-      ) : (
-        <>
-          <div className={styles.tabsContainer}>
-            <button 
-              className={`${styles.tabButton} ${activeTab === 'posts' ? styles.activeTab : ''}`}
-              onClick={() => setActiveTab('posts')}
-            >
-              Posts
-            </button>
-            <button 
-              className={`${styles.tabButton} ${activeTab === 'followers' ? styles.activeTab : ''}`}
-              onClick={() => setActiveTab('followers')}
-            >
-              Followers
-            </button>
-            <button 
-              className={`${styles.tabButton} ${activeTab === 'following' ? styles.activeTab : ''}`}
-              onClick={() => setActiveTab('following')}
-            >
-              Following
-            </button>
-          </div>
-          
-          <div className={styles.tabContent}>
-            {activeTab === 'posts' && (
-              <div className={styles.postsGrid}>
-                {posts.length > 0 ? (
-                  posts.map(post => (
-                    <div key={post.id} className={styles.postCard}>
-                      <h3 className={styles.postTitle}>{post.title}</h3>
-                      <p className={styles.postExcerpt}>
-                        {post.content.length > 100 
-                          ? `${post.content.substring(0, 100)}...` 
-                          : post.content}
-                      </p>
-                      <Link href={`/posts/${post.id}`} className={styles.readMoreLink}>
-                        Read More
-                      </Link>
-                    </div>
-                  ))
-                ) : (
-                  <div className={styles.emptyState}>
-                    <p>You haven't created any posts yet.</p>
-                    <Link href="/create-post" className={styles.createPostButton}>
-                      Create Your First Post
-                    </Link>
+        <div className={styles.tradingInfoItem}>
+          <span className={styles.tradingInfoLabel}>Success Posts:</span>
+          <span className={styles.tradingInfoValue}>{profile?.success_posts || 0}</span>
+        </div>
+        <div className={styles.tradingInfoItem}>
+          <span className={styles.tradingInfoLabel}>Loss Posts:</span>
+          <span className={styles.tradingInfoValue}>{profile?.loss_posts || 0}</span>
+        </div>
+      </div>
+
+      {/* Profile Stats */}
+      <div className={styles.profileStats}>
+        <div className={styles.statItem}>
+          <span className={styles.statValue}>{posts.length}</span>
+          <span className={styles.statLabel}>Posts</span>
+        </div>
+        <div className={styles.statItem}>
+          <span className={styles.statValue}>{followers.length}</span>
+          <span className={styles.statLabel}>Followers</span>
+        </div>
+        <div className={styles.statItem}>
+          <span className={styles.statValue}>{following.length}</span>
+          <span className={styles.statLabel}>Following</span>
+        </div>
+      </div>
+
+      {/* Content Tabs */}
+      <div className={styles.contentTabs}>
+        <button 
+          className={`${styles.tabButton} ${activeTab === 'posts' ? styles.activeTab : ''}`}
+          onClick={() => setActiveTab('posts')}
+        >
+          Posts
+        </button>
+        <button 
+          className={`${styles.tabButton} ${activeTab === 'followers' ? styles.activeTab : ''}`}
+          onClick={() => setActiveTab('followers')}
+        >
+          Followers
+        </button>
+        <button 
+          className={`${styles.tabButton} ${activeTab === 'following' ? styles.activeTab : ''}`}
+          onClick={() => setActiveTab('following')}
+        >
+          Following
+        </button>
+      </div>
+
+      {/* Content Section */}
+      <div className={styles.contentSection}>
+        {activeTab === 'posts' && (
+          <div className={styles.postsGrid}>
+            {posts.length > 0 ? (
+              posts.map(post => (
+                <div key={post.id} className={styles.postCard}>
+                  <p className={styles.postContent}>{post.content}</p>
+                  <div className={styles.postMeta}>
+                    <span className={styles.postDate}>
+                      {new Date(post.created_at).toLocaleDateString()}
+                    </span>
                   </div>
-                )}
+                </div>
+              ))
+            ) : (
+              <p className={styles.emptyMessage}>No posts yet</p>
+            )}
+          </div>
+        )}
+        
+        {activeTab === 'followers' && (
+          <div className={styles.usersGrid}>
+            {followers.length > 0 ? (
+              followers.map(follower => (
+                <div key={follower.id} className={styles.userCard}>
+                  <img 
+                    src={follower.profiles?.avatar_url || '/default-avatar.svg'} 
+                    alt={follower.profiles?.username || 'User'} 
+                    width={50} 
+                    height={50}
+                    className={styles.userAvatar}
+                  />
+                  <span className={styles.userName}>{follower.profiles?.username || 'User'}</span>
+                </div>
+              ))
+            ) : (
+              <p className={styles.emptyMessage}>No followers yet</p>
+            )}
+          </div>
+        )}
+        
+        {activeTab === 'following' && (
+          <div className={styles.usersGrid}>
+            {following.length > 0 ? (
+              following.map(follow => (
+                <div key={follow.id} className={styles.userCard}>
+                  <img 
+                    src={follow.profiles?.avatar_url || '/default-avatar.svg'} 
+                    alt={follow.profiles?.username || 'User'} 
+                    width={50} 
+                    height={50}
+                    className={styles.userAvatar}
+                  />
+                  <span className={styles.userName}>{follow.profiles?.username || 'User'}</span>
+                </div>
+              ))
+            ) : (
+              <p className={styles.emptyMessage}>Not following anyone yet</p>
+            )}
+          </div>
+        )}
+      </div>
+      
+      {/* Edit Profile Modal */}
+      {showEditModal && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Edit Profile</h2>
+              <button className={styles.closeButton} onClick={handleCloseModal}>×</button>
+            </div>
+            
+            {saveError && (
+              <div className={styles.errorMessage}>
+                {saveError}
               </div>
             )}
             
-            {activeTab === 'followers' && (
-              <div className={styles.usersGrid}>
-                {followers.length > 0 ? (
-                  followers.map(follower => (
-                    <div key={follower.id} className={styles.userCard}>
-                      <Image 
-                        src={follower.profiles?.avatar_url || '/default-avatar.svg'} 
-                        alt={follower.profiles?.username || 'User'} 
-                        width={50} 
-                        height={50}
-                        className={styles.userAvatar}
-                      />
-                      <div className={styles.userInfo}>
-                        <h3 className={styles.userName}>{follower.profiles?.username || 'User'}</h3>
-                        <Link href={`/profile/${follower.id}`} className={styles.viewProfileLink}>
-                          View Profile
-                        </Link>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className={styles.emptyState}>
-                    <p>You don't have any followers yet.</p>
-                    <p className={styles.emptyStateSubtext}>Share your profile to gain followers!</p>
-                  </div>
-                )}
+            <form onSubmit={handleSaveProfile} className={styles.editForm}>
+              <div className={styles.formGroup}>
+                <label htmlFor="username">Username</label>
+                <input
+                  type="text"
+                  id="username"
+                  name="username"
+                  value={formData.username}
+                  onChange={handleInputChange}
+                  required
+                  disabled={loading}
+                  placeholder="Enter your username"
+                />
               </div>
-            )}
-            
-            {activeTab === 'following' && (
-              <div className={styles.usersGrid}>
-                {following.length > 0 ? (
-                  following.map(follow => (
-                    <div key={follow.id} className={styles.userCard}>
-                      <Image 
-                        src={follow.profiles?.avatar_url || '/default-avatar.svg'} 
-                        alt={follow.profiles?.username || 'User'} 
-                        width={50} 
-                        height={50}
-                        className={styles.userAvatar}
-                      />
-                      <div className={styles.userInfo}>
-                        <h3 className={styles.userName}>{follow.profiles?.username || 'User'}</h3>
-                        <Link href={`/profile/${follow.id}`} className={styles.viewProfileLink}>
-                          View Profile
-                        </Link>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className={styles.emptyState}>
-                    <p>You're not following anyone yet.</p>
-                    <Link href="/" className={styles.exploreButton}>
-                      Explore Traders
-                    </Link>
-                  </div>
-                )}
+              
+              <div className={styles.formGroup}>
+                <label htmlFor="bio">Bio</label>
+                <textarea
+                  id="bio"
+                  name="bio"
+                  value={formData.bio}
+                  onChange={handleInputChange}
+                  rows={4}
+                  disabled={loading}
+                  placeholder="Tell us about yourself"
+                />
               </div>
-            )}
+              
+              <div className={styles.formGroup}>
+                <label>Profile Picture</label>
+                <div className={styles.avatarUpload}>
+                  <div className={styles.avatarPreviewContainer}>
+                    <img
+                      src={avatarPreview || avatarUrl}
+                      alt="Avatar Preview"
+                      width={100}
+                      height={100}
+                      className={styles.avatarPreview}
+                    />
+                    {avatarSaving && (
+                      <div className={styles.imageLoadingOverlay}>
+                        <div className={styles.spinner}></div>
+                      </div>
+                    )}
+                  </div>
+                  <button 
+                    type="button" 
+                    className={styles.changeAvatarButton}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={avatarSaving || loading}
+                  >
+                    {avatarSaving ? 'Uploading...' : 'Change Avatar'}
+                  </button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleAvatarChange}
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    disabled={avatarSaving || loading}
+                  />
+                </div>
+              </div>
+              
+              <div className={styles.formGroup}>
+                <label>Background Image</label>
+                <div className={styles.backgroundUpload}>
+                  <div className={styles.backgroundPreviewContainer}>
+                    <div 
+                      className={styles.backgroundPreview}
+                      style={{ 
+                        backgroundImage: `url(${backgroundPreview || backgroundUrl})` 
+                      }}
+                    />
+                    {backgroundSaving && (
+                      <div className={styles.imageLoadingOverlay}>
+                        <div className={styles.spinner}></div>
+                      </div>
+                    )}
+                  </div>
+                  <button 
+                    type="button" 
+                    className={styles.changeBackgroundButton}
+                    onClick={() => backgroundInputRef.current?.click()}
+                    disabled={backgroundSaving || loading}
+                  >
+                    {backgroundSaving ? 'Uploading...' : 'Change Background'}
+                  </button>
+                  <input
+                    type="file"
+                    ref={backgroundInputRef}
+                    onChange={handleBackgroundChange}
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    disabled={backgroundSaving || loading}
+                  />
+                </div>
+              </div>
+              
+              <div className={styles.formActions}>
+                <button 
+                  type="button" 
+                  className={styles.cancelButton}
+                  onClick={handleCloseModal}
+                  disabled={loading || avatarSaving || backgroundSaving}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className={styles.saveButton}
+                  disabled={loading || avatarSaving || backgroundSaving}
+                >
+                  {loading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

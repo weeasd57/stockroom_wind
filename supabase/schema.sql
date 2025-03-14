@@ -91,9 +91,10 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   avatar_url TEXT,
   bio TEXT,
   website TEXT,
-  trading_style TEXT,
   experience_level TEXT CHECK (experience_level IN ('beginner', 'intermediate', 'advanced', 'professional')),
   favorite_markets TEXT[],
+  success_posts INTEGER DEFAULT 0,
+  loss_posts INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL
 );
@@ -820,9 +821,10 @@ SELECT
   p.avatar_url,
   p.bio,
   p.website,
-  p.trading_style,
   p.experience_level,
   p.favorite_markets,
+  p.success_posts,
+  p.loss_posts,
   p.created_at,
   (SELECT COUNT(*) FROM public.followers WHERE following_id = p.id) AS follower_count,
   (SELECT COUNT(*) FROM public.followers WHERE follower_id = p.id) AS following_count,
