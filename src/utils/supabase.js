@@ -4,14 +4,54 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+// Check if environment variables are set
+export const isSupabaseConfigured = () => {
+  return Boolean(supabaseUrl && supabaseAnonKey);
+};
+
 // Ensure we have valid credentials before creating the client
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!isSupabaseConfigured()) {
   console.error(
     'Missing Supabase credentials. Make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in .env.local'
   );
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+// Create the Supabase client with options
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+  global: {
+    fetch: (...args) => fetch(...args),
+  },
+  // Add more detailed error handling
+  debug: process.env.NODE_ENV === 'development',
+  // Set reasonable timeouts
+  realtime: {
+    timeout: 30000, // 30 seconds
+  },
+});
+
+// Test the connection on initialization
+(async function testConnection() {
+  if (typeof window !== 'undefined' && isSupabaseConfigured()) {
+    try {
+      const { error } = await supabase.from('_connection_test').select('*').limit(1).single();
+      // If we get a "relation does not exist" error, that's actually good
+      // It means we connected to the database but the table doesn't exist
+      if (error && error.code === '42P01') {
+        console.log('Supabase connection successful');
+      } else if (error) {
+        console.warn('Supabase connection test returned an error:', error.message);
+      } else {
+        console.log('Supabase connection successful');
+      }
+    } catch (err) {
+      console.error('Failed to test Supabase connection:', err.message);
+    }
+  }
+})();
 
 // Authentication helpers
 /**
@@ -534,9 +574,20 @@ export const getAvatarImageUrl = async (userId) => {
       // Add cache-busting parameter if not already present
       const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
       const cacheBuster = `?t=${today}`;
-      return profile.avatar_url.includes('?') 
-        ? profile.avatar_url.split('?')[0] + cacheBuster 
-        : `${profile.avatar_url}${cacheBuster}`;
+      
+      // Make sure we're returning the full URL without any query parameters first
+      const cleanUrl = profile.avatar_url.includes('?') 
+        ? profile.avatar_url.split('?')[0] 
+        : profile.avatar_url;
+        
+      // Check if the URL is already a complete URL with protocol
+      if (!cleanUrl.startsWith('http') && !cleanUrl.startsWith('/')) {
+        // If it's a relative URL without protocol, prepend the Supabase URL
+        const storageUrl = `${supabaseUrl}/storage/v1/object/public/avatars/${userId}/${cleanUrl}`;
+        return `${storageUrl}${cacheBuster}`;
+      }
+      
+      return `${cleanUrl}${cacheBuster}`;
     }
 
     // If we get here, no valid avatar URL in profile, try to find one in storage
@@ -590,12 +641,13 @@ const findAvatarInStorage = async (userId) => {
       
       // Update the profile with this URL to avoid future storage checks
       try {
+        const baseUrl = publicUrlData.publicUrl.split('?')[0];
         await supabase
           .from('profiles')
-          .update({ avatar_url: publicUrlData.publicUrl.split('?')[0] })
+          .update({ avatar_url: baseUrl })
           .eq('id', userId);
         
-        console.log(`Updated profile with avatar URL: ${publicUrlData.publicUrl.split('?')[0]}`);
+        console.log(`Updated profile with avatar URL: ${baseUrl}`);
       } catch (updateError) {
         console.warn('Could not update profile with avatar URL:', updateError);
       }
@@ -645,14 +697,23 @@ export const checkFileExists = async (bucket, path) => {
  * @returns {Promise<object>} - Created post
  */
 export async function createPost(postData) {
-  const { data, error } = await supabase
-    .from('posts')
-    .insert(postData)
-    .select('*')
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('posts')
+      .insert([postData])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Invalidate posts cache after creating a new post
+    invalidatePostsCache();
     
-  if (error) throw error;
-  return data;
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error creating post:', error);
+    return { data: null, error };
+  }
 }
 
 /**
@@ -680,34 +741,172 @@ export async function uploadPostImage(file, userId) {
 }
 
 /**
- * Get posts with pagination
+ * Check if a table exists in the database
+ * @param {string} tableName - Name of the table to check
+ * @returns {Promise<boolean>} - Whether the table exists
+ */
+export async function checkTableExists(tableName) {
+  try {
+    // Query the information_schema to check if the table exists
+    const { data, error } = await supabase
+      .from('information_schema.tables')
+      .select('table_name')
+      .eq('table_name', tableName)
+      .eq('table_schema', 'public');
+    
+    if (error) {
+      console.error(`Error checking if table ${tableName} exists:`, error);
+      return false;
+    }
+    
+    return data && data.length > 0;
+  } catch (error) {
+    console.error(`Error checking if table ${tableName} exists:`, error);
+    return false;
+  }
+}
+
+/**
+ * Check if the Supabase connection is working
+ * @returns {Promise<boolean>} - Whether the connection is working
+ */
+export async function checkSupabaseConnection() {
+  try {
+    // First check if Supabase is configured
+    if (!isSupabaseConfigured()) {
+      console.error('Supabase is not configured. Check your environment variables.');
+      return false;
+    }
+
+    // Try a simple query to check if the connection works
+    const { data, error } = await supabase.from('_anon_auth_check').select('*').limit(1);
+    
+    // If we get a "relation does not exist" error, that's actually good
+    // It means we connected to the database but the table doesn't exist
+    if (error && error.code === '42P01') {
+      console.log('Supabase connection is working (table does not exist, but connection is good)');
+      return true;
+    }
+    
+    if (error) {
+      console.error('Supabase connection check failed:', error.message, error.details);
+      
+      // Check for specific error types to provide better diagnostics
+      if (error.code === 'PGRST301') {
+        console.error('Authentication error: Invalid API key or JWT');
+      } else if (error.code === 'PGRST401') {
+        console.error('Permission denied: Check your RLS policies');
+      } else if (error.message && error.message.includes('Failed to fetch')) {
+        console.error('Network error: Unable to reach Supabase servers');
+      }
+      
+      return false;
+    }
+    
+    console.log('Supabase connection is working properly');
+    return true;
+  } catch (error) {
+    console.error('Error checking Supabase connection:', error);
+    
+    // Provide more specific error information
+    if (error.message && error.message.includes('fetch')) {
+      console.error('Network error: Check your internet connection');
+    } else if (error.message && error.message.includes('timeout')) {
+      console.error('Connection timeout: Supabase server might be overloaded or unreachable');
+    }
+    
+    return false;
+  }
+}
+
+// Cache for posts data
+const postsCache = {
+  data: new Map(),
+  timestamp: new Map(),
+  ttl: 30000, // 30 seconds cache TTL
+};
+
+/**
+ * Get all posts with pagination
  * @param {number} page - Page number (1-based)
  * @param {number} limit - Number of posts per page
  * @returns {Promise<object>} - Posts and pagination info
  */
 export async function getPosts(page = 1, limit = 10) {
   try {
+    const cacheKey = `posts_${page}_${limit}`;
+    const cachedData = postsCache.data.get(cacheKey);
+    const cachedTimestamp = postsCache.timestamp.get(cacheKey);
+    
+    if (cachedData && cachedTimestamp && (Date.now() - cachedTimestamp < postsCache.ttl)) {
+      return cachedData;
+    }
+
+    // First check if we can connect to Supabase
+    const isConnected = await checkSupabaseConnection();
+    if (!isConnected) {
+      throw new Error('Unable to connect to Supabase. Please check your connection and credentials.');
+    }
+
     const from = (page - 1) * limit;
     const to = from + limit - 1;
-    
+
+    // First try to get the table structure
+    const { data: tableInfo, error: tableError } = await supabase
+      .from('post_details')
+      .select('*')
+      .limit(1);
+
+    if (tableError && tableError.code === '42P01') {
+      console.log('post_details view not found, falling back to posts table');
+      // Try posts table instead
+      const { data: postsData, error: postsError, count } = await supabase
+        .from('posts')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (postsError) {
+        console.error('Error fetching from posts table:', postsError);
+        throw postsError;
+      }
+
+      const totalPages = Math.ceil((count || 0) / limit);
+      const response = {
+        data: postsData || [],
+        error: null,
+        hasMorePages: page < totalPages,
+        totalCount: count || 0,
+        currentPage: page,
+        totalPages
+      };
+
+      postsCache.data.set(cacheKey, response);
+      postsCache.timestamp.set(cacheKey, Date.now());
+
+      return response;
+    } else if (tableError) {
+      console.error('Error fetching table info:', tableError);
+      throw tableError;
+    }
+
+    // If we got here, post_details exists. Let's see what columns we have
+    console.log('Available columns in post_details:', Object.keys(tableInfo[0] || {}));
+
+    // Now fetch the actual data with all available columns
     const { data, error, count } = await supabase
       .from('post_details')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, to);
-      
+
     if (error) {
-      console.error('Error fetching posts:', error);
-      return {
-        data: [],
-        error,
-        hasMorePages: false
-      };
+      console.error('Error fetching from post_details:', error);
+      throw error;
     }
-    
+
     const totalPages = Math.ceil((count || 0) / limit);
-    
-    return {
+    const response = {
       data: data || [],
       error: null,
       hasMorePages: page < totalPages,
@@ -715,17 +914,33 @@ export async function getPosts(page = 1, limit = 10) {
       currentPage: page,
       totalPages
     };
+
+    postsCache.data.set(cacheKey, response);
+    postsCache.timestamp.set(cacheKey, Date.now());
+
+    return response;
   } catch (error) {
-    console.error('Error in getPosts function:', error);
+    console.error('Error in getPosts:', error);
     return {
       data: [],
-      error,
+      error: {
+        message: error.message || 'Failed to fetch posts',
+        details: error.details || error.toString(),
+        hint: error.hint || 'Check your Supabase connection and database setup',
+        columns: error.columns || []
+      },
       hasMorePages: false,
       totalCount: 0,
       currentPage: page,
       totalPages: 0
     };
   }
+}
+
+// Function to invalidate posts cache when new post is created
+export function invalidatePostsCache() {
+  postsCache.data.clear();
+  postsCache.timestamp.clear();
 }
 
 /**

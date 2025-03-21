@@ -73,14 +73,16 @@ export default function Navbar() {
         <Link href="/" className={styles.logo} onClick={closeMenu}>
           <div className={styles.logoWrapper}>
             <Image 
-              src="/logo.svg" 
-              alt="StockRoom Logo" 
-              width={32}
-              height={32}
+              src="/favicon.ico" 
+              alt="FireStocks Logo" 
+              width={40}
+              height={40}
               className={styles.logoImage}
               priority
             />
-            <span className={styles.logoText}>StockRoom</span>
+            <span className={styles.logoText}>
+              <span className="text-gradient">Fire</span>Stocks
+            </span>
           </div>
         </Link>
 
@@ -147,6 +149,11 @@ export default function Navbar() {
                         width={32}
                         height={32}
                         className="rounded-full"
+                        onError={(e) => {
+                          console.error('Error loading navbar avatar image:', e);
+                          e.target.onerror = null;
+                          e.target.src = '/default-avatar.svg';
+                        }}
                       />
                       <AvatarFallback className="font-semibold">{profile?.username?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
                     </Avatar>

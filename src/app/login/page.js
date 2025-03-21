@@ -65,13 +65,13 @@ export default function Login() {
         <div className={styles.logoContainer}>
           <div className={styles.logo}>
             <Image 
-              src="/logo.svg" 
-              alt="StockRoom Logo" 
+              src="/favicon.ico" 
+              alt="FireStocks Logo" 
               width={50} 
               height={50}
               className={styles.logoImage}
             />
-            <h1 className={styles.title}>StockRoom</h1>
+            <h1 className={styles.title}>FireStocks</h1>
           </div>
           <p className={styles.subtitle}>
             {isSignUp ? 'Join the trading community' : 'Welcome back, trader'}

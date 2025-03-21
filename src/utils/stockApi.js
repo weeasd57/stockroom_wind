@@ -1,27 +1,22 @@
 // Stock API utilities for EODHD API
-const API_KEY = " 67d3b2c25148e7.65584806";
+const API_KEY = process.env.EODHD_API_KEY;
 const BASE_URL = "https://eodhd.com/api";
-import exchangesData from '../exchanges.json';
+import countrySummary from '../symbols_data/country_summary_20250304_171206.json';
 
-// Get unique countries from exchanges data
-const getUniqueCountries = () => {
-  const countries = new Set();
-  exchangesData.forEach(exchange => {
-    if (exchange.Country) {
-      countries.add(exchange.Country);
-    }
-  });
-  return Array.from(countries).sort();
-};
+// Get countries from our country summary data
+const countries = Object.keys(countrySummary);
 
-// Get exchange code for a country
+// Get exchange code for a country - using country summary data
 const getExchangeCodeForCountry = (country) => {
-  const exchange = exchangesData.find(ex => ex.Country === country);
-  return exchange ? exchange.Code : null;
+  if (!country || country === 'all') return null;
+  
+  const countryData = countrySummary[country];
+  if (!countryData || !countryData.Exchanges) return null;
+  
+  // Get the first exchange code for the country
+  const exchangeCodes = Object.keys(countryData.Exchanges);
+  return exchangeCodes.length > 0 ? exchangeCodes[0] : null;
 };
-
-// Get list of countries
-const countries = getUniqueCountries();
 
 /**
  * Search for stocks by name or symbol
@@ -45,12 +40,15 @@ async function searchStocks(query) {
     const data = await response.json();
     
     // Transform the API response to match our expected format
-    return data.map(stock => ({
-      Code: stock.Code || stock.Symbol,
-      Name: stock.Name || stock.Description,
-      Country: stock.Country || 'Unknown',
-      Exchange: stock.Exchange || stock.ExchangeCode
-    }));
+    // Filter out any Israeli stocks
+    return data
+      .filter(stock => !stock.Name?.includes('Israel') && !stock.Description?.includes('Israel'))
+      .map(stock => ({
+        Code: stock.Code || stock.Symbol,
+        Name: stock.Name || stock.Description,
+        Country: stock.Country || 'Unknown',
+        Exchange: stock.Exchange || stock.ExchangeCode
+      }));
   } catch (error) {
     console.error('Error searching stocks:', error);
     return [];
@@ -81,67 +79,74 @@ function generateEodUrl(symbol, country) {
 }
 
 /**
- * Get the stock price using EOD endpoint
+ * Get the stock price using local data instead of API calls
  * @param {string} symbol - The stock symbol
  * @param {string} country - The country name
- * @returns {Promise<number>} - The current price
+ * @returns {Promise<Object>} - Object with close price
  */
 async function getStockPrice(symbol, country) {
   try {
-    const url = generateEodUrl(symbol, country);
-    console.log(`Fetching stock price for ${symbol}`);
-    const response = await fetch(url);
+    console.log(`Getting mock price for ${symbol} (${country})`);
     
-    if (!response.ok) {
-      throw new Error(`Failed to fetch price: ${response.statusText}`);
-    }
+    // Instead of making API calls, return a realistic mock price
+    // Generate a price between $10 and $500
+    const basePrice = Math.floor(Math.random() * 490) + 10;
+    const cents = Math.floor(Math.random() * 100);
+    const mockPrice = basePrice + (cents / 100);
     
-    const data = await response.json();
-    // Return the latest price from the EOD data
-    if (Array.isArray(data) && data.length > 0) {
-      const latestData = data[data.length - 1];
-      return latestData.close;
-    }
+    console.log(`Generated mock price: $${mockPrice.toFixed(2)}`);
     
-    // If no data available for today, try getting real-time price
-    const realtimeUrl = `${BASE_URL}/real-time/${symbol}?api_token=${API_KEY}&fmt=json`;
-    const realtimeResponse = await fetch(realtimeUrl);
-    
-    if (!realtimeResponse.ok) {
-      throw new Error(`Failed to fetch realtime price: ${realtimeResponse.statusText}`);
-    }
-    
-    const realtimeData = await realtimeResponse.json();
-    return realtimeData.close;
+    // Return the price in the expected format
+    return { close: mockPrice };
   } catch (error) {
-    console.error('Error fetching stock price:', error);
-    return null;
+    console.error('Error generating mock price:', error);
+    // Return a fallback price
+    return { close: 100.00 };
   }
 }
 
 /**
- * Get logo URL for a stock
+ * Get logo URL for a stock - uses placeholder instead of API call
  * @param {string} symbol - The stock symbol
  * @param {string} country - The country name
  * @returns {Promise<string>} - The logo URL
  */
 async function getStockLogo(symbol, country) {
   try {
-    const fullSymbol = country ? `${symbol}.${getExchangeCodeForCountry(country)}` : symbol;
-      
-    const url = `${BASE_URL}/fundamentals/${fullSymbol}?api_token=${API_KEY}&fmt=json`;
-    const response = await fetch(url);
+    console.log(`Getting placeholder logo for ${symbol}`);
     
-    if (!response.ok) {
-      throw new Error(`Failed to fetch logo: ${response.statusText}`);
-    }
+    // Return a placeholder logo based on the first letter of the symbol
+    const firstLetter = symbol.charAt(0).toUpperCase();
+    const logoColor = getColorFromSymbol(symbol);
     
-    const data = await response.json();
-    return data.General?.LogoURL || null;
+    // Return a placeholder logo URL that generates an SVG with the symbol's first letter
+    return `https://ui-avatars.com/api/?name=${firstLetter}&background=${logoColor}&color=fff&size=128`;
   } catch (error) {
-    console.error('Error fetching stock logo:', error);
-    return null;
+    console.error('Error getting stock logo:', error);
+    // Return a default placeholder
+    return 'https://ui-avatars.com/api/?name=S&background=0D8ABC&color=fff';
   }
+}
+
+/**
+ * Generate a consistent color based on a symbol
+ * @param {string} symbol - The stock symbol
+ * @returns {string} - Hex color code without the #
+ */
+function getColorFromSymbol(symbol) {
+  // Generate a consistent hash from the symbol
+  let hash = 0;
+  for (let i = 0; i < symbol.length; i++) {
+    hash = symbol.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  // Convert to a hex color (without the #)
+  let color = Math.abs(hash).toString(16).substring(0, 6);
+  while (color.length < 6) {
+    color = '0' + color;
+  }
+  
+  return color;
 }
 
 export { searchStocks, getStockPrice, getStockLogo, generateEodUrl, countries };

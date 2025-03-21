@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 
-const THEME_STORAGE_KEY = "stockroom-theme";
+const THEME_STORAGE_KEY = "firestocks-theme";
 const ThemeContext = createContext({ theme: "system", setTheme: () => null });
 
 export function ThemeProvider({

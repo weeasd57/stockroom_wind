@@ -12,7 +12,7 @@ export default function Footer() {
       <div className={styles.container}>
         <div className={styles.content}>
           <div className={styles.section}>
-            <h3 className={styles.title}>StockRoom</h3>
+            <h3 className={styles.title}>FireStocks</h3>
             <p className={styles.description}>
               Your social platform for stock market enthusiasts
             </p>
@@ -39,7 +39,7 @@ export default function Footer() {
         
         <div className={styles.bottom}>
           <p className={styles.copyright}>
-            &copy; {new Date().getFullYear()} StockRoom. All rights reserved.
+            &copy; {new Date().getFullYear()} FireStocks. All rights reserved.
           </p>
         </div>
       </div>

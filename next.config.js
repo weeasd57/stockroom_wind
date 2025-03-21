@@ -8,7 +8,7 @@ const nextConfig = {
       'firebasestorage.googleapis.com', // In case you use Firebase storage
       'storage.googleapis.com', // Google Cloud Storage
       'jyoeecprvhpqfirxmpkx.supabase.co', // Supabase storage
-      'mfbgpnpgwmxgxpjnxzrb.supabase.co', // Additional Supabase storage
+      'mfbgpnpgxmxgxpjnxzrb.supabase.co', // Additional Supabase storage
     ],
   },
   experimental: {

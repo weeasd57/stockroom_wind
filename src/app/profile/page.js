@@ -1,119 +1,92 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/contexts/ProfileContext';
 import { 
-  supabase, 
-  getUserProfile, 
-  updateUserProfile, 
-  getPosts,
-  getFollowers,
-  getFollowing,
+  updateProfile,
   uploadImage
 } from '@/utils/supabase';
 import styles from '@/styles/profile.module.css';
+import useProfileStore from '@/store/profileStore';
 
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const { 
     profile, 
-    loading: profileLoading, 
-    error: profileError,
+    loading: profileLoading,
     avatarUrl: contextAvatarUrl,
     backgroundUrl: contextBackgroundUrl,
-    updateProfile,
-    refreshProfile,
-    getEffectiveAvatarUrl,
-    getEffectiveBackgroundUrl
+    updateProfile
   } = useProfile();
-  
-  const [posts, setPosts] = useState([]);
-  const [followers, setFollowers] = useState([]);
-  const [following, setFollowing] = useState([]);
-  const [activeTab, setActiveTab] = useState('posts');
+
+  // Profile store state and actions
+  const {
+    posts,
+    followers,
+    following,
+    activeTab,
+    isLoading,
+    error,
+    isInitialized,
+    setActiveTab,
+    initializeData,
+    refreshData
+  } = useProfileStore();
+
   const [showEditModal, setShowEditModal] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     bio: '',
   });
-  const [loading, setLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [avatarFile, setAvatarFile] = useState(null);
   const [backgroundFile, setBackgroundFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [backgroundPreview, setBackgroundPreview] = useState(null);
-  const [avatarSaving, setAvatarSaving] = useState(false);
-  const [backgroundSaving, setBackgroundSaving] = useState(false);
-  const [checkBucketsLogged, setCheckBucketsLogged] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(contextAvatarUrl || '/default-avatar.svg');
   const [backgroundUrl, setBackgroundUrl] = useState(contextBackgroundUrl || '/profile-bg.jpg');
   const fileInputRef = useRef(null);
   const backgroundInputRef = useRef(null);
+  const refreshInterval = useRef(null);
 
+  // Initialize data once when authenticated
   useEffect(() => {
-    const loadProfileImages = async () => {
-      if (user) {
-        try {
-          await ensureStorageBucketsExist();
-          
-          // Use the cached images from context
-          setAvatarUrl(contextAvatarUrl || '/default-avatar.svg');
-          setBackgroundUrl(contextBackgroundUrl || '/profile-bg.jpg');
-        } catch (error) {
-          console.error('Error loading profile images:', error);
-          setAvatarUrl('/default-avatar.svg');
-          setBackgroundUrl('/profile-bg.jpg');
-        }
-      } else {
-        setAvatarUrl('/default-avatar.svg');
-        setBackgroundUrl('/profile-bg.jpg');
+    if (user && isAuthenticated && !isInitialized) {
+      initializeData(user.id);
+    }
+  }, [user, isAuthenticated, isInitialized, initializeData]);
+
+  // Set up background refresh interval
+  useEffect(() => {
+    if (user && isAuthenticated) {
+      // Initial background refresh
+      refreshData(user.id);
+
+      // Set up interval for background refresh (every 30 seconds)
+      refreshInterval.current = setInterval(() => {
+        refreshData(user.id);
+      }, 30000);
+    }
+
+    return () => {
+      if (refreshInterval.current) {
+        clearInterval(refreshInterval.current);
       }
     };
-    
-    loadProfileImages();
+  }, [user, isAuthenticated, refreshData]);
+
+  // Update profile images when context changes
+  useEffect(() => {
+    if (user) {
+      setAvatarUrl(contextAvatarUrl || '/default-avatar.svg');
+      setBackgroundUrl(contextBackgroundUrl || '/profile-bg.jpg');
+    }
   }, [user, contextAvatarUrl, contextBackgroundUrl]);
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      if (user && !profileLoading) {
-        try {
-          // Ensure storage buckets exist
-          await ensureStorageBucketsExist();
-          
-          // Fetch avatar and background URLs directly from Supabase
-          const fetchedAvatarUrl = await getEffectiveAvatarUrl();
-          const fetchedBackgroundUrl = await getEffectiveBackgroundUrl();
-          
-          setAvatarUrl(fetchedAvatarUrl);
-          setBackgroundUrl(fetchedBackgroundUrl);
-          
-          // Initialize form data with profile data
-          if (profile) {
-            setFormData({
-              username: profile.username || '',
-              bio: profile.bio || '',
-            });
-          }
-          
-          // Fetch posts, followers, and following
-          const fetchedPosts = await getPosts(user.id);
-          const fetchedFollowers = await getFollowers(user.id);
-          const fetchedFollowing = await getFollowing(user.id);
-          
-          setPosts(fetchedPosts || []);
-          setFollowers(fetchedFollowers || []);
-          setFollowing(fetchedFollowing || []);
-        } catch (error) {
-          console.error('Error fetching user data:', error);
-        }
-      }
-    };
-    
-    fetchUserData();
-  }, [user, profile, profileLoading, getEffectiveAvatarUrl, getEffectiveBackgroundUrl]);
-
+  // Update form data when profile changes
   useEffect(() => {
     if (profile) {
       setFormData({
@@ -123,33 +96,40 @@ export default function Profile() {
     }
   }, [profile]);
 
-  useEffect(() => {
-    if (contextAvatarUrl) {
-      setAvatarUrl(contextAvatarUrl);
-    }
-  }, [contextAvatarUrl]);
-  
-  useEffect(() => {
-    if (contextBackgroundUrl) {
-      setBackgroundUrl(contextBackgroundUrl);
-    }
-  }, [contextBackgroundUrl]);
-
-  const handleTabChange = (tab) => {
+  // Memoized handlers
+  const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
-  };
+  }, [setActiveTab]);
 
-  const handleEditProfile = () => {
+  const handleEditProfile = useCallback(() => {
     setShowEditModal(true);
-  };
+  }, []);
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setShowEditModal(false);
     setAvatarFile(null);
-    setAvatarPreview(null);
     setBackgroundFile(null);
+    setAvatarPreview(null);
     setBackgroundPreview(null);
-  };
+    setFormData({
+      username: profile?.username || '',
+      bio: profile?.bio || ''
+    });
+  }, [profile]);
+
+  // Only show loading state during initial load
+  if (authLoading || (profileLoading && !isInitialized)) {
+    return <div className={styles.loading}>Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className={styles.notAuthenticated}>
+        <h1>Not Authenticated</h1>
+        <p>Please <Link href="/login">login</Link> to view your profile.</p>
+      </div>
+    );
+  }
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -192,7 +172,6 @@ export default function Profile() {
     if (!avatarFile) return null;
     
     try {
-      setAvatarSaving(true);
       console.log('Uploading avatar image...');
       const { publicUrl, error } = await uploadImage(
         avatarFile,
@@ -211,8 +190,6 @@ export default function Profile() {
     } catch (error) {
       console.error('Error in uploadAvatar:', error);
       throw error;
-    } finally {
-      setAvatarSaving(false);
     }
   };
 
@@ -220,7 +197,6 @@ export default function Profile() {
     if (!backgroundFile) return null;
     
     try {
-      setBackgroundSaving(true);
       console.log('Uploading background image...');
       const { publicUrl, error } = await uploadImage(
         backgroundFile,
@@ -239,18 +215,15 @@ export default function Profile() {
     } catch (error) {
       console.error('Error in uploadBackground:', error);
       throw error;
-    } finally {
-      setBackgroundSaving(false);
     }
   };
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setSaveError(null);
+    setIsSaving(true);
     
     try {
-      setLoading(true);
-      
       // Upload avatar and background in parallel if selected
       const uploadPromises = [];
       let newAvatarUrl = null;
@@ -316,93 +289,40 @@ export default function Profile() {
       
       console.log('Profile updated successfully');
       
-      // Close modal and reset files
-      handleCloseModal();
+      // Reset files
+      setAvatarFile(null);
+      setAvatarPreview(null);
+      setBackgroundFile(null);
+      setBackgroundPreview(null);
       
+      setShowEditModal(false);
     } catch (error) {
       console.error('Error saving profile:', error);
       setSaveError(saveError || 'Failed to update profile. Please try again.');
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
-
-  // Ensure the required storage buckets exist
-  const ensureStorageBucketsExist = async () => {
-    try {
-      // Try to get the buckets' public URLs - this will help us check if they're accessible
-      // If these fail, it's likely the buckets don't exist, but we'll gracefully handle errors
-      // instead of trying to create them from the client side
-      
-      let avatarsAccessible = false;
-      let backgroundsAccessible = false;
-      
-      try {
-        // Check if we can access the avatars bucket
-        const { data: avatarsData, error: avatarsError } = await supabase.storage.from('avatars').list();
-        if (avatarsError) {
-          console.log('Note: Avatars bucket may not exist or is not accessible', avatarsError.message);
-          // Don't try to create it - this requires admin permissions
-        } else {
-          // Bucket is accessible, but no need to log it repeatedly
-          avatarsAccessible = true;
-        }
-      } catch (avatarCheckError) {
-        console.log('Could not check avatars bucket', avatarCheckError);
-      }
-
-      try {
-        // Check if we can access the backgrounds bucket
-        const { data: backgroundsData, error: backgroundsError } = await supabase.storage.from('backgrounds').list();
-        if (backgroundsError) {
-          console.log('Note: Backgrounds bucket may not exist or is not accessible', backgroundsError.message);
-          // Don't try to create it - this requires admin permissions
-        } else {
-          // Bucket is accessible, but no need to log it repeatedly
-          backgroundsAccessible = true;
-        }
-      } catch (backgroundCheckError) {
-        console.log('Could not check backgrounds bucket', backgroundCheckError);
-      }
-      
-      // Only log bucket status once when component mounts
-      if (!checkBucketsLogged) {
-        if (avatarsAccessible && backgroundsAccessible) {
-          console.log('Storage buckets check: Both avatars and backgrounds buckets are accessible');
-        } else {
-          console.log('Storage buckets check:', 
-            avatarsAccessible ? 'Avatars bucket is accessible.' : 'Avatars bucket is not accessible.',
-            backgroundsAccessible ? 'Backgrounds bucket is accessible.' : 'Backgrounds bucket is not accessible.');
-        }
-        // Set flag to prevent logging again
-        setCheckBucketsLogged(true);
-      }
-      
-      // If we're here and buckets don't exist or aren't accessible,
-      // inform the user that admin needs to create these buckets
-      // Alternatively, we'll just continue with default avatars/backgrounds
-    } catch (error) {
-      console.error('Error checking storage buckets:', error);
-      // Continue with the app, just without custom avatar/background functionality
-    }
-  };
-
-  if (authLoading || profileLoading) {
-    return <div className={styles.loading}>Loading...</div>;
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className={styles.notAuthenticated}>
-        <h1>Not Authenticated</h1>
-        <p>Please <Link href="/login">login</Link> to view your profile.</p>
-      </div>
-    );
-  }
 
   return (
     <div className={styles.profileContainer}>
-      {/* Profile Header with Background */}
+      {isSaving && (
+        <div className={styles.savingOverlay}>
+          <div className={styles.savingProgress}>
+            <div className={styles.savingBar}></div>
+            <p>Saving changes...</p>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className={styles.errorToast}>
+          {error}
+          <button onClick={() => useProfileStore.getState().setError(null)}>×</button>
+        </div>
+      )}
+
+      {/* Profile Header */}
       <div 
         className={styles.profileHeader}
         style={{ 
@@ -422,11 +342,16 @@ export default function Profile() {
                 </div>
               )}
               <img
-                src={avatarUrl}
+                src={avatarPreview || avatarUrl}
                 alt={profile?.username || 'User'}
                 width={100}
                 height={100}
                 className={styles.avatar}
+                onError={(e) => {
+                  console.error('Error loading avatar image:', e);
+                  e.target.onerror = null;
+                  e.target.src = '/default-avatar.svg';
+                }}
               />
             </div>
             
@@ -488,19 +413,19 @@ export default function Profile() {
       <div className={styles.contentTabs}>
         <button 
           className={`${styles.tabButton} ${activeTab === 'posts' ? styles.activeTab : ''}`}
-          onClick={() => setActiveTab('posts')}
+          onClick={() => handleTabChange('posts')}
         >
           Posts
         </button>
         <button 
           className={`${styles.tabButton} ${activeTab === 'followers' ? styles.activeTab : ''}`}
-          onClick={() => setActiveTab('followers')}
+          onClick={() => handleTabChange('followers')}
         >
           Followers
         </button>
         <button 
           className={`${styles.tabButton} ${activeTab === 'following' ? styles.activeTab : ''}`}
-          onClick={() => setActiveTab('following')}
+          onClick={() => handleTabChange('following')}
         >
           Following
         </button>
@@ -576,7 +501,7 @@ export default function Profile() {
           <div className={styles.modalContent}>
             <div className={styles.modalHeader}>
               <h2 className={styles.modalTitle}>Edit Profile</h2>
-              <button className={styles.closeButton} onClick={handleCloseModal}>×</button>
+              <button className={styles.closeButton} onClick={handleCloseModal} disabled={isSaving}>×</button>
             </div>
             
             {saveError && (
@@ -595,7 +520,7 @@ export default function Profile() {
                   value={formData.username}
                   onChange={handleInputChange}
                   required
-                  disabled={loading}
+                  disabled={isSaving}
                   placeholder="Enter your username"
                 />
               </div>
@@ -608,7 +533,7 @@ export default function Profile() {
                   value={formData.bio}
                   onChange={handleInputChange}
                   rows={4}
-                  disabled={loading}
+                  disabled={isSaving}
                   placeholder="Tell us about yourself"
                 />
               </div>
@@ -623,20 +548,20 @@ export default function Profile() {
                       width={100}
                       height={100}
                       className={styles.avatarPreview}
+                      onError={(e) => {
+                        console.error('Error loading avatar image:', e);
+                        e.target.onerror = null;
+                        e.target.src = '/default-avatar.svg';
+                      }}
                     />
-                    {avatarSaving && (
-                      <div className={styles.imageLoadingOverlay}>
-                        <div className={styles.spinner}></div>
-                      </div>
-                    )}
                   </div>
                   <button 
                     type="button" 
                     className={styles.changeAvatarButton}
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={avatarSaving || loading}
+                    disabled={isSaving}
                   >
-                    {avatarSaving ? 'Uploading...' : 'Change Avatar'}
+                    Change Avatar
                   </button>
                   <input
                     type="file"
@@ -644,7 +569,7 @@ export default function Profile() {
                     onChange={handleAvatarChange}
                     accept="image/*"
                     style={{ display: 'none' }}
-                    disabled={avatarSaving || loading}
+                    disabled={isSaving}
                   />
                 </div>
               </div>
@@ -659,19 +584,14 @@ export default function Profile() {
                         backgroundImage: `url(${backgroundPreview || backgroundUrl})` 
                       }}
                     />
-                    {backgroundSaving && (
-                      <div className={styles.imageLoadingOverlay}>
-                        <div className={styles.spinner}></div>
-                      </div>
-                    )}
                   </div>
                   <button 
                     type="button" 
                     className={styles.changeBackgroundButton}
                     onClick={() => backgroundInputRef.current?.click()}
-                    disabled={backgroundSaving || loading}
+                    disabled={isSaving}
                   >
-                    {backgroundSaving ? 'Uploading...' : 'Change Background'}
+                    Change Background
                   </button>
                   <input
                     type="file"
@@ -679,7 +599,7 @@ export default function Profile() {
                     onChange={handleBackgroundChange}
                     accept="image/*"
                     style={{ display: 'none' }}
-                    disabled={backgroundSaving || loading}
+                    disabled={isSaving}
                   />
                 </div>
               </div>
@@ -689,16 +609,16 @@ export default function Profile() {
                   type="button" 
                   className={styles.cancelButton}
                   onClick={handleCloseModal}
-                  disabled={loading || avatarSaving || backgroundSaving}
+                  disabled={isSaving}
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit" 
                   className={styles.saveButton}
-                  disabled={loading || avatarSaving || backgroundSaving}
+                  disabled={isSaving}
                 >
-                  {loading ? 'Saving...' : 'Save Changes'}
+                  {isSaving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>

@@ -154,6 +154,25 @@ export function ProfileProvider({ children }) {
       const imageUrl = await fetchFunction(userId);
       
       if (imageUrl && imageUrl !== defaultUrl) {
+        // Ensure the URL is valid
+        if (!imageUrl.startsWith('http') && !imageUrl.startsWith('/')) {
+          console.error(`Invalid ${imageType} URL format:`, imageUrl);
+          
+          // Update cache with default
+          cacheMap.set(userId, defaultUrl);
+          imageCache.current.lastFetched.set(cacheKey, now);
+          
+          if (updateState) {
+            if (imageType === 'avatar') {
+              setAvatarUrl(defaultUrl);
+            } else {
+              setBackgroundUrl(defaultUrl);
+            }
+          }
+          
+          return defaultUrl;
+        }
+        
         // Add cache busting if needed
         const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
         const cacheBuster = `?t=${today}`;

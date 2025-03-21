@@ -1,0 +1,713 @@
+.create-post-container {
+  min-height: 100vh;
+  padding: 1rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background-color: var(--muted);
+}
+
+.create-post-wrapper {
+  width: 100%;
+  max-width: 1000px;
+  margin-top: 1rem;
+  background-color: var(--background);
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.create-post-wrapper:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.create-post-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.create-post-header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.create-post-content {
+  padding: 1rem;
+}
+
+/* Grid layout and responsive adjustments */
+.create-post-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+/* Improved media queries for responsiveness */
+@media (min-width: 640px) {
+  .create-post-container {
+    padding: 1.5rem;
+  }
+  
+  .create-post-wrapper {
+    margin-top: 1.5rem;
+  }
+  
+  .create-post-content {
+    padding: 1.25rem;
+  }
+  
+  .stock-search-container {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+  
+  .country-select {
+    width: 160px;
+    flex-shrink: 0;
+  }
+  
+  .search-input-container {
+    flex-grow: 1;
+  }
+}
+
+@media (min-width: 768px) {
+  .create-post-container {
+    padding: 2rem;
+  }
+  
+  .create-post-wrapper {
+    margin-top: 2rem;
+  }
+  
+  .create-post-content {
+    padding: 1.5rem;
+  }
+  
+  .create-post-grid {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+@media (min-width: 1024px) {
+  .create-post-wrapper {
+    max-width: 900px;
+  }
+  
+  .create-post-grid {
+    grid-template-columns: 3fr 2fr;
+    gap: 2rem;
+  }
+}
+
+/* Stock search section styling */
+.stock-search-section {
+  background-color: var(--card);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.stock-search-section:focus-within {
+  border-color: var(--ring);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.stock-search-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Improved stock info section - now displayed at top level */
+.stock-info-section {
+  background-color: var(--card);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  max-height: none;
+  width: 100%;
+  overflow-y: auto;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 1.5rem;
+}
+
+.stock-info-section:focus-within {
+  border-color: var(--ring);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Style the selected stock header */
+.stock-info-section h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.stock-info-section .text-muted-foreground {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Add visual styling to price display */
+.stock-info-section .mt-2 p {
+  background-color: rgba(0, 0, 0, 0.03);
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  display: inline-block;
+  font-weight: 500;
+  border: 1px solid var(--border);
+}
+
+/* Enhanced search input */
+.search-input-container {
+  position: relative;
+}
+
+.search-input-container input:focus {
+  box-shadow: 0 0 0 2px rgba(var(--ring-rgb), 0.3);
+  border-color: var(--ring);
+}
+
+/* Image preview styling */
+.image-preview-container {
+  margin-bottom: 1rem;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.image-preview {
+  width: 100%;
+  max-height: 300px;
+  object-fit: contain;
+  border-radius: 0.5rem;
+  border: 2px solid gold;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+}
+
+/* Search results styling */
+.search-results {
+  max-height: 350px;
+  overflow-y: auto;
+  border: 1px solid var(--ring);
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
+  position: absolute;
+  left: 0;
+  right: 0;
+  background-color: var(--background);
+  z-index: 40;
+  box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.15);
+  padding: 0.5rem;
+}
+
+.search-result-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-radius: 0.375rem;
+  margin-bottom: 0.25rem;
+  position: relative;
+  border: 1px solid transparent;
+  background-color: rgba(59, 130, 246, 0.1); /* Light blue background in light mode */
+}
+
+.search-result-item:hover {
+  background-color: rgba(59, 130, 246, 0.2); /* Slightly darker blue on hover in light mode */
+  transform: translateY(-1px);
+  border-color: var(--ring);
+}
+
+.search-result-item:active {
+  transform: translateY(0);
+}
+
+.search-result-item:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+/* Enhanced flag styling */
+.search-result-item .fi {
+  width: 45px;
+  height: 35px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  border-radius: 4px;
+  position: relative;
+  z-index: 2;
+  border: 2px solid rgba(255,255,255,0.5);
+  transition: all 0.2s;
+  transform: scale(1);
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  background-color: var(--background);
+  justify-content: center;
+  margin-right: 0.5rem;
+}
+
+.search-result-item:hover .fi {
+  transform: scale(1.2);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+  border-color: rgba(255,255,255,0.8);
+}
+
+/* Flag background glow effect */
+.search-result-item .fi::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  border-radius: 6px;
+  background: transparent;
+  z-index: -1;
+  transition: all 0.2s;
+  opacity: 0;
+}
+
+.search-result-item:hover .fi::after {
+  opacity: 1;
+  box-shadow: 0 0 15px 2px rgba(59, 130, 246, 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  .search-result-item:hover .fi::after {
+    box-shadow: 0 0 15px 2px rgba(234, 179, 8, 0.4);
+  }
+}
+
+/* Style stock symbol and name */
+.search-result-item .font-medium {
+  font-size: 1.2rem;
+  color: var(--foreground);
+  font-weight: 600;
+  position: relative;
+  z-index: 2;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.search-result-item .text-muted-foreground {
+  font-size: 0.85rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  position: relative;
+  z-index: 2;
+}
+
+/* Flag background effect */
+.search-result-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: 150% 150%;
+  background-position: center;
+  opacity: 0.07;
+  z-index: 1;
+  border-radius: 0.375rem;
+  filter: blur(1px);
+  transition: opacity 0.2s;
+  background-image: inherit; /* Will use the inline style background image */
+}
+
+/* Add selection indicator for better UX */
+.search-result-item::after {
+  content: '→';
+  position: absolute;
+  right: 1rem;
+  opacity: 0;
+  transition: all 0.2s;
+  transform: translateX(-10px);
+  font-size: 1.2rem;
+  color: var(--foreground);
+  z-index: 2;
+}
+
+.search-result-item:hover::after {
+  opacity: 0.7;
+  transform: translateX(0);
+}
+
+.search-result-item:hover::before {
+  opacity: 0.12;
+}
+
+/* Additional enhancements for stronger flag display */
+.stock-item .fi {
+  transform: scale(1.2);
+  transition: transform 0.2s;
+}
+
+.stock-item:hover .fi {
+  transform: scale(1.3);
+}
+
+/* Special dark mode styling */
+@media (prefers-color-scheme: dark) {
+  .search-result-item {
+    background-color: rgba(234, 179, 8, 0.15); /* Gold background in dark mode */
+  }
+  
+  .search-result-item:hover {
+    background-color: rgba(234, 179, 8, 0.25); /* Slightly darker gold on hover in dark mode */
+  }
+  
+  .search-result-item .fi {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  }
+}
+
+/* Country select styling */
+.country-select-content {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.country-select-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  background-color: var(--background);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.country-select-trigger:hover,
+.country-select-trigger:focus {
+  border-color: var(--ring);
+}
+
+.country-flag {
+  width: 20px;
+  height: 15px;
+  object-fit: cover;
+}
+
+/* Loading states */
+.loading-skeleton {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  background-color: var(--accent);
+  opacity: 0.5;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* Improve form inputs */
+.form-field {
+  margin-bottom: 1rem;
+}
+
+.form-field-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+/* Improve button responsiveness */
+@media (max-width: 480px) {
+  .button-group {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .button-group button {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+}
+
+/* Improve mobile experience */
+@media (max-width: 480px) {
+  .create-post-container {
+    padding: 0.5rem;
+  }
+  
+  .create-post-wrapper {
+    margin-top: 0.5rem;
+    border-radius: 0.75rem;
+  }
+  
+  .create-post-header {
+    padding: 0.75rem;
+  }
+  
+  .create-post-header h1 {
+    font-size: 1.25rem;
+  }
+  
+  .image-preview {
+    max-height: 200px;
+  }
+  
+  .search-results {
+    max-height: 250px;
+  }
+}
+
+/* Add smooth scrolling to page */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Improve focus states for better accessibility */
+input:focus,
+textarea:focus,
+select:focus,
+button:focus {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+/* Add transition for inputs */
+input, 
+textarea, 
+select {
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+/* Improve buttons */
+button {
+  transition: background-color 0.2s, transform 0.1s, opacity 0.2s;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Add animation for loading state */
+@keyframes shimmer {
+  0% {
+    background-position: -468px 0;
+  }
+  100% {
+    background-position: 468px 0;
+  }
+}
+
+.loading-skeleton {
+  background: linear-gradient(to right, var(--accent) 8%, var(--muted) 18%, var(--accent) 33%);
+  background-size: 800px 104px;
+  animation: shimmer 1.5s linear infinite;
+  opacity: 0.7;
+}
+
+/* Add visual feedback when an action is taking place */
+.is-submitting {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Add these new styles to further enhance responsiveness */
+
+/* Better handling of tall mobile devices */
+@media (max-height: 700px) and (max-width: 768px) {
+  .create-post-container {
+    align-items: flex-start;
+    padding-bottom: 2rem;
+  }
+  
+  .stock-info-section {
+    max-height: 250px;
+  }
+  
+  .search-results {
+    max-height: 200px;
+  }
+  
+  .image-preview {
+    max-height: 150px;
+  }
+}
+
+/* Print styles for when users want to print their post */
+@media print {
+  .create-post-container {
+    background-color: white;
+    padding: 0;
+  }
+  
+  .create-post-wrapper {
+    box-shadow: none;
+    max-width: 100%;
+    margin: 0;
+  }
+  
+  button {
+    display: none;
+  }
+  
+  input, textarea {
+    border: 1px solid #ccc;
+  }
+}
+
+/* Dark mode enhancements */
+@media (prefers-color-scheme: dark) {
+  .loading-skeleton {
+    background: linear-gradient(to right, rgba(55, 65, 81, 1) 8%, rgba(31, 41, 55, 1) 18%, rgba(55, 65, 81, 1) 33%);
+  }
+  
+  .image-preview {
+    border-color: rgba(234, 179, 8, 0.8);
+    box-shadow: 0 0 10px rgba(234, 179, 8, 0.2);
+  }
+}
+
+/* Handle reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Add visual styling to stock price fields */
+.stock-info-section input[type="number"] {
+  font-family: 'SF Mono', 'Consolas', monospace;
+  text-align: right;
+  color: var(--foreground);
+  transition: all 0.2s;
+}
+
+.stock-info-section input[type="number"]:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px rgba(var(--ring-rgb), 0.3);
+  background-color: rgba(var(--ring-rgb), 0.05);
+}
+
+/* Add a "currency" pseudo-element to price inputs */
+.stock-info-section .form-field {
+  position: relative;
+}
+
+.stock-info-section .form-field:first-child input {
+  padding-left: 20px;
+}
+
+.stock-info-section .form-field:first-child::before {
+  content: '$';
+  position: absolute;
+  bottom: 9px;
+  left: 10px;
+  color: var(--muted-foreground);
+  z-index: 10;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Style specifically for the XPath the user mentioned */
+#stock-result-0 .font-medium span,
+.stock-item .font-medium span {
+  display: inline-block;
+  padding: 0 0.5rem;
+  background: linear-gradient(to right, rgba(59, 130, 246, 0.2), transparent);
+  border-radius: 4px;
+}
+
+/* Dark mode specific adjustments */
+@media (prefers-color-scheme: dark) {
+  #stock-result-0 .font-medium span,
+  .stock-item .font-medium span {
+    background: linear-gradient(to right, rgba(234, 179, 8, 0.3), transparent);
+  }
+}
+
+/* Flag container styling */
+.flag-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  margin-right: 4px;
+  position: relative;
+}
+
+/* Add flag hover effect */
+.flag-container::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border-radius: 8px;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.3s;
+  background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%);
+}
+
+.flag-container:hover::before {
+  opacity: 1;
+}
+
+/* Selected stock flag styling */
+.stock-info-section .flag-container {
+  margin-right: 10px;
+}
+
+.stock-info-section .fi {
+  width: 50px;
+  height: 40px;
+  box-shadow: 0 5px 10px rgba(0,0,0,0.35);
+  border: 2px solid rgba(255,255,255,0.6);
+  border-radius: 5px;
+  transform: scale(1);
+  transition: all 0.3s;
+}
+
+.stock-info-section .fi:hover {
+  transform: scale(1.1);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+  border-color: rgba(255,255,255,0.9);
+}
+
+.stock-info-section .flag-container::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  height: 3px;
+  background: linear-gradient(to right, transparent, rgba(59, 130, 246, 0.5), transparent);
+  border-radius: 2px;
+  opacity: 0.6;
+}
+
+@media (prefers-color-scheme: dark) {
+  .stock-info-section .flag-container::after {
+    background: linear-gradient(to right, transparent, rgba(234, 179, 8, 0.5), transparent);
+  }
+}

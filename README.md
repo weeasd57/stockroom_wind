@@ -1,6 +1,6 @@
-StockRoom - Social Trading Platform
+FireStocks - Social Trading Platform
 Overview
-StockRoom is a modern social trading platform built with Next.js where traders can share insights, analysis, and discuss market opportunities.
+FireStocks is a modern social trading platform built with Next.js where traders can share insights, analysis, and discuss market opportunities.
 
 Features
 🚀 Real-time stock data and market insights

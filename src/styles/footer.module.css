@@ -31,10 +31,18 @@
   color: var(--foreground);
 }
 
+:global(.dark) .title {
+  color: hsl(0, 0%, 100%);
+}
+
 .description {
   color: var(--muted-foreground);
   font-size: 0.9rem;
   line-height: 1.5;
+}
+
+:global(.dark) .description {
+  color: hsl(0, 0%, 80%);
 }
 
 .links {
@@ -54,8 +62,16 @@
   transition: color 0.2s ease;
 }
 
+:global(.dark) .links a {
+  color: hsl(0, 0%, 70%);
+}
+
 .links a:hover {
   color: var(--foreground);
+}
+
+:global(.dark) .links a:hover {
+  color: hsl(45, 100%, 70%);
 }
 
 .bottom {
@@ -67,6 +83,10 @@
   color: var(--muted-foreground);
   font-size: 0.85rem;
   text-align: center;
+}
+
+:global(.dark) .copyright {
+  color: hsl(0, 0%, 70%);
 }
 
 @media (max-width: 768px) {
