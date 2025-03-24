@@ -35,6 +35,7 @@ export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState('/default-avatar.svg');
+  const [avatarLoading, setAvatarLoading] = useState(true);
   const navLinks = getNavLinks(isAuthenticated);
 
   useEffect(() => {
@@ -48,24 +49,72 @@ export default function Navbar() {
   useEffect(() => {
     const loadAvatarUrl = async () => {
       if (user) {
-        const url = await getEffectiveAvatarUrl();
-        setAvatarUrl(url);
+        try {
+          setAvatarLoading(true);
+          const url = await getEffectiveAvatarUrl();
+          
+          // Check if the URL is a Supabase URL or needs to be constructed
+          if (url) {
+            // If it's already a full URL (starts with http or https), use it directly
+            if (url.startsWith('http')) {
+              setAvatarUrl(url);
+            } 
+            // If it's a Supabase storage path, ensure it's properly formatted
+            else if (url.includes('avatars/') || url.includes('profiles/')) {
+              // Make sure we have the complete Supabase storage URL
+              const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+              const fullUrl = `${supabaseUrl}/storage/v1/object/public/${url}`;
+              setAvatarUrl(fullUrl);
+            } 
+            // Otherwise use as is
+            else {
+              setAvatarUrl(url);
+            }
+          } else {
+            setAvatarUrl('/default-avatar.svg');
+          }
+        } catch (error) {
+          console.error('Error loading avatar image:', error);
+          setAvatarUrl('/default-avatar.svg');
+        } finally {
+          setAvatarLoading(false);
+        }
       } else {
         setAvatarUrl('/default-avatar.svg');
+        setAvatarLoading(false);
       }
     };
     
     loadAvatarUrl();
   }, [user, getEffectiveAvatarUrl]);
 
+  // Define functions early
+  const toggleMenu = () => setIsMenuOpen(prev => !prev);
+  const closeMenu = () => setIsMenuOpen(false);
+  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+
+  // Effect to prevent body scrolling when menu is open
+  useEffect(() => {
+    if (isMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMenuOpen]);
+
+  // Close mobile menu when route changes
+  useEffect(() => {
+    closeMenu();
+  }, [pathname]);
+
   // No rendering at all on server-side
   if (!mounted) {
     return null;
   }
-
-  const toggleMenu = () => setIsMenuOpen(prev => !prev);
-  const closeMenu = () => setIsMenuOpen(false);
-  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
 
   return (
     <header className={`${styles.header} ${isScrolled ? styles.scrolled : ''}`} suppressHydrationWarning>
@@ -90,6 +139,7 @@ export default function Navbar() {
           className={styles.menuButton} 
           onClick={toggleMenu}
           aria-label="Toggle menu"
+          aria-expanded={isMenuOpen}
         >
           <div className={isMenuOpen ? `${styles.menuIcon} ${styles.open}` : styles.menuIcon}>
             <span></span>
@@ -98,7 +148,7 @@ export default function Navbar() {
           </div>
         </button>
 
-        <nav className={isMenuOpen ? `${styles.nav} ${styles.open}` : styles.nav}>
+        <nav className={isMenuOpen ? `${styles.nav} ${styles.open}` : `${styles.nav} ${styles.hidden}`} aria-hidden={!isMenuOpen}>
           <ul className={styles.navList}>
             {navLinks.map(link => (
               <li key={link.href} className={styles.navItem}>
@@ -142,24 +192,28 @@ export default function Navbar() {
               <div className={styles.userMenu}>
                 <Link href="/profile" className={styles.profileLink}>
                   <div className={styles.avatar}>
-                    <Avatar className="h-10 w-10 border-2 border-primary">
-                      <AvatarImage 
+                    {avatarLoading ? (
+                      <div className="rounded-full w-10 h-10 border-2 border-primary bg-primary/10 flex items-center justify-center animate-pulse">
+                        <span className="font-semibold text-primary">
+                          {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                        </span>
+                      </div>
+                    ) : (
+                      <img 
                         src={avatarUrl} 
-                        alt="User Avatar"
-                        width={32}
-                        height={32}
-                        className="rounded-full"
+                        alt={`${profile?.username || 'User'}'s Avatar`}
+                        width={40}
+                        height={40}
                         onError={(e) => {
-                          console.error('Error loading navbar avatar image:', e);
+                          console.error('Error loading navbar avatar image');
                           e.target.onerror = null;
                           e.target.src = '/default-avatar.svg';
                         }}
                       />
-                      <AvatarFallback className="font-semibold">{profile?.username?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
-                    </Avatar>
+                    )}
                   </div>
                   <span className={styles.profileText}>
-                    {profile?.username || 'Profile'}
+                    {profile?.username || user?.email?.split('@')[0] || 'Profile'}
                   </span>
                 </Link>
                 <button 

@@ -150,3 +150,179 @@
     text-decoration: underline;
   }
 }
+
+/* Ensure proper viewport handling for all screen sizes */
+@media screen and (max-width: 768px) {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  
+  :root {
+    --container-padding: 1rem;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  :root {
+    --container-padding: 0.75rem;
+  }
+  
+  body {
+    overflow-x: hidden;
+  }
+}
+
+/* Fix for mobile touch targets */
+@media (hover: none) and (pointer: coarse) {
+  button, 
+  a,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Fix for mobile bottom navigation icons */
+.mobile-nav-icon,
+.bottom-navigation svg,
+.bottom-navigation path,
+.bottom-navigation polygon,
+nav[role="navigation"] svg,
+nav[role="navigation"] path,
+button svg,
+button path {
+  fill: currentColor !important;
+  stroke: currentColor !important;
+  color: inherit !important;
+}
+
+.dark nav svg,
+.dark button svg {
+  fill: hsl(45, 100%, 60%) !important;
+  color: hsl(45, 100%, 60%) !important;
+}
+
+/* Fix for white triangle that appears when scrolling */
+.scroll-indicator,
+.scroll-arrow,
+.scroll-to-top {
+  background-color: transparent !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.dark .scroll-indicator,
+.dark .scroll-arrow,
+.dark .scroll-to-top {
+  color: hsl(45, 100%, 60%) !important;
+}
+
+/* Fix any triangular navigation elements */
+nav polygon,
+nav path[d*="triangle"],
+button polygon,
+button path[d*="triangle"] {
+  fill: hsl(var(--foreground)) !important;
+}
+
+.dark nav polygon,
+.dark nav path[d*="triangle"],
+.dark button polygon,
+.dark button path[d*="triangle"] {
+  fill: hsl(45, 100%, 60%) !important;
+}
+
+/* Fix white triangle in bottom navigation */
+.dark div > svg > polygon,
+.dark button > svg > polygon,
+.dark [role="button"] > svg > polygon,
+.dark a > svg > polygon,
+.dark div[role="navigation"] svg polygon {
+  fill: hsl(45, 100%, 60%) !important;
+  stroke: hsl(45, 100%, 60%) !important;
+}
+
+/* Target system back/forward triangles specifically */
+.dark div[role="navigation"] button svg,
+.dark div[role="navigation"] a svg,
+.dark [role="navigation"] svg {
+  color: hsl(45, 100%, 60%) !important;
+  fill: hsl(45, 100%, 60%) !important;
+  stroke: hsl(45, 100%, 60%) !important;
+}
+
+/* Fix for bottom bar */
+@media (max-width: 767px) {
+  /* Target fixed position elements at bottom of screen */
+  body > div:last-child > div[style*="fixed"][style*="bottom"],
+  body > div > div[style*="fixed"][style*="bottom"],
+  div[role="navigation"][style*="bottom"],
+  nav[style*="bottom"] {
+    background-color: hsl(var(--background)) !important;
+    border-top: 1px solid hsl(var(--border)) !important;
+  }
+  
+  .dark body > div:last-child > div[style*="fixed"][style*="bottom"],
+  .dark body > div > div[style*="fixed"][style*="bottom"],
+  .dark div[role="navigation"][style*="bottom"],
+  .dark nav[style*="bottom"] {
+    background-color: hsl(0, 0%, 10%) !important;
+    border-top: 1px solid hsl(45, 30%, 30%) !important;
+  }
+}
+
+/* Target system navigation triangle elements - this is the most direct approach */
+[style*="color: white"],
+[style*="color:white"],
+[style*="color: #fff"],
+[style*="color:#fff"],
+[style*="color: rgb(255, 255, 255)"],
+[style*="color:rgb(255,255,255)"],
+[style*="border-color: white"],
+[style*="border-color: #fff"],
+[style*="border-color:white"],
+[style*="border-color:#fff"] {
+  color: hsl(var(--foreground)) !important;
+  border-color: hsl(var(--foreground)) !important;
+  fill: hsl(var(--foreground)) !important;
+  stroke: hsl(var(--foreground)) !important;
+  background-color: transparent !important;
+}
+
+.dark [style*="color: white"],
+.dark [style*="color:white"],
+.dark [style*="color: #fff"],
+.dark [style*="color:#fff"],
+.dark [style*="color: rgb(255, 255, 255)"],
+.dark [style*="color:rgb(255,255,255)"],
+.dark [style*="border-color: white"],
+.dark [style*="border-color: #fff"],
+.dark [style*="border-color:white"],
+.dark [style*="border-color:#fff"] {
+  color: hsl(45, 100%, 60%) !important;
+  border-color: hsl(45, 100%, 60%) !important;
+  fill: hsl(45, 100%, 60%) !important;
+  stroke: hsl(45, 100%, 60%) !important;
+  background-color: transparent !important;
+}
+
+/* Target system-injected navigation elements */
+@media (max-width: 767px) {
+  /* For iOS-style bottom navigation */
+  :root {
+    --system-nav-color: hsl(var(--foreground));
+  }
+  
+  .dark {
+    --system-nav-color: hsl(45, 100%, 60%);
+  }
+  
+  /* Directly override any fixed or absolute elements at the bottom of page */
+  *[style*="position: fixed"][style*="bottom"] *,
+  *[style*="position:fixed"][style*="bottom"] *,
+  *[style*="position: absolute"][style*="bottom"] *,
+  *[style*="position:absolute"][style*="bottom"] * {
+    color: var(--system-nav-color) !important;
+    fill: var(--system-nav-color) !important;
+    stroke: var(--system-nav-color) !important;
+  }
+}

@@ -262,7 +262,7 @@ export const updateUserProfile = async (userId, updates) => {
  * @param {string} fileType - File type (default: 'avatar')
  * @returns {Promise<object>} - Public URL of the uploaded image and error
  */
-export const uploadImage = async (file, bucket, userId, fileType = 'avatar') => {
+export const uploadImage = async (file, bucket, userId, fileType = 'avatar', options = {}) => {
   if (!file || !bucket || !userId) {
     console.error(`Missing required parameters for uploadImage: file=${!!file}, bucket=${bucket}, userId=${userId}`);
     return { publicUrl: null, error: 'Missing required parameters' };
@@ -325,47 +325,62 @@ export const uploadImage = async (file, bucket, userId, fileType = 'avatar') => 
       // Continue with the upload even if deletion fails
     }
     
-    // Upload the new file
+    // Upload the new file with progress handling if provided
     console.log(`Uploading new ${fileType} file...`);
-    const { error: uploadError } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from(bucket)
       .upload(filePath, file, {
         upsert: true,
         cacheControl: 'no-cache',
+        ...options // Include any additional options like onUploadProgress
       });
     
     if (uploadError) {
       console.error(`Error uploading ${fileType}:`, uploadError);
-      throw uploadError;
+      return { data: null, error: uploadError, publicUrl: null };
     }
     
     // Get the public URL
-    const { data } = supabase.storage
+    const publicUrlResponse = supabase.storage
       .from(bucket)
       .getPublicUrl(filePath);
     
-    if (!data?.publicUrl) {
-      throw new Error('Failed to get public URL');
+    // Handle different response structures in different Supabase versions
+    let publicUrl;
+    if (publicUrlResponse?.data?.publicUrl) {
+      publicUrl = publicUrlResponse.data.publicUrl;
+    } else if (typeof publicUrlResponse?.publicUrl === 'string') {
+      publicUrl = publicUrlResponse.publicUrl;
+    } else {
+      console.error('Unexpected response format from getPublicUrl:', publicUrlResponse);
+      return { data: uploadData, error: new Error('Failed to get public URL'), publicUrl: null };
     }
+    
+    if (!publicUrl) {
+      console.error('Failed to get public URL from response:', publicUrlResponse);
+      return { data: uploadData, error: new Error('Failed to get public URL'), publicUrl: null };
+    }
+    
+    console.log(`Retrieved public URL: ${publicUrl}`);
     
     // Use a more stable cache-busting parameter (daily instead of every millisecond)
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const cacheBuster = `?t=${today}`;
-    const publicUrl = data.publicUrl.split('?')[0]; // Base URL without any query parameters
-    const publicUrlWithCacheBuster = `${publicUrl}${cacheBuster}`;
+    const baseUrl = publicUrl.split('?')[0]; // Base URL without any query parameters
+    const publicUrlWithCacheBuster = `${baseUrl}${cacheBuster}`;
     
     // Automatically update the profile with the new image URL
     try {
       const profileField = fileType === 'avatar' ? 'avatar_url' : 'background_url';
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ [profileField]: publicUrl })
+        .update({ [profileField]: baseUrl })
         .eq('id', userId);
       
       if (updateError) {
         console.warn(`Could not update profile with ${fileType} URL:`, updateError);
       } else {
-        console.log(`Successfully updated profile with ${fileType} URL: ${publicUrl}`);
+        console.log(`Successfully updated profile with ${fileType} URL: ${baseUrl}`);
       }
     } catch (updateError) {
       console.warn(`Error updating profile with ${fileType} URL:`, updateError);
@@ -373,16 +388,16 @@ export const uploadImage = async (file, bucket, userId, fileType = 'avatar') => 
     }
     
     console.log(`Successfully uploaded ${fileType}, URL: ${publicUrlWithCacheBuster}`);
-    return { publicUrl: publicUrlWithCacheBuster, error: null };
+    return { data: uploadData, publicUrl: publicUrlWithCacheBuster, error: null };
   } catch (error) {
     console.error(`Error uploading ${fileType}:`, error);
-    return { publicUrl: null, error };
+    return { data: null, publicUrl: null, error };
   }
 };
 
 // Get background image URL directly from storage
 /**
- * Get a user's background image URL
+ * Get a user's background image URL directly from storage, updating profile if needed
  * @param {string} userId - User ID
  * @returns {Promise<string>} - Background image URL
  */
@@ -390,7 +405,78 @@ export const getBackgroundImageUrl = async (userId) => {
   if (!userId) return '/profile-bg.jpg';
 
   try {
-    // First check if the user has a background_url in their profile
+    // First attempt to get the background directly from storage
+    // This ensures we always have the latest version
+    console.log(`Checking storage directly for background of user ${userId}`);
+    
+    try {
+      // Check if user has files in the backgrounds bucket
+      const { data: files, error: listError } = await supabase.storage
+        .from('backgrounds')
+        .list(userId);
+      
+      if (listError) {
+        console.warn(`Error listing background files for user ${userId}:`, listError);
+      } else if (files && files.length > 0) {
+        // First try to find files prefixed with 'background.'
+        let backgroundFile = files.find(file => file.name.startsWith('background.'));
+        
+        // If no background.* file found, take any image file
+        if (!backgroundFile) {
+          const imageFiles = files.filter(file => 
+            file.name.endsWith('.jpg') || 
+            file.name.endsWith('.jpeg') || 
+            file.name.endsWith('.png') || 
+            file.name.endsWith('.gif') || 
+            file.name.endsWith('.webp')
+          );
+          
+          if (imageFiles.length > 0) {
+            // Sort by last modified and get the most recent
+            backgroundFile = imageFiles.sort((a, b) => {
+              return new Date(b.created_at || b.last_modified) - new Date(a.created_at || a.last_modified);
+            })[0];
+          }
+        }
+        
+        if (backgroundFile) {
+          console.log(`Found background file in storage: ${backgroundFile.name}`);
+          
+          // Get the public URL for the file
+          const { data: urlData } = supabase.storage
+            .from('backgrounds')
+            .getPublicUrl(`${userId}/${backgroundFile.name}`);
+          
+          if (urlData?.publicUrl) {
+            const baseUrl = urlData.publicUrl.split('?')[0]; // Remove query params
+            const cacheParam = `?t=${Date.now()}`; // Force cache refresh
+            const fullUrl = `${baseUrl}${cacheParam}`;
+            
+            // Also update the profile table with this URL (without cache param)
+            console.log('Updating profile with background URL from storage:', baseUrl);
+            try {
+              const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ background_url: baseUrl })
+                .eq('id', userId);
+              
+              if (updateError) {
+                console.warn('Could not update profile with background URL:', updateError);
+              }
+            } catch (updateError) {
+              console.warn('Error updating profile with background URL:', updateError);
+            }
+            
+            return fullUrl;
+          }
+        }
+      }
+    } catch (storageError) {
+      console.error('Error accessing background in storage:', storageError);
+    }
+    
+    // If we couldn't get the background from storage, check the profile
+    console.log(`Checking profile for background URL of user ${userId}`);
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('background_url')
@@ -398,122 +484,24 @@ export const getBackgroundImageUrl = async (userId) => {
       .single();
 
     if (profileError) {
-      // Handle 'not found' errors differently than other errors
-      if (profileError.code === 'PGRST116') {
-        console.log(`No profile found for user ${userId}, will try storage directly`);
-      } else {
-        console.error('Error fetching profile for background URL:', profileError.message || profileError);
-      }
-      // Continue execution to try storage directly
+      console.warn('Error fetching profile for background URL:', profileError.message || profileError);
+    } else if (profile?.background_url && profile.background_url !== '/profile-bg.jpg') {
+      // If we have a valid URL in the profile, use it with cache busting
+      const cacheParam = `?t=${Date.now()}`; // Force cache refresh
+      const baseUrl = profile.background_url.split('?')[0]; // Remove any existing params
+      return `${baseUrl}${cacheParam}`;
     }
 
-    // If we have a valid URL in the profile that's not the default, use it
-    if (profile?.background_url && profile.background_url !== '/profile-bg.jpg') {
-      // Check if it's a Supabase storage URL
-      if (profile.background_url.includes('supabase.co/storage')) {
-        // First check if the file actually exists before returning the URL with cache busting
-        try {
-          // Extract the path from the URL
-          const urlParts = profile.background_url.split('/storage/v1/object/public/');
-          if (urlParts.length > 1) {
-            const pathPart = urlParts[1];
-            const [bucket, ...pathSegments] = pathPart.split('/');
-            const path = pathSegments.join('/');
-            
-            // Check if file exists
-            const fileExists = await checkFileExists(bucket, path);
-            
-            if (!fileExists) {
-              console.warn(`Background image in profile does not exist in storage: ${profile.background_url}`);
-              // Try to find a new background image in storage
-              return await findBackgroundInStorage(userId);
-            }
-            
-            // File exists, return with modest cache busting (daily instead of every millisecond)
-            // This reduces the number of unique URLs that can fail
-            const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-            const cacheBuster = `?t=${today}`;
-            return profile.background_url.includes('?') 
-              ? profile.background_url.split('?')[0] + cacheBuster
-              : `${profile.background_url}${cacheBuster}`;
-          }
-        } catch (checkError) {
-          console.error('Error checking if background file exists:', checkError);
-          // Try to find a new background image in storage
-          return await findBackgroundInStorage(userId);
-        }
-      }
-      
-      // For non-Supabase URLs or if the check failed, return as is
-      return profile.background_url;
-    }
-
-    // If we get here, no valid background URL in profile, try to find one in storage
-    return await findBackgroundInStorage(userId);
+    // If no background found in storage or profile, return default
+    return '/profile-bg.jpg';
   } catch (error) {
-    console.error('Error getting background image URL:', error);
+    console.error('Error getting background URL:', error);
     return '/profile-bg.jpg';
   }
 };
 
 /**
- * Helper function to find a background image in storage
- * @param {string} userId - User ID
- * @returns {Promise<string>} - Background image URL or default
- */
-const findBackgroundInStorage = async (userId) => {
-  try {
-    // List files in the user's directory to find background images with any extension
-    const { data: files, error: listError } = await supabase.storage
-      .from('backgrounds')
-      .list(userId);
-    
-    if (listError) {
-      console.error('Error listing background files:', listError);
-      return '/profile-bg.jpg';
-    }
-    
-    // Find any file that starts with 'background.'
-    const backgroundFile = files?.find(file => file.name.startsWith('background.'));
-    
-    if (backgroundFile) {
-      // Get the public URL
-      const { data } = supabase.storage
-        .from('backgrounds')
-        .getPublicUrl(`${userId}/${backgroundFile.name}`);
-        
-      if (data?.publicUrl) {
-        // Add a more stable cache-busting parameter (daily instead of every millisecond)
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-        const cacheBuster = `?t=${today}`;
-        const publicUrl = `${data.publicUrl.split('?')[0]}${cacheBuster}`;
-        
-        // Update the profile with this URL to avoid future storage checks
-        try {
-          await supabase
-            .from('profiles')
-            .update({ background_url: data.publicUrl.split('?')[0] })
-            .eq('id', userId);
-          
-          console.log(`Updated profile with background URL: ${data.publicUrl.split('?')[0]}`);
-        } catch (updateError) {
-          console.warn('Could not update profile with background URL:', updateError);
-        }
-        
-        return publicUrl;
-      }
-    }
-    
-    // If we get here, no background image found for user, return default
-    return '/profile-bg.jpg';
-  } catch (storageError) {
-    console.error('Error checking background in storage:', storageError);
-    return '/profile-bg.jpg';
-  }
-};
-
-/**
- * Get a user's avatar image URL
+ * Get a user's avatar image URL directly from storage, updating profile if needed
  * @param {string} userId - User ID
  * @returns {Promise<string>} - Avatar image URL
  */
@@ -521,7 +509,78 @@ export const getAvatarImageUrl = async (userId) => {
   if (!userId) return '/default-avatar.svg';
 
   try {
-    // First check if the user has an avatar_url in their profile
+    // First attempt to get the avatar directly from storage
+    // This ensures we always have the latest version
+    console.log(`Checking storage directly for avatar of user ${userId}`);
+    
+    try {
+      // Check if user has files in the avatars bucket
+      const { data: files, error: listError } = await supabase.storage
+        .from('avatars')
+        .list(userId);
+      
+      if (listError) {
+        console.warn(`Error listing files for user ${userId}:`, listError);
+      } else if (files && files.length > 0) {
+        // First try to find files prefixed with 'avatar.'
+        let avatarFile = files.find(file => file.name.startsWith('avatar.'));
+        
+        // If no avatar.* file found, take any image file
+        if (!avatarFile) {
+          const imageFiles = files.filter(file => 
+            file.name.endsWith('.jpg') || 
+            file.name.endsWith('.jpeg') || 
+            file.name.endsWith('.png') || 
+            file.name.endsWith('.gif') || 
+            file.name.endsWith('.webp')
+          );
+          
+          if (imageFiles.length > 0) {
+            // Sort by last modified and get the most recent
+            avatarFile = imageFiles.sort((a, b) => {
+              return new Date(b.created_at || b.last_modified) - new Date(a.created_at || a.last_modified);
+            })[0];
+          }
+        }
+        
+        if (avatarFile) {
+          console.log(`Found avatar file in storage: ${avatarFile.name}`);
+          
+          // Get the public URL for the file
+          const { data: urlData } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(`${userId}/${avatarFile.name}`);
+          
+          if (urlData?.publicUrl) {
+            const baseUrl = urlData.publicUrl.split('?')[0]; // Remove query params
+            const cacheParam = `?t=${Date.now()}`; // Force cache refresh
+            const fullUrl = `${baseUrl}${cacheParam}`;
+            
+            // Also update the profile table with this URL (without cache param)
+            console.log('Updating profile with avatar URL from storage:', baseUrl);
+            try {
+              const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ avatar_url: baseUrl })
+                .eq('id', userId);
+              
+              if (updateError) {
+                console.warn('Could not update profile with avatar URL:', updateError);
+              }
+            } catch (updateError) {
+              console.warn('Error updating profile with avatar URL:', updateError);
+            }
+            
+            return fullUrl;
+          }
+        }
+      }
+    } catch (storageError) {
+      console.error('Error accessing avatar in storage:', storageError);
+    }
+    
+    // If we couldn't get the avatar from storage, check the profile
+    console.log(`Checking profile for avatar URL of user ${userId}`);
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('avatar_url')
@@ -529,136 +588,18 @@ export const getAvatarImageUrl = async (userId) => {
       .single();
 
     if (profileError) {
-      // Handle 'not found' errors differently than other errors
-      if (profileError.code === 'PGRST116') {
-        console.log(`No profile found for user ${userId}, will try storage directly`);
-      } else {
-        console.error('Error fetching profile for avatar URL:', profileError.message || profileError);
-      }
-      // Continue execution to try storage directly
+      console.warn('Error fetching profile for avatar URL:', profileError.message || profileError);
+    } else if (profile?.avatar_url && profile.avatar_url !== '/default-avatar.svg') {
+      // If we have a valid URL in the profile, use it with cache busting
+      const cacheParam = `?t=${Date.now()}`; // Force cache refresh
+      const baseUrl = profile.avatar_url.split('?')[0]; // Remove any existing params
+      return `${baseUrl}${cacheParam}`;
     }
 
-    // If we have a valid URL in the profile, use it
-    if (profile?.avatar_url && profile.avatar_url !== '/default-avatar.svg') {
-      // Check if the URL is from Google (OAuth profile picture)
-      if (profile.avatar_url.includes('googleusercontent.com')) {
-        return profile.avatar_url;
-      }
-      
-      // If it's a Supabase storage URL, check if the file exists
-      if (profile.avatar_url.includes('supabase.co/storage')) {
-        try {
-          // Extract the path from the URL
-          const urlParts = profile.avatar_url.split('/storage/v1/object/public/');
-          if (urlParts.length > 1) {
-            const pathPart = urlParts[1];
-            const [bucket, ...pathSegments] = pathPart.split('/');
-            const path = pathSegments.join('/');
-            
-            // Check if file exists
-            const fileExists = await checkFileExists(bucket, path);
-            
-            if (!fileExists) {
-              console.warn(`Avatar image in profile does not exist in storage: ${profile.avatar_url}`);
-              // Try to find a new avatar image in storage
-              return await findAvatarInStorage(userId);
-            }
-          }
-        } catch (checkError) {
-          console.error('Error checking if avatar file exists:', checkError);
-          // Try to find a new avatar image in storage
-          return await findAvatarInStorage(userId);
-        }
-      }
-      
-      // Add cache-busting parameter if not already present
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-      const cacheBuster = `?t=${today}`;
-      
-      // Make sure we're returning the full URL without any query parameters first
-      const cleanUrl = profile.avatar_url.includes('?') 
-        ? profile.avatar_url.split('?')[0] 
-        : profile.avatar_url;
-        
-      // Check if the URL is already a complete URL with protocol
-      if (!cleanUrl.startsWith('http') && !cleanUrl.startsWith('/')) {
-        // If it's a relative URL without protocol, prepend the Supabase URL
-        const storageUrl = `${supabaseUrl}/storage/v1/object/public/avatars/${userId}/${cleanUrl}`;
-        return `${storageUrl}${cacheBuster}`;
-      }
-      
-      return `${cleanUrl}${cacheBuster}`;
-    }
-
-    // If we get here, no valid avatar URL in profile, try to find one in storage
-    return await findAvatarInStorage(userId);
+    // If no avatar found in storage or profile, return default
+    return '/default-avatar.svg';
   } catch (error) {
-    console.error('Error getting avatar image URL:', error.message || error);
-    return '/default-avatar.svg';
-  }
-};
-
-/**
- * Helper function to find an avatar image in storage
- * @param {string} userId - User ID
- * @returns {Promise<string>} - Avatar image URL or default
- */
-const findAvatarInStorage = async (userId) => {
-  try {
-    // First check if the user folder exists
-    const { data: userFiles, error: listError } = await supabase.storage
-      .from('avatars')
-      .list(userId);
-    
-    if (listError) {
-      console.log(`Error listing files for user ${userId} in avatars bucket:`, listError);
-      return '/default-avatar.svg';
-    }
-    
-    if (!userFiles || userFiles.length === 0) {
-      console.log(`No avatar files found for user ${userId}`);
-      return '/default-avatar.svg';
-    }
-    
-    // Find the first file that starts with 'avatar.'
-    const avatarFile = userFiles.find(file => file.name.startsWith('avatar.'));
-    
-    if (!avatarFile) {
-      console.log(`No avatar file found for user ${userId}`);
-      return '/default-avatar.svg';
-    }
-    
-    // Get the public URL
-    const { data: publicUrlData } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(`${userId}/${avatarFile.name}`);
-    
-    if (publicUrlData?.publicUrl) {
-      // Add cache-busting parameter
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-      const cacheBuster = `?t=${today}`;
-      const publicUrl = `${publicUrlData.publicUrl.split('?')[0]}${cacheBuster}`;
-      
-      // Update the profile with this URL to avoid future storage checks
-      try {
-        const baseUrl = publicUrlData.publicUrl.split('?')[0];
-        await supabase
-          .from('profiles')
-          .update({ avatar_url: baseUrl })
-          .eq('id', userId);
-        
-        console.log(`Updated profile with avatar URL: ${baseUrl}`);
-      } catch (updateError) {
-        console.warn('Could not update profile with avatar URL:', updateError);
-      }
-      
-      return publicUrl;
-    }
-    
-    // If we get here, no avatar image found for user, return default
-    return '/default-avatar.svg';
-  } catch (storageError) {
-    console.error('Error getting avatar from storage:', storageError);
+    console.error('Error getting avatar URL:', error);
     return '/default-avatar.svg';
   }
 };

@@ -7,6 +7,7 @@ import { SupabaseProvider } from '@/hooks/useSupabase';
 import { ClientSideLayout } from "@/components/ClientSideLayout";
 import ClientImagePreloader from '@/components/ClientImagePreloader';
 import { Roboto_Mono } from 'next/font/google';
+import './globals.css';
 
 // Replace Geist with Inter as the primary font
 const inter = Inter({
@@ -21,62 +22,26 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata = {
-  title: "FireStocks - Trading Community & Stock Analysis Platform",
-  description: "Join our trading community to share stock insights with target prices and stop loss levels. Track performance metrics, analyze success rates, and discover top-performing traders ranked by their analysis accuracy.",
-  keywords: "stock analysis, trading community, target price, stop loss, trader rankings, stock performance, investment insights, social trading, market analysis",
-  openGraph: {
-    title: "FireStocks - Trading Community & Stock Analysis Platform",
-    description: "Join our trading community to share stock insights with target prices and stop loss levels. Track performance metrics and discover top-performing traders.",
-    type: "website",
-    locale: "en_US",
-    url: "https://firestocks.com/",
-    siteName: "FireStocks",
-    images: [
-      {
-        url: "/og-image.jpg",
-        width: 1200,
-        height: 630,
-        alt: "FireStocks Trading Platform"
-      }
-    ]
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "FireStocks - Trading Community & Stock Analysis Platform",
-    description: "Join our trading community to share stock insights with target prices and stop loss levels. Track performance metrics and discover top-performing traders.",
-    images: ["/twitter-image.jpg"]
-  }
+  title: 'FireStocks - Stock Analysis Platform',
+  description: 'Powerful tools for investors to track, analyze, and optimize their portfolios',
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" translate="no" className="notranslate" suppressHydrationWarning>
-      <head>
-        <meta name="google" content="notranslate" />
-        <meta name="translator" content="notranslate" />
-        <meta httpEquiv="Content-Language" content="en" />
-      </head>
-      <body
-        className={`${inter.variable} ${robotoMono.variable} ${inter.className} antialiased notranslate`}
-        suppressHydrationWarning
-      >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
+    <html lang="en" className={`scroll-smooth dark ${inter.variable} ${robotoMono.variable}`}>
+      <body>
+        <SupabaseProvider>
           <AuthProvider>
-            <SupabaseProvider>
-              <ProfileProvider>
+            <ProfileProvider>
+              <ThemeProvider defaultTheme="dark" attribute="class">
                 <ClientSideLayout>
                   <ClientImagePreloader />
                   {children}
                 </ClientSideLayout>
-              </ProfileProvider>
-            </SupabaseProvider>
+              </ThemeProvider>
+            </ProfileProvider>
           </AuthProvider>
-        </ThemeProvider>
+        </SupabaseProvider>
       </body>
     </html>
   );

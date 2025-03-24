@@ -1,15 +1,49 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import styles from '@/styles/landing.module.css';
 
 export default function LandingPage() {
-  const [isVisible, setIsVisible] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const [hoverButton, setHoverButton] = useState(null);
   
+  const heroRef = useRef(null);
+  const featuresRef = useRef(null);
+  const statsRef = useRef(null);
+
   useEffect(() => {
-    setIsVisible(true);
+    setVisible(true);
+    
+    // Setup intersection observer for animations
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add(styles.animate);
+          }
+        });
+      },
+      { threshold: 0.2 }
+    );
+    
+    // Observe all sections
+    const sections = [heroRef.current, featuresRef.current, statsRef.current];
+    sections.forEach(section => {
+      if (section) observer.observe(section);
+    });
+    
+    return () => {
+      sections.forEach(section => {
+        if (section) observer.unobserve(section);
+      });
+    };
   }, []);
+  
+  const handleButtonHover = (id) => {
+    setHoverButton(id);
+    setTimeout(() => setHoverButton(null), 500);
+  };
 
   const features = [
     {
@@ -34,180 +68,72 @@ export default function LandingPage() {
     },
   ];
 
-  const pricingPlans = [
-    {
-      id: 1,
-      name: "Basic",
-      price: "Free",
-      features: [
-        "Market data access",
-        "Basic stock analysis",
-        "Community forum access",
-        "Limited portfolio tracking",
-      ],
-      cta: "Sign Up Free",
-      popular: false,
-    },
-    {
-      id: 2,
-      name: "Pro",
-      price: "$19.99",
-      period: "monthly",
-      features: [
-        "All Basic features",
-        "Advanced technical analysis",
-        "Real-time alerts",
-        "Unlimited portfolio tracking",
-        "Priority support",
-      ],
-      cta: "Start Free Trial",
-      popular: true,
-    },
-    {
-      id: 3,
-      name: "Enterprise",
-      price: "$49.99",
-      period: "monthly",
-      features: [
-        "All Pro features",
-        "API access",
-        "Custom integrations",
-        "Dedicated account manager",
-        "Team collaboration tools",
-      ],
-      cta: "Contact Sales",
-      popular: false,
-    },
-  ];
-
   return (
-    <div className={`${styles.landingPage} ${isVisible ? styles.visible : ''}`}>
-      {/* Hero Section */}
-      <section className={styles.heroSection}>
-        <div className={styles.heroContainer}>
-          <div className={styles.heroContent}>
-            <h1 className={styles.heroTitle}>
-              Elevate Your <span className={styles.accent}>Stock Analysis</span> Experience
-            </h1>
-            <p className={styles.heroSubtitle}>
-              Join FireStocks - the platform that helps you analyze stocks with target prices and stop losses. Automatically track performance metrics and success rates.
-            </p>
-            <div className={styles.heroCta}>
-              <Link href="/signup" className={styles.primaryButton}>
-                Get Started
-              </Link>
-              <Link href="/about" className={styles.secondaryButton}>
-                Learn More
-              </Link>
-            </div>
+    <div className={styles.landingPage}>
+     
+      
+      <section className={`${styles.heroSection} ${styles.fadeSection}`} ref={heroRef}>
+        <div className={styles.heroContent}>
+          <h1 className={`${styles.heroTitle} ${styles.slideInLeft}`}>
+            Real-time Stock Analysis and Portfolio Management
+          </h1>
+          <p className={`${styles.heroSubtitle} ${styles.slideInRight}`}>
+            Powerful tools for investors to track, analyze, and optimize their portfolios with market-beating strategies.
+          </p>
+          <div className={styles.heroCta}>
+            <button 
+              className={`${styles.primaryButton} ${hoverButton === 'signup' ? styles.pulse : ''}`}
+              onMouseEnter={() => handleButtonHover('signup')}
+            >
+              Sign Up
+            </button>
+          </div>
+        </div>
+        <div className={`${styles.heroImage} ${styles.slideInUp}`}>
+          {/* Hero Image */}
+          <div className={styles.mockup}>
+            <Image 
+              src="/favicon.ico" 
+              alt="FireStocks Logo" 
+              width={128} 
+              height={128}
+              className={styles.faviconImage}
+            />
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className={styles.featuresSection}>
-        <div className={styles.container}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>Powerful Features</h2>
-            <p className={styles.sectionSubtitle}>
-              Everything you need to make informed investment decisions
-            </p>
-          </div>
-          <div className={styles.featuresGrid}>
-            {features.map((feature) => (
-              <div key={feature.id} className={styles.featureCard}>
-                <div className={styles.featureIcon}>
-                </div>
-                <h3 className={styles.featureTitle}>{feature.title}</h3>
-                <p className={styles.featureDescription}>{feature.description}</p>
+      <section className={`${styles.featuresSection} ${styles.fadeSection}`} ref={featuresRef}>
+        <h2 className={styles.sectionTitle}>Platform Features</h2>
+        <div className={styles.featuresGrid}>
+          {features.map((feature, index) => (
+            <div key={index} className={`${styles.featureCard} ${styles.fadeIn}`}>
+              <div className={styles.featureIcon}>
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="40" height="40" rx="8" fill="currentColor" fillOpacity="0.1" />
+                  <path d="M20 10L26 16M20 10L14 16M20 10V24M30 20L24 26M30 20L24 14M30 20H16M10 20L16 26M10 20L16 14M10 20H24M20 30L26 24M20 30L14 24M20 30V16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
               </div>
-            ))}
-          </div>
+              <h3>{feature.title}</h3>
+              <p>{feature.description}</p>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Statistics Section */}
-      <section className={styles.statsSection}>
-        <div className={styles.container}>
-          <div className={styles.statsGrid}>
-            <div className={styles.statCard}>
-              <div className={styles.statNumber}>50K+</div>
-              <div className={styles.statLabel}>Active Users</div>
-            </div>
-            <div className={styles.statCard}>
-              <div className={styles.statNumber}>$2.5B+</div>
-              <div className={styles.statLabel}>Analysis Volume</div>
-            </div>
-            <div className={styles.statCard}>
-              <div className={styles.statNumber}>10K+</div>
-              <div className={styles.statLabel}>Daily Insights</div>
-            </div>
-            <div className={styles.statCard}>
-              <div className={styles.statNumber}>98%</div>
-              <div className={styles.statLabel}>Satisfaction Rate</div>
-            </div>
+      <section className={`${styles.statsSection} ${styles.fadeSection}`} ref={statsRef}>
+        <div className={styles.statsContainer}>
+          <div className={`${styles.statCard} ${styles.slideInLeft}`}>
+            <h3>50K+</h3>
+            <p>Active Users</p>
           </div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section className={styles.pricingSection}>
-        <div className={styles.container}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>Flexible Pricing</h2>
-            <p className={styles.sectionSubtitle}>
-              Choose the plan that fits your analysis style
-            </p>
+          <div className={`${styles.statCard} ${styles.slideInUp}`}>
+            <h3>$500M+</h3>
+            <p>Portfolio Value Managed</p>
           </div>
-          <div className={styles.pricingGrid}>
-            {pricingPlans.map((plan) => (
-              <div 
-                key={plan.id} 
-                className={`${styles.pricingCard} ${plan.popular ? styles.popularPlan : ''}`}
-              >
-                {plan.popular && <div className={styles.popularBadge}>Most Popular</div>}
-                <h3 className={styles.planName}>{plan.name}</h3>
-                <div className={styles.planPrice}>
-                  <span className={styles.price}>{plan.price}</span>
-                  {plan.period && <span className={styles.period}>/{plan.period}</span>}
-                </div>
-                <ul className={styles.planFeatures}>
-                  {plan.features.map((feature, index) => (
-                    <li key={index} className={styles.planFeature}>
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                <div className={styles.planCta}>
-                  <Link 
-                    href={plan.name === "Enterprise" ? "/contact" : "/signup"} 
-                    className={`${styles.planButton} ${plan.popular ? styles.primaryButton : styles.outlineButton}`}
-                  >
-                    {plan.cta}
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Call to Action Section */}
-      <section className={styles.ctaSection}>
-        <div className={styles.container}>
-          <div className={styles.ctaContent}>
-            <h2 className={styles.ctaTitle}>Ready to Transform Your Stock Analysis?</h2>
-            <p className={styles.ctaSubtitle}>
-              Join FireStocks today and get access to powerful stock analysis tools with target prices and stop loss tracking.
-            </p>
-            <div className={styles.ctaButtons}>
-              <Link href="/signup" className={styles.primaryButton}>
-                Get Started Now
-              </Link>
-              <Link href="/demo" className={styles.outlineButton}>
-                Request Demo
-              </Link>
-            </div>
+          <div className={`${styles.statCard} ${styles.slideInRight}`}>
+            <h3>98%</h3>
+            <p>Satisfaction Rate</p>
           </div>
         </div>
       </section>

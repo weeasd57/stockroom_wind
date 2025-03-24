@@ -66,36 +66,33 @@ export function ProfileProvider({ children }) {
           };
           setProfile(mergedProfile);
           
-          // Get avatar and background URLs with caching
-          await Promise.all([
-            getImageWithCaching('avatar', user.id),
-            getImageWithCaching('background', user.id)
-          ]);
-          
-          // Update profile in Supabase if needed
-          const updatedFields = {};
-          let needsUpdate = false;
-          
-          // If avatar_url is missing or different in the profile
-          if (avatarUrl && avatarUrl !== '/default-avatar.svg' && profileData.avatar_url !== avatarUrl) {
-            updatedFields.avatar_url = avatarUrl.includes('?') ? avatarUrl.split('?')[0] : avatarUrl; // Store without cache busting
-            needsUpdate = true;
-          }
-          
-          // If background_url is missing or different in the profile
-          if (backgroundUrl && backgroundUrl !== '/profile-bg.jpg' && profileData.background_url !== backgroundUrl) {
-            updatedFields.background_url = backgroundUrl.includes('?') ? backgroundUrl.split('?')[0] : backgroundUrl; // Store without cache busting
-            needsUpdate = true;
-          }
-          
-          // Update profile if needed
-          if (needsUpdate) {
-            try {
-              await updateUserProfile(user.id, updatedFields);
-              // Update local profile state with the updated fields
-              setProfile(prev => ({ ...prev, ...updatedFields }));
-            } catch (updateError) {
-              console.error('Error updating profile with latest image URLs:', updateError);
+          // Directly get avatar and background URLs from storage and update profile if needed
+          try {
+            console.log('Directly fetching avatar and background from storage after profile load');
+            const avatarUrl = await getAvatarImageUrl(user.id);
+            const backgroundUrl = await getBackgroundImageUrl(user.id);
+            
+            console.log('Setting avatar URL from storage:', avatarUrl);
+            console.log('Setting background URL from storage:', backgroundUrl);
+            
+            setAvatarUrl(avatarUrl);
+            setBackgroundUrl(backgroundUrl);
+          } catch (imageError) {
+            console.error('Error fetching images from storage:', imageError);
+            
+            // Fall back to profile URLs if available
+            if (profileData.avatar_url) {
+              const cacheParam = `?t=${Date.now()}`;
+              setAvatarUrl(`${profileData.avatar_url.split('?')[0]}${cacheParam}`);
+            } else {
+              setAvatarUrl('/default-avatar.svg');
+            }
+            
+            if (profileData.background_url) {
+              const cacheParam = `?t=${Date.now()}`;
+              setBackgroundUrl(`${profileData.background_url.split('?')[0]}${cacheParam}`);
+            } else {
+              setBackgroundUrl('/profile-bg.jpg');
             }
           }
         } else {
@@ -173,9 +170,9 @@ export function ProfileProvider({ children }) {
           return defaultUrl;
         }
         
-        // Add cache busting if needed
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-        const cacheBuster = `?t=${today}`;
+        // Add cache busting if needed - use a fixed value instead of changing daily
+        // This prevents image transitions when navigating between tabs
+        const cacheBuster = `?fixedRef=1`;
         const urlWithCacheBusting = imageUrl.includes('?') 
           ? imageUrl 
           : `${imageUrl}${cacheBuster}`;
@@ -306,15 +303,11 @@ export function ProfileProvider({ children }) {
         // Update local state
         setProfile(profileData);
         
-        // Clear cache for this user to force refresh
+        // Clear cache for avatar only to force refresh
         imageCache.current.lastFetched.delete(`${user.id}-avatar`);
-        imageCache.current.lastFetched.delete(`${user.id}-background`);
         
-        // Refresh avatar and background URLs
-        await Promise.all([
-          getImageWithCaching('avatar', user.id),
-          getImageWithCaching('background', user.id)
-        ]);
+        // Refresh avatar URL only, not background
+        await getImageWithCaching('avatar', user.id);
         
         return profileData;
       }

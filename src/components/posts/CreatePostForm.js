@@ -5,13 +5,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/contexts/ProfileContext';
 import { generateEodUrl, getStockPrice, countries } from '@/utils/stockApi';
 import { getCountrySymbolCounts, searchStocks } from '@/utils/symbolSearch';
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar.jsx";
 import 'flag-icons/css/flag-icons.min.css';
+import '@/styles/create-post-page.css';
 
 // Map of country names to their ISO codes for flags
 const COUNTRY_ISO_CODES = {
@@ -510,299 +505,302 @@ export default function CreatePostForm({ onPostCreated, onCancel }) {
     <>
       {/* Image Preview */}
       {imagePreview && (
-        <div className="image-preview-container">
-          <div className="relative">
+        <div className="form-group">
+          <div className="file-preview-item">
             <img
               src={imagePreview}
               alt="Preview"
-              className="image-preview"
+              className="file-preview-item img"
             />
-            <Button
-              variant="destructive"
-              size="sm"
-              className="absolute top-2 right-2"
+            <button
+              className="file-remove"
               onClick={handleRemoveImage}
+              aria-label="Remove image"
             >
-              Remove
-            </Button>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
           </div>
         </div>
       )}
 
-      {/* Selected Stock Info - Moved here from sidebar */}
+      {/* Selected Stock Info */}
       {selectedStock && (
-        <div className="stock-info-section mb-4">
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <div className="flex items-center gap-2">
+        <div className="form-group">
+          <div className="stock-info-container">
+            <div className="stock-header">
+              <div className="stock-symbol">
                 <div className="flag-container">
                   <span className={`fi fi-${selectedStock.country.toLowerCase()} stock-flag`}></span>
                 </div>
-                <h3 className="font-medium">{selectedStock.symbol}</h3>
+                <h3 className="stock-name">{selectedStock.symbol}</h3>
                 {selectedStock.exchange && (
-                  <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-full">
-                    EXCHANGE
+                  <span className="stock-exchange">
+                    {selectedStock.exchange}
                   </span>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground">{selectedStock.name}</p>
-              <div className="text-xs opacity-60 mt-0.5">
-                {Object.entries(COUNTRY_ISO_CODES).find(([_, code]) => 
-                  code.toLowerCase() === selectedStock.country.toLowerCase()
-                )?.[0] || selectedStock.country}
+              <button className="btn btn-icon" onClick={() => setSelectedStock(null)}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            <p className="stock-description">{selectedStock.name}</p>
+            <div className="stock-country">
+              {Object.entries(COUNTRY_ISO_CODES).find(([_, code]) => 
+                code.toLowerCase() === selectedStock.country.toLowerCase()
+              )?.[0] || selectedStock.country}
+            </div>
+          
+            {currentPrice && (
+              <div className="current-price-container">
+                <p className="current-price">
+                  Current Price: <span className="price-value">${currentPrice}</span>
+                </p>
+              </div>
+            )}
+            
+            <div className="price-inputs">
+              <div className="floating-label">
+                <input
+                  id="targetPrice"
+                  type="number"
+                  value={targetPrice}
+                  onChange={(e) => setTargetPrice(e.target.value)}
+                  placeholder=" "
+                  className="form-control"
+                />
+                <label htmlFor="targetPrice" className="form-label">Target Price</label>
+                <div className="focus-ring"></div>
+              </div>
+              
+              <div className="floating-label">
+                <input
+                  id="stopLoss"
+                  type="number"
+                  value={stopLossPrice}
+                  onChange={(e) => setStopLossPrice(e.target.value)}
+                  placeholder=" "
+                  className="form-control"
+                />
+                <label htmlFor="stopLoss" className="form-label">Stop Loss</label>
+                <div className="focus-ring"></div>
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setSelectedStock(null)}>
-              Remove
-            </Button>
-          </div>
-          {currentPrice && (
-            <div className="mt-2">
-              <p className="text-sm bg-gray-50 dark:bg-gray-900 py-2 px-3 rounded border">
-                Current Price: <span className="font-semibold">${currentPrice}</span>
-              </p>
-            </div>
-          )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-            <div className="form-field">
-              <Label htmlFor="targetPrice" className="text-sm mb-1 block">Target Price</Label>
-              <Input
-                id="targetPrice"
-                type="number"
-                value={targetPrice}
-                onChange={(e) => setTargetPrice(e.target.value)}
-                placeholder="Enter target price"
-                className="w-full"
-              />
-            </div>
-            <div className="form-field">
-              <Label htmlFor="stopLoss" className="text-sm mb-1 block">Stop Loss</Label>
-              <Input
-                id="stopLoss"
-                type="number"
-                value={stopLossPrice}
-                onChange={(e) => setStopLossPrice(e.target.value)}
-                placeholder="Enter stop loss"
-                className="w-full"
-              />
-            </div>
-          </div>
 
-          {/* Strategy Selection */}
-          <div className="mt-4 form-field">
-            <Label className="text-sm mb-1 block">Trading Strategy</Label>
-            <Select value={selectedStrategy} onValueChange={setSelectedStrategy}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a strategy" />
-              </SelectTrigger>
-              <SelectContent>
-                {strategies.map((strategy) => (
-                  <SelectItem key={strategy} value={strategy}>
-                    {strategy}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Strategy Selection */}
+            <div className="form-group">
+              <label className="form-label">Trading Strategy</label>
+              <div className="select-field" onClick={() => setShowStrategyInput(!showStrategyInput)}>
+                <span>{selectedStrategy || "Select a strategy"}</span>
+                <span className="select-field-icon">▼</span>
+              </div>
+              
+              {showStrategyInput && (
+                <div className="category-dropdown show">
+                  {strategies.map((strategy) => (
+                    <div 
+                      key={strategy} 
+                      className={`category-option ${selectedStrategy === strategy ? 'selected' : ''}`}
+                      onClick={() => {
+                        setSelectedStrategy(strategy);
+                        setShowStrategyInput(false);
+                      }}
+                    >
+                      <span className="category-option-check">✓</span>
+                      {strategy}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      <div className="create-post-grid">
-        {/* Main Content */}
-        <div>
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Avatar className="w-8 h-8">
-                <AvatarImage src={avatarUrl} alt="User avatar" />
-                <AvatarFallback>U</AvatarFallback>
-              </Avatar>
-              <span className="text-sm md:text-base">{user?.email}</span>
-            </div>
+      <div className="form-group">
+        <div className="user-info">
+          <div className="user-avatar">
+            <img src={avatarUrl} alt="User avatar" />
+          </div>
+          <span className="user-email">{user?.email}</span>
+        </div>
+      </div>
 
-            <div className="form-field">
-              <Label htmlFor="description" className="form-field-label">What's on your mind?</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Share your thoughts..."
-                className="mt-2 min-h-[120px] w-full"
-              />
-            </div>
+      <div className="form-group">
+        <label htmlFor="description" className="form-label">What's on your mind?</label>
+        <textarea
+          id="description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Share your thoughts..."
+          className="form-control"
+        ></textarea>
+        <div className="focus-ring"></div>
+        {description && (
+          <div className={`char-counter ${description.length > 500 ? 'warning' : ''} ${description.length > 1000 ? 'danger' : ''}`}>
+            {description.length} / 1000
+          </div>
+        )}
+      </div>
 
-            {/* Image Upload */}
-            <div className="form-field">
-              <Label className="form-field-label">Add Image</Label>
-              <div className="flex gap-2 mt-2 button-group">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex-1"
-                >
-                  Upload Image
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowImageUrlInput(!showImageUrlInput)}
-                  className="flex-1"
-                >
-                  Image URL
-                </Button>
-              </div>
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept="image/*"
-                onChange={handleImageChange}
-              />
-              {showImageUrlInput && (
-                <Input
-                  type="url"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="Enter image URL"
-                  className="mt-2 w-full"
-                />
-              )}
-            </div>
+      {/* Image Upload */}
+      <div className="form-group">
+        <label className="form-label">Add Image</label>
+        <div className="file-upload">
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="file-upload-input"
+            accept="image/*"
+            onChange={handleImageChange}
+          />
+          <div className="file-upload-label" onClick={() => fileInputRef.current?.click()}>
+            <span className="file-upload-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+            </span>
+            <span className="file-upload-text">Click to upload an image or drag and drop</span>
+          </div>
+        </div>
+        
+        <div className="form-actions">
+          <button className="btn btn-outline" onClick={() => setShowImageUrlInput(!showImageUrlInput)}>
+            {showImageUrlInput ? 'Hide URL input' : 'Use Image URL'}
+          </button>
+        </div>
+        
+        {showImageUrlInput && (
+          <div className="form-group">
+            <label htmlFor="imageUrl" className="form-label">Image URL</label>
+            <input
+              id="imageUrl"
+              type="url"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="Enter image URL"
+              className="form-control"
+            />
+            <div className="focus-ring"></div>
+          </div>
+        )}
+      </div>
             
-            {/* Submit Buttons */}
-            <div className="flex justify-end gap-2 button-group mt-4">
-              <Button
-                onClick={handleSubmit}
-                disabled={isSubmitting || !description}
-                className={`flex-1 md:flex-initial ${isSubmitting ? 'is-submitting' : ''}`}
+      
+
+      {/* Stock Search Section */}
+      <div className="form-group">
+        <label className="form-label">Search for a stock</label>
+        
+        <div className="category-select">
+          <label htmlFor="countrySelect" className="form-label">Country</label>
+          <div 
+            className={`select-field ${searchResults.length > 0 ? 'open' : ''}`}
+            onClick={() => setShowStockSearch(!showStockSearch)}
+          >
+            <span>
+              {selectedCountry === 'all' ? (
+                'All Countries'
+              ) : (
+                <>
+                  <span className={`fi fi-${selectedCountry} country-flag`}></span>
+                  {Object.entries(COUNTRY_ISO_CODES).find(([_, code]) => 
+                    code.toLowerCase() === selectedCountry
+                  )?.[0] || selectedCountry}
+                </>
+              )}
+            </span>
+            <span className="select-field-icon">▼</span>
+          </div>
+          
+          {showStockSearch && (
+            <div className="category-dropdown show">
+              <div 
+                className={`category-option ${selectedCountry === 'all' ? 'selected' : ''}`}
+                onClick={() => {
+                  handleCountryChange('all');
+                  setShowStockSearch(false);
+                }}
               >
-                {isSubmitting ? 'Posting...' : 'Post'}
-              </Button>
-              <Button variant="outline" onClick={onCancel} className="flex-1 md:flex-initial">
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-4">
-          {/* Stock Search Section */}
-          <div className="stock-search-section">
-            <div className="stock-search-container">
-              {/* Country Selection */}
-              <div className="country-select">
-                <Label htmlFor="countrySelect" className="block text-sm mb-1">Country</Label>
-                <Select value={selectedCountry} onValueChange={handleCountryChange}>
-                  <SelectTrigger id="countrySelect" className="country-select-trigger w-full">
-                    <SelectValue>
-                      {selectedCountry === 'all' ? (
-                        'All Countries'
-                      ) : (
-                        <>
-                          <span className={`fi fi-${selectedCountry} mr-2`}></span>
-                          {Object.entries(COUNTRY_ISO_CODES).find(([_, code]) => 
-                            code.toLowerCase() === selectedCountry
-                          )?.[0] || selectedCountry}
-                        </>
-                      )}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent className="country-select-content">
-                    <SelectItem value="all">All Countries</SelectItem>
-                    {Object.entries(COUNTRY_ISO_CODES)
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([country, code]) => (
-                        <SelectItem 
-                          key={`country-${code.toLowerCase()}`} 
-                          value={code.toLowerCase()}
-                        >
-                          <span className={`fi fi-${code.toLowerCase()} mr-2`}></span>
-                          {country} ({countrySymbolCounts[code.toLowerCase()] || 0})
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                <span className="category-option-check">✓</span>
+                All Countries
               </div>
-
-              {/* Search Input */}
-              <div className="search-input-container relative">
-                <Label htmlFor="stockSearch" className="block text-sm mb-1">Search for a stock</Label>
-                <Input
-                  id="stockSearch"
-                  ref={searchInputRef}
-                  type="text"
-                  value={stockSearch}
-                  onChange={(e) => setStockSearch(e.target.value)}
-                  placeholder="Enter symbol or name"
-                  className="w-full"
-                  aria-expanded={searchResults.length > 0}
-                  aria-controls={searchResults.length > 0 ? "search-results-list" : undefined}
-                  aria-autocomplete="list"
-                />
-                {isSearching && (
-                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                    <div className="h-4 w-16 loading-skeleton rounded"></div>
-                  </span>
-                )}
-
-                {/* Search Results */}
-                {searchResults.length > 0 && (
+              
+              {Object.entries(COUNTRY_ISO_CODES)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([country, code]) => (
                   <div 
-                    className="search-results" 
-                    ref={stockSearchResultsRef}
-                    id="search-results-list"
-                    role="listbox"
-                    aria-label="Stock search results"
+                    key={`country-${code.toLowerCase()}`}
+                    className={`category-option ${selectedCountry === code.toLowerCase() ? 'selected' : ''}`}
+                    onClick={() => {
+                      handleCountryChange(code.toLowerCase());
+                      setShowStockSearch(false);
+                    }}
                   >
-                    <div className="text-xs text-center py-1 text-muted-foreground mb-1">
-                      {searchResults.length} {searchResults.length === 1 ? 'result' : 'results'} found
-                    </div>
-                    {searchResults.map((stock, index) => (
-                      <div
-                        key={`${stock.symbol}-${stock.country}-${stock.exchange || ''}-${index}`}
-                        className={`search-result-item stock-item flag-${stock.country.toLowerCase()}`}
-                        onClick={() => handleStockSelect(stock)}
-                        tabIndex={0}
-                        role="option"
-                        aria-selected={false}
-                        id={`stock-result-${index}`}
-                      >
-                        <div className="flag-container">
-                          <span 
-                            className={`fi fi-${stock.country.toLowerCase()} stock-flag`}
-                            title={Object.entries(COUNTRY_ISO_CODES).find(([_, code]) => 
-                              code.toLowerCase() === stock.country.toLowerCase()
-                            )?.[0] || stock.country}
-                          ></span>
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium flex items-center">
-                            {stock.symbol}
-                            {stock.exchange && (
-                              <span className="ml-2 text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-full">
-                                EXCHANGE
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {stock.name}
-                            {stock.exchange && <span className="ml-1 text-xs opacity-70">({stock.exchange})</span>}
-                          </div>
-                          <div className="text-xs opacity-60 mt-0.5">
-                            {Object.entries(COUNTRY_ISO_CODES).find(([_, code]) => 
-                              code.toLowerCase() === stock.country.toLowerCase()
-                            )?.[0] || stock.country}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                    <span className="category-option-check">✓</span>
+                    <span className={`fi fi-${code.toLowerCase()} country-flag`}></span>
+                    {country} ({countrySymbolCounts[code.toLowerCase()] || 0})
                   </div>
-                )}
-              </div>
+                ))}
             </div>
-          </div>
+          )}
         </div>
+        
+        <div className="form-group">
+          <div className="search-container">
+            <input
+              id="stockSearch"
+              ref={searchInputRef}
+              type="text"
+              value={stockSearch}
+              onChange={(e) => setStockSearch(e.target.value)}
+              placeholder="Enter symbol or name"
+              className="form-control"
+            />
+            <div className="focus-ring"></div>
+            {isSearching && (
+              <div className="search-loader"></div>
+            )}
+          </div>
+          
+          {searchResults.length > 0 && (
+            <div className="search-results" ref={stockSearchResultsRef}>
+              {searchResults.map((stock) => (
+                <div 
+                  key={stock.uniqueId || `${stock.symbol}-${stock.country}`}
+                  className="search-result-item"
+                  onClick={() => handleStockSelect(stock)}
+                >
+                  <span className={`fi fi-${stock.country.toLowerCase()} search-flag`}></span>
+                  <div className="search-result-content">
+                    <div className="search-result-symbol">{stock.symbol}</div>
+                    <div className="search-result-name">{stock.name}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Submit Buttons */}
+      <div className="form-actions">
+        <button
+          onClick={handleSubmit}
+          disabled={isSubmitting || !description}
+          className={`btn btn-primary ${isSubmitting ? 'is-submitting' : ''}`}
+        >
+          {isSubmitting ? 'Posting...' : 'Post'}
+        </button>
+        <button className="btn btn-secondary" onClick={onCancel}>
+          Cancel
+        </button>
       </div>
     </>
   );

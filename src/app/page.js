@@ -3,12 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from 'next/navigation';
 import { useAuth } from "@/hooks/useAuth";
-import Image from "next/image";
-import Link from "next/link";
 import { getPosts } from "@/utils/supabase";
-import PostCard from "@/components/posts/PostCard";
-import { Button } from "@/components/ui/button";
-import CreatePostButton from "@/components/posts/CreatePostButton";
 
 export default function MainPage() {
   const router = useRouter();

@@ -39,6 +39,7 @@ export default function Profile() {
   const [formData, setFormData] = useState({
     username: '',
     bio: '',
+    experience_level: 'beginner',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -48,16 +49,35 @@ export default function Profile() {
   const [backgroundPreview, setBackgroundPreview] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState(contextAvatarUrl || '/default-avatar.svg');
   const [backgroundUrl, setBackgroundUrl] = useState(contextBackgroundUrl || '/profile-bg.jpg');
+  const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
+  const [backgroundUploadProgress, setBackgroundUploadProgress] = useState(0);
+  const [avatarUploadError, setAvatarUploadError] = useState(null);
+  const [backgroundUploadError, setBackgroundUploadError] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
   const backgroundInputRef = useRef(null);
   const refreshInterval = useRef(null);
 
   // Initialize data once when authenticated
   useEffect(() => {
-    if (user && isAuthenticated && !isInitialized) {
+    if (!isAuthenticated || !user) return;
+    
+    // Initialize profile store if not already done
+    if (!isInitialized) {
       initializeData(user.id);
     }
-  }, [user, isAuthenticated, isInitialized, initializeData]);
+    
+    // Update form data with profile details when they become available
+    if (profile && !profileLoading) {
+      setFormData({
+        username: profile.username || '',
+        bio: profile.bio || '',
+        experience_level: profile.experience_level || 'beginner',
+      });
+      setAvatarUrl(contextAvatarUrl || '/default-avatar.svg');
+      setBackgroundUrl(contextBackgroundUrl || '/profile-bg.jpg');
+    }
+  }, [user, contextAvatarUrl, contextBackgroundUrl, profile, profileLoading, isAuthenticated, isInitialized, initializeData]);
 
   // Set up background refresh interval
   useEffect(() => {
@@ -78,23 +98,33 @@ export default function Profile() {
     };
   }, [user, isAuthenticated, refreshData]);
 
-  // Update profile images when context changes
-  useEffect(() => {
-    if (user) {
-      setAvatarUrl(contextAvatarUrl || '/default-avatar.svg');
-      setBackgroundUrl(contextBackgroundUrl || '/profile-bg.jpg');
-    }
-  }, [user, contextAvatarUrl, contextBackgroundUrl]);
-
   // Update form data when profile changes
   useEffect(() => {
     if (profile) {
       setFormData({
         username: profile.username || '',
         bio: profile.bio || '',
+        experience_level: profile.experience_level || 'beginner',
       });
     }
   }, [profile]);
+
+  // Add this effect to load images when profile or context data updates
+  useEffect(() => {
+    if (user && isAuthenticated) {
+      // Set avatar URL from context when it becomes available
+      if (contextAvatarUrl && contextAvatarUrl !== avatarUrl) {
+        console.log('Updating avatar from context:', contextAvatarUrl);
+        setAvatarUrl(contextAvatarUrl);
+      }
+      
+      // Set background URL from context when it becomes available
+      if (contextBackgroundUrl && contextBackgroundUrl !== backgroundUrl) {
+        console.log('Updating background from context:', contextBackgroundUrl);
+        setBackgroundUrl(contextBackgroundUrl);
+      }
+    }
+  }, [user, isAuthenticated, contextAvatarUrl, contextBackgroundUrl, avatarUrl, backgroundUrl]);
 
   // Memoized handlers
   const handleTabChange = useCallback((tab) => {
@@ -113,9 +143,99 @@ export default function Profile() {
     setBackgroundPreview(null);
     setFormData({
       username: profile?.username || '',
-      bio: profile?.bio || ''
+      bio: profile?.bio || '',
+      experience_level: profile?.experience_level || 'beginner',
     });
   }, [profile]);
+
+  // Add this function at the top level of the component
+  const addCacheBuster = (url) => {
+    if (!url || url.startsWith('/')) return url;
+    const cacheBuster = `?t=${Date.now()}`;
+    return url.includes('?') ? url : `${url}${cacheBuster}`;
+  };
+
+  // Simplified function that doesn't refresh images automatically
+  const refreshImages = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      // Only refresh context data
+      await refreshData(user.id);
+      // No longer refreshing avatar or background images here
+    } catch (error) {
+      console.error('Error refreshing profile data:', error);
+    }
+  }, [user, refreshData]);
+
+  // Add this effect to load images only once when the page loads
+  useEffect(() => {
+    if (user && isAuthenticated && profile) {
+      // Create a function that sets image URLs only once
+      const loadImagesOnce = async () => {
+        console.log('Loading profile images on page load');
+        
+        try {
+          // Get the latest data from the database
+          await refreshData(user.id);
+          
+          // Set avatar URL once without cache busting
+          if (contextAvatarUrl) {
+            console.log('Setting initial avatar URL:', contextAvatarUrl);
+            setAvatarUrl(contextAvatarUrl);
+          }
+          
+          // Set background image once
+          if (contextBackgroundUrl) {
+            console.log('Setting initial background URL:', contextBackgroundUrl);
+            setBackgroundUrl(contextBackgroundUrl);
+          }
+        } catch (error) {
+          console.error('Error loading initial images:', error);
+        }
+      };
+      
+      // Run the function
+      loadImagesOnce();
+    }
+  }, [user, isAuthenticated, profile]);
+
+  // Clear upload errors when modal opens/closes
+  useEffect(() => {
+    if (showEditModal) {
+      setAvatarUploadError(null);
+      setBackgroundUploadError(null);
+    }
+  }, [showEditModal]);
+
+  // Force refresh the background image when needed
+  const forceRefreshBackground = useCallback(() => {
+    if (backgroundUrl) {
+      console.log('Forcing background refresh');
+      // Add a temporary cache buster to the URL to force a refresh
+      const cacheBuster = `?t=${Date.now()}`;
+      const baseUrl = backgroundUrl.split('?')[0];
+      const tempUrl = `${baseUrl}${cacheBuster}`;
+      
+      // Set a temporary URL to force refresh, then revert back
+      setBackgroundUrl(tempUrl);
+      
+      // After a short delay, revert to the clean URL
+      setTimeout(() => {
+        setBackgroundUrl(baseUrl);
+      }, 100);
+    }
+  }, [backgroundUrl]);
+  
+  // Call force refresh after the background upload is complete
+  useEffect(() => {
+    if (backgroundUploadProgress === 100) {
+      const timer = setTimeout(() => {
+        forceRefreshBackground();
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [backgroundUploadProgress, forceRefreshBackground]);
 
   // Only show loading state during initial load
   if (authLoading || (profileLoading && !isInitialized)) {
@@ -126,7 +246,10 @@ export default function Profile() {
     return (
       <div className={styles.notAuthenticated}>
         <h1>Not Authenticated</h1>
-        <p>Please <Link href="/login">login</Link> to view your profile.</p>
+        <p>You need to be logged in to view and manage your profile</p>
+        <Link href="/login" className={styles.loginButton}>
+          Log In to Continue
+        </Link>
       </div>
     );
   }
@@ -140,169 +263,460 @@ export default function Profile() {
     fileInputRef.current.click();
   };
 
+  // Handle background image click to open file picker
   const handleBackgroundClick = () => {
-    backgroundInputRef.current.click();
+    if (showEditModal) {
+      document.getElementById('background-file-input').click();
+    }
   };
 
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      setAvatarFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    
+    // Clear previous errors
+    setAvatarUploadError(null);
+    
+    // Validate file is an image
+    if (!file.type.startsWith('image/')) {
+      setAvatarUploadError('File must be an image');
+      console.error('File must be an image');
+      return;
     }
+    
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      setAvatarUploadError('File must be less than 2MB');
+      console.error('File must be less than 2MB');
+      return;
+    }
+    
+    setAvatarFile(file);
+    
+    // Create and set preview immediately for instant feedback
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarPreview(previewUrl);
+    
+    // Log file details for debugging
+    console.log(`Selected avatar: ${file.name}, ${file.type}, ${Math.round(file.size / 1024)}KB`);
   };
 
   const handleBackgroundChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      setBackgroundFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setBackgroundPreview(reader.result);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    
+    // Clear previous errors
+    setBackgroundUploadError(null);
+    
+    // Validate file is an image
+    if (!file.type.startsWith('image/')) {
+      setBackgroundUploadError('File must be an image');
+      console.error('File must be an image');
+      return;
     }
+    
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      setBackgroundUploadError('File must be less than 2MB');
+      console.error('File must be less than 2MB');
+      return;
+    }
+    
+    setBackgroundFile(file);
+    
+    // Create and set preview immediately for instant feedback
+    const previewUrl = URL.createObjectURL(file);
+    setBackgroundPreview(previewUrl);
+    
+    // Log file details for debugging
+    console.log(`Selected background: ${file.name}, ${file.type}, ${Math.round(file.size / 1024)}KB`);
   };
 
+  // Upload avatar with better error handling
   const uploadAvatar = async () => {
     if (!avatarFile) return null;
     
+    console.log('Starting avatar upload', { 
+      name: avatarFile.name, 
+      type: avatarFile.type, 
+      size: Math.round(avatarFile.size / 1024) + 'KB' 
+    });
+    
+    setAvatarUploadError(null);
+    setAvatarUploadProgress(0);
+    
     try {
-      console.log('Uploading avatar image...');
-      const { publicUrl, error } = await uploadImage(
+      // Generate a unique filename
+      const fileExt = avatarFile.name.split('.').pop();
+      const fileName = `${user.id}-avatar-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+      
+      console.log(`Uploading avatar to ${filePath}`);
+      
+      // Upload the file to Supabase Storage
+      const { data, error, publicUrl } = await uploadImage(
         avatarFile,
         'avatars',
         user.id,
-        'avatar'
+        'avatar',
+        {
+          cacheControl: 'no-cache',
+          upsert: true,
+          onUploadProgress: (progress) => {
+            const percent = Math.round((progress.loaded / progress.total) * 100);
+            setAvatarUploadProgress(percent);
+            console.log(`Avatar upload progress: ${percent}%`);
+          }
+        }
       );
       
       if (error) {
-        console.error('Error uploading avatar:', error);
-        throw error;
+        console.error('Supabase avatar upload error:', error);
+        let errorMessage = 'Failed to upload avatar image';
+        
+        // Provide more specific error messages based on error type
+        if (error.statusCode === 413) {
+          errorMessage = 'Avatar image is too large. Please choose a smaller file (max 2MB).';
+        } else if (error.statusCode === 403) {
+          errorMessage = 'Permission denied. You may not have access to upload images.';
+        } else if (error.statusCode === 429) {
+          errorMessage = 'Too many upload attempts. Please try again later.';
+        } else if (error.message) {
+          errorMessage = `Upload failed: ${error.message}`;
+        }
+        
+        setAvatarUploadError(errorMessage);
+        setAvatarUploadProgress(0);
+        throw new Error(errorMessage);
       }
       
-      console.log('Avatar uploaded successfully:', publicUrl);
+      console.log('Avatar upload completed successfully');
+      
+      if (!publicUrl) {
+        console.error('No public URL returned from uploadImage');
+        throw new Error('Failed to get public URL for avatar image');
+      }
+      
+      console.log('Avatar public URL:', publicUrl);
+      
+      // Add a delay to ensure Supabase has processed the image
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Update the avatar URL state
+      setAvatarUrl(publicUrl);
+      console.log('Setting avatar URL to:', publicUrl);
+      
+      // Clean up the preview
+      if (avatarPreview) {
+        URL.revokeObjectURL(avatarPreview);
+        setAvatarPreview(null);
+      }
+      
+      // Only reset progress if there were no errors
+      if (!avatarUploadError) {
+        setTimeout(() => {
+          setAvatarUploadProgress(0);
+        }, 1000);
+      }
+      
+      setAvatarFile(null);
       return publicUrl;
+      
     } catch (error) {
-      console.error('Error in uploadAvatar:', error);
+      console.error('Avatar upload function error:', error);
+      
+      // Only set error if not already set
+      if (!avatarUploadError) {
+        setAvatarUploadError(error.message || 'Failed to upload avatar image. Please try again.');
+      }
+      
+      setAvatarUploadProgress(0);
       throw error;
     }
   };
-
+  
+  // Upload background with better error handling and visual feedback
   const uploadBackground = async () => {
     if (!backgroundFile) return null;
     
+    console.log('Starting background upload', { 
+      name: backgroundFile.name, 
+      type: backgroundFile.type, 
+      size: Math.round(backgroundFile.size / 1024) + 'KB' 
+    });
+    
+    setBackgroundUploadError(null);
+    setBackgroundUploadProgress(0);
+    setIsUploading(true);
+    
     try {
-      console.log('Uploading background image...');
-      const { publicUrl, error } = await uploadImage(
+      // Generate a unique filename
+      const fileExt = backgroundFile.name.split('.').pop();
+      const fileName = `${user.id}-background-${Date.now()}.${fileExt}`;
+      const filePath = `backgrounds/${fileName}`;
+      
+      console.log(`Uploading background to ${filePath}`);
+      
+      // Upload the file to Supabase Storage
+      const { data, error, publicUrl } = await uploadImage(
         backgroundFile,
         'backgrounds',
         user.id,
-        'background'
+        'background',
+        {
+          cacheControl: 'no-cache',
+          upsert: true,
+          onUploadProgress: (progress) => {
+            const percent = Math.round((progress.loaded / progress.total) * 100);
+            setBackgroundUploadProgress(percent);
+            console.log(`Background upload progress: ${percent}%`);
+          }
+        }
       );
       
       if (error) {
-        console.error('Error uploading background:', error);
-        throw error;
+        console.error('Supabase background upload error:', error);
+        let errorMessage = 'Failed to upload background image';
+        
+        // Provide more specific error messages based on error type
+        if (error.statusCode === 413) {
+          errorMessage = 'Background image is too large. Please choose a smaller file (max 2MB).';
+        } else if (error.statusCode === 403) {
+          errorMessage = 'Permission denied. You may not have access to upload images.';
+        } else if (error.statusCode === 429) {
+          errorMessage = 'Too many upload attempts. Please try again later.';
+        } else if (error.message) {
+          errorMessage = `Upload failed: ${error.message}`;
+        }
+        
+        setBackgroundUploadError(errorMessage);
+        setBackgroundUploadProgress(0);
+        setIsUploading(false);
+        throw new Error(errorMessage);
       }
       
-      console.log('Background uploaded successfully:', publicUrl);
-      return publicUrl;
+      console.log('Background upload completed successfully');
+      
+      if (!publicUrl) {
+        console.error('No public URL returned from uploadImage');
+        setBackgroundUploadError('Failed to get public URL for background image');
+        setBackgroundUploadProgress(0);
+        setIsUploading(false);
+        throw new Error('Failed to get public URL for background image');
+      }
+      
+      console.log('Background public URL:', publicUrl);
+      
+      // Add a delay to ensure Supabase has processed the image
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Extract the base URL without cache busters
+      const baseUrl = publicUrl.split('?')[0];
+      // Add our own cache buster to force a fresh load
+      const refreshedUrl = `${baseUrl}?refresh=${Date.now()}`;
+      
+      // Set the background URL directly with our cache buster
+      setBackgroundUrl(refreshedUrl);
+      console.log('Setting background URL to:', refreshedUrl);
+      
+      // Clean up the preview
+      if (backgroundPreview) {
+        URL.revokeObjectURL(backgroundPreview);
+        setBackgroundPreview(null);
+      }
+      
+      // Only reset progress if there were no errors
+      if (!backgroundUploadError) {
+        setTimeout(() => {
+          setBackgroundUploadProgress(0);
+        }, 1000);
+      }
+      
+      setBackgroundFile(null);
+      setIsUploading(false);
+      return baseUrl; // Return the clean URL for the database
+      
     } catch (error) {
-      console.error('Error in uploadBackground:', error);
+      console.error('Background upload function error:', error);
+      
+      // Only set error if not already set
+      if (!backgroundUploadError) {
+        setBackgroundUploadError(error.message || 'Failed to upload background image. Please try again.');
+      }
+      
+      setBackgroundUploadProgress(0);
+      setIsUploading(false);
       throw error;
     }
   };
 
+  // Update handleSaveProfile to handle image changes directly and display errors clearly
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setSaveError(null);
+    setAvatarUploadError(null);
+    setBackgroundUploadError(null);
     setIsSaving(true);
+    setIsUploading(true);
     
     try {
-      // Upload avatar and background in parallel if selected
-      const uploadPromises = [];
+      // Upload avatar and background images if selected
       let newAvatarUrl = null;
       let newBackgroundUrl = null;
       
-      if (avatarFile) {
-        uploadPromises.push(
-          uploadAvatar()
-            .then(url => {
-              newAvatarUrl = url;
-              console.log('Avatar URL after upload:', newAvatarUrl);
-            })
-            .catch(error => {
-              console.error('Avatar upload failed:', error);
-              setSaveError(prev => prev || 'Failed to upload avatar image. Please try again.');
-            })
-        );
+      // Process uploads concurrently if both files are present
+      if (avatarFile && backgroundFile) {
+        try {
+          console.log('Uploading both avatar and background files...');
+          
+          // Use Promise.allSettled to handle partial failures
+          const results = await Promise.allSettled([
+            uploadAvatar(),
+            uploadBackground()
+          ]);
+          
+          // Handle results
+          if (results[0].status === 'fulfilled') {
+            newAvatarUrl = results[0].value;
+            console.log('Avatar upload succeeded:', newAvatarUrl);
+          } else {
+            console.error('Avatar upload failed:', results[0].reason);
+            // Error is already set by uploadAvatar
+          }
+          
+          if (results[1].status === 'fulfilled') {
+            newBackgroundUrl = results[1].value;
+            console.log('Background upload succeeded:', newBackgroundUrl);
+          } else {
+            console.error('Background upload failed:', results[1].reason);
+            // Error is already set by uploadBackground
+          }
+          
+          // If both failed, stop the save process
+          if (results[0].status === 'rejected' && results[1].status === 'rejected') {
+            setSaveError('Failed to upload images. Please try again.');
+            setIsSaving(false);
+            setIsUploading(false);
+            return;
+          }
+          
+        } catch (uploadError) {
+          console.error('Error during file uploads:', uploadError);
+          setSaveError('Error uploading images. Please try again.');
+          setIsSaving(false);
+          setIsUploading(false);
+          return;
+        }
+      } else {
+        // Process individual uploads if needed
+        if (avatarFile) {
+          try {
+            console.log('Uploading only avatar file...');
+            const url = await uploadAvatar();
+            newAvatarUrl = url;
+            console.log('Avatar URL after upload (for database):', newAvatarUrl);
+            // URL is already set in uploadAvatar function
+          } catch (avatarError) {
+            console.error('Error uploading avatar:', avatarError);
+            // Error is already set by uploadAvatar
+            if (!backgroundFile) {
+              setIsSaving(false);
+              setIsUploading(false);
+              return;
+            }
+          }
+        }
+        
+        if (backgroundFile) {
+          try {
+            console.log('Uploading only background file...');
+            const url = await uploadBackground();
+            newBackgroundUrl = url;
+            console.log('Background URL after upload (for database):', newBackgroundUrl);
+            // URL is already set in uploadBackground function
+          } catch (backgroundError) {
+            console.error('Error uploading background:', backgroundError);
+            // Error is already set by uploadBackground
+            if (!avatarFile || avatarUploadError) {
+              setIsSaving(false);
+              setIsUploading(false);
+              return;
+            }
+          }
+        }
       }
       
-      if (backgroundFile) {
-        uploadPromises.push(
-          uploadBackground()
-            .then(url => {
-              newBackgroundUrl = url;
-              console.log('Background URL after upload:', newBackgroundUrl);
-            })
-            .catch(error => {
-              console.error('Background upload failed:', error);
-              setSaveError(prev => prev || 'Failed to upload background image. Please try again.');
-            })
-        );
+      // Check if there are any successful uploads to continue with
+      if (avatarFile && !newAvatarUrl && backgroundFile && !newBackgroundUrl) {
+        console.log('No successful uploads to save');
+        setIsSaving(false);
+        setIsUploading(false);
+        return;
       }
       
-      // Wait for all uploads to complete
-      if (uploadPromises.length > 0) {
-        await Promise.allSettled(uploadPromises);
-      }
-      
-      // Prepare update data
+      // Prepare the profile update data
       const updateData = {
         ...formData
       };
       
-      // Only update avatar_url if a new file was uploaded successfully
+      // Add any new image URLs to the update data
       if (newAvatarUrl) {
-        updateData.avatar_url = newAvatarUrl;
+        updateData.avatar_url = newAvatarUrl.split('?')[0]; // Remove cache busting
+        console.log('Adding avatar_url to update data:', updateData.avatar_url);
       }
       
-      // Add background URL if uploaded successfully
       if (newBackgroundUrl) {
-        updateData.background_url = newBackgroundUrl;
+        updateData.background_url = newBackgroundUrl.split('?')[0]; // Remove cache busting
+        console.log('Adding background_url to update data:', updateData.background_url);
       }
       
       console.log('Updating profile with data:', updateData);
       
-      // Update profile
+      // Save the profile updates to Supabase
       const { success, error } = await updateProfile(updateData);
       
-      if (!success) {
-        setSaveError('Failed to update profile information. Please try again.');
-        throw error || new Error('Failed to update profile');
+      if (error) {
+        console.error('Error updating profile in Supabase:', error);
+        setSaveError(error.message || 'Failed to update profile. Please try again.');
+        setIsUploading(false);
+        return;
       }
       
-      console.log('Profile updated successfully');
+      console.log('Profile updated successfully in Supabase');
       
-      // Reset files
-      setAvatarFile(null);
-      setAvatarPreview(null);
-      setBackgroundFile(null);
-      setBackgroundPreview(null);
+      // Just update the context data without refreshing images
+      await refreshData(user.id);
       
-      setShowEditModal(false);
+      // Only close modal if there were no errors
+      if (!avatarUploadError && !backgroundUploadError && !saveError) {
+        setShowEditModal(false);
+      }
+      
     } catch (error) {
-      console.error('Error saving profile:', error);
-      setSaveError(saveError || 'Failed to update profile. Please try again.');
+      console.error('Error in handleSaveProfile:', error);
+      setSaveError(error.message || 'An unexpected error occurred. Please try again.');
     } finally {
       setIsSaving(false);
+      setIsUploading(false);
     }
   };
+
+  // Update avatar img element to handle loading errors better
+  const avatarImgElement = (imgSrc) => (
+    <img
+      src={imgSrc || '/default-avatar.svg'}
+      alt={profile?.username || 'User'}
+      width={100}
+      height={100}
+      className={styles.avatar}
+      key={imgSrc || Date.now()} // Ensure re-render on URL change
+      onError={(e) => {
+        console.error('Error loading avatar image:', e);
+        e.target.onerror = null; // Prevent infinite error loop
+        e.target.src = '/default-avatar.svg';
+      }}
+    />
+  );
 
   return (
     <div className={styles.profileContainer}>
@@ -326,10 +740,17 @@ export default function Profile() {
       <div 
         className={styles.profileHeader}
         style={{ 
-          backgroundImage: `url(${backgroundUrl})`,
+          backgroundImage: `url(${backgroundPreview || backgroundUrl})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          transition: 'background-image 0.3s ease-in-out'
+          imageRendering: 'auto',
+        }}
+        key={backgroundUrl} // Add a key attribute to force re-render when URL changes
+        aria-label="Profile background image"
+        onError={(e) => {
+          console.error('Error loading background image');
+          // Directly set the background to the default image in case of error
+          e.target.style.backgroundImage = `url('/profile-bg.jpg')`;
         }}
       >
         <div className={styles.profileHeaderOverlay}>
@@ -341,18 +762,7 @@ export default function Profile() {
                   <span>Change</span>
                 </div>
               )}
-              <img
-                src={avatarPreview || avatarUrl}
-                alt={profile?.username || 'User'}
-                width={100}
-                height={100}
-                className={styles.avatar}
-                onError={(e) => {
-                  console.error('Error loading avatar image:', e);
-                  e.target.onerror = null;
-                  e.target.src = '/default-avatar.svg';
-                }}
-              />
+              {avatarImgElement(avatarPreview || avatarUrl)}
             </div>
             
             {/* User info section */}
@@ -361,12 +771,14 @@ export default function Profile() {
               <p className={styles.profileBio}>{profile?.bio || 'No bio yet'}</p>
               
               {!showEditModal && (
-                <button 
-                  onClick={handleEditProfile} 
-                  className={styles.editButton}
-                >
-                  Edit Profile
-                </button>
+                <div className={styles.profileButtons}>
+                  <button 
+                    onClick={handleEditProfile} 
+                    className={styles.editButton}
+                  >
+                    Edit Profile
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -435,6 +847,16 @@ export default function Profile() {
       <div className={styles.contentSection}>
         {activeTab === 'posts' && (
           <div className={styles.postsGrid}>
+            <div className={styles.emptyHomeContainer}>
+              <div className={styles.createPostContainer}>
+                <h1 className={styles.emptyHomeTitle}>Create a New Post</h1>
+                <p className={styles.emptyHomeText}>Share your stock analysis with the community</p>
+                <Link href="/create-post" className={styles.createPostButton}>
+                  Create Post
+                </Link>
+              </div>
+            </div>
+            
             {posts.length > 0 ? (
               posts.map(post => (
                 <div key={post.id} className={styles.postCard}>
@@ -507,6 +929,13 @@ export default function Profile() {
             {saveError && (
               <div className={styles.errorMessage}>
                 {saveError}
+                <button 
+                  className={styles.dismissError} 
+                  onClick={() => setSaveError(null)}
+                  aria-label="Dismiss error"
+                >
+                  ✕
+                </button>
               </div>
             )}
             
@@ -542,26 +971,26 @@ export default function Profile() {
                 <label>Profile Picture</label>
                 <div className={styles.avatarUpload}>
                   <div className={styles.avatarPreviewContainer}>
-                    <img
-                      src={avatarPreview || avatarUrl}
-                      alt="Avatar Preview"
-                      width={100}
-                      height={100}
-                      className={styles.avatarPreview}
-                      onError={(e) => {
-                        console.error('Error loading avatar image:', e);
-                        e.target.onerror = null;
-                        e.target.src = '/default-avatar.svg';
-                      }}
-                    />
+                    {avatarUploadProgress > 0 && (
+                      <div className={styles.imageLoadingOverlay}>
+                        <div className={styles.uploadProgress}>
+                          <div className={styles.progressBar} style={{width: `${avatarUploadProgress}%`}}></div>
+                          <span>{Math.round(avatarUploadProgress)}%</span>
+                        </div>
+                      </div>
+                    )}
+                    {avatarImgElement(avatarPreview || avatarUrl)}
                   </div>
+                  {avatarUploadError && (
+                    <p className={styles.uploadError}>{avatarUploadError}</p>
+                  )}
                   <button 
                     type="button" 
                     className={styles.changeAvatarButton}
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={isSaving}
+                    disabled={isSaving || avatarUploadProgress > 0}
                   >
-                    Change Avatar
+                    {avatarUploadProgress > 0 ? `Uploading (${Math.round(avatarUploadProgress)}%)` : 'Change Avatar'}
                   </button>
                   <input
                     type="file"
@@ -569,39 +998,64 @@ export default function Profile() {
                     onChange={handleAvatarChange}
                     accept="image/*"
                     style={{ display: 'none' }}
-                    disabled={isSaving}
+                    disabled={isSaving || avatarUploadProgress > 0}
                   />
                 </div>
               </div>
               
               <div className={styles.formGroup}>
                 <label>Background Image</label>
-                <div className={styles.backgroundUpload}>
-                  <div className={styles.backgroundPreviewContainer}>
-                    <div 
-                      className={styles.backgroundPreview}
-                      style={{ 
-                        backgroundImage: `url(${backgroundPreview || backgroundUrl})` 
-                      }}
-                    />
+                <div 
+                  className={styles.backgroundPreview}
+                  style={{
+                    backgroundImage: `url(${backgroundPreview || backgroundUrl})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    position: 'relative'
+                  }}
+                  onClick={() => backgroundUploadProgress === 0 && !isSaving && document.getElementById('background-file-input').click()}
+                >
+                  {backgroundUploadProgress > 0 && (
+                    <div className={styles.imageLoadingOverlay}>
+                      <div className={styles.uploadProgress}>
+                        <div className={styles.progressBar} style={{width: `${backgroundUploadProgress}%`}}></div>
+                        <span>{Math.round(backgroundUploadProgress)}%</span>
+                      </div>
+                    </div>
+                  )}
+                  <div className={styles.backgroundOverlay}>
+                    <span>{backgroundUploadProgress > 0 ? `Uploading (${Math.round(backgroundUploadProgress)}%)` : 'Change Background'}</span>
                   </div>
-                  <button 
-                    type="button" 
-                    className={styles.changeBackgroundButton}
-                    onClick={() => backgroundInputRef.current?.click()}
-                    disabled={isSaving}
-                  >
-                    Change Background
-                  </button>
-                  <input
-                    type="file"
-                    ref={backgroundInputRef}
-                    onChange={handleBackgroundChange}
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    disabled={isSaving}
-                  />
                 </div>
+                {backgroundUploadError && (
+                  <div className={styles.errorContainer}>
+                    <p className={styles.uploadError}>{backgroundUploadError}</p>
+                    <button 
+                      type="button" 
+                      className={styles.dismissError} 
+                      onClick={() => setBackgroundUploadError(null)}
+                      aria-label="Dismiss error"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  id="background-file-input"
+                  onChange={handleBackgroundChange}
+                  style={{ display: 'none' }}
+                  disabled={isSaving || backgroundUploadProgress > 0}
+                />
+                <button 
+                  type="button" 
+                  className={styles.changeBackgroundButton}
+                  onClick={() => document.getElementById('background-file-input').click()}
+                  disabled={isSaving || backgroundUploadProgress > 0}
+                >
+                  {backgroundUploadProgress > 0 ? `Uploading (${Math.round(backgroundUploadProgress)}%)` : 'Change Background'}
+                </button>
               </div>
               
               <div className={styles.formActions}>
