@@ -820,7 +820,17 @@ export default function Profile() {
           <span className={styles.statLabel}>Following</span>
         </div>
       </div>
+            {/* createPostContainer */}
 
+      <div className={styles.emptyHomeContainer}>
+              <div className={styles.createPostContainer}>
+                <h1 className={styles.emptyHomeTitle}>Create a New Post</h1>
+                <p className={styles.emptyHomeText}>Share your stock analysis with the community</p>
+                <Link href="/create-post" className={styles.createPostButton}>
+                  Create Post
+                </Link>
+              </div>
+            </div>
       {/* Content Tabs */}
       <div className={styles.contentTabs}>
         <button 
@@ -847,15 +857,7 @@ export default function Profile() {
       <div className={styles.contentSection}>
         {activeTab === 'posts' && (
           <div className={styles.postsGrid}>
-            <div className={styles.emptyHomeContainer}>
-              <div className={styles.createPostContainer}>
-                <h1 className={styles.emptyHomeTitle}>Create a New Post</h1>
-                <p className={styles.emptyHomeText}>Share your stock analysis with the community</p>
-                <Link href="/create-post" className={styles.createPostButton}>
-                  Create Post
-                </Link>
-              </div>
-            </div>
+            
             
             {posts.length > 0 ? (
               posts.map(post => (

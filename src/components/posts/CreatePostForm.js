@@ -74,6 +74,21 @@ const COUNTRY_ISO_CODES = {
   'Zimbabwe': 'zw'
 };
 
+// Function to convert ISO code to flag emoji
+const getCountryFlagEmoji = (countryCode) => {
+  if (!countryCode) return '';
+  
+  // Convert ISO code to regional indicator symbols
+  // Each letter is represented by a regional indicator symbol in the range 127462 (🇦) to 127487 (🇿)
+  const codePoints = countryCode
+    .toUpperCase()
+    .split('')
+    .map(char => 127397 + char.charCodeAt(0));
+  
+  // Convert code points to emoji
+  return String.fromCodePoint(...codePoints);
+};
+
 export default function CreatePostForm({ onPostCreated, onCancel }) {
   const { user } = useAuth();
   const { profile, getEffectiveAvatarUrl } = useProfile();
@@ -501,8 +516,39 @@ export default function CreatePostForm({ onPostCreated, onCancel }) {
     };
   }, [searchResults.length]);
 
+  // Add drag and drop handlers for avatar
+  const handleAvatarDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      try {
+        // Create object URL for preview
+        const previewUrl = URL.createObjectURL(file);
+        setAvatarUrl(previewUrl);
+        
+        // Update profile context with new avatar
+        await profile.updateAvatar(file);
+        
+        // Clean up the object URL
+        URL.revokeObjectURL(previewUrl);
+      } catch (error) {
+        console.error('Error updating avatar:', error);
+        // Revert to previous avatar if update fails
+        setAvatarUrl(profile?.avatarUrl || '/default-avatar.svg');
+      }
+    }
+  };
+
+  const handleAvatarDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   return (
     <>
+    
       {/* Image Preview */}
       {imagePreview && (
         <div className="form-group">
@@ -529,33 +575,42 @@ export default function CreatePostForm({ onPostCreated, onCancel }) {
       {/* Selected Stock Info */}
       {selectedStock && (
         <div className="form-group">
-          <div className="stock-info-container">
-            <div className="stock-header">
-              <div className="stock-symbol">
-                <div className="flag-container">
-                  <span className={`fi fi-${selectedStock.country.toLowerCase()} stock-flag`}></span>
+          <div 
+            className="stock-info-container"
+            style={{
+              backgroundImage: `url(https://flagcdn.com/${Object.entries(COUNTRY_ISO_CODES).find(
+                ([countryName]) => countryName.toLowerCase() === selectedStock.country.toLowerCase()
+              )?.[1]?.toLowerCase() || selectedStock.country.toLowerCase()}.svg)`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+            }}
+          >
+            <div className="stock-info-overlay">
+              {/* Stock Item */}
+              <div className="stock-item selected">
+                <div className="stock-info">
+                  <div className="stock-symbol">{selectedStock.symbol}</div>
+                  <div className="stock-name">{selectedStock.name}</div>
+                  <div className="stock-country">
+                    {Object.entries(COUNTRY_ISO_CODES).find(
+                      ([countryName]) => countryName.toLowerCase() === selectedStock.country.toLowerCase()
+                    )?.[0] || selectedStock.country}
                 </div>
-                <h3 className="stock-name">{selectedStock.symbol}</h3>
-                {selectedStock.exchange && (
-                  <span className="stock-exchange">
-                    {selectedStock.exchange}
-                  </span>
-                )}
               </div>
-              <button className="btn btn-icon" onClick={() => setSelectedStock(null)}>
+                <button 
+                  className="btn btn-icon" 
+                  onClick={() => setSelectedStock(null)}
+                  aria-label="Remove stock"
+                >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18"></line>
                   <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
               </button>
             </div>
-            <p className="stock-description">{selectedStock.name}</p>
-            <div className="stock-country">
-              {Object.entries(COUNTRY_ISO_CODES).find(([_, code]) => 
-                code.toLowerCase() === selectedStock.country.toLowerCase()
-              )?.[0] || selectedStock.country}
-            </div>
-          
+
+              {/* Rest of the content */}
             {currentPrice && (
               <div className="current-price-container">
                 <p className="current-price">
@@ -592,7 +647,6 @@ export default function CreatePostForm({ onPostCreated, onCancel }) {
               </div>
             </div>
 
-            {/* Strategy Selection */}
             <div className="form-group">
               <label className="form-label">Trading Strategy</label>
               <div className="select-field" onClick={() => setShowStrategyInput(!showStrategyInput)}>
@@ -611,12 +665,12 @@ export default function CreatePostForm({ onPostCreated, onCancel }) {
                         setShowStrategyInput(false);
                       }}
                     >
-                      <span className="category-option-check">✓</span>
                       {strategy}
                     </div>
                   ))}
                 </div>
               )}
+              </div>
             </div>
           </div>
         </div>
@@ -624,7 +678,13 @@ export default function CreatePostForm({ onPostCreated, onCancel }) {
 
       <div className="form-group">
         <div className="user-info">
-          <div className="user-avatar">
+          <div 
+            className="user-avatar"
+            onDrop={handleAvatarDrop}
+            onDragOver={handleAvatarDragOver}
+            style={{ cursor: 'pointer' }}
+            title="Drop new avatar image here"
+          >
             <img src={avatarUrl} alt="User avatar" />
           </div>
           <span className="user-email">{user?.email}</span>
@@ -699,96 +759,134 @@ export default function CreatePostForm({ onPostCreated, onCancel }) {
       <div className="form-group">
         <label className="form-label">Search for a stock</label>
         
-        <div className="category-select">
-          <label htmlFor="countrySelect" className="form-label">Country</label>
-          <div 
-            className={`select-field ${searchResults.length > 0 ? 'open' : ''}`}
-            onClick={() => setShowStockSearch(!showStockSearch)}
-          >
-            <span>
-              {selectedCountry === 'all' ? (
-                'All Countries'
-              ) : (
-                <>
-                  <span className={`fi fi-${selectedCountry} country-flag`}></span>
-                  {Object.entries(COUNTRY_ISO_CODES).find(([_, code]) => 
-                    code.toLowerCase() === selectedCountry
-                  )?.[0] || selectedCountry}
-                </>
-              )}
-            </span>
-            <span className="select-field-icon">▼</span>
-          </div>
-          
-          {showStockSearch && (
-            <div className="category-dropdown show">
-              <div 
-                className={`category-option ${selectedCountry === 'all' ? 'selected' : ''}`}
-                onClick={() => {
-                  handleCountryChange('all');
-                  setShowStockSearch(false);
-                }}
-              >
-                <span className="category-option-check">✓</span>
-                All Countries
-              </div>
-              
-              {Object.entries(COUNTRY_ISO_CODES)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([country, code]) => (
-                  <div 
-                    key={`country-${code.toLowerCase()}`}
-                    className={`category-option ${selectedCountry === code.toLowerCase() ? 'selected' : ''}`}
-                    onClick={() => {
-                      handleCountryChange(code.toLowerCase());
-                      setShowStockSearch(false);
-                    }}
-                  >
-                    <span className="category-option-check">✓</span>
-                    <span className={`fi fi-${code.toLowerCase()} country-flag`}></span>
-                    {country} ({countrySymbolCounts[code.toLowerCase()] || 0})
-                  </div>
-                ))}
+        <div className="stock-search-container">
+          <div className="category-select">
+            <label htmlFor="countrySelect" className="form-label">Country</label>
+            <div 
+              className={`select-field ${searchResults.length > 0 ? 'open' : ''}`}
+              onClick={() => setShowStockSearch(!showStockSearch)}
+            >
+              <span>
+                {selectedCountry === 'all' ? (
+                  'All Countries'
+                ) : (
+                  <>
+                    <div className="country-flag-wrapper">
+                      <span className={`fi fi-${selectedCountry} country-flag`}></span>
+                    </div>
+                    {Object.entries(COUNTRY_ISO_CODES).find(([_, code]) => 
+                      code.toLowerCase() === selectedCountry
+                    )?.[0] || selectedCountry}
+                  </>
+                )}
+              </span>
+              <span className="select-field-icon">▼</span>
             </div>
-          )}
-        </div>
-        
-        <div className="form-group">
-          <div className="search-container">
-            <input
-              id="stockSearch"
-              ref={searchInputRef}
-              type="text"
-              value={stockSearch}
-              onChange={(e) => setStockSearch(e.target.value)}
-              placeholder="Enter symbol or name"
-              className="form-control"
-            />
-            <div className="focus-ring"></div>
-            {isSearching && (
-              <div className="search-loader"></div>
+            
+            {showStockSearch && (
+              <div className="category-dropdown show">
+                <div 
+                  className={`category-option ${selectedCountry === 'all' ? 'selected' : ''}`}
+                  onClick={() => {
+                    handleCountryChange('all');
+                    setShowStockSearch(false);
+                  }}
+                >
+                  <span className="category-option-check">✓</span>
+                  All Countries
+                </div>
+                
+                {Object.entries(COUNTRY_ISO_CODES)
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([country, code]) => (
+                    <div 
+                      key={`country-${code.toLowerCase()}`}
+                      className={`category-option ${selectedCountry === code.toLowerCase() ? 'selected' : ''}`}
+                      onClick={() => {
+                        handleCountryChange(code.toLowerCase());
+                        setShowStockSearch(false);
+                      }}
+                    >
+                      <span className="category-option-check">✓</span>
+                      <div className="country-flag-wrapper">
+                        <span className={`fi fi-${code.toLowerCase()} country-flag`}></span>
+                      </div>
+                      {country} ({countrySymbolCounts[code.toLowerCase()] || 0})
+                    </div>
+                  ))}
+              </div>
             )}
           </div>
           
-          {searchResults.length > 0 && (
-            <div className="search-results" ref={stockSearchResultsRef}>
-              {searchResults.map((stock) => (
-                <div 
-                  key={stock.uniqueId || `${stock.symbol}-${stock.country}`}
-                  className="search-result-item"
-                  onClick={() => handleStockSelect(stock)}
+          <div className="search-field-container">
+            <label htmlFor="stockSearch" className="form-label">Symbol or Name</label>
+            <div className="search-container">
+              <input
+                id="stockSearch"
+                ref={searchInputRef}
+                type="text"
+                value={stockSearch}
+                onChange={(e) => setStockSearch(e.target.value)}
+                placeholder="Enter symbol or name"
+                className="form-control visible-input"
+              />
+              <div className="focus-ring"></div>
+              {stockSearch && (
+                <button 
+                  className="clear-search-button" 
+                  onClick={() => setStockSearch('')}
+                  aria-label="Clear search"
                 >
-                  <span className={`fi fi-${stock.country.toLowerCase()} search-flag`}></span>
-                  <div className="search-result-content">
-                    <div className="search-result-symbol">{stock.symbol}</div>
-                    <div className="search-result-name">{stock.name}</div>
-                  </div>
-                </div>
-              ))}
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              )}
+              {isSearching && (
+                <div className="search-loader"></div>
+              )}
             </div>
-          )}
+            
+            {searchResults.length > 0 && (
+              <div className="search-results" ref={stockSearchResultsRef}>
+                {searchResults.map((stock) => {
+                  // Find the country ISO code from the stock's country name
+                  const countryCode = Object.entries(COUNTRY_ISO_CODES).find(
+                    ([countryName]) => countryName.toLowerCase() === stock.country.toLowerCase()
+                  )?.[1]?.toLowerCase() || stock.country.toLowerCase();
+                  
+                  return (
+                  <div 
+                    key={stock.uniqueId || `${stock.symbol}-${stock.country}`}
+                      className={`stock-item ${selectedStock && selectedStock.symbol === stock.symbol ? 'selected' : ''}`}
+                    onClick={() => handleStockSelect(stock)}
+                      tabIndex="0" // Make it focusable for keyboard navigation
+                    >
+                      <div className="stock-flag">
+                        <span 
+                          className={`fi fi-${countryCode}`} 
+                          title={stock.country}
+                        ></span>
+                    </div>
+                      <div className="stock-info">
+                        <div className="stock-symbol">{stock.symbol}</div>
+                        <div className="stock-name">{stock.name}</div>
+                        <div className="stock-country">
+                          {Object.entries(COUNTRY_ISO_CODES).find(([_, code]) => 
+                            code.toLowerCase() === countryCode
+                          )?.[0] || stock.country}
+                      </div>
+                    </div>
+                  </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
       {/* Submit Buttons */}
       <div className="form-actions">
         <button

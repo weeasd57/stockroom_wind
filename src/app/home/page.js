@@ -2,30 +2,33 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import styles from '@/styles/home.module.css';
+import CreatePostButton from '@/components/posts/CreatePostButton';
 
 export default function HomePage() {
   const router = useRouter();
   const { isAuthenticated, loading, user } = useAuth();
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    // Redirect to landing page if not authenticated
+    // Only redirect if we're sure the user is not authenticated
     if (!loading && !isAuthenticated) {
       router.push('/landing');
     }
-    
-    // Animation effect
-    setIsVisible(true);
   }, [isAuthenticated, loading, router]);
 
   // Show loading state while checking authentication
   if (loading) {
     return (
-      <div className={styles.loadingContainer}>
-        <div className={styles.loadingSpinner}></div>
+      <div className={`${styles.homePage} ${styles.visible}`}>
+        <div className={styles.emptyHomeContainer}>
+          <div className={styles.createPostContainer}>
+            <h1 className={styles.emptyHomeTitle}>Welcome to FireStocks</h1>
+            <p className={styles.emptyHomeText}>Share your stock analysis with the community</p>
+            <div className={styles.loadingSpinner}></div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -36,16 +39,14 @@ export default function HomePage() {
   }
 
   return (
-    <div className={`${styles.homePage} ${isVisible ? styles.visible : ''}`}>
+    <div className={`${styles.homePage} ${styles.visible}`}>
       <div className={styles.emptyHomeContainer}>
         <div className={styles.createPostContainer}>
           <h1 className={styles.emptyHomeTitle}>Welcome to FireStocks</h1>
           <p className={styles.emptyHomeText}>Share your stock analysis with the community</p>
-          <Link href="/create-post" className={styles.createPostButton}>
-            Create Post
-          </Link>
+          <CreatePostButton className={styles.createPostButton} inDialog={true} />
         </div>
       </div>
     </div>
   );
-} 
+}
