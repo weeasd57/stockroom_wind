@@ -3,13 +3,23 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/contexts/ProfileContext';
+import { usePostForm } from '@/contexts/PostFormContext';
 import { generateEodLastCloseUrl, countries, BASE_URL, API_KEY } from '@/utils/stockApi';
 import { getCountrySymbolCounts, searchStocks, COUNTRY_ISO_CODES } from '@/utils/symbolSearch';
 import { formatSymbolForApi, getExchangeCodeFromData, getSymbolPriceFromLocalData, getEodApiUrlParams } from '@/utils/symbolUtils';
-import { createPost as supabaseCreatePost, uploadPostImage, createUserStrategy, getUserStrategies } from '@/utils/supabase';
+import { 
+  createPost as supabaseCreatePost, 
+  uploadPostImage, 
+  createUserStrategy, 
+  getUserStrategies,
+  invalidatePostsCache,
+  createBucketIfNotExists,
+} from '@/utils/supabase';
 import 'flag-icons/css/flag-icons.min.css';
 import '@/styles/create-post-page.css';
 import '@/styles/animation.css';
+import { compressImage } from '@/utils/imageUtils';
+import { toast } from 'react-toastify';
 
 // Near the top of the file
 const COUNTRY_CODE_TO_NAME = {
@@ -213,6 +223,16 @@ const getCurrencySymbol = (country) => {
 export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingChange }) {
   const { user } = useAuth();
   const { profile, getEffectiveAvatarUrl } = useProfile();
+  const { 
+    formState, 
+    updateFormState, 
+    clearFormState, 
+    handleDialogCancel, 
+    setBackgroundSubmission, 
+    requestCancellation 
+  } = usePostForm();
+  
+  // State initialization with context values
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionProgress, setSubmissionProgress] = useState('');
   const [description, setDescription] = useState('');
@@ -239,17 +259,23 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
   const [countrySymbolCounts, setCountrySymbolCounts] = useState({});
   const [priceHistory, setPriceHistory] = useState([]);
   const [apiResponse, setApiResponse] = useState(null);
+  const [targetPercentage, setTargetPercentage] = useState(5);
+  const [stopLossPercentage, setStopLossPercentage] = useState(5);
+  const [showStrategyDialog, setShowStrategyDialog] = useState(false);
+  const [originalImageFile, setOriginalImageFile] = useState(null);
+  const [imageCompressing, setImageCompressing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+
+  // References
   const fileInputRef = useRef(null);
   const searchTimeoutRef = useRef(null);
   const searchInputRef = useRef(null);
   const stockSearchResultsRef = useRef(null);
   const strategySelectRef = useRef(null);
   const formWrapperRef = useRef(null);
-  const [targetPercentage, setTargetPercentage] = useState(5);
-  const [stopLossPercentage, setStopLossPercentage] = useState(5);
-  const [showStrategyDialog, setShowStrategyDialog] = useState(false);
 
-  // الاستراتيجيات الافتراضية
+  // Default strategies
   const DEFAULT_STRATEGIES = [
     'Long Term Investment',
     'Swing Trading',
@@ -264,6 +290,111 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
     'Scalping',
     'News Trading'
   ];
+
+  // Load saved form state from context on component mount
+  useEffect(() => {
+    if (formState) {
+      if (formState.description) setDescription(formState.description);
+      if (formState.imagePreview) setImagePreview(formState.imagePreview);
+      if (formState.imageUrl) setImageUrl(formState.imageUrl);
+      if (formState.selectedStock) setSelectedStock(formState.selectedStock);
+      if (formState.currentPrice) setCurrentPrice(formState.currentPrice);
+      if (formState.targetPrice) setTargetPrice(formState.targetPrice);
+      if (formState.stopLossPrice) setStopLossPrice(formState.stopLossPrice);
+      if (formState.selectedStrategy) setSelectedStrategy(formState.selectedStrategy);
+      if (formState.targetPercentage) setTargetPercentage(formState.targetPercentage);
+      if (formState.stopLossPercentage) setStopLossPercentage(formState.stopLossPercentage);
+      if (formState.isSubmitting) setIsSubmitting(formState.isSubmitting);
+      if (formState.submissionProgress) setSubmissionProgress(formState.submissionProgress);
+    }
+  }, [formState]);
+
+  // Add a new useRef for tracking previous state
+  const prevStateRef = useRef(null);
+
+  // Update context state when critical form fields change, but avoid recursive updates
+  useEffect(() => {
+    // Skip the update if we're initializing from context (first render)
+    if (!prevStateRef.current) {
+      prevStateRef.current = {
+        description,
+        imagePreview,
+        imageUrl,
+        selectedStock,
+        currentPrice,
+        targetPrice,
+        stopLossPrice,
+        selectedStrategy,
+        targetPercentage,
+        stopLossPercentage,
+        isSubmitting,
+        submissionProgress
+      };
+      return;
+    }
+    
+    // Create a debounced update function
+    const timeoutId = setTimeout(() => {
+      // Check if any meaningful values have changed from previous state
+      const hasChanged = 
+        prevStateRef.current.description !== description ||
+        prevStateRef.current.imagePreview !== imagePreview ||
+        prevStateRef.current.imageUrl !== imageUrl ||
+        prevStateRef.current.selectedStock !== selectedStock ||
+        prevStateRef.current.targetPrice !== targetPrice ||
+        prevStateRef.current.stopLossPrice !== stopLossPrice ||
+        prevStateRef.current.selectedStrategy !== selectedStrategy ||
+        prevStateRef.current.targetPercentage !== targetPercentage ||
+        prevStateRef.current.stopLossPercentage !== stopLossPercentage ||
+        prevStateRef.current.isSubmitting !== isSubmitting ||
+        prevStateRef.current.submissionProgress !== submissionProgress;
+      
+      // Only update context if there are meaningful changes
+      if (hasChanged) {
+        try {
+          const currentState = {
+            isSubmitting,
+            submissionProgress,
+            description,
+            imagePreview,
+            imageUrl,
+            selectedStock,
+            currentPrice,
+            targetPrice,
+            stopLossPrice,
+            selectedStrategy,
+            targetPercentage,
+            stopLossPercentage
+          };
+          
+          // Update the context
+          updateFormState(currentState);
+          
+          // Update our reference to current values
+          prevStateRef.current = { ...currentState };
+        } catch (error) {
+          console.error('Error updating form state:', error);
+        }
+      }
+    }, 100); // Add a small delay to prevent rapid updates
+    
+    // Cleanup timeout on unmount or when dependencies change
+    return () => clearTimeout(timeoutId);
+  }, [
+    description,
+    imagePreview, 
+    imageUrl, 
+    selectedStock, 
+    currentPrice, 
+    targetPrice, 
+    stopLossPrice, 
+    selectedStrategy,
+    targetPercentage,
+    stopLossPercentage,
+    isSubmitting,
+    submissionProgress,
+    updateFormState
+  ]);
 
   // Notify parent component about submission state changes
   useEffect(() => {
@@ -608,26 +739,36 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
     }
   }, [stockSearch, selectedCountry]);
 
-  // Handle stock selection
+  // Add a ref for API request caching
+  const apiCache = useRef(new Map());
+  // Add a ref for the current abort controller
+  const currentFetchController = useRef(null);
+  // Add a ref for debouncing
+  const fetchDebounceRef = useRef(null);
+  
+  // Optimize the handle stock select function with debouncing and caching
   const handleStockSelect = async (stock) => {
     try {
-      // Set selected stock immediately for better UX
-      setSelectedStock(stock);
-      // Clear stock search to close dropdown
-      setStockSearch('');
-      setSearchResults([]);
-      // Show loading state
+      // Cancel any in-progress fetch
+      if (currentFetchController.current) {
+        currentFetchController.current.abort();
+      }
+      
+      // Clear any pending debounce
+      if (fetchDebounceRef.current) {
+        clearTimeout(fetchDebounceRef.current);
+      }
+      
+      // Set loading state
       setIsSearching(true);
       
-      // First, let's properly format the symbol for consistent API use
-      const formattedSymbol = formatSymbolForApi(stock.symbol, stock.country);
-      console.log(`Formatted symbol for API: ${formattedSymbol}`);
+      // Clear search results and hide dropdown immediately after selection
+      setSearchResults([]);
+      setShowStockSearch(false);
       
-      // Get the full country name if needed
-      let countryName = stock.country;
-      if (countryName.length === 2 && COUNTRY_CODE_TO_NAME[countryName.toLowerCase()]) {
-        countryName = COUNTRY_CODE_TO_NAME[countryName.toLowerCase()];
-      }
+      // Get the current stock country or fallback to the selected one
+      const countryName = stock.country || selectedCountry || 'US';
+      setSelectedStock(stock);
       
       // Try to get price data from local symbol file first
       try {
@@ -642,8 +783,6 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
           // Set default target prices based on the fetched price
           setTargetPrice((price * 1.05).toFixed(2));
           setStopLossPrice((price * 0.95).toFixed(2));
-          
-         
           
           setApiResponse({
             source: 'local',
@@ -693,16 +832,54 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
         setTimeout(() => {
           scrollToStockInfo();
         }, 100);
-      } else {
-        // Fetch price data using the generated URL
+        setIsSearching(false);
+        return;
+      }
+      
+      // Check cache first
+      const cacheKey = `price_${stock.symbol}_${countryName}`;
+      const cachedData = apiCache.current.get(cacheKey);
+      const cacheExpiry = 5 * 60 * 1000; // 5 minutes cache
+      
+      if (cachedData && (Date.now() - cachedData.timestamp < cacheExpiry)) {
+        console.log(`Using cached data for ${stock.symbol}`);
+        handlePriceData(cachedData.data, 'cache', currentApiUrl, cachedData.fetchTime);
+        setIsSearching(false);
+        setTimeout(() => {
+          scrollToStockInfo();
+        }, 100);
+        return;
+      }
+      
+      // Create a new AbortController for this fetch
+      currentFetchController.current = new AbortController();
+      const signal = currentFetchController.current.signal;
+      
+      // Use a timeout for the fetch
+      const timeoutId = setTimeout(() => {
+        if (currentFetchController.current) {
+          currentFetchController.current.abort();
+        }
+      }, 8000); // 8 seconds timeout
+      
+      // Track fetch start time
+      const fetchStartTime = new Date();
+      
+      // Use debouncing for the actual fetch
+      fetchDebounceRef.current = setTimeout(async () => {
         try {
           console.log(`Fetching price data from API: ${currentApiUrl}`);
-          // Always fetch the data from the API for the most up-to-date price
           
-          // Track fetch start time
-          const fetchStartTime = new Date();
+          const response = await fetch(currentApiUrl, {
+            signal,
+            headers: {
+              'Accept': 'application/json'
+            },
+            cache: 'no-cache' // Force fresh data
+          });
           
-          const response = await fetch(currentApiUrl);
+          // Clear timeout since fetch completed
+          clearTimeout(timeoutId);
           
           // Calculate fetch duration
           const fetchEndTime = new Date();
@@ -715,38 +892,15 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
           const priceData = await response.json();
           console.log(`API response:`, priceData);
           
-          // Store the full response
-          setApiResponse({
-            source: 'api',
-            url: currentApiUrl,
+          // Cache the successful response
+          apiCache.current.set(cacheKey, {
             data: priceData,
-            fetched: true,
-            fetchTime: `${fetchDuration}ms`
+            timestamp: Date.now(),
+            fetchTime: fetchDuration
           });
           
-          if (Array.isArray(priceData) && priceData.length > 0 && priceData[0] && typeof priceData[0].close === 'number') {
-            const price = priceData[0].close;
-            console.log(`Successfully parsed price from API: $${price}`);
-            
-            setCurrentPrice(price);
-            
-            // Set default target prices based on the fetched price
-            setTargetPrice((price * 1.05).toFixed(2));
-            setStopLossPrice((price * 0.95).toFixed(2));
-            
-            // Create a simple price history with just the current data point
-            setPriceHistory([{
-              date: priceData[0].date || new Date().toISOString().split('T')[0],
-              open: priceData[0].open || price,
-              high: priceData[0].high || price,
-              low: priceData[0].low || price,
-              close: price,
-              volume: priceData[0].volume || 0
-            }]);
-          } else {
-            console.warn(`Invalid API response structure for ${stock.symbol}:`, priceData);
-            throw new Error('Invalid price data structure in API response');
-          }
+          // Process the data
+          handlePriceData(priceData, 'api', currentApiUrl, fetchDuration);
         } catch (error) {
           console.error(`Error fetching stock price from API: ${error.message}`);
           // Set default values in case of error
@@ -755,71 +909,21 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
           setStopLossPrice('');
           setPriceHistory([]);
           
-          // Try to fetch directly from the URL as a fallback
-          try {
-            console.log(`Attempting direct fetch from: ${currentApiUrl}`);
-            
-            // Create a new AbortController to limit fetch time
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
-            
-            // Track fetch start time
-            const fetchStartTime = new Date();
-            
-            const directResponse = await fetch(currentApiUrl, {
-              signal: controller.signal,
-              headers: {
-                'Accept': 'application/json'
-              }
-            });
-            
-            clearTimeout(timeoutId);
-            
-            // Calculate fetch duration
-            const fetchEndTime = new Date();
-            const fetchDuration = fetchEndTime - fetchStartTime;
-            
-            if (!directResponse.ok) {
-              throw new Error(`Direct API call returned status: ${directResponse.status}`);
-            }
-            
-            const directData = await directResponse.json();
-            console.log('Direct API response:', directData);
-            
-            setApiResponse({
-              source: 'direct_api',
-              url: currentApiUrl,
-              data: directData,
-              fetched: true,
-              fetchTime: `${fetchDuration}ms`
-            });
-            
-            // Try to parse price data from the direct response
-            if (Array.isArray(directData) && directData.length > 0 && directData[0]?.close) {
-              const directPrice = directData[0].close;
-              setCurrentPrice(directPrice);
-              setTargetPrice((directPrice * 1.05).toFixed(2));
-              setStopLossPrice((directPrice * 0.95).toFixed(2));
-              
-              console.log(`Successfully parsed price from direct API: $${directPrice}`);
-            }
-          } catch (directError) {
-            console.error(`Direct fetch failed: ${directError.message}`);
+          // Try to fetch directly from the URL as a fallback only if not aborted
+          if (error.name !== 'AbortError') {
+            attemptDirectFetch(currentApiUrl, cacheKey);
+          } else {
             setApiResponse({
               source: 'api',
               url: currentApiUrl,
-              error: `${error.message} (Direct fetch also failed: ${directError.message})`,
+              error: 'Request timed out',
               fetched: true
             });
+            setIsSearching(false);
           }
         }
-      }
+      }, 300); // 300ms debounce
       
-      // Scroll to the stock info container after a short delay to ensure it's rendered
-      setTimeout(() => {
-        scrollToStockInfo();
-      }, 300); // 300ms delay to ensure the component is fully rendered
-
     } catch (error) {
       console.error('Error selecting stock/exchange:', error);
       // Don't show static data - set all price-related values to null or empty
@@ -827,14 +931,115 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
       setTargetPrice('');
       setStopLossPrice('');
       setPriceHistory([]);
-    } finally {
-      // Always clear loading state
+      setIsSearching(false);
+    }
+  };
+  
+  // Helper function to handle price data processing
+  const handlePriceData = (priceData, source, url, fetchTime) => {
+    setApiResponse({
+      source,
+      url,
+      data: priceData,
+      fetched: true,
+      fetchTime: typeof fetchTime === 'number' ? `${fetchTime}ms` : fetchTime
+    });
+    
+    if (Array.isArray(priceData) && priceData.length > 0 && priceData[0] && typeof priceData[0].close === 'number') {
+      const price = priceData[0].close;
+      console.log(`Successfully parsed price from ${source}: $${price}`);
+      
+      setCurrentPrice(price);
+      
+      // Set default target prices based on the fetched price
+      setTargetPrice((price * 1.05).toFixed(2));
+      setStopLossPrice((price * 0.95).toFixed(2));
+      
+      // Create a simple price history with just the current data point
+      setPriceHistory([{
+        date: priceData[0].date || new Date().toISOString().split('T')[0],
+        open: priceData[0].open || price,
+        high: priceData[0].high || price,
+        low: priceData[0].low || price,
+        close: price,
+        volume: priceData[0].volume || 0
+      }]);
+    } else {
+      console.warn(`Invalid API response structure:`, priceData);
+      setCurrentPrice(null);
+      setTargetPrice('');
+      setStopLossPrice('');
+      setPriceHistory([]);
+    }
+    
+    setIsSearching(false);
+    
+    // Scroll to the stock info container
+    setTimeout(() => {
+      scrollToStockInfo();
+    }, 100);
+  };
+  
+  // Helper function for direct fetch fallback
+  const attemptDirectFetch = async (url, cacheKey) => {
+    try {
+      console.log(`Attempting direct fetch from: ${url}`);
+      
+      // Create a new AbortController to limit fetch time
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      // Track fetch start time
+      const fetchStartTime = new Date();
+      
+      const directResponse = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json'
+        },
+        cache: 'no-cache'
+      });
+      
+      clearTimeout(timeoutId);
+      
+      // Calculate fetch duration
+      const fetchEndTime = new Date();
+      const fetchDuration = fetchEndTime - fetchStartTime;
+      
+      if (!directResponse.ok) {
+        throw new Error(`Direct API call returned status: ${directResponse.status}`);
+      }
+      
+      const directData = await directResponse.json();
+      console.log('Direct API response:', directData);
+      
+      // Cache the successful direct response
+      apiCache.current.set(cacheKey, {
+        data: directData,
+        timestamp: Date.now(),
+        fetchTime: fetchDuration
+      });
+      
+      handlePriceData(directData, 'direct_api', url, fetchDuration);
+    } catch (directError) {
+      console.error(`Direct fetch failed: ${directError.message}`);
+      setApiResponse({
+        source: 'api',
+        url,
+        error: `Failed to fetch data (${directError.message})`,
+        fetched: true
+      });
       setIsSearching(false);
     }
   };
 
-  // Helper function to scroll to stock info
+  // Add this conditional check function to safely use window
+  const isBrowser = () => typeof window !== 'undefined';
+
+  // Update the scrollToStockInfo function
   const scrollToStockInfo = () => {
+    if (!isBrowser()) return; // Don't execute on server
+
     const stockInfoElement = document.querySelector('.stock-info-container');
     if (stockInfoElement) {
       // First scroll the form to the top
@@ -885,16 +1090,114 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
     }
   };
 
-  // Handle image selection
-  const handleImageChange = (e) => {
+  // Update all useEffect hooks that use window or document
+  useEffect(() => {
+    if (!isBrowser()) return; // Skip on server
+
+    if (showStrategyInput) {
+      // Get the form elements
+      const formWrapper = document.querySelector('.form-wrapper');
+      const allFormElements = document.querySelectorAll('.form-group, .form-actions-bottom');
+      const scrollPosition = window.scrollY || document.documentElement.scrollTop;
+      
+      // Lock body scrolling completely
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollPosition}px`;
+      document.body.style.width = '100%';
+      
+      // Set all form elements to a lower z-index
+      allFormElements.forEach(el => {
+        if (el) el.style.zIndex = '1';
+      });
+      
+      // Reset scroll position of dialog content
+      setTimeout(() => {
+        const dialogContent = document.querySelector('.strategy-dialog-content');
+        if (dialogContent) {
+          dialogContent.scrollTop = 0;
+        }
+      }, 10);
+      
+      // Handle escape key to close
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+          setShowStrategyInput(false);
+        }
+      };
+      
+      window.addEventListener('keydown', handleKeyDown);
+      
+      return () => {
+        // Restore body scrolling
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        
+        // Restore scroll position
+        window.scrollTo(0, scrollPosition);
+        
+        // Reset z-index on form elements
+        allFormElements.forEach(el => {
+          if (el) el.style.zIndex = '';
+        });
+        
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [showStrategyInput]);
+
+  // Update handleImageChange to add compression
+  const handleImageChange = async (e) => {
     const file = e.target.files[0];
-    if (file) {
-      setImageFile(file);
-      // Create a URL for the preview
-      const objectUrl = URL.createObjectURL(file);
-      setImagePreview(objectUrl);
-      // Clean up the old URL to prevent memory leaks
-      return () => URL.revokeObjectURL(objectUrl);
+    if (!file) return;
+  
+    try {
+      // Store the original file reference
+      setOriginalImageFile(file);
+      
+      // Create preview immediately for better UX
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+      
+      // Show compressing state
+      setImageCompressing(true);
+      
+      // Compress the image in a non-blocking way
+      setTimeout(async () => {
+        try {
+          console.log('Starting image compression...');
+          // Compress image if it's larger than 800KB
+          if (file.size > 800 * 1024) {
+            const compressedFile = await compressImage(file, {
+              maxSizeMB: 0.8,
+              maxWidthOrHeight: 1920,
+              useWebWorker: true
+            });
+            
+            console.log('Image compressed:', {
+              originalSize: Math.round(file.size / 1024) + 'KB',
+              compressedSize: Math.round(compressedFile.size / 1024) + 'KB',
+              compressionRatio: Math.round((file.size / compressedFile.size) * 100) / 100 + 'x'
+            });
+            
+            setImageFile(compressedFile);
+          } else {
+            // Small images don't need compression
+            setImageFile(file);
+          }
+        } catch (compressError) {
+          console.error('Error compressing image:', compressError);
+          // Fallback to original file if compression fails
+          setImageFile(file);
+        } finally {
+          setImageCompressing(false);
+        }
+      }, 0);
+    } catch (error) {
+      console.error('Error handling image:', error);
+      setImageCompressing(false);
     }
   };
 
@@ -938,91 +1241,27 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
     }
   };
 
-  // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // Function to handle cancelling directly from the indicator
+  const handleCancelIndicator = () => {
+    console.log('Cancel requested from indicator (via context).');
+    requestCancellation(true); // Request cancellation via context
     
-    // التحقق من أن نافذة الاستراتيجية مغلقة قبل المتابعة
-    if (showStrategyDialog) {
-      closeStrategyDialog();
-    }
+    // Reset all submission states
+    setIsSubmitting(false);
+    setSubmissionProgress('');
+    setBackgroundSubmission(false);
     
-    if (!description.trim()) {
-      // toast.error('Please enter a description');
-      return;
-    }
+    // Reset form state in context
+    updateFormState({
+      isSubmitting: false,
+      submissionProgress: '',
+      backgroundSubmission: false,
+      isCancelled: false
+    });
     
-    setIsSubmitting(true);
-    setSubmissionProgress('Preparing your post...');
-    
-    try {
-      let uploadedImageUrl = imageUrl;
-      
-      // Upload image if file is selected
-      if (imageFile) {
-        setSubmissionProgress('Uploading image...');
-        uploadedImageUrl = await uploadPostImage(imageFile, user.id);
-      }
-      
-      // Create post data object
-      const postData = {
-        user_id: user.id,
-        content: description.trim(),
-        image_url: uploadedImageUrl || null,
-        strategy: selectedStrategy || null,
-      };
-      
-      // Add stock data if selected
-      if (selectedStock) {
-        postData.symbol = selectedStock.symbol;
-        postData.company_name = selectedStock.name;
-        postData.country = selectedStock.country;
-        postData.current_price = currentPrice;
-        postData.target_price = targetPrice ? parseFloat(targetPrice) : null;
-        postData.stop_loss_price = stopLossPrice ? parseFloat(stopLossPrice) : null;
-      }
-      
-      // Create post in database
-      setSubmissionProgress('Creating your post...');
-      const { data: newPost, error } = await supabaseCreatePost(postData);
-      
-      if (error) {
-        throw error;
-      }
-      
-      setSubmissionProgress('Post created! Finishing up...');
-      
-      // Only reset the form after successful submission
-      // Don't clear the form while posting to allow user to stay in context
-      if (newPost) {
-        // Reset form
-        setDescription('');
-        setImageFile(null);
-        setImagePreview('');
-        setImageUrl('');
-        setSelectedStock(null);
-        setStockSearch('');
-        setCurrentPrice(null);
-        setTargetPrice('');
-        setStopLossPrice('');
-        setSelectedStrategy('');
-        
-        // Notify parent component
-        if (onPostCreated) {
-          onPostCreated(newPost);
-        }
-      }
-      
-      // toast.success('Post created successfully');
-    } catch (error) {
-      console.error('Error creating post:', error);
-      // toast.error('Failed to create post');
-    } finally {
-      setTimeout(() => {
-        setSubmissionProgress('');
-        setIsSubmitting(false);
-      }, 1000); // Keep the status visible briefly after completion
-    }
+    // Invalidate posts cache to ensure fresh data on next request
+    invalidatePostsCache();
+    console.log('Posts cache invalidated after canceling fetch.');
   };
 
   // Handle scroll in stock search results to maintain focus
@@ -1078,15 +1317,6 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
       }
     };
   }, [showStockSearch, searchResults.length, handleStockResultsScroll, handleStockResultsKeyDown]);
-
-  // Format currency helper function
-  const formatCurrency = (value, currency = 'USD') => {
-    if (!value) return '';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency
-    }).format(value);
-  };
 
   const handleRemoveImage = () => {
     setImageFile(null);
@@ -1146,115 +1376,56 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
     e.stopPropagation();
   };
 
-  // Handle strategy dropdown display
+  // إضافة استماع لمفتاح Escape
   useEffect(() => {
-    if (showStrategyInput) {
-      // Get the form elements
-      const formWrapper = document.querySelector('.form-wrapper');
-      const allFormElements = document.querySelectorAll('.form-group, .form-actions-bottom');
-      const scrollPosition = window.scrollY || document.documentElement.scrollTop;
-      
-      // Lock body scrolling completely
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollPosition}px`;
-      document.body.style.width = '100%';
-      
-      // Set all form elements to a lower z-index
-      allFormElements.forEach(el => {
-        if (el) el.style.zIndex = '1';
-      });
-      
-      // Reset scroll position of dialog content
-      setTimeout(() => {
-        const dialogContent = document.querySelector('.strategy-dialog-content');
-        if (dialogContent) {
-          dialogContent.scrollTop = 0;
-        }
-      }, 10);
-      
-      // Handle escape key to close
-      const handleKeyDown = (e) => {
-        if (e.key === 'Escape') {
-          setShowStrategyInput(false);
-        }
-      };
-      
-      window.addEventListener('keydown', handleKeyDown);
-      
-      return () => {
-        // Restore body scrolling
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-        
-        // Restore scroll position
-        window.scrollTo(0, scrollPosition);
-        
-        // Reset z-index on form elements
-        allFormElements.forEach(el => {
-          if (el) el.style.zIndex = '';
-        });
-        
-        window.removeEventListener('keydown', handleKeyDown);
-      };
-    }
-  }, [showStrategyInput]);
+    const handleEscapeKeyForStrategy = (e) => {
+      if (e.key === 'Escape' && showStrategyDialog) {
+        closeStrategyDialog();
+      }
+    };
+    
+    document.addEventListener('keydown', handleEscapeKeyForStrategy);
+    
+    return () => {
+      document.removeEventListener('keydown', handleEscapeKeyForStrategy);
+    };
+  }, [showStrategyDialog]);
 
-  // Add this function to properly cancel search
-  const handleCancelSearch = () => {
-    // Clear search results
-    setSearchResults([]);
-    // Clear search input
-    setStockSearch('');
-    // Ensure loading state is cleared
-    setIsSearching(false);
-    // Clear any pending timeouts
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-      searchTimeoutRef.current = null;
-    }
-  };
-
-  // Effect to handle body and form scrolling when strategy dialog is open
+  // 4. تحسين استجابة مفتاح Escape
   useEffect(() => {
-    if (showStrategyInput) {
-      // Prevent body scrolling
-      document.body.style.overflow = 'hidden';
-      
-      // Also prevent form wrapper scrolling
-      const formWrapper = document.querySelector('.form-wrapper');
-      if (formWrapper) {
-        formWrapper.style.overflow = 'hidden';
-      }
-      
-      // iOS specific fix for momentum scrolling and proper dialog height
-      const dialogContent = document.querySelector('.strategy-dialog-content');
-      if (dialogContent) {
-        dialogContent.style.scrollBehavior = 'auto';
-        
-        // Force redraw to ensure proper rendering on iOS
-        setTimeout(() => {
-          dialogContent.style.display = 'none';
-          void dialogContent.offsetHeight; // Trigger reflow
-          dialogContent.style.display = 'block';
-          dialogContent.scrollTop = 0;
-        }, 50);
-      }
-      
-      return () => {
-        // Restore scrolling
-        document.body.style.overflow = '';
-        if (formWrapper) {
-          formWrapper.style.overflow = '';
+    const handleEscapeKey = (event) => {
+      if (event.key === 'Escape') {
+        console.log('Escape key pressed, showStrategyDialog:', showStrategyDialog);
+        if (showStrategyDialog) {
+          closeStrategyDialog();
         }
-      };
-    }
-  }, [showStrategyInput]);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscapeKey);
+    return () => {
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [showStrategyDialog]);
+
+  // Listen for Escape key to close strategy dialog
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && showStrategyDialog) {
+        closeStrategyDialog();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showStrategyDialog]);
 
   // Function to scroll form wrapper and page to top, but only for strategy select-field
   const scrollFormToTop = (element) => {
+    if (!isBrowser()) return; // Skip on server
+    
     // Only scroll to top for strategy select-field, not category select-field
     if (element === 'strategy') {
       // Scroll the form wrapper to top
@@ -1340,6 +1511,8 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
 
   // إضافة دالة للتمرير إلى الأعلى عند فتح ديالوج الاستراتيجية
   const openStrategyDialog = () => {
+    if (!isBrowser()) return; // Skip on server
+    
     // First, make sure the strategies are loaded
     if (strategies.length === 0) {
       setStrategies(DEFAULT_STRATEGIES);
@@ -1376,6 +1549,8 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
 
   // Function to close the strategy dialog
   const closeStrategyDialog = () => {
+    if (!isBrowser()) return; // Skip on server
+    
     console.log('Closing strategy dialog');
     
     // Hide the dialog
@@ -1397,51 +1572,228 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
     }, 100);
   };
 
-  // إضافة استماع لمفتاح Escape
-  useEffect(() => {
-    const handleEscapeKeyForStrategy = (e) => {
-      if (e.key === 'Escape' && showStrategyDialog) {
-        closeStrategyDialog();
-      }
-    };
+  // Enhance cancel search function to properly abort in-progress fetches
+  const handleCancelSearch = () => {
+    // Clear search results
+    setSearchResults([]);
+    // Clear search input
+    setStockSearch('');
+    // Ensure loading state is cleared
+    setIsSearching(false);
     
-    document.addEventListener('keydown', handleEscapeKeyForStrategy);
+    // Abort any in-progress fetch
+    if (currentFetchController.current) {
+      currentFetchController.current.abort();
+      currentFetchController.current = null;
+    }
     
-    return () => {
-      document.removeEventListener('keydown', handleEscapeKeyForStrategy);
-    };
-  }, [showStrategyDialog]);
+    // Clear any pending timeouts
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+    
+    if (fetchDebounceRef.current) {
+      clearTimeout(fetchDebounceRef.current);
+      fetchDebounceRef.current = null;
+    }
+  };
 
-  // 4. تحسين استجابة مفتاح Escape
-  useEffect(() => {
-    const handleEscapeKey = (event) => {
-      if (event.key === 'Escape') {
-        console.log('Escape key pressed, showStrategyDialog:', showStrategyDialog);
-        if (showStrategyDialog) {
-          closeStrategyDialog();
+  const handleCancel = () => {
+    if (onCancel) {
+      onCancel();
+    }
+  };
+
+  // Add handleSubmit function
+  const handleSubmit = async () => {
+    if (!description.trim() || isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      setSubmissionProgress('Preparing your post...');
+
+      let imageUrlToUse = imageUrl;
+
+      // If there's an image file, try to upload it
+      if (imageFile) {
+        try {
+          setSubmissionProgress('Uploading image...');
+          
+          // Calculate upload progress percentage
+          const uploadStartTime = Date.now();
+          const updateProgress = () => {
+            const elapsed = Date.now() - uploadStartTime;
+            // Simulate progress based on time (max 90% until actual completion)
+            const progress = Math.min(90, Math.round(elapsed / 50)); // Divide by a factor to control speed
+            setSubmissionProgress(`Uploading image... ${progress}%`);
+          };
+          
+          // Start progress updates
+          const progressInterval = setInterval(updateProgress, 200);
+          
+          // Use handleImageUpload instead of direct uploadPostImage call
+          imageUrlToUse = await handleImageUpload(imageFile);
+          
+          // Clear the interval once upload is complete
+          clearInterval(progressInterval);
+          
+          if (imageUrlToUse) {
+            setSubmissionProgress('Upload complete!');
+          } else {
+            setSubmissionProgress('Continuing without image...');
+          }
+          
+        } catch (uploadError) {
+          console.error('Error uploading image:', uploadError);
+          imageUrlToUse = null;
+          setSubmissionProgress('Continuing without image...');
         }
       }
-    };
 
-    document.addEventListener('keydown', handleEscapeKey);
-    return () => {
-      document.removeEventListener('keydown', handleEscapeKey);
-    };
-  }, [showStrategyDialog]);
+      // Create the post data object with only existing columns
+      const postData = {
+        content: description.trim(),
+        user_id: user.id,
+        image_url: imageUrlToUse,
+        symbol: selectedStock?.symbol || null,
+        company_name: selectedStock?.name || null,
+        country: selectedStock?.country || null,
+        target_price: targetPrice || null,
+        exchange: selectedStock?.exchange || null,  
+        current_price: currentPrice || null,
+        stop_loss_price: stopLossPrice || null,
+        strategy: selectedStrategy || null,
+        description: description.trim() || null,
+      };
 
-  // Listen for Escape key to close strategy dialog
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && showStrategyDialog) {
-        closeStrategyDialog();
+      // Create the post
+      setSubmissionProgress('Creating post...');
+      const { data, error } = await supabaseCreatePost(postData);
+      
+      if (error) {
+        throw error;
       }
-    };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [showStrategyDialog]);
+      // Clear form state
+      setDescription('');
+      setImageFile(null);
+      setOriginalImageFile(null);
+      setImagePreview('');
+      setImageUrl('');
+      setSelectedStock(null);
+      setCurrentPrice(null);
+      setTargetPrice('');
+      setStopLossPrice('');
+      setSelectedStrategy('');
+      clearFormState();
+
+      // Notify parent of successful creation with the complete post data
+      if (onPostCreated && data) {
+        // Add created_at if it's missing
+        if (!data.created_at) {
+          data.created_at = new Date().toISOString();
+        }
+        
+        // Add any missing fields from the post data
+        const completePostData = {
+          ...data,
+          ...postData
+        };
+        
+        console.log('Post created successfully:', completePostData);
+        onPostCreated({ data: completePostData });
+      }
+
+    } catch (error) {
+      console.error('Error creating post:', error);
+      setSubmissionProgress('Error creating post. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+      setSubmissionProgress('');
+    }
+  };
+
+  // Add a configurable timeout with a longer duration
+  const uploadTimeout = 60000; // 60 seconds instead of default
+
+  // Modify your image upload function to include better timeout handling
+  const handleImageUpload = async (file) => {
+    try {
+      setIsUploading(true);
+      setUploadError(null);
+      setSubmissionProgress('Preparing to upload image...');
+      
+      // Try to ensure the bucket exists before uploading
+      try {
+        setSubmissionProgress('Checking storage bucket...');
+        const bucketExists = await createBucketIfNotExists('posts');
+        if (!bucketExists) {
+          console.warn('Failed to create or verify posts bucket');
+        }
+      } catch (bucketError) {
+        console.error('Error checking/creating bucket:', bucketError);
+      }
+      
+      // Create a timeout promise that rejects after specified time
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Upload timeout - please try again with a smaller image or check your connection')), uploadTimeout);
+      });
+      
+      // Race the actual upload against the timeout
+      let uploadResult;
+      try {
+        setSubmissionProgress('Uploading to Supabase storage...');
+        uploadResult = await Promise.race([
+          uploadPostImage(file), // Your existing upload function
+          timeoutPromise
+        ]);
+      } catch (error) {
+        // Check for bucket not found error and create a data URL as fallback
+        if (error.message && (error.message.includes('Bucket not found') || 
+            (error.statusCode === '404' && error.error === 'Bucket not found'))) {
+          console.log('Bucket not found, using data URL as fallback');
+          setSubmissionProgress('Storage bucket not available, using alternative storage method...');
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const dataUrl = reader.result;
+              setImageUrl(dataUrl);
+              setIsUploading(false);
+              setSubmissionProgress('');
+              console.log('Used data URL as fallback (temporary storage method)');
+              resolve(dataUrl);
+            };
+            reader.readAsDataURL(file);
+          });
+        } else {
+          // Re-throw other errors
+          throw error;
+        }
+      }
+      
+      // Check if the result is a data URL (fallback) or a proper storage URL
+      const isDataUrl = typeof uploadResult === 'string' && uploadResult.startsWith('data:');
+      if (isDataUrl) {
+        console.log('Image stored as data URL (temporary method)');
+      } else {
+        console.log('Image successfully uploaded to Supabase storage:', uploadResult.url || uploadResult);
+      }
+      
+      setImageUrl(uploadResult.url || uploadResult);
+      setIsUploading(false);
+      setSubmissionProgress('');
+      return uploadResult.url || uploadResult;
+    } catch (error) {
+      setIsUploading(false);
+      setUploadError(error.message);
+      setSubmissionProgress('');
+      console.error("Error uploading image:", error);
+      // Show a user-friendly error message
+      toast.error(`Upload failed: ${error.message}. Please try again with a smaller image.`);
+      return null;
+    }
+  };
 
   return (
     <div className="create-post-form-container" ref={formWrapperRef}>
@@ -1456,6 +1808,14 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
               {submissionProgress || 'Processing your post...'}
             </div>
           </div>
+          {/* Add Cancel button to the indicator */}
+          <button 
+            onClick={handleCancelIndicator}
+            className="post-status-cancel-btn"
+            aria-label="Cancel post submission"
+          >
+            ✕
+          </button>
         </div>
       )}
       
@@ -1469,6 +1829,11 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
                 alt="Preview"
                 className="file-preview-item img"
               />
+              {imageCompressing && (
+                <div className="image-compression-badge">
+                  Optimizing...
+                </div>
+              )}
               <button
                 className="file-remove"
                 onClick={handleRemoveImage}
@@ -1480,6 +1845,12 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
                 </svg>
               </button>
             </div>
+            {imageFile && originalImageFile && imageFile.size < originalImageFile.size && (
+              <div className="compression-info">
+                Optimized: {Math.round(originalImageFile.size / 1024)}KB → {Math.round(imageFile.size / 1024)}KB 
+                ({Math.round((1 - imageFile.size / originalImageFile.size) * 100)}% smaller)
+              </div>
+            )}
           </div>
         )}
 
@@ -1629,9 +2000,6 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
                     <div className="form-group col-md-6 target-price-group">
                       <label htmlFor="targetPrice">Target Price</label>
                       <div className="price-input-with-percentage">
-                        <div className="currency-symbol-prefix">
-                          {getCurrencySymbol(selectedStock?.country)}
-                        </div>
                         <input
                           type="number"
                           className="form-control with-currency-symbol"
@@ -1672,9 +2040,6 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
                     <div className="form-group col-md-6 stop-loss-price-group">
                       <label htmlFor="stopLossPrice">Stop Loss</label>
                       <div className="price-input-with-percentage">
-                        <div className="currency-symbol-prefix">
-                          {getCurrencySymbol(selectedStock?.country)}
-                        </div>
                         <input
                           type="number"
                           className="form-control with-currency-symbol"
@@ -1782,14 +2147,20 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
           <textarea
             id="description"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) => {
+              try {
+                setDescription(e.target.value);
+              } catch (error) {
+                console.error('Error updating description:', error);
+              }
+            }}
             placeholder="Share your thoughts..."
             className="form-control"
           ></textarea>
           <div className="focus-ring"></div>
           {description && (
             <div className={`char-counter ${description.length > 500 ? 'warning' : ''} ${description.length > 1000 ? 'danger' : ''}`}>
-              {description.length} / 1000
+              {typeof description === 'string' ? description.length : 0} / 1000
             </div>
           )}
         </div>
@@ -1840,9 +2211,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
         </div>
               
         {/* Stock Search Section */}
-        <div className="form-group stock-search-container">
-          <label className="form-label">Search for a stock</label>
-          
+        <div className="form-group stock-search-container">          
           <div className="stock-search-wrapper">
             <div className="category-select">
               <label htmlFor="countrySelect" className="form-label">Country</label>
@@ -2123,28 +2492,45 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
         </div>
       </div>
 
-      {/* Submit Buttons - Fixed at bottom */}
+      {/* Form Actions */}
       <div className="form-actions form-actions-bottom">
-        <button
-          onClick={handleSubmit}
-          disabled={isSubmitting || !description}
-          className={`btn btn-primary ${isSubmitting ? 'is-submitting' : ''}`}
-        >
-          {isSubmitting ? 'Posting...' : 'Post'}
-        </button>
-        <button 
-          className="btn btn-secondary" 
-          onClick={(e) => {
-            if (isSubmitting) {
-              // Show posting message but still allow dialog to close
-              setSubmissionProgress('Posting in progress, your post will complete in the background...');
-            }
-            // Always call onCancel to close the dialog
-            onCancel();
-          }}
-        >
-          Cancel
-        </button>
+        <div className="form-actions-content">
+          {submissionProgress && (
+            <div className="submission-progress">
+              <div className="progress-spinner"></div>
+              <span>{submissionProgress}</span>
+            </div>
+          )}
+          <div className="form-buttons">
+            <button
+              type="submit"
+              className={`submit-button ${isSubmitting ? 'submitting' : ''}`}
+              disabled={isSubmitting || !description.trim()}
+              onClick={handleSubmit}
+            >
+              {isSubmitting ? 'Posting...' : 'Post'}
+            </button>
+            {isSubmitting ? (
+              <button 
+                type="button" 
+                className="cancel-button cancel-fetching"
+                onClick={handleCancelIndicator}
+                aria-label="Cancel post submission"
+              >
+                Cancel Fetching
+              </button>
+            ) : (
+              <button 
+                type="button" 
+                className="cancel-button"
+                onClick={handleCancel}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

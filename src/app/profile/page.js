@@ -238,6 +238,26 @@ export default function Profile() {
     }
   }, [backgroundUploadProgress, forceRefreshBackground]);
 
+  // Add useEffect to periodically refresh posts
+  useEffect(() => {
+    // Initial load
+    if (user && !isInitialized) {
+      initializeData(user.id);
+    }
+    
+    // Set up auto-refresh
+    let refreshInterval;
+    if (user && user.id) {
+      refreshInterval = setInterval(() => {
+        refreshData(user.id);
+      }, 60000); // Refresh every minute
+    }
+    
+    return () => {
+      if (refreshInterval) clearInterval(refreshInterval);
+    };
+  }, [user, isInitialized, initializeData, refreshData]);
+
   // Only show loading state during initial load
   if (authLoading || (profileLoading && !isInitialized)) {
     return <div className={styles.loading}>Loading...</div>;
@@ -871,24 +891,88 @@ export default function Profile() {
       {/* Content Section */}
       <div className={styles.contentSection}>
         {activeTab === 'posts' && (
-          <div className={styles.postsGrid}>
-            
-            
-            {posts.length > 0 ? (
-              posts.map(post => (
-                <div key={post.id} className={styles.postCard}>
-                  <p className={styles.postContent}>{post.content}</p>
-                  <div className={styles.postMeta}>
-                    <span className={styles.postDate}>
-                      {new Date(post.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-              ))
+          <>
+            {isLoading && posts.length === 0 ? (
+              <div className={styles.loadingContainer}>
+                <div className={styles.loadingSpinner}></div>
+                <p>Loading posts...</p>
+              </div>
             ) : (
-              <p className={styles.emptyMessage}>No posts yet</p>
+              <div className={styles.postsGrid}>
+                {posts.length > 0 ? (
+                  posts.map(post => (
+                    <div key={post.id} className={styles.postCard}>
+                      {post.image_url && (
+                        <div className={styles.postImageContainer}>
+                          <img 
+                            src={post.image_url} 
+                            alt="Post" 
+                            className={styles.postImage}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      )}
+                      
+                      <div className={styles.postContent}>
+                        {post.content}
+                      </div>
+                      
+                      {post.symbol && (
+                        <div className={styles.stockInfo}>
+                          <div className={styles.stockSymbol}>
+                            {post.symbol}
+                            {post.company_name && <span> - {post.company_name}</span>}
+                          </div>
+                          
+                          {post.current_price && (
+                            <div className={styles.priceInfo}>
+                              <div className={styles.currentPrice}>
+                                Current: {post.current_price}
+                              </div>
+                              
+                              {post.target_price && (
+                                <div className={styles.targetPrice}>
+                                  Target: {post.target_price}
+                                </div>
+                              )}
+                              
+                              {post.stop_loss_price && (
+                                <div className={styles.stopLossPrice}>
+                                  Stop: {post.stop_loss_price}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {post.strategy && (
+                            <div className={styles.strategy}>
+                              Strategy: {post.strategy}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      <div className={styles.postMeta}>
+                        <span className={styles.postDate}>
+                          {new Date(post.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className={styles.emptyPostsContainer}>
+                    <p className={styles.emptyMessage}>No posts yet</p>
+                    <p className={styles.createPostPrompt}>
+                      Share your first trading idea with the community!
+                    </p>
+                  </div>
+                )}
+              </div>
             )}
-          </div>
+          </>
         )}
         
         {activeTab === 'followers' && (

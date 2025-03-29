@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import '@/styles/create-post-page.css';
 import logger from '@/utils/logger';
+import useProfileStore from '@/store/profileStore';
 
 // Lazy load CreatePostForm component
 const CreatePostForm = lazy(() => import('./CreatePostForm'));
@@ -19,6 +20,8 @@ export default function CreatePostButton({ className = '', inDialog = false }) {
   const { isAuthenticated } = useAuth();
   const [showDialog, setShowDialog] = useState(false);
   const isSubmittingRef = useRef(false);
+  // Get the addPost function from profileStore
+  const addPost = useProfileStore(state => state.addPost);
 
   const handleOpenDialog = () => {
     if (isAuthenticated) {
@@ -31,10 +34,15 @@ export default function CreatePostButton({ className = '', inDialog = false }) {
     setShowDialog(false);
   };
 
-  const handlePostCreated = () => {
+  const handlePostCreated = (newPost) => {
     isSubmittingRef.current = false;
     setShowDialog(false);
-    // You could add a callback here to refresh posts if needed
+    
+    // Add the new post to the profile store to update UI immediately
+    if (newPost && newPost.data) {
+      console.log('Adding new post to profile store:', newPost.data);
+      addPost(newPost.data);
+    }
   };
 
   // Track submission state

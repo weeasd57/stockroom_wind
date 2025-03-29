@@ -34,6 +34,31 @@ export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
   },
 });
 
+// Initialize required storage buckets
+export async function initializeStorageBuckets() {
+  if (typeof window === 'undefined' || !isSupabaseConfigured()) {
+    return false;
+  }
+  
+  try {
+    // List of buckets required by the application
+    const requiredBuckets = ['posts', 'avatars', 'backgrounds'];
+    
+    // Check and create each bucket
+    for (const bucketName of requiredBuckets) {
+      const success = await createBucketIfNotExists(bucketName);
+      if (!success) {
+        console.warn(`Failed to create/verify bucket: ${bucketName}`);
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error initializing storage buckets:', error);
+    return false;
+  }
+}
+
 // Test the connection on initialization
 (async function testConnection() {
   if (typeof window !== 'undefined' && isSupabaseConfigured()) {
@@ -48,6 +73,9 @@ export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
       } else {
         logger.log('Supabase connection successful');
       }
+      
+      // Initialize storage buckets
+      await initializeStorageBuckets();
     } catch (err) {
       logger.error('Failed to test Supabase connection:', err.message);
     }
@@ -659,27 +687,138 @@ export async function createPost(postData) {
 }
 
 /**
+ * Create a storage bucket if it doesn't exist
+ * @param {string} bucketName - Name of the bucket to create
+ * @returns {Promise<boolean>} - Whether the bucket was created or already exists
+ */
+export async function createBucketIfNotExists(bucketName) {
+  try {
+    // First check if the bucket exists
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    
+    if (listError) {
+      console.error('Error listing buckets:', listError);
+      return false;
+    }
+    
+    // Check if the bucket already exists
+    const bucketExists = buckets.some(bucket => bucket.name === bucketName);
+    if (bucketExists) {
+      console.log(`Bucket "${bucketName}" already exists`);
+      return true;
+    }
+    
+    // Create the bucket if it doesn't exist
+    const { error: createError } = await supabase.storage.createBucket(bucketName, {
+      public: true, // Make bucket publicly accessible
+      fileSizeLimit: 5242880, // 5MB in bytes
+    });
+    
+    if (createError) {
+      console.error(`Error creating bucket "${bucketName}":`, createError);
+      return false;
+    }
+    
+    console.log(`Bucket "${bucketName}" created successfully`);
+    return true;
+  } catch (error) {
+    console.error(`Error checking/creating bucket "${bucketName}":`, error);
+    return false;
+  }
+}
+
+/**
  * Upload post image to storage
  * @param {File} file - Image file to upload
  * @param {string} userId - User ID
+ * @param {Object} options - Upload options
  * @returns {Promise<string>} - Public URL of the uploaded image
  */
-export async function uploadPostImage(file, userId) {
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${userId}/${Date.now()}.${fileExt}`;
-  const filePath = `post-images/${fileName}`;
+export async function uploadPostImage(file, userId = 'anonymous') {
+  if (!file) throw new Error('No file provided');
   
-  const { error } = await supabase.storage
-    .from('posts')
-    .upload(filePath, file);
+  try {
+    // Verify file size - reject if too large (5MB max)
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+    if (file.size > MAX_SIZE) {
+      throw new Error(`File size exceeds limit (5MB). Current size: ${Math.round(file.size / 1024)}KB`);
+    }
     
-  if (error) throw error;
-  
-  const { data } = supabase.storage
-    .from('posts')
-    .getPublicUrl(filePath);
+    console.log(`Uploading post image: ${file.name} (${Math.round(file.size / 1024)}KB)`);
     
-  return data.publicUrl;
+    // Try to create the bucket if it doesn't exist
+    const bucketCreated = await createBucketIfNotExists('posts');
+    if (!bucketCreated) {
+      console.warn('Failed to create posts bucket. Falling back to data URL.');
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+    }
+    
+    // Create a unique file path
+    const fileExt = file.name.split('.').pop().toLowerCase();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${fileExt}`;
+    const filePath = `post-images/${userId}/${fileName}`;
+    
+    // Set up cache control to improve performance
+    const options = {
+      cacheControl: '3600',
+      upsert: false
+    };
+    
+    // Upload the file with enhanced error handling
+    const { error } = await supabase.storage
+      .from('posts')
+      .upload(filePath, file, options);
+      
+    if (error) {
+      console.error('Upload error:', error);
+      
+      // Provide more specific error messages
+      if (error.message && (error.message.includes('storage/bucket-not-found') || error.message.includes('Bucket not found'))) {
+        // If bucket doesn't exist, use FileReader to convert the image to a data URL
+        console.log('Falling back to data URL for image');
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(file);
+        });
+      } else if (error.message && error.message.includes('413')) {
+        throw new Error('File too large');
+      } else if (error.message && error.message.includes('network')) {
+        throw new Error('Network error');
+      }
+      
+      throw error;
+    }
+    
+    // Get the public URL
+    const { data } = supabase.storage
+      .from('posts')
+      .getPublicUrl(filePath);
+    
+    if (!data || !data.publicUrl) {
+      throw new Error('Failed to get public URL');
+    }
+    
+    console.log('Post image uploaded successfully:', data.publicUrl);
+    return data.publicUrl;
+  } catch (error) {
+    // If bucket not found, try a different approach
+    if (error.message && error.message.includes('Bucket not found')) {
+      console.log('Posts bucket not found, using data URL instead');
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+    }
+    
+    console.error('Error in uploadPostImage:', error);
+    throw error;
+  }
 }
 
 /**

@@ -9,6 +9,7 @@ import ClientImagePreloader from '@/components/ClientImagePreloader';
 import { Roboto_Mono } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
+import { PostFormProvider } from '@/contexts/PostFormContext';
 
 // Replace Geist with Inter as the primary font
 const inter = Inter({
@@ -57,18 +58,20 @@ export default function RootLayout({ children }) {
             }
           `}
         </Script>
-        <SupabaseProvider>
-          <AuthProvider>
-            <ProfileProvider>
-              <ThemeProvider defaultTheme="dark" attribute="class">
-                <ClientSideLayout>
-                  <ClientImagePreloader />
-                  {children}
-                </ClientSideLayout>
-              </ThemeProvider>
-            </ProfileProvider>
-          </AuthProvider>
-        </SupabaseProvider>
+        <PostFormProvider>
+          <SupabaseProvider>
+            <AuthProvider>
+              <ProfileProvider>
+                <ThemeProvider defaultTheme="dark" attribute="class">
+                  <ClientSideLayout>
+                    <ClientImagePreloader />
+                    {children}
+                  </ClientSideLayout>
+                </ThemeProvider>
+              </ProfileProvider>
+            </AuthProvider>
+          </SupabaseProvider>
+        </PostFormProvider>
       </body>
     </html>
   );
