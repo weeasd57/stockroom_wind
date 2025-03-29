@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { getAvatarImageUrl, getBackgroundImageUrl } from '@/utils/supabase';
+import logger from '@/utils/logger';
 
 /**
  * Client component that preloads user images to ensure they're properly cached
@@ -26,9 +27,9 @@ const ClientImagePreloader = () => {
           preloadImage('/profile-bg.jpg', true)
         ]);
         
-        console.log('Default images preloaded successfully');
+        logger.log('Default images preloaded successfully');
       } catch (error) {
-        console.error('Error preloading default images:', error);
+        logger.error('Error preloading default images:', error);
       }
     };
     
@@ -42,14 +43,14 @@ const ClientImagePreloader = () => {
         try {
           avatarUrl = await getAvatarImageUrl(user.id);
         } catch (error) {
-          console.warn('Error getting avatar URL for preloading:', error);
+          logger.warn('Error getting avatar URL for preloading:', error);
           avatarUrl = null;
         }
         
         try {
           backgroundUrl = await getBackgroundImageUrl(user.id);
         } catch (error) {
-          console.warn('Error getting background URL for preloading:', error);
+          logger.warn('Error getting background URL for preloading:', error);
           backgroundUrl = null;
         }
         
@@ -73,14 +74,14 @@ const ClientImagePreloader = () => {
         // Wait for user images to load if there are any
         if (userImagesPromises.length > 0) {
           await Promise.all(userImagesPromises);
-          console.log('User-specific images preloaded successfully');
+          logger.log('User-specific images preloaded successfully');
         } else {
-          console.log('No user-specific images to preload');
+          logger.log('No user-specific images to preload');
         }
         
         setImagesLoaded(true);
       } catch (error) {
-        console.error('Error preloading user images:', error);
+        logger.error('Error preloading user images:', error);
         setImagesLoaded(true);
       }
     };
@@ -112,7 +113,7 @@ const ClientImagePreloader = () => {
       
       // Skip if this URL has failed before
       if (!isDefaultImage && failedUrlsRef.current.has(baseUrl)) {
-        console.log(`Skipping previously failed image: ${baseUrl}`);
+        logger.log(`Skipping previously failed image: ${baseUrl}`);
         resolve();
         return;
       }
@@ -121,7 +122,7 @@ const ClientImagePreloader = () => {
       
       // Set a timeout to avoid hanging on slow loading images
       const timeoutId = setTimeout(() => {
-        console.warn(`Image load timeout for ${baseUrl}`);
+        logger.warn(`Image load timeout for ${baseUrl}`);
         img.src = ''; // Cancel the image request
         
         if (!isDefaultImage) {
@@ -135,23 +136,23 @@ const ClientImagePreloader = () => {
       img.onload = () => {
         clearTimeout(timeoutId);
         const sourceType = isDefaultImage ? 'default' : 'user';
-        console.log(`Successfully preloaded ${sourceType} ${imageType} image: ${baseUrl}`);
+        logger.log(`Successfully preloaded ${sourceType} ${imageType} image: ${baseUrl}`);
         resolve(src);
       };
       
       img.onerror = (error) => {
         clearTimeout(timeoutId);
         const sourceType = isDefaultImage ? 'default' : 'user';
-        console.warn(`Failed to preload ${sourceType} ${imageType} image: ${baseUrl}`);
+        logger.warn(`Failed to preload ${sourceType} ${imageType} image: ${baseUrl}`);
         
         if (!isDefaultImage) {
           // Add to failed URLs set to avoid repeated attempts
           failedUrlsRef.current.add(baseUrl);
           
           if (imageType === 'background') {
-            console.log('Using default background image as fallback');
+            logger.log('Using default background image as fallback');
           } else if (imageType === 'avatar') {
-            console.log('Using default avatar image as fallback');
+            logger.log('Using default avatar image as fallback');
           }
           resolve(); // Resolve anyway to not block the app
         } else {

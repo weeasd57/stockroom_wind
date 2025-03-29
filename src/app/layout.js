@@ -7,6 +7,7 @@ import { SupabaseProvider } from '@/hooks/useSupabase';
 import { ClientSideLayout } from "@/components/ClientSideLayout";
 import ClientImagePreloader from '@/components/ClientImagePreloader';
 import { Roboto_Mono } from 'next/font/google';
+import Script from 'next/script';
 import './globals.css';
 
 // Replace Geist with Inter as the primary font
@@ -29,7 +30,33 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`scroll-smooth dark ${inter.variable} ${robotoMono.variable}`}>
+      <head>
+        {/* Add metadata if needed */}
+      </head>
       <body>
+        {/* Add console suppression script */}
+        <Script id="console-suppressor" strategy="beforeInteractive">
+          {`
+            if (process.env.NODE_ENV === 'production') {
+              // Keep error and warn for debugging
+              const originalLog = console.log;
+              const originalInfo = console.info;
+              const originalDebug = console.debug;
+              
+              // Replace with empty functions
+              console.log = function() {};
+              console.info = function() {};
+              console.debug = function() {};
+              
+              // Add a way to restore if needed
+              window._restoreConsole = function() {
+                console.log = originalLog;
+                console.info = originalInfo;
+                console.debug = originalDebug;
+              };
+            }
+          `}
+        </Script>
         <SupabaseProvider>
           <AuthProvider>
             <ProfileProvider>

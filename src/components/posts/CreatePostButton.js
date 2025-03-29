@@ -1,14 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, lazy, Suspense, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
-import CreatePostForm from './CreatePostForm';
 import '@/styles/create-post-page.css';
+import logger from '@/utils/logger';
+
+// Lazy load CreatePostForm component
+const CreatePostForm = lazy(() => import('./CreatePostForm'));
+
+// Preload function for the form
+const preloadCreatePostForm = () => {
+  // This will trigger the import but not render anything
+  import('./CreatePostForm');
+};
 
 export default function CreatePostButton({ className = '', inDialog = false }) {
   const { isAuthenticated } = useAuth();
   const [showDialog, setShowDialog] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const handleOpenDialog = () => {
     if (isAuthenticated) {
@@ -17,18 +27,43 @@ export default function CreatePostButton({ className = '', inDialog = false }) {
   };
 
   const handleCloseDialog = () => {
+    // Allow closing even if submitting - handled by CreatePostForm
     setShowDialog(false);
   };
 
   const handlePostCreated = () => {
+    isSubmittingRef.current = false;
     setShowDialog(false);
     // You could add a callback here to refresh posts if needed
   };
 
+  // Track submission state
+  const handleSubmissionState = (isSubmitting) => {
+    isSubmittingRef.current = isSubmitting;
+  };
+
+  // Initialize dialog when it shows
+  useEffect(() => {
+    if (showDialog) {
+      // Prevent scrolling when dialog is open
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
+        // Allow scrolling when dialog is closed
+        document.body.style.overflow = '';
+      };
+    }
+  }, [showDialog]);
+
   // If not using dialog mode, just render a link to the create post page
   if (!inDialog) {
     return (
-      <Link href="/create-post" className={`createPostButton ${className}`}>
+      <Link 
+        href="/create-post" 
+        className={`createPostButton ${className}`}
+        onMouseEnter={preloadCreatePostForm}
+        onTouchStart={preloadCreatePostForm}
+      >
         Create Post
       </Link>
     );
@@ -39,6 +74,8 @@ export default function CreatePostButton({ className = '', inDialog = false }) {
       <button 
         onClick={handleOpenDialog} 
         className={`createPostButton ${className}`}
+        onMouseEnter={preloadCreatePostForm}
+        onTouchStart={preloadCreatePostForm}
       >
         Create Post
       </button>
@@ -60,10 +97,18 @@ export default function CreatePostButton({ className = '', inDialog = false }) {
               </button>
             </div>
             <div className="dialog-body">
-              <CreatePostForm 
-                onPostCreated={handlePostCreated} 
-                onCancel={handleCloseDialog} 
-              />
+              <Suspense fallback={
+                <div className="loading-container">
+                  <div className="loading-spinner"></div>
+                  <p>Loading form...</p>
+                </div>
+              }>
+                <CreatePostForm 
+                  onPostCreated={handlePostCreated} 
+                  onCancel={handleCloseDialog}
+                  onSubmittingChange={handleSubmissionState}
+                />
+              </Suspense>
             </div>
           </div>
         </div>

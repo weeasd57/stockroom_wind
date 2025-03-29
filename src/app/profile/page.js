@@ -10,6 +10,7 @@ import {
 } from '@/utils/supabase';
 import styles from '@/styles/profile.module.css';
 import useProfileStore from '@/store/profileStore';
+import CreatePostButton from '@/components/posts/CreatePostButton';
 
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -703,19 +704,25 @@ export default function Profile() {
 
   // Update avatar img element to handle loading errors better
   const avatarImgElement = (imgSrc) => (
-    <img
-      src={imgSrc || '/default-avatar.svg'}
-      alt={profile?.username || 'User'}
-      width={100}
-      height={100}
-      className={styles.avatar}
-      key={imgSrc || Date.now()} // Ensure re-render on URL change
-      onError={(e) => {
-        console.error('Error loading avatar image:', e);
-        e.target.onerror = null; // Prevent infinite error loop
-        e.target.src = '/default-avatar.svg';
-      }}
-    />
+    <div className={styles.avatarPreviewContainer}>
+      <img
+        src={imgSrc || '/default-avatar.svg'}
+        alt={profile?.username || 'User'}
+        className={styles.avatarPreview}
+        key={`avatar-${Date.now()}`} // Ensure re-render on URL change with unique key
+        onError={(e) => {
+          console.error('Error loading avatar image in dialog:', e);
+          e.target.onerror = null; // Prevent infinite error loop
+          e.target.src = '/default-avatar.svg';
+        }}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          display: 'block'
+        }}
+      />
+    </div>
   );
 
   return (
@@ -762,7 +769,17 @@ export default function Profile() {
                   <span>Change</span>
                 </div>
               )}
-              {avatarImgElement(avatarPreview || avatarUrl)}
+              <img
+                src={avatarPreview || avatarUrl || '/default-avatar.svg'} 
+                alt={profile?.username || 'User'}
+                className={styles.avatar}
+                key={`profile-avatar-${Date.now()}`}
+                onError={(e) => {
+                  console.error('Error loading profile avatar image');
+                  e.target.onerror = null;
+                  e.target.src = '/default-avatar.svg';
+                }}
+              />
             </div>
             
             {/* User info section */}
@@ -823,14 +840,12 @@ export default function Profile() {
             {/* createPostContainer */}
 
       <div className={styles.emptyHomeContainer}>
-              <div className={styles.createPostContainer}>
-                <h1 className={styles.emptyHomeTitle}>Create a New Post</h1>
-                <p className={styles.emptyHomeText}>Share your stock analysis with the community</p>
-                <Link href="/create-post" className={styles.createPostButton}>
-                  Create Post
-                </Link>
-              </div>
-            </div>
+        <div className={styles.createPostContainer}>
+          <h1 className={styles.emptyHomeTitle}>Create a New Post</h1>
+          <p className={styles.emptyHomeText}>Share your stock analysis with the community</p>
+          <CreatePostButton className={styles.createPostButton} inDialog={true} />
+        </div>
+      </div>
       {/* Content Tabs */}
       <div className={styles.contentTabs}>
         <button 
@@ -981,7 +996,17 @@ export default function Profile() {
                         </div>
                       </div>
                     )}
-                    {avatarImgElement(avatarPreview || avatarUrl)}
+                    <img
+                      src={avatarPreview || avatarUrl || '/default-avatar.svg'}
+                      alt={profile?.username || 'User'}
+                      className={styles.avatarPreview}
+                      key={`avatar-${Date.now()}`}
+                      onError={(e) => {
+                        console.error('Error loading avatar image in dialog');
+                        e.target.onerror = null;
+                        e.target.src = '/default-avatar.svg';
+                      }}
+                    />
                   </div>
                   {avatarUploadError && (
                     <p className={styles.uploadError}>{avatarUploadError}</p>

@@ -3,6 +3,7 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase, signIn, signUp, signOut, getCurrentUser, getUserProfile, getAvatarImageUrl } from '@/utils/supabase';
+import logger from '@/utils/logger';
 
 const AuthContext = createContext();
 
@@ -16,7 +17,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const { data, error } = await supabase.auth.refreshSession();
       if (error) {
-        console.warn('Session refresh error:', error.message);
+        logger.warn('Session refresh error:', error.message);
         // Clear potentially corrupted session
         await supabase.auth.signOut();
         setUser(null);
@@ -31,7 +32,7 @@ export const AuthProvider = ({ children }) => {
         return false;
       }
     } catch (error) {
-      console.error('Error refreshing session:', error);
+      logger.error('Error refreshing session:', error);
       setUser(null);
       return false;
     }
@@ -45,7 +46,7 @@ export const AuthProvider = ({ children }) => {
         const { data, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
-          console.warn('Session error:', sessionError.message);
+          logger.warn('Session error:', sessionError.message);
           // Try refreshing the session
           const refreshed = await refreshSession();
           if (!refreshed) {
@@ -79,7 +80,7 @@ export const AuthProvider = ({ children }) => {
           }
         }
       } catch (error) {
-        console.error('Error checking auth:', error);
+        logger.error('Error checking auth:', error);
         setUser(null);
       } finally {
         setLoading(false);
@@ -89,13 +90,13 @@ export const AuthProvider = ({ children }) => {
     // Helper function to ensure user profile and avatar are set up correctly
     const ensureUserProfile = async (userId) => {
       try {
-        console.log('Ensuring profile is set up for user:', userId);
+        logger.log('Ensuring profile is set up for user:', userId);
         
         // First get user profile (this will create one if it doesn't exist)
         const { data: profileData, error: profileError } = await getUserProfile(userId);
         
         if (profileError) {
-          console.error('Error ensuring user profile exists:', profileError);
+          logger.error('Error ensuring user profile exists:', profileError);
           return;
         }
         
@@ -107,7 +108,7 @@ export const AuthProvider = ({ children }) => {
             .list(userId);
             
           if (listError) {
-            console.warn('Error listing avatar files:', listError);
+            logger.warn('Error listing avatar files:', listError);
           } else if (files && files.length > 0) {
             // Find the avatar file (should be named avatar.ext)
             const avatarFile = files.find(file => file.name.startsWith('avatar.'));
@@ -123,7 +124,7 @@ export const AuthProvider = ({ children }) => {
                 
                 // Check if profile needs to be updated with this URL
                 if (!profileData.avatar_url || profileData.avatar_url !== baseUrl) {
-                  console.log('Updating profile with avatar URL from storage:', baseUrl);
+                  logger.log('Updating profile with avatar URL from storage:', baseUrl);
                   
                   // Update profile in database with the avatar URL
                   const { error: updateError } = await supabase
@@ -132,17 +133,17 @@ export const AuthProvider = ({ children }) => {
                     .eq('id', userId);
                     
                   if (updateError) {
-                    console.error('Error updating profile with avatar URL:', updateError);
+                    logger.error('Error updating profile with avatar URL:', updateError);
                   }
                 }
               }
             }
           }
         } catch (storageError) {
-          console.error('Error checking avatar in storage:', storageError);
+          logger.error('Error checking avatar in storage:', storageError);
         }
       } catch (error) {
-        console.error('Error in ensureUserProfile:', error);
+        logger.error('Error in ensureUserProfile:', error);
       }
     };
 
@@ -151,7 +152,7 @@ export const AuthProvider = ({ children }) => {
     // Set up auth state listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session ? 'session exists' : 'no session');
+        logger.log('Auth state changed:', event, session ? 'session exists' : 'no session');
         if (event === 'SIGNED_IN' && session) {
           setUser(session.user);
           
@@ -160,14 +161,14 @@ export const AuthProvider = ({ children }) => {
             // Fetch user profile to ensure it's created
             const { data: profileData, error: profileError } = await getUserProfile(session.user.id);
             if (profileError) {
-              console.error('Error fetching profile after auth state change:', profileError);
+              logger.error('Error fetching profile after auth state change:', profileError);
             }
             
             // Fetch avatar URL to ensure it's available immediately
             const avatarUrl = await getAvatarImageUrl(session.user.id);
-            console.log('Fetched avatar URL after auth state change:', avatarUrl);
+            logger.log('Fetched avatar URL after auth state change:', avatarUrl);
           } catch (error) {
-            console.error('Error handling profile after auth state change:', error);
+            logger.error('Error handling profile after auth state change:', error);
           }
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
@@ -197,15 +198,15 @@ export const AuthProvider = ({ children }) => {
         // Fetch user profile to ensure it's created and cached
         const { data: profileData, error: profileError } = await getUserProfile(data.user.id);
         if (profileError) {
-          console.error('Error fetching profile after login:', profileError);
+          logger.error('Error fetching profile after login:', profileError);
         }
         
         // Fetch avatar URL to ensure it's available immediately after login
         try {
           const avatarUrl = await getAvatarImageUrl(data.user.id);
-          console.log('Fetched avatar URL after login:', avatarUrl);
+          logger.log('Fetched avatar URL after login:', avatarUrl);
         } catch (avatarError) {
-          console.error('Error fetching avatar URL after login:', avatarError);
+          logger.error('Error fetching avatar URL after login:', avatarError);
         }
       }
       
@@ -237,7 +238,7 @@ export const AuthProvider = ({ children }) => {
       if (error) throw error;
       router.push('/');
     } catch (error) {
-      console.error('Error signing out:', error);
+      logger.error('Error signing out:', error);
     } finally {
       setLoading(false);
     }

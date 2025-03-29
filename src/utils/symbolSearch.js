@@ -2,9 +2,114 @@
 
 // Import country summary file - this will help us know which files to search
 import countrySummary from '../symbols_data/country_summary_20250304_171206.json';
+import logger from '@/utils/logger';
 
 // Cache for storing loaded symbol data
 const symbolDataCache = {};
+
+/**
+ * Dynamically generates a map of country names to ISO codes from the country summary file
+ * @returns {Object} - Map of country names to ISO codes
+ */
+const generateCountryISOCodes = () => {
+  // Base ISO codes for known countries
+  const baseISOCodes = {
+    'USA': 'us',
+    'UK': 'gb',
+    'Canada': 'ca',
+    'Germany': 'de',
+    'Luxembourg': 'lu',
+    'Austria': 'at',
+    'France': 'fr',
+    'Belgium': 'be',
+    'Spain': 'es',
+    'Switzerland': 'ch',
+    'Portugal': 'pt',
+    'Netherlands': 'nl',
+    'Iceland': 'is',
+    'Ireland': 'ie',
+    'Finland': 'fi',
+    'Norway': 'no',
+    'Denmark': 'dk',
+    'Sweden': 'se',
+    'Zimbabwe': 'zw',
+    'Zambia': 'zm',
+    'Uganda': 'ug',
+    'Tanzania': 'tz',
+    'Czech Republic': 'cz',
+    'Rwanda': 'rw',
+    'Botswana': 'bw',
+    'Egypt': 'eg',
+    'Nigeria': 'ng',
+    'Ghana': 'gh',
+    'Malawi': 'mw',
+    'Ivory Coast': 'ci',
+    'Kenya': 'ke',
+    'Morocco': 'ma',
+    'Mauritius': 'mu',
+    'Korea': 'kr',
+    'Hungary': 'hu',
+    'Poland': 'pl',
+    'Philippines': 'ph',
+    'Indonesia': 'id',
+    'Australia': 'au',
+    'China': 'cn',
+    'India': 'in',
+    'South Africa': 'za',
+    'Pakistan': 'pk',
+    'Malaysia': 'my',
+    'Vietnam': 'vn',
+    'Sri Lanka': 'lk',
+    'Thailand': 'th',
+    'Chile': 'cl',
+    'Greece': 'gr',
+    'Argentina': 'ar',
+    'Brazil': 'br',
+    'Romania': 'ro',
+    'Turkey': 'tr',
+    'Peru': 'pe',
+    'Taiwan': 'tw',
+    'Croatia': 'hr',
+    'Mexico': 'mx',
+    // Additional mappings for UI display
+    'United Arab Emirates': 'ae',
+    'Hong Kong': 'hk',
+    'Italy': 'it',
+    'Japan': 'jp',
+    'Jordan': 'jo',
+    'Kuwait': 'kw',
+    'Lebanon': 'lb',
+    'New Zealand': 'nz',
+    'Oman': 'om',
+    'Qatar': 'qa',
+    'Russia': 'ru',
+    'Saudi Arabia': 'sa',
+    'Singapore': 'sg',
+    'South Korea': 'kr'
+  };
+
+  // Get all country names from the summary file
+  const countryNames = Object.keys(countrySummary);
+  
+  // Create new ISO codes map with all countries from summary file
+  const isoCodes = { ...baseISOCodes };
+  
+  // Add any missing countries from summary file with generic ISO mapping
+  countryNames.forEach(country => {
+    if (!isoCodes[country]) {
+      // Generate a simple lowercase ISO code for unknown countries
+      // This is a fallback for countries not in our base list
+      const simpleCode = country.toLowerCase().substring(0, 2);
+      logger.debug(`Adding missing country ISO code: ${country} -> ${simpleCode}`);
+      isoCodes[country] = simpleCode;
+    }
+  });
+  
+  return isoCodes;
+};
+
+// Generate the full COUNTRY_ISO_CODES map when the module loads
+const COUNTRY_ISO_CODES = generateCountryISOCodes();
 
 /**
  * Load symbols data for a specific country
@@ -12,54 +117,55 @@ const symbolDataCache = {};
  * @returns {Promise<Array>} - Array of symbols for that country
  */
 const loadSymbolsForCountry = async (country) => {
-  // If we've already loaded this country's data, return from cache
+  // If we've already loaded symbols for this country, return them from cache
   if (symbolDataCache[country]) {
-    console.log(`Using cached data for ${country}`);
+    logger.debug(`Using cached symbols for ${country}`);
     return symbolDataCache[country];
   }
 
+  logger.debug(`Loading symbols for country: ${country}`);
+  
   try {
-    // Format country name for file path (handle spaces correctly)
-    const formattedCountry = country.replace(/\s+/g, '_');
-    
-    // Log which country we're trying to load
-    console.log(`Attempting to load symbols for ${country}`);
-    
-    // Try both possible file formats with better error handling
-    const fileUrls = [
-      `/symbols_data/${country}_all_symbols_20250304_171206.json`,
-      `/symbols_data/${formattedCountry}_all_symbols_20250304_171206.json`
-    ];
-    
+    // Look for exact file pattern: "{CountryName}_all_symbols_20250304_171206.json"
     let symbols = [];
-    let lastError = null;
+    const fileDateVersion = "_20250304_171206"; // Common timestamp pattern in files
     
-    for (const url of fileUrls) {
+    try {
+      // Try direct import with exact file name format first
+      const fileName = `${country}_all_symbols${fileDateVersion}`;
+      logger.debug(`Trying to load: ${fileName}`);
+      const dataModule = await import(`../symbols_data/${fileName}.json`).catch(() => null);
+      symbols = dataModule?.default || [];
+      logger.debug(`Successfully imported symbols for ${country} using exact filename`);
+    } catch (importErr) {
+      logger.debug(`Could not import with exact filename pattern: ${importErr.message}`);
+      
       try {
-        console.log(`Trying to fetch from: ${url}`);
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-          console.warn(`Failed to fetch from ${url}: ${response.status} ${response.statusText}`);
-          continue; // Try the next URL format
-        }
-        
-        symbols = await response.json();
-        console.log(`Successfully loaded ${symbols.length} symbols for ${country}`);
-        
-        // Cache the data
-        symbolDataCache[country] = symbols;
-        return symbols;
-      } catch (error) {
-        console.warn(`Error fetching ${url}: ${error.message}`);
-        lastError = error;
+        // If that fails, try with different formats of country name
+        const formattedCountry = country.replace(/\s+/g, '_');
+        const fileName = `${formattedCountry}_all_symbols${fileDateVersion}`;
+        logger.debug(`Trying with formatted country name: ${fileName}`);
+        const dataModule = await import(`../symbols_data/${fileName}.json`).catch(() => null);
+        symbols = dataModule?.default || [];
+        logger.debug(`Successfully imported symbols for ${country} using formatted name`);
+      } catch (err) {
+        logger.debug(`Could not import with formatted filename: ${err.message}`);
+        logger.error(`No matching files found for ${country}`);
+        return [];
       }
     }
     
-    // If we reach here, all fetch attempts failed
-    throw lastError || new Error(`Failed to fetch symbols for ${country}`);
+    if (symbols && symbols.length > 0) {
+      logger.debug(`Loaded ${symbols.length} symbols for ${country}`);
+      // Cache the symbols to avoid redundant loading
+      symbolDataCache[country] = symbols;
+      return symbols;
+    } else {
+      logger.warn(`No symbols found for ${country}`);
+      return [];
+    }
   } catch (error) {
-    console.error(`Error loading symbols for ${country}:`, error);
+    logger.error(`Error loading symbols for ${country}:`, error);
     return [];
   }
 };
@@ -92,7 +198,7 @@ const detectAvailableCountries = async () => {
   const potentialCountries = Object.keys(countrySummary);
   const availableCountries = [];
   
-  console.log(`Checking data availability for ${potentialCountries.length} countries...`);
+  logger.debug(`Checking data availability for ${potentialCountries.length} countries...`);
   
   // Check each country one by one
   for (const country of potentialCountries) {
@@ -101,50 +207,51 @@ const detectAvailableCountries = async () => {
       const symbols = await loadSymbolsForCountry(country);
       if (symbols && symbols.length > 0) {
         availableCountries.push(country);
-        console.log(`✓ Confirmed data for ${country} (${symbols.length} symbols)`);
+        logger.debug(`✓ Confirmed data for ${country} (${symbols.length} symbols)`);
       } else {
-        console.log(`× No data found for ${country}`);
+        logger.debug(`× No data found for ${country}`);
       }
     } catch (error) {
-      console.log(`× Failed to load data for ${country}`);
+      logger.debug(`× Failed to load data for ${country}`);
     }
   }
   
-  console.log(`Found data for ${availableCountries.length} out of ${potentialCountries.length} countries`);
+  logger.debug(`Found data for ${availableCountries.length} out of ${potentialCountries.length} countries`);
   return availableCountries;
 };
 
 /**
  * Get the count of symbols for each available country
- * @returns {Promise<Object>} - Object with country names as keys and symbol counts as values
+ * @returns {Object} - Object with country codes as keys and symbol counts as values
  */
-const getCountrySymbolCounts = async () => {
-  const availableCountries = getAvailableCountries();
-  const countryCounts = {};
-  
-  // Add "All Countries" with total count
+const getCountrySymbolCounts = () => {
+  const countryData = {};
   let totalCount = 0;
   
-  // For each available country, load symbols and count them
-  for (const country of availableCountries) {
-    try {
-      const symbols = await loadSymbolsForCountry(country);
-      if (symbols && symbols.length > 0) {
-        countryCounts[country] = symbols.length;
-        totalCount += symbols.length;
-      } else {
-        countryCounts[country] = 0;
-      }
-    } catch (error) {
-      console.error(`Error getting symbol count for ${country}:`, error);
-      countryCounts[country] = 0;
+  // Extract symbol counts directly from the summary file
+  Object.entries(countrySummary).forEach(([countryName, data]) => {
+    // Convert country name to ISO code
+    const countryCode = getCountryCode(countryName);
+    if (countryCode) {
+      // Store the count using the lowercase ISO code as the key
+      countryData[countryCode.toLowerCase()] = data.TotalSymbols;
+      totalCount += data.TotalSymbols;
     }
-  }
+  });
   
-  // Add the total count for "All Countries"
-  countryCounts['all'] = totalCount;
+  // Add total count
+  countryData['all'] = totalCount;
   
-  return countryCounts;
+  return countryData;
+};
+
+/**
+ * Convert a country name to its ISO code
+ * @param {string} countryName - Name of the country
+ * @returns {string|null} - ISO code or null if not found
+ */
+const getCountryCode = (countryName) => {
+  return COUNTRY_ISO_CODES[countryName] || null;
 };
 
 /**
@@ -155,57 +262,68 @@ const getCountrySymbolCounts = async () => {
  * @returns {Promise<Array>} - Array of matching symbols
  */
 const searchStocks = async (query, country = null, limit = 50) => {
-  if (!query || query.length < 2) {
+  logger.debug(`Searching for "${query || 'all symbols'}" in country: ${country || 'all'}`);
+  
+  // If query is empty and country is not null, return all symbols for that country
+  // Otherwise, require at least 2 characters for search
+  if (query.length < 2 && !(!query && country)) {
     return [];
   }
-
-  const queryLower = query.toLowerCase();
-  let results = [];
   
-  // Only search in confirmed available countries
-  const availableCountries = getAvailableCountries();
-  const countries = country ? 
-    (availableCountries.includes(country) ? [country] : []) : 
-    availableCountries;
-
-  // For each country we want to search in
-  for (const countryName of countries) {
-    try {
-      // Load symbols for this country
-      const countrySymbols = await loadSymbolsForCountry(countryName);
+  try {
+    let allSymbols = [];
+    
+    if (country) {
+      // If a specific country is selected, load symbols for that country
+      const countrySymbols = await loadSymbolsForCountry(country);
+      allSymbols = [...countrySymbols];
+      logger.debug(`Loaded ${countrySymbols.length} symbols for ${country}`);
+    } else {
+      // If no country is selected, load symbols for all available countries
+      const countries = getAvailableCountries();
+      logger.debug(`Loading symbols for all countries: ${countries.join(', ')}`);
       
-      // Skip if no symbols were found
-      if (!countrySymbols || countrySymbols.length === 0) {
-        continue;
+      for (const c of countries) {
+        try {
+          const countrySymbols = await loadSymbolsForCountry(c);
+          allSymbols = [...allSymbols, ...countrySymbols];
+        } catch (error) {
+          logger.error(`Error loading symbols for ${c}:`, error);
+        }
       }
-      
-      // Filter symbols that match the query
-      const matchingSymbols = countrySymbols.filter(symbol => {
-        return (
-          symbol.Symbol.toLowerCase().includes(queryLower) ||
-          (symbol.Name && symbol.Name.toLowerCase().includes(queryLower))
-        );
-      });
-      
-      // Add matching symbols to results
-      results = [...results, ...matchingSymbols];
-      
-      // Stop if we've reached the limit
-      if (results.length >= limit) {
-        break;
-      }
-    } catch (error) {
-      console.error(`Error searching in ${countryName}:`, error);
-      // Continue with next country instead of failing the whole search
     }
+    
+    logger.debug(`Total symbols loaded: ${allSymbols.length}`);
+    
+    // If query is empty, return all symbols without filtering (for country-specific views)
+    if (!query) {
+      logger.debug(`Returning all ${Math.min(allSymbols.length, limit)} symbols without filtering`);
+      return allSymbols.slice(0, limit).map((symbol, index) => ({
+        ...symbol,
+        uniqueId: `${symbol.Symbol}-${symbol.Country || 'unknown'}-${index}`
+      }));
+    }
+    
+    // Filter symbols based on the query (case insensitive)
+    const normalizedQuery = query.toLowerCase();
+    
+    const filteredSymbols = allSymbols.filter(symbol => {
+      const symbolMatch = symbol.Symbol && symbol.Symbol.toLowerCase().includes(normalizedQuery);
+      const nameMatch = symbol.Name && symbol.Name.toLowerCase().includes(normalizedQuery);
+      return symbolMatch || nameMatch;
+    });
+    
+    logger.debug(`Found ${filteredSymbols.length} matching symbols for query "${query}"`);
+    
+    // Return limited results with unique identifiers
+    return filteredSymbols.slice(0, limit).map((symbol, index) => ({
+      ...symbol,
+      uniqueId: `${symbol.Symbol}-${symbol.Country || 'unknown'}-${index}`
+    }));
+  } catch (error) {
+    logger.error('Error searching stocks:', error);
+    return [];
   }
-
-  // Ensure each result has a unique identifier
-  return results.slice(0, limit).map((item, index) => ({
-    ...item,
-    Code: item.Symbol,
-    uniqueId: `${item.Symbol}-${item.Country}-${index}`
-  }));
 };
 
 /**
@@ -219,14 +337,14 @@ const getSymbolDetails = async (symbolCode, country) => {
     // Check if the country is in our confirmed list
     const availableCountries = getAvailableCountries();
     if (!availableCountries.includes(country)) {
-      console.warn(`No data available for country: ${country}`);
+      logger.warn(`No data available for country: ${country}`);
       return null;
     }
     
     const countrySymbols = await loadSymbolsForCountry(country);
     return countrySymbols.find(symbol => symbol.Symbol === symbolCode) || null;
   } catch (error) {
-    console.error(`Error getting symbol details for ${symbolCode} in ${country}:`, error);
+    logger.error(`Error getting symbol details for ${symbolCode} in ${country}:`, error);
     return null;
   }
 };
@@ -242,10 +360,10 @@ const preloadPopularCountries = async () => {
     'India', 'Australia', 'Egypt'
   ].filter(country => getAvailableCountries().includes(country));
   
-  console.log(`Preloading data for ${popularCountries.length} popular markets...`);
+  logger.debug(`Preloading data for ${popularCountries.length} popular markets...`);
   
   if (popularCountries.length === 0) {
-    console.log('No popular markets available for preloading. Skipping.');
+    logger.debug('No popular markets available for preloading. Skipping.');
     return;
   }
   
@@ -253,15 +371,15 @@ const preloadPopularCountries = async () => {
   // This might be more reliable than parallel loading
   for (const country of popularCountries) {
     try {
-      console.log(`Loading ${country} symbols...`);
+      logger.debug(`Loading ${country} symbols...`);
       const symbols = await loadSymbolsForCountry(country);
-      console.log(`✓ Loaded ${symbols.length} ${country} symbols`);
+      logger.debug(`✓ Loaded ${symbols.length} ${country} symbols`);
     } catch (error) {
-      console.error(`× Failed to load ${country} symbols:`, error);
+      logger.error(`× Failed to load ${country} symbols:`, error);
     }
   }
   
-  console.log('Preloading complete');
+  logger.debug('Preloading complete');
 };
 
 export {
@@ -270,5 +388,6 @@ export {
   getSymbolDetails,
   getCountrySymbolCounts,
   preloadPopularCountries,
-  detectAvailableCountries
+  detectAvailableCountries,
+  COUNTRY_ISO_CODES
 };
