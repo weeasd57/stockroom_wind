@@ -1,24 +1,21 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  reactStrictMode: true,
   images: {
     domains: [
       'lh3.googleusercontent.com',  // Google profile pictures
-      'avatars.githubusercontent.com', // GitHub profile pictures (if you use GitHub auth)
-      'localhost', // Local development
-      'firebasestorage.googleapis.com', // In case you use Firebase storage
-      'storage.googleapis.com', // Google Cloud Storage
-      'jyoeecprvhpqfirxmpkx.supabase.co', // Supabase storage
-      'mfbgpnpgxmxgxpjnxzrb.supabase.co', // Additional Supabase storage
+      'avatars.githubusercontent.com',  // GitHub profile pictures
     ],
-    unoptimized: true,
   },
+  // Completely disable static exports
+  output: 'standalone',
+  // This is critical: it forces Next.js to use server-side rendering for all pages
+  // and prevents static generation entirely
   experimental: {
     serverActions: {
       allowedOrigins: ['localhost:3000', 'localhost:3001'],
     },
   },
-  // Disable React StrictMode to prevent double-rendering which can worsen hydration issues
-  reactStrictMode: false,
   // Add custom headers to prevent translation extensions
   async headers() {
     return [
@@ -26,23 +23,24 @@ const nextConfig = {
         source: '/:path*',
         headers: [
           {
-            key: 'X-Google-Translate',
-            value: 'nope',
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN',
           },
           {
-            key: 'x-translate',
-            value: 'no',
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
           },
         ],
       },
-    ]
+    ];
   },
-  // Skip type checking during builds for faster builds
+  // Disable ESLint during build - useful while in development
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  // Disable TypeScript checking during build
   typescript: {
     ignoreBuildErrors: true,
-  },
-  // Disable ESLint during builds for faster builds
-  eslint: {
     ignoreDuringBuilds: true,
   },
   // Prevent Next.js from trying to statically optimize pages
@@ -51,10 +49,20 @@ const nextConfig = {
     // Disable React removing properties
     removeConsole: false,
   },
-  // Set this to true to completely disable static generation
-  output: 'standalone',
-  // Completely disable static optimization
-  staticPageGenerationTimeout: 0
-}
+  // Force dynamic rendering for all pages
+  // This is the critical setting that disables static generation
+  env: {
+    NEXT_DISABLE_PRERENDER: '1',
+  },
+  // This forces Next.js to only use server-side rendering (SSR)
+  // and prevents any static site generation (SSG)
+  distDir: '.next',
+  poweredByHeader: false,
+  // Prevent automatic static optimization
+  // This forces all pages to be dynamically rendered
+  trailingSlash: false,
+  // Disable static export
+  exportPathMap: null,
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;

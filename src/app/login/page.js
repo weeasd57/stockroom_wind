@@ -1,99 +1,124 @@
 "use client";
 
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import Image from 'next/image';
 import { useAuth } from '@/hooks/useAuth';
+import { signInWithGoogle, signInWithGithub } from '@/utils/supabase-auth';
 import { supabase } from '@/utils/supabase';
 import styles from '@/styles/login.module.css';
-import { withClientOnly } from '@/components/ClientOnly';
 
-function Login() {
+// Export a simple component that uses useEffect to ensure it only runs on client-side
+export default function LoginPage() {
+  // Using useState here ensures this component only fully renders on the client
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // This ensures we only render the component on the client side
+    setMounted(true);
+  }, []);
+
+  // Return null during server-side rendering
+  if (!mounted) {
+    return <div className="loading-container">Loading...</div>;
+  }
+
+  // Only render the actual login component on the client side
+  return <LoginContent />;
+}
+
+// Separate the actual login content
+function LoginContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const { login, register } = useAuth();
   const router = useRouter();
 
-  const handleSubmit = async (e) => {
+  useEffect(() => {
+    // Check if user is already authenticated
+    const checkUser = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        router.push('/home');
+      }
+    };
+
+    checkUser();
+  }, [router]);
+
+  const handleEmailChange = (e) => {
+    setEmail(e.target.value);
+  };
+
+  const handlePasswordChange = (e) => {
+    setPassword(e.target.value);
+  };
+
+  const handleToggleAuthMode = () => {
+    setIsSignUp(!isSignUp);
+    setError(null);
+  };
+
+  const handleEmailAuth = async (e) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
+    setError(null);
 
     try {
       if (isSignUp) {
-        const { success, error } = await register(email, password);
-        if (!success) throw new Error(error);
-        router.push('/profile');
+        // Sign up
+        await register(email, password);
+        alert('Check your email for the confirmation link!');
       } else {
-        const { success, error } = await login(email, password);
-        if (!success) throw new Error(error);
-        router.push('/');
+        // Sign in
+        await login(email, password);
+        router.push('/home');
       }
-    } catch (err) {
-      setError(err.message);
+    } catch (error) {
+      setError(error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = async () => {
-    setError('');
-    setLoading(true);
+  const handleGoogleSignIn = async () => {
     try {
-      // Get the origin in a way that works on both client and server
-      const origin = typeof window !== 'undefined' 
-        ? window.location.origin 
-        : process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-        
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${origin}/auth/callback`,
-        },
-      });
-      
-      if (error) throw error;
-      // No need to do anything else here as the user will be redirected to Google
-    } catch (err) {
-      console.error('Google sign-in error:', err);
-      setError(err.message || 'Failed to sign in with Google');
-      setLoading(false);
+      await signInWithGoogle();
+    } catch (error) {
+      setError(error.message);
+    }
+  };
+
+  const handleGithubSignIn = async () => {
+    try {
+      await signInWithGithub();
+    } catch (error) {
+      setError(error.message);
     }
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.formWrapper}>
-        <div className={styles.logoContainer}>
-          <div className={styles.logo}>
-            <Image 
-              src="/favicon.ico" 
-              alt="FireStocks Logo" 
-              width={50} 
-              height={50}
-              className={styles.logoImage}
-            />
-            <h1 className={styles.title}>FireStocks</h1>
-          </div>
-          <p className={styles.subtitle}>
-            {isSignUp ? 'Join the trading community' : 'Welcome back, trader'}
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className={styles.form}>
-          {error && <div className={styles.error}>{error}</div>}
-          
+    <div className={styles.loginContainer}>
+      <div className={styles.loginCard}>
+        <h1 className={styles.title}>{isSignUp ? 'Create Account' : 'Welcome Back'}</h1>
+        <p className={styles.subtitle}>
+          {isSignUp 
+            ? 'Sign up to start tracking your stock portfolio' 
+            : 'Sign in to continue to your account'}
+        </p>
+        
+        {error && <div className={styles.errorMessage}>{error}</div>}
+        
+        <form onSubmit={handleEmailAuth} className={styles.form}>
           <div className={styles.inputGroup}>
-            <label htmlFor="email" className={styles.label}>Email</label>
+            <label htmlFor="email">Email</label>
             <input
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={handleEmailChange}
               required
               className={styles.input}
               placeholder="your@email.com"
@@ -101,70 +126,69 @@ function Login() {
           </div>
           
           <div className={styles.inputGroup}>
-            <label htmlFor="password" className={styles.label}>Password</label>
+            <label htmlFor="password">Password</label>
             <input
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={handlePasswordChange}
               required
               className={styles.input}
               placeholder="••••••••"
+              minLength={6}
             />
           </div>
           
           <button 
             type="submit" 
-            className={`${styles.button} ${styles.primaryButton}`}
+            className={styles.submitButton}
             disabled={loading}
           >
-            {loading ? 'Loading...' : isSignUp ? 'Create Account' : 'Sign In'}
-          </button>
-          
-          <div className={styles.divider}>
-            <span>or</span>
-          </div>
-          
-          <button 
-            type="button" 
-            onClick={handleGoogleLogin}
-            className={`${styles.button} ${styles.googleButton}`}
-            disabled={loading}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>
-            </svg>
-            Continue with Google
+            {loading ? 'Processing...' : isSignUp ? 'Create Account' : 'Sign In'}
           </button>
         </form>
         
-        <div className={styles.switchMode}>
-          {isSignUp ? (
-            <p>Already have an account? <button onClick={() => setIsSignUp(false)} className={styles.switchButton}>Sign In</button></p>
-          ) : (
-            <p>Don't have an account? <button onClick={() => setIsSignUp(true)} className={styles.switchButton}>Sign Up</button></p>
-          )}
+        <div className={styles.divider}>
+          <span>OR</span>
         </div>
-      </div>
-      
-      <div className={styles.imageContainer}>
-        <div className={styles.imageOverlay}></div>
-        <div className={styles.imageContent}>
-          <h2>Trade Together, Grow Together</h2>
-          <p>Join thousands of traders sharing insights and strategies</p>
+        
+        <div className={styles.socialButtons}>
+          <button 
+            onClick={handleGoogleSignIn}
+            className={styles.googleButton}
+          >
+            <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+              <g transform="matrix(1, 0, 0, 1, 0, 0)">
+                <path d="M21.35,11.1H12v3.2h5.59c-0.56,2.68-3.08,4.7-5.59,4.7c-3.09,0-5.6-2.51-5.6-5.6c0-3.09,2.51-5.6,5.6-5.6 c1.57,0,2.97,0.64,4.01,1.68l2.37-2.37C16.54,5.36,14.42,4.5,12,4.5c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9 C21,12.34,20.78,11.7,21.35,11.1z" fill="#4285F4"></path>
+                <path d="M7.5,13.5L7.5,13.5C7.5,13.5,7.49,13.5,7.5,13.5C7.49,13.5,7.5,13.5,7.5,13.5z" fill="none"></path>
+                <path d="M7.5,13.5L7.5,13.5C7.5,13.5,7.49,13.5,7.5,13.5C7.49,13.5,7.5,13.5,7.5,13.5z" fill="none"></path>
+              </g>
+            </svg>
+            Continue with Google
+          </button>
+          
+          <button 
+            onClick={handleGithubSignIn}
+            className={styles.githubButton}
+          >
+            <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12,2A10,10 0 0,0 2,12C2,16.42 4.87,20.17 8.84,21.5C9.34,21.58 9.5,21.27 9.5,21C9.5,20.77 9.5,20.14 9.5,19.31C6.73,19.91 6.14,17.97 6.14,17.97C5.68,16.81 5.03,16.5 5.03,16.5C4.12,15.88 5.1,15.9 5.1,15.9C6.1,15.97 6.63,16.93 6.63,16.93C7.5,18.45 8.97,18 9.54,17.76C9.63,17.11 9.89,16.67 10.17,16.42C7.95,16.17 5.62,15.31 5.62,11.5C5.62,10.39 6,9.5 6.65,8.79C6.55,8.54 6.2,7.5 6.75,6.15C6.75,6.15 7.59,5.88 9.5,7.17C10.29,6.95 11.15,6.84 12,6.84C12.85,6.84 13.71,6.95 14.5,7.17C16.41,5.88 17.25,6.15 17.25,6.15C17.8,7.5 17.45,8.54 17.35,8.79C18,9.5 18.38,10.39 18.38,11.5C18.38,15.32 16.04,16.16 13.81,16.41C14.17,16.72 14.5,17.33 14.5,18.26C14.5,19.6 14.5,20.68 14.5,21C14.5,21.27 14.66,21.59 15.17,21.5C19.14,20.16 22,16.42 22,12A10,10 0 0,0 12,2Z" fill="#24292e"></path>
+            </svg>
+            Continue with GitHub
+          </button>
+        </div>
+        
+        <div className={styles.toggleAuth}>
+          {isSignUp ? 'Already have an account?' : 'Don\'t have an account?'}
+          <button 
+            type="button" 
+            onClick={handleToggleAuthMode}
+            className={styles.toggleButton}
+          >
+            {isSignUp ? 'Sign In' : 'Sign Up'}
+          </button>
         </div>
       </div>
     </div>
   );
 }
-
-// Export wrapped version that only renders on the client side
-export default withClientOnly(Login,
-  // Simple loading state for server-side rendering
-  <div className="w-full h-screen flex items-center justify-center">
-    <div className="animate-pulse text-center">
-      <h2 className="text-2xl font-bold mb-4">Loading Authentication...</h2>
-      <p className="text-gray-500">Please wait while we set up your secure login</p>
-    </div>
-  </div>
-);
