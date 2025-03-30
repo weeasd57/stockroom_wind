@@ -51,6 +51,10 @@ const nextConfig = {
     // Disable React removing properties
     removeConsole: false,
   },
+  // Explicitly disable static page generation and force server-side rendering
+  exportPathMap: null,
+  // This will completely disable static HTML export
+  output: null,
 }
 
 module.exports = nextConfig

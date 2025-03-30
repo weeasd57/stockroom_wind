@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+  "buildCommand": "node vercel-build.js",
   "outputDirectory": ".next",
   "framework": "nextjs",
   "regions": ["iad1"],
@@ -9,5 +9,9 @@
       "memory": 1024,
       "maxDuration": 10
     }
+  },
+  "env": {
+    "NEXT_SKIP_STATIC_GENERATION": "true",
+    "NEXT_FORCE_DYNAMIC": "true"
   }
 }
