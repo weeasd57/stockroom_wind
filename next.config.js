@@ -36,6 +36,8 @@ const nextConfig = {
       },
     ]
   },
+  // Disable static optimization for pages that use client-side only features
+  output: 'standalone',
 }
 
 module.exports = nextConfig
