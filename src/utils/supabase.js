@@ -10,6 +10,9 @@ export const isSupabaseConfigured = () => {
   return Boolean(supabaseUrl && supabaseAnonKey);
 };
 
+// Function to check if we're in a browser environment
+const isBrowser = () => typeof window !== 'undefined';
+
 // Ensure we have valid credentials before creating the client
 if (!isSupabaseConfigured()) {
   logger.error(
@@ -36,7 +39,7 @@ export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
 
 // Initialize required storage buckets
 export async function initializeStorageBuckets() {
-  if (typeof window === 'undefined' || !isSupabaseConfigured()) {
+  if (!isBrowser() || !isSupabaseConfigured()) {
     return false;
   }
   
@@ -60,8 +63,8 @@ export async function initializeStorageBuckets() {
 }
 
 // Test the connection on initialization
-(async function testConnection() {
-  if (typeof window !== 'undefined' && isSupabaseConfigured()) {
+if (isBrowser() && isSupabaseConfigured()) {
+  (async function testConnection() {
     try {
       const { error } = await supabase.from('_connection_test').select('*').limit(1).single();
       // If we get a "relation does not exist" error, that's actually good
@@ -79,8 +82,8 @@ export async function initializeStorageBuckets() {
     } catch (err) {
       logger.error('Failed to test Supabase connection:', err.message);
     }
-  }
-})();
+  })();
+}
 
 // Authentication helpers
 /**

@@ -1,15 +1,17 @@
 import { Inter } from 'next/font/google';
 import '@/styles/globals.css'
-import { ThemeProvider } from "@/components/theme-provider";
-import { AuthProvider } from "@/hooks/useAuth";
-import { ProfileProvider } from '@/contexts/ProfileContext';
-import { SupabaseProvider } from '@/hooks/useSupabase';
-import { ClientSideLayout } from "@/components/ClientSideLayout";
-import ClientImagePreloader from '@/components/ClientImagePreloader';
-import { Roboto_Mono } from 'next/font/google';
 import Script from 'next/script';
+import { Roboto_Mono } from 'next/font/google';
 import './globals.css';
-import { PostFormProvider } from '@/contexts/PostFormContext';
+import { 
+  DynamicThemeProvider, 
+  DynamicAuthProvider, 
+  DynamicProfileProvider, 
+  DynamicSupabaseProvider, 
+  DynamicPostFormProvider,
+  DynamicClientSideLayout,
+  DynamicClientImagePreloader
+} from './dynamic-imports';
 
 // Replace Geist with Inter as the primary font
 const inter = Inter({
@@ -58,20 +60,20 @@ export default function RootLayout({ children }) {
             }
           `}
         </Script>
-        <PostFormProvider>
-          <SupabaseProvider>
-            <AuthProvider>
-              <ProfileProvider>
-                <ThemeProvider defaultTheme="dark" attribute="class">
-                  <ClientSideLayout>
-                    <ClientImagePreloader />
+        <DynamicPostFormProvider>
+          <DynamicSupabaseProvider>
+            <DynamicAuthProvider>
+              <DynamicProfileProvider>
+                <DynamicThemeProvider defaultTheme="dark" attribute="class">
+                  <DynamicClientSideLayout>
+                    <DynamicClientImagePreloader />
                     {children}
-                  </ClientSideLayout>
-                </ThemeProvider>
-              </ProfileProvider>
-            </AuthProvider>
-          </SupabaseProvider>
-        </PostFormProvider>
+                  </DynamicClientSideLayout>
+                </DynamicThemeProvider>
+              </DynamicProfileProvider>
+            </DynamicAuthProvider>
+          </DynamicSupabaseProvider>
+        </DynamicPostFormProvider>
       </body>
     </html>
   );
