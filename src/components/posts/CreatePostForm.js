@@ -749,6 +749,11 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
   // Optimize the handle stock select function with debouncing and caching
   const handleStockSelect = async (stock) => {
     try {
+      // Clear search results and hide dropdown immediately after selection
+      setSearchResults([]); // Clear the search results
+      setStockSearch(''); // Clear the search input
+      setShowStockSearch(false); // Hide the stock search dropdown
+
       // Cancel any in-progress fetch
       if (currentFetchController.current) {
         currentFetchController.current.abort();
@@ -761,10 +766,6 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
       
       // Set loading state
       setIsSearching(true);
-      
-      // Clear search results and hide dropdown immediately after selection
-      setSearchResults([]);
-      setShowStockSearch(false);
       
       // Get the current stock country or fallback to the selected one
       const countryName = stock.country || selectedCountry || 'US';
