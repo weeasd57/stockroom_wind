@@ -11,7 +11,6 @@
     }
   },
   "env": {
-    "NEXT_SKIP_STATIC_GENERATION": "true",
-    "NEXT_FORCE_DYNAMIC": "true"
+    "NEXT_PUBLIC_RUNTIME_SSR_ONLY": "true"
   }
 }
