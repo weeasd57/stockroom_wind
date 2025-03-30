@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { getUserPosts, getFollowers, getFollowing } from '@/utils/supabase';
+import { getPosts, getFollowers, getFollowing } from '@/utils/supabase';
 
 const useProfileStore = create(
   persist(
@@ -30,14 +30,14 @@ const useProfileStore = create(
         set({ isLoading: true, error: null });
 
         try {
-          const [postsData, followers, following] = await Promise.all([
-            getUserPosts(userId),
+          const [posts, followers, following] = await Promise.all([
+            getPosts(userId),
             getFollowers(userId),
             getFollowing(userId)
           ]);
 
           set({
-            posts: postsData?.posts || [],
+            posts: posts || [],
             followers: followers || [],
             following: following || [],
             isLoading: false,
@@ -55,14 +55,14 @@ const useProfileStore = create(
         if (!userId) return;
 
         try {
-          const [postsData, followers, following] = await Promise.all([
-            getUserPosts(userId),
+          const [posts, followers, following] = await Promise.all([
+            getPosts(userId),
             getFollowers(userId),
             getFollowing(userId)
           ]);
 
           set({
-            posts: postsData?.posts || [],
+            posts: posts || [],
             followers: followers || [],
             following: following || [],
             lastFetched: Date.now()

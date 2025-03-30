@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS posts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  content TEXT NOT NULL,
+  description TEXT NOT NULL,
   image_url TEXT,
   symbol TEXT,
   company_name TEXT,

@@ -1,17 +1,14 @@
 import { Inter } from 'next/font/google';
 import '@/styles/globals.css'
-import Script from 'next/script';
+import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider } from "@/hooks/useAuth";
+import { ProfileProvider } from '@/contexts/ProfileContext';
+import { SupabaseProvider } from '@/hooks/useSupabase';
+import { ClientSideLayout } from "@/components/ClientSideLayout";
+import ClientImagePreloader from '@/components/ClientImagePreloader';
 import { Roboto_Mono } from 'next/font/google';
+import Script from 'next/script';
 import './globals.css';
-import { 
-  DynamicThemeProvider, 
-  DynamicAuthProvider, 
-  DynamicProfileProvider, 
-  DynamicSupabaseProvider, 
-  DynamicPostFormProvider,
-  DynamicClientSideLayout,
-  DynamicClientImagePreloader
-} from './dynamic-imports';
 
 // Replace Geist with Inter as the primary font
 const inter = Inter({
@@ -40,7 +37,7 @@ export default function RootLayout({ children }) {
         {/* Add console suppression script */}
         <Script id="console-suppressor" strategy="beforeInteractive">
           {`
-            if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+            if (process.env.NODE_ENV === 'production') {
               // Keep error and warn for debugging
               const originalLog = console.log;
               const originalInfo = console.info;
@@ -60,20 +57,18 @@ export default function RootLayout({ children }) {
             }
           `}
         </Script>
-        <DynamicPostFormProvider>
-          <DynamicSupabaseProvider>
-            <DynamicAuthProvider>
-              <DynamicProfileProvider>
-                <DynamicThemeProvider defaultTheme="dark" attribute="class">
-                  <DynamicClientSideLayout>
-                    <DynamicClientImagePreloader />
-                    {children}
-                  </DynamicClientSideLayout>
-                </DynamicThemeProvider>
-              </DynamicProfileProvider>
-            </DynamicAuthProvider>
-          </DynamicSupabaseProvider>
-        </DynamicPostFormProvider>
+        <SupabaseProvider>
+          <AuthProvider>
+            <ProfileProvider>
+              <ThemeProvider defaultTheme="dark" attribute="class">
+                <ClientSideLayout>
+                  <ClientImagePreloader />
+                  {children}
+                </ClientSideLayout>
+              </ThemeProvider>
+            </ProfileProvider>
+          </AuthProvider>
+        </SupabaseProvider>
       </body>
     </html>
   );

@@ -10,7 +10,6 @@ import {
   getAvatarImageUrl,
   getBackgroundImageUrl
 } from '@/utils/supabase';
-import logger from '@/utils/logger';
 
 // Create the context
 const ProfileContext = createContext(null);
@@ -53,7 +52,7 @@ export function ProfileProvider({ children }) {
         const { data: profileData, error: profileError } = await getUserProfile(user.id);
         
         if (profileError) {
-          logger.error('Error fetching profile data:', profileError);
+          console.error('Error fetching profile data:', profileError);
           setError(profileError);
           return;
         }
@@ -69,17 +68,17 @@ export function ProfileProvider({ children }) {
           
           // Directly get avatar and background URLs from storage and update profile if needed
           try {
-            logger.debug('Directly fetching avatar and background from storage after profile load');
+            console.debug('Directly fetching avatar and background from storage after profile load');
             const avatarUrl = await getAvatarImageUrl(user.id);
             const backgroundUrl = await getBackgroundImageUrl(user.id);
             
-            logger.debug('Setting avatar URL from storage:', avatarUrl);
-            logger.debug('Setting background URL from storage:', backgroundUrl);
+            console.debug('Setting avatar URL from storage:', avatarUrl);
+            console.debug('Setting background URL from storage:', backgroundUrl);
             
             setAvatarUrl(avatarUrl);
             setBackgroundUrl(backgroundUrl);
           } catch (imageError) {
-            logger.error('Error fetching images from storage:', imageError);
+            console.error('Error fetching images from storage:', imageError);
             
             // Fall back to profile URLs if available
             if (profileData.avatar_url) {
@@ -103,7 +102,7 @@ export function ProfileProvider({ children }) {
           setBackgroundUrl('/profile-bg.jpg');
         }
       } catch (err) {
-        logger.error('Error in fetchProfileData:', err);
+        console.error('Error in fetchProfileData:', err);
         setError(err);
         setAvatarUrl('/default-avatar.svg');
         setBackgroundUrl('/profile-bg.jpg');
@@ -132,7 +131,7 @@ export function ProfileProvider({ children }) {
     // Check if we have a cached value that's not expired
     if (cacheMap.has(userId) && (now - lastFetched < CACHE_TIMEOUT)) {
       const cachedUrl = cacheMap.get(userId);
-      logger.debug(`Using cached ${imageType} URL for user ${userId}:`, cachedUrl);
+      console.debug(`Using cached ${imageType} URL for user ${userId}:`, cachedUrl);
       
       // Only update state if explicitly requested (to avoid updates during render)
       if (updateState) {
@@ -154,7 +153,7 @@ export function ProfileProvider({ children }) {
       if (imageUrl && imageUrl !== defaultUrl) {
         // Ensure the URL is valid
         if (!imageUrl.startsWith('http') && !imageUrl.startsWith('/')) {
-          logger.error(`Invalid ${imageType} URL format:`, imageUrl);
+          console.error(`Invalid ${imageType} URL format:`, imageUrl);
           
           // Update cache with default
           cacheMap.set(userId, defaultUrl);
@@ -209,7 +208,7 @@ export function ProfileProvider({ children }) {
         return defaultUrl;
       }
     } catch (error) {
-      logger.error(`Error fetching ${imageType} URL:`, error);
+      console.error(`Error fetching ${imageType} URL:`, error);
       
       // Only update state if explicitly requested
       if (updateState) {
@@ -252,7 +251,7 @@ export function ProfileProvider({ children }) {
       
       return { success: true };
     } catch (err) {
-      logger.error('Error updating profile:', err);
+      console.error('Error updating profile:', err);
       setError(err);
       return { success: false, error: err };
     } finally {
@@ -295,7 +294,7 @@ export function ProfileProvider({ children }) {
       const { data: profileData, error } = await getUserProfile(user.id);
       
       if (error) {
-        logger.error('Error refreshing profile:', error);
+        console.error('Error refreshing profile:', error);
         setError(error);
         return null;
       }
@@ -315,7 +314,7 @@ export function ProfileProvider({ children }) {
       
       return null;
     } catch (err) {
-      logger.error('Error refreshing profile:', err);
+      console.error('Error refreshing profile:', err);
       setError(err);
       return null;
     } finally {
@@ -328,7 +327,7 @@ export function ProfileProvider({ children }) {
     imageCache.current.avatars.clear();
     imageCache.current.backgrounds.clear();
     imageCache.current.lastFetched.clear();
-    logger.debug('Image cache cleared');
+    console.debug('Image cache cleared');
   };
 
   const value = {

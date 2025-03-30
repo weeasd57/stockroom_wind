@@ -1,5 +1,5 @@
 // Stock API utilities for EODHD API
-const API_KEY = process.env.NEXT_PUBLIC_EODHD_API_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_EODHD_API_KEY ; // استخدام القيمة الاحتياطية إذا لم يتم تعيين المتغير البيئي
 const BASE_URL = "https://eodhd.com/api";
 import countrySummary from '../symbols_data/country_summary_20250304_171206.json';
 import { EXCHANGE_MAP, formatSymbolForApi, getExchangeCodeFromData } from './symbolUtils';

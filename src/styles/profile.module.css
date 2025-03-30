@@ -241,8 +241,6 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 1.5rem;
-  width: 100%;
-  margin-top: 1rem;
 }
 
 .usersGrid {
@@ -258,9 +256,6 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   transition: all 0.2s ease;
   border: 1px solid hsla(var(--border)/0.1);
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
 }
 
 .postCard:hover {
@@ -268,74 +263,9 @@
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
 }
 
-.postImageContainer {
-  width: 100%;
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 0.5rem;
-}
-
-.postImage {
-  width: 100%;
-  height: auto;
-  object-fit: cover;
-  max-height: 200px;
-  border-radius: 8px;
-}
-
 .postContent {
-  margin-bottom: 0.5rem;
+  margin-bottom: 1rem;
   line-height: 1.6;
-  word-break: break-word;
-}
-
-.stockInfo {
-  background-color: hsla(var(--muted)/0.3);
-  border-radius: 8px;
-  padding: 0.75rem;
-  font-size: 0.875rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.stockSymbol {
-  font-weight: 600;
-  color: hsl(var(--primary));
-}
-
-.priceInfo {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  font-size: 0.8rem;
-}
-
-.currentPrice, .targetPrice, .stopLossPrice {
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-weight: 500;
-}
-
-.currentPrice {
-  background-color: hsla(var(--primary)/0.1);
-  color: hsl(var(--primary));
-}
-
-.targetPrice {
-  background-color: hsla(var(--success)/0.1);
-  color: hsl(var(--success));
-}
-
-.stopLossPrice {
-  background-color: hsla(var(--destructive)/0.1);
-  color: hsl(var(--destructive));
-}
-
-.strategy {
-  font-style: italic;
-  color: hsl(var(--muted-foreground));
-  font-size: 0.8rem;
 }
 
 .postMeta {
@@ -343,61 +273,6 @@
   justify-content: space-between;
   color: hsl(var(--muted-foreground));
   font-size: 0.875rem;
-  margin-top: auto;
-  padding-top: 0.5rem;
-  border-top: 1px solid hsla(var(--border)/0.1);
-}
-
-.loadingContainer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  color: hsl(var(--muted-foreground));
-}
-
-.loadingSpinner {
-  width: 30px;
-  height: 30px;
-  border: 3px solid hsla(var(--primary)/0.2);
-  border-top-color: hsl(var(--primary));
-  border-radius: 50%;
-  animation: spinner 0.8s linear infinite;
-  margin-bottom: 1rem;
-}
-
-.refreshButton {
-  margin: 1.5rem auto;
-  display: block;
-  padding: 0.5rem 1.5rem;
-  background-color: hsla(var(--primary)/0.1);
-  color: hsl(var(--primary));
-  border: 1px solid hsla(var(--primary)/0.2);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.refreshButton:hover {
-  background-color: hsla(var(--primary)/0.2);
-}
-
-.emptyPostsContainer {
-  text-align: center;
-  padding: 2rem;
-}
-
-.createPostPrompt {
-  margin-top: 0.5rem;
-  color: hsl(var(--primary));
-  font-size: 0.9rem;
-}
-
-@keyframes spinner {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .userCard {

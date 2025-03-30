@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import logger from '@/utils/logger';
+// import logger from '@/utils/logger';
 
 // Create a single supabase client for interacting with your database
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -10,12 +10,9 @@ export const isSupabaseConfigured = () => {
   return Boolean(supabaseUrl && supabaseAnonKey);
 };
 
-// Function to check if we're in a browser environment
-const isBrowser = () => typeof window !== 'undefined';
-
 // Ensure we have valid credentials before creating the client
 if (!isSupabaseConfigured()) {
-  logger.error(
+  console.error(
     'Missing Supabase credentials. Make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in .env.local'
   );
 }
@@ -37,53 +34,25 @@ export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
   },
 });
 
-// Initialize required storage buckets
-export async function initializeStorageBuckets() {
-  if (!isBrowser() || !isSupabaseConfigured()) {
-    return false;
-  }
-  
-  try {
-    // List of buckets required by the application
-    const requiredBuckets = ['posts', 'avatars', 'backgrounds'];
-    
-    // Check and create each bucket
-    for (const bucketName of requiredBuckets) {
-      const success = await createBucketIfNotExists(bucketName);
-      if (!success) {
-        console.warn(`Failed to create/verify bucket: ${bucketName}`);
-      }
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Error initializing storage buckets:', error);
-    return false;
-  }
-}
-
 // Test the connection on initialization
-if (isBrowser() && isSupabaseConfigured()) {
-  (async function testConnection() {
+(async function testConnection() {
+  if (typeof window !== 'undefined' && isSupabaseConfigured()) {
     try {
       const { error } = await supabase.from('_connection_test').select('*').limit(1).single();
       // If we get a "relation does not exist" error, that's actually good
       // It means we connected to the database but the table doesn't exist
       if (error && error.code === '42P01') {
-        logger.log('Supabase connection successful');
+        console.log('Supabase connection successful');
       } else if (error) {
-        logger.warn('Supabase connection test returned an error:', error.message);
+        console.warn('Supabase connection test returned an error:', error.message);
       } else {
-        logger.log('Supabase connection successful');
+        console.log('Supabase connection successful');
       }
-      
-      // Initialize storage buckets
-      await initializeStorageBuckets();
     } catch (err) {
-      logger.error('Failed to test Supabase connection:', err.message);
+      console.error('Failed to test Supabase connection:', err.message);
     }
-  })();
-}
+  }
+})();
 
 // Authentication helpers
 /**
@@ -102,7 +71,7 @@ export const signUp = async (email, password) => {
     if (error) throw error;
     return { data, error: null };
   } catch (e) {
-    logger.error('Sign up error:', e);
+    console.error('Sign up error:', e);
     return { data: null, error: e };
   }
 };
@@ -127,7 +96,7 @@ export const signIn = async (email, password) => {
     
     return { data, error: null };
   } catch (e) {
-    logger.error('Sign in error:', e);
+    console.error('Sign in error:', e);
     return { data: null, error: e };
   }
 };
@@ -142,7 +111,7 @@ export const signOut = async () => {
     if (error) throw error;
     return { error: null };
   } catch (e) {
-    logger.error('Sign out error:', e);
+    console.error('Sign out error:', e);
     return { error: e };
   }
 };
@@ -157,7 +126,7 @@ export const getCurrentUser = async () => {
     
     // If there's an authentication error (like invalid refresh token)
     if (error) {
-      logger.warn('Auth error getting current user:', error.message);
+      console.warn('Auth error getting current user:', error.message);
       // Clear any potentially corrupted session data
       await supabase.auth.signOut();
       return null;
@@ -165,7 +134,7 @@ export const getCurrentUser = async () => {
     
     return user;
   } catch (error) {
-    logger.error('Error getting current user:', error);
+    console.error('Error getting current user:', error);
     // Return null to gracefully handle the error
     return null;
   }
@@ -179,12 +148,12 @@ export const getCurrentUser = async () => {
  */
 export const getUserProfile = async (userId) => {
   if (userId === undefined) {
-    logger.error('Error fetching user profile: userId is undefined');
+    console.error('Error fetching user profile: userId is undefined');
     return { data: null, error: { message: 'User ID is required' } };
   }
 
   if (userId === null) {
-    logger.error('Error fetching user profile: userId is null');
+    console.error('Error fetching user profile: userId is null');
     return { data: null, error: { message: 'User ID cannot be null' } };
   }
 
@@ -198,7 +167,7 @@ export const getUserProfile = async (userId) => {
     
     // If no profile exists, return empty data instead of error
     if (!data || data.length === 0) {
-      logger.log(`No profile found for user ${userId}, creating default profile`);
+      console.log(`No profile found for user ${userId}, creating default profile`);
       
       // Create a default profile for the user
       const defaultProfile = {
@@ -219,7 +188,7 @@ export const getUserProfile = async (userId) => {
         .insert([defaultProfile]);
       
       if (insertError) {
-        logger.error('Error creating default profile:', insertError);
+        console.error('Error creating default profile:', insertError);
         return { data: null, error: insertError };
       }
       
@@ -229,7 +198,7 @@ export const getUserProfile = async (userId) => {
     // Return the first profile if multiple exist (should be only one)
     return { data: data[0], error: null };
   } catch (error) {
-    logger.error('Error fetching user profile:', error);
+    console.error('Error fetching user profile:', error);
     return { data: null, error };
   }
 };
@@ -244,7 +213,7 @@ export const updateUserProfile = async (userId, updates) => {
   if (!userId) return { data: null, error: 'No user ID provided' };
 
   try {
-    logger.log(`Updating profile for user ${userId}:`, updates);
+    console.log(`Updating profile for user ${userId}:`, updates);
     
     // Ensure avatar_url and background_url are properly handled
     const sanitizedUpdates = { ...updates };
@@ -257,13 +226,13 @@ export const updateUserProfile = async (userId, updates) => {
       } else if (sanitizedUpdates.avatar_url.includes('?')) {
         // For non-OAuth URLs, remove cache-busting parameters
         sanitizedUpdates.avatar_url = sanitizedUpdates.avatar_url.split('?')[0];
-        logger.log('Sanitized avatar_url:', sanitizedUpdates.avatar_url);
+        console.log('Sanitized avatar_url:', sanitizedUpdates.avatar_url);
       }
     }
     
     if (sanitizedUpdates.background_url && sanitizedUpdates.background_url.includes('?')) {
       sanitizedUpdates.background_url = sanitizedUpdates.background_url.split('?')[0];
-      logger.log('Sanitized background_url:', sanitizedUpdates.background_url);
+      console.log('Sanitized background_url:', sanitizedUpdates.background_url);
     }
 
     const { data, error } = await supabase
@@ -274,13 +243,13 @@ export const updateUserProfile = async (userId, updates) => {
       .single();
 
     if (error) {
-      logger.error('Error updating profile:', error);
+      console.error('Error updating profile:', error);
       throw error;
     }
 
     return { data, error: null };
   } catch (error) {
-    logger.error('Error in updateUserProfile:', error);
+    console.error('Error in updateUserProfile:', error);
     return { data: null, error };
   }
 };
@@ -296,19 +265,19 @@ export const updateUserProfile = async (userId, updates) => {
  */
 export const uploadImage = async (file, bucket, userId, fileType = 'avatar', options = {}) => {
   if (!file || !bucket || !userId) {
-    logger.error(`Missing required parameters for uploadImage: file=${!!file}, bucket=${bucket}, userId=${userId}`);
+    console.error(`Missing required parameters for uploadImage: file=${!!file}, bucket=${bucket}, userId=${userId}`);
     return { publicUrl: null, error: 'Missing required parameters' };
   }
 
   try {
-    logger.log(`Uploading ${fileType} to ${bucket} for user ${userId}`);
+    console.log(`Uploading ${fileType} to ${bucket} for user ${userId}`);
     
     // Get file extension from the file type
     const fileExtension = file.name.split('.').pop().toLowerCase();
     
     // Create a path for the file: userId/fileType.extension
     const filePath = `${userId}/${fileType}.${fileExtension}`;
-    logger.log(`File path: ${filePath}`);
+    console.log(`File path: ${filePath}`);
     
     // Check if we can access the bucket - do NOT try to create it if it doesn't exist
     try {
@@ -317,17 +286,17 @@ export const uploadImage = async (file, bucket, userId, fileType = 'avatar', opt
         .list();
       
       if (listError) {
-        logger.error(`Cannot access bucket ${bucket}:`, listError);
+        console.error(`Cannot access bucket ${bucket}:`, listError);
         return { publicUrl: null, error: `Storage bucket '${bucket}' is not accessible. This is likely because it hasn't been created by an administrator. Please contact support.` };
       }
     } catch (bucketAccessError) {
-      logger.error(`Error accessing bucket ${bucket}:`, bucketAccessError);
+      console.error(`Error accessing bucket ${bucket}:`, bucketAccessError);
       return { publicUrl: null, error: bucketAccessError };
     }
     
     // Delete any existing files with the same name pattern
     try {
-      logger.log(`Checking for existing ${fileType} files to delete...`);
+      console.log(`Checking for existing ${fileType} files to delete...`);
       const { data: existingFiles, error: listError } = await supabase.storage
         .from(bucket)
         .list(userId);
@@ -336,29 +305,29 @@ export const uploadImage = async (file, bucket, userId, fileType = 'avatar', opt
         const filesToDelete = existingFiles.filter(file => file.name.startsWith(`${fileType}.`));
         
         if (filesToDelete.length > 0) {
-          logger.log(`Found ${filesToDelete.length} existing ${fileType} files to delete`);
+          console.log(`Found ${filesToDelete.length} existing ${fileType} files to delete`);
           
           for (const fileToDelete of filesToDelete) {
-            logger.log(`Deleting ${userId}/${fileToDelete.name}`);
+            console.log(`Deleting ${userId}/${fileToDelete.name}`);
             const { error: deleteError } = await supabase.storage
               .from(bucket)
               .remove([`${userId}/${fileToDelete.name}`]);
             
             if (deleteError) {
-              logger.error(`Error deleting existing file ${fileToDelete.name}:`, deleteError);
+              console.error(`Error deleting existing file ${fileToDelete.name}:`, deleteError);
             }
           }
         } else {
-          logger.log(`No existing ${fileType} files found to delete`);
+          console.log(`No existing ${fileType} files found to delete`);
         }
       }
     } catch (deleteError) {
-      logger.error(`Error handling existing files:`, deleteError);
+      console.error(`Error handling existing files:`, deleteError);
       // Continue with the upload even if deletion fails
     }
     
     // Upload the new file with progress handling if provided
-    logger.log(`Uploading new ${fileType} file...`);
+    console.log(`Uploading new ${fileType} file...`);
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from(bucket)
       .upload(filePath, file, {
@@ -368,7 +337,7 @@ export const uploadImage = async (file, bucket, userId, fileType = 'avatar', opt
       });
     
     if (uploadError) {
-      logger.error(`Error uploading ${fileType}:`, uploadError);
+      console.error(`Error uploading ${fileType}:`, uploadError);
       return { data: null, error: uploadError, publicUrl: null };
     }
     
@@ -384,16 +353,16 @@ export const uploadImage = async (file, bucket, userId, fileType = 'avatar', opt
     } else if (typeof publicUrlResponse?.publicUrl === 'string') {
       publicUrl = publicUrlResponse.publicUrl;
     } else {
-      logger.error('Unexpected response format from getPublicUrl:', publicUrlResponse);
+      console.error('Unexpected response format from getPublicUrl:', publicUrlResponse);
       return { data: uploadData, error: new Error('Failed to get public URL'), publicUrl: null };
     }
     
     if (!publicUrl) {
-      logger.error('Failed to get public URL from response:', publicUrlResponse);
+      console.error('Failed to get public URL from response:', publicUrlResponse);
       return { data: uploadData, error: new Error('Failed to get public URL'), publicUrl: null };
     }
     
-    logger.log(`Retrieved public URL: ${publicUrl}`);
+    console.log(`Retrieved public URL: ${publicUrl}`);
     
     // Use a more stable cache-busting parameter (daily instead of every millisecond)
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
@@ -410,19 +379,19 @@ export const uploadImage = async (file, bucket, userId, fileType = 'avatar', opt
         .eq('id', userId);
       
       if (updateError) {
-        logger.warn(`Could not update profile with ${fileType} URL:`, updateError);
+        console.warn(`Could not update profile with ${fileType} URL:`, updateError);
       } else {
-        logger.log(`Successfully updated profile with ${fileType} URL: ${baseUrl}`);
+        console.log(`Successfully updated profile with ${fileType} URL: ${baseUrl}`);
       }
     } catch (updateError) {
-      logger.warn(`Error updating profile with ${fileType} URL:`, updateError);
+      console.warn(`Error updating profile with ${fileType} URL:`, updateError);
       // Continue even if profile update fails
     }
     
-    logger.log(`Successfully uploaded ${fileType}, URL: ${publicUrlWithCacheBuster}`);
+    console.log(`Successfully uploaded ${fileType}, URL: ${publicUrlWithCacheBuster}`);
     return { data: uploadData, publicUrl: publicUrlWithCacheBuster, error: null };
   } catch (error) {
-    logger.error(`Error uploading ${fileType}:`, error);
+    console.error(`Error uploading ${fileType}:`, error);
     return { data: null, publicUrl: null, error };
   }
 };
@@ -439,7 +408,7 @@ export const getBackgroundImageUrl = async (userId) => {
   try {
     // First attempt to get the background directly from storage
     // This ensures we always have the latest version
-    logger.log(`Checking storage directly for background of user ${userId}`);
+    console.log(`Checking storage directly for background of user ${userId}`);
     
     try {
       // Check if user has files in the backgrounds bucket
@@ -448,7 +417,7 @@ export const getBackgroundImageUrl = async (userId) => {
         .list(userId);
       
       if (listError) {
-        logger.warn(`Error listing background files for user ${userId}:`, listError);
+        console.warn(`Error listing background files for user ${userId}:`, listError);
       } else if (files && files.length > 0) {
         // First try to find files prefixed with 'background.'
         let backgroundFile = files.find(file => file.name.startsWith('background.'));
@@ -472,7 +441,7 @@ export const getBackgroundImageUrl = async (userId) => {
         }
         
         if (backgroundFile) {
-          logger.log(`Found background file in storage: ${backgroundFile.name}`);
+          console.log(`Found background file in storage: ${backgroundFile.name}`);
           
           // Get the public URL for the file
           const { data: urlData } = supabase.storage
@@ -485,7 +454,7 @@ export const getBackgroundImageUrl = async (userId) => {
             const fullUrl = `${baseUrl}${cacheParam}`;
             
             // Also update the profile table with this URL (without cache param)
-            logger.log('Updating profile with background URL from storage:', baseUrl);
+            console.log('Updating profile with background URL from storage:', baseUrl);
             try {
               const { error: updateError } = await supabase
                 .from('profiles')
@@ -493,10 +462,10 @@ export const getBackgroundImageUrl = async (userId) => {
                 .eq('id', userId);
               
               if (updateError) {
-                logger.warn('Could not update profile with background URL:', updateError);
+                console.warn('Could not update profile with background URL:', updateError);
               }
             } catch (updateError) {
-              logger.warn('Error updating profile with background URL:', updateError);
+              console.warn('Error updating profile with background URL:', updateError);
             }
             
             return fullUrl;
@@ -504,11 +473,11 @@ export const getBackgroundImageUrl = async (userId) => {
         }
       }
     } catch (storageError) {
-      logger.error('Error accessing background in storage:', storageError);
+      console.error('Error accessing background in storage:', storageError);
     }
     
     // If we couldn't get the background from storage, check the profile
-    logger.log(`Checking profile for background URL of user ${userId}`);
+    console.log(`Checking profile for background URL of user ${userId}`);
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('background_url')
@@ -516,7 +485,7 @@ export const getBackgroundImageUrl = async (userId) => {
       .single();
 
     if (profileError) {
-      logger.warn('Error fetching profile for background URL:', profileError.message || profileError);
+      console.warn('Error fetching profile for background URL:', profileError.message || profileError);
     } else if (profile?.background_url && profile.background_url !== '/profile-bg.jpg') {
       // If we have a valid URL in the profile, use it with cache busting
       const cacheParam = `?t=${Date.now()}`; // Force cache refresh
@@ -527,7 +496,7 @@ export const getBackgroundImageUrl = async (userId) => {
     // If no background found in storage or profile, return default
     return '/profile-bg.jpg';
   } catch (error) {
-    logger.error('Error getting background URL:', error);
+    console.error('Error getting background URL:', error);
     return '/profile-bg.jpg';
   }
 };
@@ -543,7 +512,7 @@ export const getAvatarImageUrl = async (userId) => {
   try {
     // First attempt to get the avatar directly from storage
     // This ensures we always have the latest version
-    logger.log(`Checking storage directly for avatar of user ${userId}`);
+    console.log(`Checking storage directly for avatar of user ${userId}`);
     
     try {
       // Check if user has files in the avatars bucket
@@ -552,7 +521,7 @@ export const getAvatarImageUrl = async (userId) => {
         .list(userId);
       
       if (listError) {
-        logger.warn(`Error listing files for user ${userId}:`, listError);
+        console.warn(`Error listing files for user ${userId}:`, listError);
       } else if (files && files.length > 0) {
         // First try to find files prefixed with 'avatar.'
         let avatarFile = files.find(file => file.name.startsWith('avatar.'));
@@ -576,7 +545,7 @@ export const getAvatarImageUrl = async (userId) => {
         }
         
         if (avatarFile) {
-          logger.log(`Found avatar file in storage: ${avatarFile.name}`);
+          console.log(`Found avatar file in storage: ${avatarFile.name}`);
           
           // Get the public URL for the file
           const { data: urlData } = supabase.storage
@@ -589,7 +558,7 @@ export const getAvatarImageUrl = async (userId) => {
             const fullUrl = `${baseUrl}${cacheParam}`;
             
             // Also update the profile table with this URL (without cache param)
-            logger.log('Updating profile with avatar URL from storage:', baseUrl);
+            console.log('Updating profile with avatar URL from storage:', baseUrl);
             try {
               const { error: updateError } = await supabase
                 .from('profiles')
@@ -597,10 +566,10 @@ export const getAvatarImageUrl = async (userId) => {
                 .eq('id', userId);
               
               if (updateError) {
-                logger.warn('Could not update profile with avatar URL:', updateError);
+                console.warn('Could not update profile with avatar URL:', updateError);
               }
             } catch (updateError) {
-              logger.warn('Error updating profile with avatar URL:', updateError);
+              console.warn('Error updating profile with avatar URL:', updateError);
             }
             
             return fullUrl;
@@ -608,11 +577,11 @@ export const getAvatarImageUrl = async (userId) => {
         }
       }
     } catch (storageError) {
-      logger.error('Error accessing avatar in storage:', storageError);
+      console.error('Error accessing avatar in storage:', storageError);
     }
     
     // If we couldn't get the avatar from storage, check the profile
-    logger.log(`Checking profile for avatar URL of user ${userId}`);
+    console.log(`Checking profile for avatar URL of user ${userId}`);
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('avatar_url')
@@ -620,7 +589,7 @@ export const getAvatarImageUrl = async (userId) => {
       .single();
 
     if (profileError) {
-      logger.warn('Error fetching profile for avatar URL:', profileError.message || profileError);
+      console.warn('Error fetching profile for avatar URL:', profileError.message || profileError);
     } else if (profile?.avatar_url && profile.avatar_url !== '/default-avatar.svg') {
       // If we have a valid URL in the profile, use it with cache busting
       const cacheParam = `?t=${Date.now()}`; // Force cache refresh
@@ -631,7 +600,7 @@ export const getAvatarImageUrl = async (userId) => {
     // If no avatar found in storage or profile, return default
     return '/default-avatar.svg';
   } catch (error) {
-    logger.error('Error getting avatar URL:', error);
+    console.error('Error getting avatar URL:', error);
     return '/default-avatar.svg';
   }
 };
@@ -658,7 +627,7 @@ export const checkFileExists = async (bucket, path) => {
     // Check if the file exists in the directory
     return data && data.some(file => file.name === fileName);
   } catch (error) {
-    logger.error('Error checking if file exists:', error);
+    console.error('Error checking if file exists:', error);
     return false;
   }
 };
@@ -684,49 +653,8 @@ export async function createPost(postData) {
     
     return { data, error: null };
   } catch (error) {
-    logger.error('Error creating post:', error);
+    console.error('Error creating post:', error);
     return { data: null, error };
-  }
-}
-
-/**
- * Create a storage bucket if it doesn't exist
- * @param {string} bucketName - Name of the bucket to create
- * @returns {Promise<boolean>} - Whether the bucket was created or already exists
- */
-export async function createBucketIfNotExists(bucketName) {
-  try {
-    // First check if the bucket exists
-    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-    
-    if (listError) {
-      console.error('Error listing buckets:', listError);
-      return false;
-    }
-    
-    // Check if the bucket already exists
-    const bucketExists = buckets.some(bucket => bucket.name === bucketName);
-    if (bucketExists) {
-      console.log(`Bucket "${bucketName}" already exists`);
-      return true;
-    }
-    
-    // Create the bucket if it doesn't exist
-    const { error: createError } = await supabase.storage.createBucket(bucketName, {
-      public: true, // Make bucket publicly accessible
-      fileSizeLimit: 5242880, // 5MB in bytes
-    });
-    
-    if (createError) {
-      console.error(`Error creating bucket "${bucketName}":`, createError);
-      return false;
-    }
-    
-    console.log(`Bucket "${bucketName}" created successfully`);
-    return true;
-  } catch (error) {
-    console.error(`Error checking/creating bucket "${bucketName}":`, error);
-    return false;
   }
 }
 
@@ -734,94 +662,24 @@ export async function createBucketIfNotExists(bucketName) {
  * Upload post image to storage
  * @param {File} file - Image file to upload
  * @param {string} userId - User ID
- * @param {Object} options - Upload options
  * @returns {Promise<string>} - Public URL of the uploaded image
  */
-export async function uploadPostImage(file, userId = 'anonymous') {
-  if (!file) throw new Error('No file provided');
+export async function uploadPostImage(file, userId) {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${userId}/${Date.now()}.${fileExt}`;
+  const filePath = `post-images/${fileName}`;
   
-  try {
-    // Verify file size - reject if too large (5MB max)
-    const MAX_SIZE = 5 * 1024 * 1024; // 5MB
-    if (file.size > MAX_SIZE) {
-      throw new Error(`File size exceeds limit (5MB). Current size: ${Math.round(file.size / 1024)}KB`);
-    }
+  const { error } = await supabase.storage
+    .from('posts')
+    .upload(filePath, file);
     
-    console.log(`Uploading post image: ${file.name} (${Math.round(file.size / 1024)}KB)`);
+  if (error) throw error;
+  
+  const { data } = supabase.storage
+    .from('posts')
+    .getPublicUrl(filePath);
     
-    // Try to create the bucket if it doesn't exist
-    const bucketCreated = await createBucketIfNotExists('posts');
-    if (!bucketCreated) {
-      console.warn('Failed to create posts bucket. Falling back to data URL.');
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(file);
-      });
-    }
-    
-    // Create a unique file path
-    const fileExt = file.name.split('.').pop().toLowerCase();
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${fileExt}`;
-    const filePath = `post-images/${userId}/${fileName}`;
-    
-    // Set up cache control to improve performance
-    const options = {
-      cacheControl: '3600',
-      upsert: false
-    };
-    
-    // Upload the file with enhanced error handling
-    const { error } = await supabase.storage
-      .from('posts')
-      .upload(filePath, file, options);
-      
-    if (error) {
-      console.error('Upload error:', error);
-      
-      // Provide more specific error messages
-      if (error.message && (error.message.includes('storage/bucket-not-found') || error.message.includes('Bucket not found'))) {
-        // If bucket doesn't exist, use FileReader to convert the image to a data URL
-        console.log('Falling back to data URL for image');
-        return new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.readAsDataURL(file);
-        });
-      } else if (error.message && error.message.includes('413')) {
-        throw new Error('File too large');
-      } else if (error.message && error.message.includes('network')) {
-        throw new Error('Network error');
-      }
-      
-      throw error;
-    }
-    
-    // Get the public URL
-    const { data } = supabase.storage
-      .from('posts')
-      .getPublicUrl(filePath);
-    
-    if (!data || !data.publicUrl) {
-      throw new Error('Failed to get public URL');
-    }
-    
-    console.log('Post image uploaded successfully:', data.publicUrl);
-    return data.publicUrl;
-  } catch (error) {
-    // If bucket not found, try a different approach
-    if (error.message && error.message.includes('Bucket not found')) {
-      console.log('Posts bucket not found, using data URL instead');
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(file);
-      });
-    }
-    
-    console.error('Error in uploadPostImage:', error);
-    throw error;
-  }
+  return data.publicUrl;
 }
 
 /**
@@ -839,13 +697,13 @@ export async function checkTableExists(tableName) {
       .eq('table_schema', 'public');
     
     if (error) {
-      logger.error(`Error checking if table ${tableName} exists:`, error);
+      console.error(`Error checking if table ${tableName} exists:`, error);
       return false;
     }
     
     return data && data.length > 0;
   } catch (error) {
-    logger.error(`Error checking if table ${tableName} exists:`, error);
+    console.error(`Error checking if table ${tableName} exists:`, error);
     return false;
   }
 }
@@ -858,7 +716,7 @@ export async function checkSupabaseConnection() {
   try {
     // First check if Supabase is configured
     if (!isSupabaseConfigured()) {
-      logger.error('Supabase is not configured. Check your environment variables.');
+      console.error('Supabase is not configured. Check your environment variables.');
       return false;
     }
 
@@ -868,35 +726,35 @@ export async function checkSupabaseConnection() {
     // If we get a "relation does not exist" error, that's actually good
     // It means we connected to the database but the table doesn't exist
     if (error && error.code === '42P01') {
-      logger.log('Supabase connection is working (table does not exist, but connection is good)');
+      console.log('Supabase connection is working (table does not exist, but connection is good)');
       return true;
     }
     
     if (error) {
-      logger.error('Supabase connection check failed:', error.message, error.details);
+      console.error('Supabase connection check failed:', error.message, error.details);
       
       // Check for specific error types to provide better diagnostics
       if (error.code === 'PGRST301') {
-        logger.error('Authentication error: Invalid API key or JWT');
+        console.error('Authentication error: Invalid API key or JWT');
       } else if (error.code === 'PGRST401') {
-        logger.error('Permission denied: Check your RLS policies');
+        console.error('Permission denied: Check your RLS policies');
       } else if (error.message && error.message.includes('Failed to fetch')) {
-        logger.error('Network error: Unable to reach Supabase servers');
+        console.error('Network error: Unable to reach Supabase servers');
       }
       
       return false;
     }
     
-    logger.log('Supabase connection is working properly');
+    console.log('Supabase connection is working properly');
     return true;
   } catch (error) {
-    logger.error('Error checking Supabase connection:', error);
+    console.error('Error checking Supabase connection:', error);
     
     // Provide more specific error information
     if (error.message && error.message.includes('fetch')) {
-      logger.error('Network error: Check your internet connection');
+      console.error('Network error: Check your internet connection');
     } else if (error.message && error.message.includes('timeout')) {
-      logger.error('Connection timeout: Supabase server might be overloaded or unreachable');
+      console.error('Connection timeout: Supabase server might be overloaded or unreachable');
     }
     
     return false;
@@ -942,7 +800,7 @@ export async function getPosts(page = 1, limit = 10) {
       .limit(1);
 
     if (tableError && tableError.code === '42P01') {
-      logger.log('post_details view not found, falling back to posts table');
+      console.log('post_details view not found, falling back to posts table');
       // Try posts table instead
       const { data: postsData, error: postsError, count } = await supabase
         .from('posts')
@@ -951,7 +809,7 @@ export async function getPosts(page = 1, limit = 10) {
         .range(from, to);
 
       if (postsError) {
-        logger.error('Error fetching from posts table:', postsError);
+        console.error('Error fetching from posts table:', postsError);
         throw postsError;
       }
 
@@ -970,12 +828,12 @@ export async function getPosts(page = 1, limit = 10) {
 
       return response;
     } else if (tableError) {
-      logger.error('Error fetching table info:', tableError);
+      console.error('Error fetching table info:', tableError);
       throw tableError;
     }
 
     // If we got here, post_details exists. Let's see what columns we have
-    logger.log('Available columns in post_details:', Object.keys(tableInfo[0] || {}));
+    console.log('Available columns in post_details:', Object.keys(tableInfo[0] || {}));
 
     // Now fetch the actual data with all available columns
     const { data, error, count } = await supabase
@@ -985,7 +843,7 @@ export async function getPosts(page = 1, limit = 10) {
       .range(from, to);
 
     if (error) {
-      logger.error('Error fetching from post_details:', error);
+      console.error('Error fetching from post_details:', error);
       throw error;
     }
 
@@ -1004,7 +862,7 @@ export async function getPosts(page = 1, limit = 10) {
 
     return response;
   } catch (error) {
-    logger.error('Error in getPosts:', error);
+    console.error('Error in getPosts:', error);
     return {
       data: [],
       error: {
@@ -1136,7 +994,7 @@ export const unfollowUser = async (followerId, followingId) => {
  */
 export const getFollowers = async (userId) => {
   if (!userId) {
-    logger.error('Error fetching followers: userId is undefined or null');
+    console.error('Error fetching followers: userId is undefined or null');
     return { data: [], error: { message: 'User ID is required' } };
   }
 
@@ -1156,7 +1014,7 @@ export const getFollowers = async (userId) => {
     if (error) throw error;
     return { data, error: null };
   } catch (error) {
-    logger.error('Error fetching followers:', error);
+    console.error('Error fetching followers:', error);
     return { data: [], error };
   }
 };
@@ -1168,7 +1026,7 @@ export const getFollowers = async (userId) => {
  */
 export const getFollowing = async (userId) => {
   if (!userId) {
-    logger.error('Error fetching following: userId is undefined or null');
+    console.error('Error fetching following: userId is undefined or null');
     return { data: [], error: { message: 'User ID is required' } };
   }
 
@@ -1188,7 +1046,7 @@ export const getFollowing = async (userId) => {
     if (error) throw error;
     return { data, error: null };
   } catch (error) {
-    logger.error('Error fetching following:', error);
+    console.error('Error fetching following:', error);
     return { data: [], error };
   }
 };
