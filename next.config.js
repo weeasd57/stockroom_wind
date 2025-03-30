@@ -53,6 +53,8 @@ const nextConfig = {
   },
   // Set this to true to completely disable static generation
   output: 'standalone',
+  // Completely disable static optimization
+  staticPageGenerationTimeout: 0
 }
 
 module.exports = nextConfig
