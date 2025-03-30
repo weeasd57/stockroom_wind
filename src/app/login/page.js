@@ -7,8 +7,9 @@ import Image from 'next/image';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/utils/supabase';
 import styles from '@/styles/login.module.css';
+import { withClientOnly } from '@/components/ClientOnly';
 
-export default function Login() {
+function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
@@ -156,3 +157,14 @@ export default function Login() {
     </div>
   );
 }
+
+// Export wrapped version that only renders on the client side
+export default withClientOnly(Login,
+  // Simple loading state for server-side rendering
+  <div className="w-full h-screen flex items-center justify-center">
+    <div className="animate-pulse text-center">
+      <h2 className="text-2xl font-bold mb-4">Loading Authentication...</h2>
+      <p className="text-gray-500">Please wait while we set up your secure login</p>
+    </div>
+  </div>
+);

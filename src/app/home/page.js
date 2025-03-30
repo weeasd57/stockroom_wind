@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import styles from '@/styles/home.module.css';
 import CreatePostButton from '@/components/posts/CreatePostButton';
+import { withClientOnly } from '@/components/ClientOnly';
 
-export default function HomePage() {
+function HomePage() {
   const router = useRouter();
   const { isAuthenticated, loading, user } = useAuth();
   const [isVisible, setIsVisible] = useState(true);
@@ -50,3 +51,12 @@ export default function HomePage() {
     </div>
   );
 }
+
+export default withClientOnly(HomePage, 
+  <div className="w-full h-screen flex items-center justify-center">
+    <div className="animate-pulse text-center">
+      <h2 className="text-2xl font-bold mb-4">Loading Home Page...</h2>
+      <p className="text-gray-500">Please wait while we prepare your experience</p>
+    </div>
+  </div>
+);

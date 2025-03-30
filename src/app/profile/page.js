@@ -11,8 +11,9 @@ import {
 import styles from '@/styles/profile.module.css';
 import useProfileStore from '@/store/profileStore';
 import CreatePostButton from '@/components/posts/CreatePostButton';
+import { withClientOnly } from '@/components/ClientOnly';
 
-export default function Profile() {
+function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const { 
     profile, 
@@ -1193,3 +1194,14 @@ export default function Profile() {
     </div>
   );
 }
+
+// Export wrapped version that only renders on the client side
+export default withClientOnly(Profile,
+  // Simple loading state for server-side rendering
+  <div className="w-full h-screen flex items-center justify-center">
+    <div className="animate-pulse text-center">
+      <h2 className="text-2xl font-bold mb-4">Loading Profile...</h2>
+      <p className="text-gray-500">Preparing your personalized experience</p>
+    </div>
+  </div>
+);

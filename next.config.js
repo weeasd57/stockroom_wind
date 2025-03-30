@@ -51,6 +51,8 @@ const nextConfig = {
     // Disable React removing properties
     removeConsole: false,
   },
+  // Set this to true to completely disable static generation
+  output: 'standalone',
 }
 
 module.exports = nextConfig

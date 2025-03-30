@@ -28,3 +28,14 @@ export default function ClientOnly({ children, fallback = null }) {
   // Once mounted on the client, render children
   return children;
 }
+
+// Create a higher-order component for wrapping page components
+export function withClientOnly(Component, fallback = null) {
+  return function WithClientOnly(props) {
+    return (
+      <ClientOnly fallback={fallback}>
+        <Component {...props} />
+      </ClientOnly>
+    );
+  };
+}

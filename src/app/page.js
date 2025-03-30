@@ -4,11 +4,11 @@ import { useState, useEffect } from "react";
 import { useRouter } from 'next/navigation';
 import { useAuth } from "@/hooks/useAuth";
 import { getPosts } from "@/utils/supabase";
+import { withClientOnly } from '@/components/ClientOnly';
 
-export default function MainPage() {
+function MainPage() {
   const router = useRouter();
   const { isAuthenticated, loading } = useAuth();
-  const [isRedirecting, setIsRedirecting] = useState(true);
   const [isVisible, setIsVisible] = useState(false);
   const [posts, setPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -129,3 +129,14 @@ export default function MainPage() {
     </div>
   );
 }
+
+// Export wrapped version that only renders on the client side
+export default withClientOnly(MainPage,
+  // Simple loading state for server-side rendering
+  <div className="w-full h-screen flex items-center justify-center">
+    <div className="animate-pulse text-center">
+      <h2 className="text-2xl font-bold mb-4">Loading FireStocks...</h2>
+      <p className="text-gray-500">Preparing your stock trading experience</p>
+    </div>
+  </div>
+);
