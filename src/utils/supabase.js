@@ -769,25 +769,37 @@ const postsCache = {
 };
 
 /**
- * Get all posts with pagination
+ * Get posts with pagination
  * @param {number} page - Page number (1-based)
  * @param {number} limit - Number of posts per page
+ * @param {AbortSignal} signal - AbortController signal for cancellation
  * @returns {Promise<object>} - Posts and pagination info
  */
-export async function getPosts(page = 1, limit = 10) {
+export async function getPosts(page = 1, limit = 10, signal) {
   try {
     const cacheKey = `posts_${page}_${limit}`;
     const cachedData = postsCache.data.get(cacheKey);
     const cachedTimestamp = postsCache.timestamp.get(cacheKey);
     
+    // Check if there's a cached version and it's not expired
     if (cachedData && cachedTimestamp && (Date.now() - cachedTimestamp < postsCache.ttl)) {
       return cachedData;
+    }
+    
+    // Check if the operation was cancelled before starting
+    if (signal && signal.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
     }
 
     // First check if we can connect to Supabase
     const isConnected = await checkSupabaseConnection();
     if (!isConnected) {
       throw new Error('Unable to connect to Supabase. Please check your connection and credentials.');
+    }
+    
+    // Check if cancelled after connection check
+    if (signal && signal.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
     }
 
     const from = (page - 1) * limit;
@@ -797,16 +809,24 @@ export async function getPosts(page = 1, limit = 10) {
     const { data: tableInfo, error: tableError } = await supabase
       .from('post_details')
       .select('*')
-      .limit(1);
+      .limit(1)
+      .abortSignal(signal); // Add abort signal support
 
     if (tableError && tableError.code === '42P01') {
       console.log('post_details view not found, falling back to posts table');
+      
+      // Check if cancelled before fallback
+      if (signal && signal.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      
       // Try posts table instead
       const { data: postsData, error: postsError, count } = await supabase
         .from('posts')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
-        .range(from, to);
+        .range(from, to)
+        .abortSignal(signal); // Add abort signal support
 
       if (postsError) {
         console.error('Error fetching from posts table:', postsError);
@@ -823,13 +843,21 @@ export async function getPosts(page = 1, limit = 10) {
         totalPages
       };
 
-      postsCache.data.set(cacheKey, response);
-      postsCache.timestamp.set(cacheKey, Date.now());
+      // Don't cache results if the request was aborted
+      if (!signal || !signal.aborted) {
+        postsCache.data.set(cacheKey, response);
+        postsCache.timestamp.set(cacheKey, Date.now());
+      }
 
       return response;
     } else if (tableError) {
       console.error('Error fetching table info:', tableError);
       throw tableError;
+    }
+    
+    // Check if cancelled after table check
+    if (signal && signal.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
     }
 
     // If we got here, post_details exists. Let's see what columns we have
@@ -840,7 +868,8 @@ export async function getPosts(page = 1, limit = 10) {
       .from('post_details')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
-      .range(from, to);
+      .range(from, to)
+      .abortSignal(signal); // Add abort signal support
 
     if (error) {
       console.error('Error fetching from post_details:', error);
@@ -856,12 +885,20 @@ export async function getPosts(page = 1, limit = 10) {
       currentPage: page,
       totalPages
     };
-
-    postsCache.data.set(cacheKey, response);
-    postsCache.timestamp.set(cacheKey, Date.now());
+    
+    // Don't cache results if the request was aborted
+    if (!signal || !signal.aborted) {
+      postsCache.data.set(cacheKey, response);
+      postsCache.timestamp.set(cacheKey, Date.now());
+    }
 
     return response;
   } catch (error) {
+    // If this is an abort error, just propagate it
+    if (error.name === 'AbortError') {
+      throw error;
+    }
+    
     console.error('Error in getPosts:', error);
     return {
       data: [],

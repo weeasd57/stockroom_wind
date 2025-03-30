@@ -6,14 +6,18 @@
 
 .visible {
   opacity: 1;
+  min-height: 50vh;
 }
 
 /* Loading Container */
 .loadingContainer {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
-  min-height: calc(100vh - 64px);
+  padding: 2rem;
+  gap: 1rem;
+  margin-top: 2rem;
 }
 
 .loadingSpinner {
@@ -29,6 +33,81 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Error Container */
+.errorContainer {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.errorMessage {
+  color: #ef4444;
+  margin-bottom: 1rem;
+}
+
+.retryButton {
+  padding: 0.5rem 1.5rem;
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retryButton:hover {
+  background-color: #dc2626;
+}
+
+/* Posts Container */
+.postsContainer {
+  width: 100%;
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.postItem {
+  background-color: hsl(var(--card));
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid hsla(var(--border)/0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.postItem:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.loadMoreButton {
+  margin-top: 1rem;
+  padding: 0.75rem 1.5rem;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  align-self: center;
+}
+
+.loadMoreButton:hover {
+  background-color: hsla(var(--primary)/0.9);
+}
+
+.loadMoreButton:disabled {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  cursor: not-allowed;
 }
 
 /* Dashboard Header */

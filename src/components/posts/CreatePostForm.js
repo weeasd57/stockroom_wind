@@ -7,6 +7,7 @@ import { generateEodLastCloseUrl, countries, BASE_URL, API_KEY } from '@/utils/s
 import { getCountrySymbolCounts, searchStocks, COUNTRY_ISO_CODES } from '@/utils/symbolSearch';
 import { formatSymbolForApi, getExchangeCodeFromData, getSymbolPriceFromLocalData, getEodApiUrlParams } from '@/utils/symbolUtils';
 import { createPost as supabaseCreatePost, uploadPostImage, createUserStrategy, getUserStrategies } from '@/utils/supabase';
+import { useCreatePostForm } from '@/contexts/CreatePostFormContext';
 import 'flag-icons/css/flag-icons.min.css';
 import '@/styles/create-post-page.css';
 import '@/styles/animation.css';
@@ -210,23 +211,36 @@ const getCurrencySymbol = (country) => {
   return countryCode ? (COUNTRY_CURRENCY_SYMBOLS[countryCode] || '$') : '$';
 };
 
-export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingChange }) {
+export default function CreatePostForm() {
   const { user } = useAuth();
   const { profile, getEffectiveAvatarUrl } = useProfile();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submissionProgress, setSubmissionProgress] = useState('');
-  const [description, setDescription] = useState('');
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [stockSearch, setStockSearch] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [selectedStock, setSelectedStock] = useState(null);
-  const [currentPrice, setCurrentPrice] = useState(null);
-  const [targetPrice, setTargetPrice] = useState('');
-  const [stopLossPrice, setStopLossPrice] = useState('');
+  const { 
+    formState, 
+    updateField, 
+    updateFields, 
+    resetForm, 
+    forceCloseDialog 
+  } = useCreatePostForm();
+
+  const {
+    description,
+    imageFile,
+    imagePreview,
+    imageUrl,
+    stockSearch,
+    searchResults,
+    selectedStock,
+    currentPrice,
+    targetPrice,
+    stopLossPrice,
+    selectedStrategy,
+    targetPercentage,
+    stopLossPercentage,
+    isSubmitting,
+    submissionProgress
+  } = formState;
+
   const [strategies, setStrategies] = useState([]);
-  const [selectedStrategy, setSelectedStrategy] = useState('');
   const [newStrategy, setNewStrategy] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [showStockSearch, setShowStockSearch] = useState(false);
@@ -245,8 +259,6 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
   const stockSearchResultsRef = useRef(null);
   const strategySelectRef = useRef(null);
   const formWrapperRef = useRef(null);
-  const [targetPercentage, setTargetPercentage] = useState(5);
-  const [stopLossPercentage, setStopLossPercentage] = useState(5);
   const [showStrategyDialog, setShowStrategyDialog] = useState(false);
 
   // الاستراتيجيات الافتراضية
@@ -264,13 +276,6 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
     'Scalping',
     'News Trading'
   ];
-
-  // Notify parent component about submission state changes
-  useEffect(() => {
-    if (onSubmittingChange) {
-      onSubmittingChange(isSubmitting);
-    }
-  }, [isSubmitting, onSubmittingChange]);
 
   // Preload popular country data on component mount
   useEffect(() => {
@@ -378,7 +383,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
       
       // Only update if there's a change to prevent unnecessary re-renders
       if (JSON.stringify(filteredResults) !== JSON.stringify(searchResults)) {
-        setSearchResults(filteredResults);
+        updateField('searchResults', filteredResults);
       }
       setIsSearching(false);
       return;
@@ -395,7 +400,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
     if (stockSearch.length < 2) {
       // Only clear results if we're in all countries mode
       if (selectedCountry === 'all') {
-        setSearchResults([]);
+        updateField('searchResults', []);
       }
       setIsSearching(false);
       return;
@@ -430,11 +435,11 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
           uniqueId: item.uniqueId
         }));
         
-        setSearchResults(formattedResults);
+        updateField('searchResults', formattedResults);
       } catch (error) {
         console.error('Error searching stocks:', error);
         // Clear search results to indicate error to user
-        setSearchResults([]);
+        updateField('searchResults', []);
       } finally {
         setIsSearching(false);
       }
@@ -447,7 +452,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
         setIsSearching(false); // Ensure loading state is cleared on cleanup
       }
     };
-  }, [stockSearch, selectedCountry, searchResults]);
+  }, [stockSearch, selectedCountry, searchResults, updateField]);
 
   // Handle country selection change
   const handleCountryChange = (value) => {
@@ -485,119 +490,28 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
               uniqueId: item.uniqueId
             }));
             
-            setSearchResults(formattedResults);
+            updateField('searchResults', formattedResults);
           } else {
             // If no results are returned from the search, attempt to directly import the symbols file
             console.log(`No symbols returned from search for ${searchCountry}, attempting direct file import`);
 
             // Create a placeholder loading result
-            setSearchResults([{
+            updateField('searchResults', [{
               symbol: `Loading symbols for ${searchCountry}...`,
               name: "Please wait while we load the symbols",
               country: searchCountry,
               exchange: "",
               uniqueId: "loading-message"
             }]);
-            
-            // For Egyptian stocks specifically (since that seems to be a focus)
-            if (searchCountry.toLowerCase() === 'egypt') {
-              // Create some default Egyptian stocks if all else fails
-              const egyptStocks = [
-                { Symbol: "ABUK", Name: "Abou Kir Fertilizers", Country: "Egypt", Exchange: "EGX" },
-                { Symbol: "COMI", Name: "Commercial International Bank", Country: "Egypt", Exchange: "EGX" },
-                { Symbol: "EFIC", Name: "Egyptian Financial & Industrial", Country: "Egypt", Exchange: "EGX" },
-                { Symbol: "EAST", Name: "Eastern Company", Country: "Egypt", Exchange: "EGX" },
-                { Symbol: "HRHO", Name: "EFG Hermes Holding", Country: "Egypt", Exchange: "EGX" }
-              ];
-              
-              const formattedResults = egyptStocks.map(item => ({
-                symbol: item.Symbol,
-                name: item.Name,
-                country: item.Country,
-                exchange: item.Exchange,
-                uniqueId: `${item.Symbol}-${item.Country}`
-              }));
-              
-              setSearchResults(formattedResults);
-              console.log(`Loaded ${formattedResults.length} default symbols for Egypt`);
-            } else {
-              // Try to dynamically import the country symbols
-              try {
-                // Check if searchCountry is a country code, and if so, convert it to a full country name
-                let countryName = searchCountry;
-                if (searchCountry.length === 2 && COUNTRY_CODE_TO_NAME[searchCountry.toLowerCase()]) {
-                  countryName = COUNTRY_CODE_TO_NAME[searchCountry.toLowerCase()];
-                  console.log(`Converted country code ${searchCountry} to country name ${countryName}`);
-                }
-                
-                // Format the country name to match file naming
-                const formattedCountry = countryName.replace(/\s/g, '_');
-                const fileName = `${formattedCountry}_all_symbols_20250304_171206.json`;
-                console.log(`Attempting to import file: ${fileName}`);
-                
-                import(`@/symbols_data/${fileName}`)
-                  .then(module => {
-                    const symbols = module.default || [];
-                    if (symbols.length > 0) {
-                      const formattedResults = symbols.slice(0, 250).map(item => ({
-                        symbol: item.Symbol || item.symbol,
-                        name: item.Name || item.name,
-                        country: item.Country || item.country || searchCountry,
-                        exchange: item.Exchange || item.exchange || "",
-                        uniqueId: `${item.Symbol || item.symbol}-${searchCountry}`
-                      }));
-                      
-                      setSearchResults(formattedResults);
-                      console.log(`Directly loaded ${formattedResults.length} symbols for ${searchCountry}`);
-                    } else {
-                      console.error(`Failed to load symbols for ${searchCountry}`);
-                      // Show a message in the search results
-                      setSearchResults([{
-                        symbol: "Select another country",
-                        name: `No symbols could be loaded for ${searchCountry}`,
-                        country: searchCountry,
-                        exchange: "",
-                        uniqueId: "no-symbols-message"
-                      }]);
-                    }
-                  })
-                  .catch(err => {
-                    console.error(`Error loading symbols file for ${searchCountry}:`, err);
-                    // Show at least some results rather than nothing
-                    setSearchResults([{
-                      symbol: "Try another country",
-                      name: `File not found for ${searchCountry}`,
-                      country: searchCountry,
-                      exchange: "",
-                      uniqueId: "error-message"
-                    }]);
-                  });
-              } catch (error) {
-                console.error(`Error importing symbols for ${searchCountry}:`, error);
-              }
-            }
           }
-          setIsSearching(false);
         })
         .catch(error => {
-          console.error('Error loading symbols after country change:', error);
-          // Don't clear search results on error, show a helpful message
-          setSearchResults([{
-            symbol: "Search for a stock",
-            name: `Error loading symbols for ${searchCountry}, please try searching by name`,
-            country: searchCountry,
-            exchange: "",
-            uniqueId: "error-message"
-          }]);
-          setIsSearching(false);
-        })
-        .finally(() => {
-          // Ensure loading state is cleared regardless of success or error
-          setIsSearching(false);
+          console.error('Error loading symbols:', error);
+          // Handle error
         });
     } else {
       // If 'All Countries' is selected, clear results until user types search
-      setSearchResults([]);
+      updateField('searchResults', []);
     }
   };
 
@@ -612,10 +526,10 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
   const handleStockSelect = async (stock) => {
     try {
       // Set selected stock immediately for better UX
-      setSelectedStock(stock);
+      updateField('selectedStock', stock);
       // Clear stock search to close dropdown
-      setStockSearch('');
-      setSearchResults([]);
+      updateField('stockSearch', '');
+      updateField('searchResults', []);
       // Show loading state
       setIsSearching(true);
       
@@ -637,13 +551,11 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
         if (localPriceData && localPriceData.price) {
           console.log(`Found local price data: ${JSON.stringify(localPriceData)}`);
           const price = localPriceData.price;
-          setCurrentPrice(price);
+          updateField('currentPrice', price);
           
           // Set default target prices based on the fetched price
-          setTargetPrice((price * 1.05).toFixed(2));
-          setStopLossPrice((price * 0.95).toFixed(2));
-          
-         
+          updateField('targetPrice', (price * 1.05).toFixed(2));
+          updateField('stopLossPrice', (price * 0.95).toFixed(2));
           
           setApiResponse({
             source: 'local',
@@ -683,9 +595,9 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
       
       // For exchanges, don't try to get price data
       if (stock.exchange) {
-        setCurrentPrice(null);
-        setTargetPrice('');
-        setStopLossPrice('');
+        updateField('currentPrice', null);
+        updateField('targetPrice', '');
+        updateField('stopLossPrice', '');
         setPriceHistory([]);
         setApiResponse(null);
         
@@ -728,11 +640,11 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
             const price = priceData[0].close;
             console.log(`Successfully parsed price from API: $${price}`);
             
-            setCurrentPrice(price);
+            updateField('currentPrice', price);
             
             // Set default target prices based on the fetched price
-            setTargetPrice((price * 1.05).toFixed(2));
-            setStopLossPrice((price * 0.95).toFixed(2));
+            updateField('targetPrice', (price * 1.05).toFixed(2));
+            updateField('stopLossPrice', (price * 0.95).toFixed(2));
             
             // Create a simple price history with just the current data point
             setPriceHistory([{
@@ -750,9 +662,9 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
         } catch (error) {
           console.error(`Error fetching stock price from API: ${error.message}`);
           // Set default values in case of error
-          setCurrentPrice(null);
-          setTargetPrice('');
-          setStopLossPrice('');
+          updateField('currentPrice', null);
+          updateField('targetPrice', '');
+          updateField('stopLossPrice', '');
           setPriceHistory([]);
           
           // Try to fetch directly from the URL as a fallback
@@ -797,9 +709,9 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
             // Try to parse price data from the direct response
             if (Array.isArray(directData) && directData.length > 0 && directData[0]?.close) {
               const directPrice = directData[0].close;
-              setCurrentPrice(directPrice);
-              setTargetPrice((directPrice * 1.05).toFixed(2));
-              setStopLossPrice((directPrice * 0.95).toFixed(2));
+              updateField('currentPrice', directPrice);
+              updateField('targetPrice', (directPrice * 1.05).toFixed(2));
+              updateField('stopLossPrice', (directPrice * 0.95).toFixed(2));
               
               console.log(`Successfully parsed price from direct API: $${directPrice}`);
             }
@@ -823,9 +735,9 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
     } catch (error) {
       console.error('Error selecting stock/exchange:', error);
       // Don't show static data - set all price-related values to null or empty
-      setCurrentPrice(null);
-      setTargetPrice('');
-      setStopLossPrice('');
+      updateField('currentPrice', null);
+      updateField('targetPrice', '');
+      updateField('stopLossPrice', '');
       setPriceHistory([]);
     } finally {
       // Always clear loading state
@@ -889,10 +801,10 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setImageFile(file);
+      updateField('imageFile', file);
       // Create a URL for the preview
       const objectUrl = URL.createObjectURL(file);
-      setImagePreview(objectUrl);
+      updateField('imagePreview', objectUrl);
       // Clean up the old URL to prevent memory leaks
       return () => URL.revokeObjectURL(objectUrl);
     }
@@ -900,9 +812,9 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
 
   // Handle image URL input
   const handleImageUrlChange = (e) => {
-    setImageUrl(e.target.value);
-    setImageFile(null);
-    setImagePreview('');
+    updateField('imageUrl', e.target.value);
+    updateField('imageFile', null);
+    updateField('imagePreview', '');
   };
 
   // Handle adding a new strategy
@@ -913,7 +825,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
       // التحقق مما إذا كانت الاستراتيجية موجودة بالفعل
       if (strategies.includes(newStrategy.trim())) {
         // إذا كانت الاستراتيجية موجودة بالفعل، حدد فقط
-        setSelectedStrategy(newStrategy.trim());
+        updateField('selectedStrategy', newStrategy.trim());
         setNewStrategy('');
         setShowStrategyInput(false);
         return;
@@ -922,7 +834,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
       // إضافة الاستراتيجية إلى القائمة المحلية أولاً للتحديث الفوري
       const updatedStrategies = [...strategies, newStrategy.trim()];
       setStrategies(updatedStrategies);
-      setSelectedStrategy(newStrategy.trim());
+      updateField('selectedStrategy', newStrategy.trim());
       setNewStrategy('');
       setShowStrategyInput(false);
       
@@ -942,25 +854,24 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // التحقق من أن نافذة الاستراتيجية مغلقة قبل المتابعة
+    // Close strategy dialog if open
     if (showStrategyDialog) {
       closeStrategyDialog();
     }
     
     if (!description.trim()) {
-      // toast.error('Please enter a description');
       return;
     }
     
-    setIsSubmitting(true);
-    setSubmissionProgress('Preparing your post...');
+    updateField('isSubmitting', true);
+    updateField('submissionProgress', 'Preparing your post...');
     
     try {
       let uploadedImageUrl = imageUrl;
       
       // Upload image if file is selected
       if (imageFile) {
-        setSubmissionProgress('Uploading image...');
+        updateField('submissionProgress', 'Uploading image...');
         uploadedImageUrl = await uploadPostImage(imageFile, user.id);
       }
       
@@ -983,45 +894,28 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
       }
       
       // Create post in database
-      setSubmissionProgress('Creating your post...');
+      updateField('submissionProgress', 'Creating your post...');
       const { data: newPost, error } = await supabaseCreatePost(postData);
       
       if (error) {
         throw error;
       }
       
-      setSubmissionProgress('Post created! Finishing up...');
+      // Show success message in the global status indicator
+      updateField('submissionProgress', 'Post created successfully! Your post is now visible.');
       
-      // Only reset the form after successful submission
-      // Don't clear the form while posting to allow user to stay in context
-      if (newPost) {
-        // Reset form
-        setDescription('');
-        setImageFile(null);
-        setImagePreview('');
-        setImageUrl('');
-        setSelectedStock(null);
-        setStockSearch('');
-        setCurrentPrice(null);
-        setTargetPrice('');
-        setStopLossPrice('');
-        setSelectedStrategy('');
-        
-        // Notify parent component
-        if (onPostCreated) {
-          onPostCreated(newPost);
-        }
-      }
+      // Reset form data
+      resetForm();
       
-      // toast.success('Post created successfully');
+      // Close the dialog after a delay to allow the user to see the success message
+      setTimeout(() => {
+        forceCloseDialog();
+      }, 1500);
+      
     } catch (error) {
       console.error('Error creating post:', error);
-      // toast.error('Failed to create post');
-    } finally {
-      setTimeout(() => {
-        setSubmissionProgress('');
-        setIsSubmitting(false);
-      }, 1000); // Keep the status visible briefly after completion
+      // Show error message in the status indicator
+      updateField('submissionProgress', `Error: ${error.message || 'Failed to create post'}`);
     }
   };
 
@@ -1057,11 +951,11 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
     // Close results on Escape key
     if (e.key === 'Escape') {
       e.preventDefault();
-      setSearchResults([]);
-      setStockSearch('');
+      updateField('searchResults', []);
+      updateField('stockSearch', '');
       searchInputRef.current?.focus();
     }
-  }, [showStockSearch, searchResults.length]);
+  }, [showStockSearch, searchResults.length, updateField]);
 
   // Add event listeners for the stock search results
   useEffect(() => {
@@ -1079,19 +973,10 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
     };
   }, [showStockSearch, searchResults.length, handleStockResultsScroll, handleStockResultsKeyDown]);
 
-  // Format currency helper function
-  const formatCurrency = (value, currency = 'USD') => {
-    if (!value) return '';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency
-    }).format(value);
-  };
-
   const handleRemoveImage = () => {
-    setImageFile(null);
-    setImagePreview('');
-    setImageUrl('');
+    updateField('imageFile', null);
+    updateField('imagePreview', '');
+    updateField('imageUrl', '');
     // Clear the file input value
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -1205,9 +1090,9 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
   // Add this function to properly cancel search
   const handleCancelSearch = () => {
     // Clear search results
-    setSearchResults([]);
+    updateField('searchResults', []);
     // Clear search input
-    setStockSearch('');
+    updateField('stockSearch', '');
     // Ensure loading state is cleared
     setIsSearching(false);
     // Clear any pending timeouts
@@ -1305,7 +1190,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
       
       if (price !== null && !isNaN(price)) {
         console.log(`Successfully parsed price from API: $${price}`);
-        setCurrentPrice(price);
+        updateField('currentPrice', price);
         
         // نسبة الهدف 5% فوق سعر السهم الحالي
         const targetPercentage = 5;
@@ -1316,18 +1201,18 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
         const targetValue = (price * (1 + targetPercentage/100)).toFixed(2);
         const stopLossValue = (price * (1 - stopLossPercentage/100)).toFixed(2);
         
-        setTargetPrice(targetValue);
-        setStopLossPrice(stopLossValue);
+        updateField('targetPrice', targetValue);
+        updateField('stopLossPrice', stopLossValue);
         // تخزين النسب المئوية لاستخدامها في العرض
-        setTargetPercentage(targetPercentage);
-        setStopLossPercentage(stopLossPercentage);
+        updateField('targetPercentage', targetPercentage);
+        updateField('stopLossPercentage', stopLossPercentage);
       } else {
         console.warn(`Invalid API response structure for ${symbol}:`, data);
         throw new Error('Invalid price data structure in API response');
       }
     } catch (error) {
       console.error('Error fetching current price from API:', error);
-      setCurrentPrice(null);
+      updateField('currentPrice', null);
     }
   };
 
@@ -1444,708 +1329,696 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSubmittingCh
   }, [showStrategyDialog]);
 
   return (
-    <div className="create-post-form-container" ref={formWrapperRef}>
-      
-      {/* Post submission status indicator */}
-      {isSubmitting && (
-        <div className="post-status-indicator">
-          <div className="post-status-spinner"></div>
-          <div className="post-status-content">
-            <div className="post-status-title">Creating Post</div>
-            <div className="post-status-message">
-              {submissionProgress || 'Processing your post...'}
-            </div>
-          </div>
-        </div>
-      )}
-      
-      <div className="form-wrapper">
-        {/* Image Preview */}
-        {imagePreview && (
-          <div className="form-group">
-            <div className="file-preview-item">
-              <img
-                src={imagePreview}
-                alt="Preview"
-                className="file-preview-item img"
-              />
-              <button
-                className="file-remove"
-                onClick={handleRemoveImage}
-                aria-label="Remove image"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Selected Stock Info */}
-        {selectedStock && (
-          <div className="form-group">
-            <div className="stock-info-container">
-              {/* Background flag with opacity */}
-              <div
-                className="stock-info-bg-flag"
-                style={{
-                  backgroundImage: `url(https://flagcdn.com/${Object.entries(COUNTRY_ISO_CODES).find(
-                    ([countryName]) => countryName.toLowerCase() === selectedStock.country.toLowerCase()
-                  )?.[1]?.toLowerCase() || selectedStock.country.toLowerCase()}.svg)`
-                }}
-              ></div>
-              
-              <div className="stock-info-overlay">
-                {/* Stock Item */}
-                <div className="stock-item selected">
-                  <div className="stock-info">
-                    <div className="stock-symbol">{selectedStock.symbol}</div>
-                    <div className="stock-name">{selectedStock.name}</div>
-                    <div className="stock-country">
-                      {Object.entries(COUNTRY_ISO_CODES).find(
-                        ([countryName]) => countryName.toLowerCase() === selectedStock.country.toLowerCase()
-                      )?.[0] || selectedStock.country}
-                    </div>
-                  </div>
-                  <button 
-                    className="btn btn-icon" 
-                    onClick={() => setSelectedStock(null)}
-                    aria-label="Remove stock"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18"></line>
-                      <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                  </button>
-                </div>
-
-                {/* Big Price Banner - Always visible even when loading */}
-                <div className="stock-price-banner">
-                  <div className="stock-price-label">
-                    Current Price {selectedStock?.country && <span className="stock-country-code">({selectedStock.country})</span>}
-                  </div>
-                  {isSearching ? (
-                    <div className="stock-price-loading">
-                      Loading...
-                    </div>
-                  ) : currentPrice !== null && !isNaN(currentPrice) ? (
-                    <div className="stock-price stock-price-value">
-                      {getCurrencySymbol(selectedStock?.country)} {typeof currentPrice === 'number' ? currentPrice.toFixed(2) : parseFloat(currentPrice).toFixed(2)}
-                    </div>
-                  ) : (
-                    <div className="stock-price-unavailable">
-                      {apiResponse && apiResponse.error ? (
-                        <div className="error-message">{apiResponse.error}</div>
-                      ) : (
-                        <div className="api-url-display-inline">
-                          <div className="url-label">No price available</div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {selectedStock && !isSearching && (
-                    <div className="stock-price-info">
-                      Symbol: {selectedStock.symbol} • Exchange: {selectedStock.exchange || 'N/A'}
-                    </div>
-                  )}
-                  
-                  {/* Display API response summary in the price banner */}
-                  {apiResponse && !isSearching && (
-                    <div>
-                      <div className="response-source">
-                        Data Source: <span className="response-source-value">{apiResponse.source || 'API'}</span>
-                      </div>
-                      {apiResponse.source === 'api' && apiResponse.url && (
-                        <div className="response-url" title={apiResponse.url}>
-                          <span className="url-label">Response:</span> 
-                          <span className="url-value">
-                            {typeof apiResponse.data === 'object' ? 
-                              JSON.stringify(apiResponse.data, null, 2).substring(0, 150) + 
-                              (JSON.stringify(apiResponse.data, null, 2).length > 150 ? '...' : '') 
-                              : apiResponse.data || 'No data available'}
-                          </span>
-                        </div>
-                      )}
-                      {apiResponse.error ? (
-                        <div className="response-error">Error: {apiResponse.error}</div>
-                      ) : apiResponse.data ? (
-                        <div className="response-summary">
-                          {typeof apiResponse.data === 'object' ? (
-                            <span className="response-summary-text">
-                              {Array.isArray(apiResponse.data) 
-                                ? `Received ${apiResponse.data.length} data points` 
-                                : 'Response received successfully'}
-                            </span>
-                          ) : (
-                            <span className="response-summary-text">Data received</span>
-                          )}
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
-
-                {/* Price History Display */}
-                {priceHistory && priceHistory.length > 0 && (
-                  <div className="price-history-container">
-                    <h4 className="price-history-title">7-Day Price History</h4>
-                    <div className="price-chart">
-                      {priceHistory.map((day, index) => {
-                        const maxPrice = Math.max(...priceHistory.map(d => d.high));
-                        const minPrice = Math.min(...priceHistory.map(d => d.low));
-                        const priceRange = maxPrice - minPrice;
-                        const heightPercent = priceRange > 0 
-                          ? ((day.close - minPrice) / priceRange) * 100 
-                          : 50;
-                        
-                        // Calculate bar color based on price change from previous day
-                        const prevDay = index > 0 ? priceHistory[index - 1] : null;
-                        const priceChange = prevDay ? day.close - prevDay.close : 0;
-                        const barColor = priceChange > 0 ? '#4ade80' : priceChange < 0 ? '#f87171' : '#94a3b8';
-                        
-                        return (
-                          <div key={day.date} className="price-bar-wrapper">
-                            <div 
-                              className="price-bar" 
-                              style={{ 
-                                height: `${Math.max(heightPercent, 5)}%`,
-                                backgroundColor: barColor
-                              }}
-                              title={`${day.date}: $${day.close}`}
-                            ></div>
-                            <div className="price-date">{day.date.split('-')[2]}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <div className="price-inputs">
-                  <div className="form-row price-inputs-container">
-                    <div className="form-group col-md-6 target-price-group">
-                      <label htmlFor="targetPrice">Target Price</label>
-                      <div className="price-input-with-percentage">
-                        <div className="currency-symbol-prefix">
-                          {getCurrencySymbol(selectedStock?.country)}
-                        </div>
-                        <input
-                          type="number"
-                          className="form-control with-currency-symbol"
-                          id="targetPrice"
-                          value={targetPrice}
-                          onChange={(e) => {
-                            setTargetPrice(e.target.value);
-                            // حساب النسبة المئوية الجديدة
-                            if (currentPrice && !isNaN(currentPrice) && !isNaN(e.target.value)) {
-                              const newPercentage = (((parseFloat(e.target.value) / currentPrice) - 1) * 100).toFixed(1);
-                              setTargetPercentage(parseFloat(newPercentage));
-                            }
-                          }}
-                          placeholder="Target Price"
-                        />
-                        <div className="price-percentage-edit">
-                          <input 
-                            type="number" 
-                            className="percentage-input target-input" 
-                            value={targetPercentage}
-                            onChange={(e) => {
-                              const newPercentage = parseFloat(e.target.value);
-                              setTargetPercentage(newPercentage);
-                              // تحديث سعر الهدف بناءً على النسبة الجديدة
-                              if (currentPrice && !isNaN(currentPrice) && !isNaN(newPercentage)) {
-                                const newTargetPrice = (currentPrice * (1 + newPercentage/100)).toFixed(2);
-                                setTargetPrice(newTargetPrice);
-                              }
-                            }}
-                            step="0.1"
-                            aria-label="Target percentage"
-                          />
-                          <span className="percentage-symbol">%</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="form-group col-md-6 stop-loss-price-group">
-                      <label htmlFor="stopLossPrice">Stop Loss</label>
-                      <div className="price-input-with-percentage">
-                        <div className="currency-symbol-prefix">
-                          {getCurrencySymbol(selectedStock?.country)}
-                        </div>
-                        <input
-                          type="number"
-                          className="form-control with-currency-symbol"
-                          id="stopLossPrice"
-                          value={stopLossPrice}
-                          onChange={(e) => {
-                            setStopLossPrice(e.target.value);
-                            // حساب النسبة المئوية الجديدة
-                            if (currentPrice && !isNaN(currentPrice) && !isNaN(e.target.value)) {
-                              const newPercentage = ((1 - (parseFloat(e.target.value) / currentPrice)) * 100).toFixed(1);
-                              setStopLossPercentage(parseFloat(newPercentage));
-                            }
-                          }}
-                          placeholder="Stop Loss Price"
-                        />
-                        <div className="price-percentage-edit">
-                          <input 
-                            type="number" 
-                            className="percentage-input stop-loss-input" 
-                            value={stopLossPercentage}
-                            onChange={(e) => {
-                              const newPercentage = parseFloat(e.target.value);
-                              setStopLossPercentage(newPercentage);
-                              // تحديث سعر إيقاف الخسارة بناءً على النسبة الجديدة
-                              if (currentPrice && !isNaN(currentPrice) && !isNaN(newPercentage)) {
-                                const newStopLossPrice = (currentPrice * (1 - newPercentage/100)).toFixed(2);
-                                setStopLossPrice(newStopLossPrice);
-                              }
-                            }}
-                            step="0.1"
-                            aria-label="Stop loss percentage"
-                          />
-                          <span className="percentage-symbol">%</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* حقل اختيار استراتيجية التداول */}
-                <div className="form-group strategy-form-group">
-                  <label htmlFor="strategy" className="form-label">Trading Strategy</label>
-                  
-                  <div 
-                    className="strategy-field-container"
-                    onClick={openStrategyDialog}
-                    role="button"
-                    tabIndex="0"
-                    aria-haspopup="dialog"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        openStrategyDialog();
-                        e.preventDefault();
-                      }
-                    }}
-                  >
-                    <div className="select-field">
-                      {selectedStrategy ? (
-                        <div className="selected-strategy">
-                          <span className="strategy-name">{selectedStrategy}</span>
-                          <button 
-                            type="button" 
-                            className="clear-strategy-button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedStrategy('');
-                            }}
-                            aria-label="Clear selected strategy"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="placeholder">Select a trading strategy</span>
-                      )}
-                      <div className="select-field-icon">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M4 6L8 10L12 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="form-group">
-          <div className="user-info">
-            <div 
-              className="user-avatar user-avatar-cursor"
-              onDrop={handleAvatarDrop}
-              onDragOver={handleAvatarDragOver}
-              title="Drop new avatar image here"
-            >
-              <img src={avatarUrl} alt="User avatar" />
-            </div>
-            <span className="user-email">{user?.email}</span>
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="description" className="form-label">What's on your mind?</label>
-          <textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Share your thoughts..."
-            className="form-control"
-          ></textarea>
-          <div className="focus-ring"></div>
-          {description && (
-            <div className={`char-counter ${description.length > 500 ? 'warning' : ''} ${description.length > 1000 ? 'danger' : ''}`}>
-              {description.length} / 1000
-            </div>
-          )}
-        </div>
-
-        {/* Image Upload */}
-        <div className="form-group">
-          <label className="form-label">Add Image</label>
-          <div className="file-upload">
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="file-upload-input"
-              accept="image/*"
-              onChange={handleImageChange}
-            />
-            <div className="file-upload-label" onClick={() => fileInputRef.current?.click()}>
-              <span className="file-upload-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                  <polyline points="21 15 16 10 5 21"></polyline>
-                </svg>
-              </span>
-              <span className="file-upload-text">Click to upload an image or drag and drop</span>
-            </div>
-          </div>
-          
-          <div className="form-actions">
-            <button className="btn btn-outline" onClick={() => setShowImageUrlInput(!showImageUrlInput)}>
-              {showImageUrlInput ? 'Hide URL input' : 'Use Image URL'}
-            </button>
-          </div>
-          
-          {showImageUrlInput && (
+    <>
+      <div className="create-post-form-container" ref={formWrapperRef}>
+        {/* Form content starts here */}
+        <div className="form-wrapper">
+          {/* Image Preview */}
+          {imagePreview && (
             <div className="form-group">
-              <label htmlFor="imageUrl" className="form-label">Image URL</label>
-              <input
-                id="imageUrl"
-                type="url"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="Enter image URL"
-                className="form-control"
-              />
-              <div className="focus-ring"></div>
+              <div className="file-preview-item">
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="file-preview-item img"
+                />
+                <button
+                  className="file-remove"
+                  onClick={handleRemoveImage}
+                  aria-label="Remove image"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
             </div>
           )}
-        </div>
-              
-        {/* Stock Search Section */}
-        <div className="form-group stock-search-container">
-          <label className="form-label">Search for a stock</label>
-          
-          <div className="stock-search-wrapper">
-            <div className="category-select">
-              <label htmlFor="countrySelect" className="form-label">Country</label>
-              <div 
-                className={`select-field ${searchResults.length > 0 ? 'open' : ''}`}
-                onClick={() => {
-                  setShowStockSearch(!showStockSearch);
-                }}
-              >
-                <span>
-                  {selectedCountry === 'all' ? (
-                    'All Countries'
-                  ) : (
-                    <>
-                      <div className="country-flag-wrapper">
-                        <span className={`fi fi-${selectedCountry} country-flag`}></span>
+
+          {/* Selected Stock Info */}
+          {selectedStock && (
+            <div className="form-group">
+              <div className="stock-info-container">
+                {/* Background flag with opacity */}
+                <div
+                  className="stock-info-bg-flag"
+                  style={{
+                    backgroundImage: `url(https://flagcdn.com/${Object.entries(COUNTRY_ISO_CODES).find(
+                      ([countryName]) => countryName.toLowerCase() === selectedStock.country.toLowerCase()
+                    )?.[1]?.toLowerCase() || selectedStock.country.toLowerCase()}.svg)`
+                  }}
+                ></div>
+                
+                <div className="stock-info-overlay">
+                  {/* Stock Item */}
+                  <div className="stock-item selected">
+                    <div className="stock-info">
+                      <div className="stock-symbol">{selectedStock.symbol}</div>
+                      <div className="stock-name">{selectedStock.name}</div>
+                      <div className="stock-country">
+                        {Object.entries(COUNTRY_ISO_CODES).find(
+                          ([countryName]) => countryName.toLowerCase() === selectedStock.country.toLowerCase()
+                        )?.[0] || selectedStock.country}
                       </div>
-                      {Object.entries(COUNTRY_ISO_CODES).find(([_, code]) => 
-                        code.toLowerCase() === selectedCountry
-                      )?.[0] || selectedCountry}
-                    </>
-                  )}
-                </span>
-                <span className="select-field-icon">▼</span>
-              </div>
-              
-              {showStockSearch && (
-                <div className="category-dropdown show category-dropdown-z">
-                  <div className="search-results-header country-dropdown-header">
-                    <span className="search-results-count">Select a country</span>
+                    </div>
                     <button 
-                      className="btn btn-sm btn-cancel"
-                      onClick={() => setShowStockSearch(false)}
-                      aria-label="Cancel country selection"
+                      className="btn btn-icon" 
+                      onClick={() => updateField('selectedStock', null)}
+                      aria-label="Remove stock"
                     >
-                      Cancel
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
                     </button>
                   </div>
-                  <div 
-                    className={`category-option ${selectedCountry === 'all' ? 'selected' : ''}`}
-                    onClick={() => {
-                      handleCountryChange('all');
-                      setShowStockSearch(false);
-                    }}
-                  >
-                    <div className="category-option-content">
-                      <div className="category-option-name">All Countries</div>
-                      <div className="category-option-count">{countrySymbolCounts['all'] || 0} symbols</div>
+
+                  {/* Big Price Banner - Always visible even when loading */}
+                  <div className="stock-price-banner">
+                    <div className="stock-price-label">
+                      Current Price {selectedStock?.country && <span className="stock-country-code">({selectedStock.country})</span>}
                     </div>
-                  </div>
-                  
-                  {Object.entries(COUNTRY_ISO_CODES)
-                    .filter(([_, code]) => {
-                      const countCode = code.toLowerCase();
-                      const count = countrySymbolCounts[countCode] || 0;
-                      return count > 0; // Only show countries with at least one stock
-                    })
-                    .sort(([a], [b]) => a.localeCompare(b))
-                    .map(([country, code]) => {
-                      const countCode = code.toLowerCase();
-                      const count = countrySymbolCounts[countCode] || 0;
-                      
-                      return (
-                        <div 
-                          key={`country-${countCode}`}
-                          className={`category-option ${selectedCountry === countCode ? 'selected' : ''}`}
-                          onClick={() => {
-                            handleCountryChange(countCode);
-                            setShowStockSearch(false);
-                          }}
-                        >
-                          <div className="country-flag-wrapper">
-                            <span className={`fi fi-${countCode} country-flag`}></span>
+                    {isSearching ? (
+                      <div className="stock-price-loading">
+                        Loading...
+                      </div>
+                    ) : currentPrice !== null && !isNaN(currentPrice) ? (
+                      <div className="stock-price stock-price-value">
+                        {getCurrencySymbol(selectedStock?.country)} {typeof currentPrice === 'number' ? currentPrice.toFixed(2) : parseFloat(currentPrice).toFixed(2)}
+                      </div>
+                    ) : (
+                      <div className="stock-price-unavailable">
+                        {apiResponse && apiResponse.error ? (
+                          <div className="error-message">{apiResponse.error}</div>
+                        ) : (
+                          <div className="api-url-display-inline">
+                            <div className="url-label">No price available</div>
                           </div>
-                          <div className="category-option-content">
-                            <div className="category-option-name">{country}</div>
-                            <div className="category-option-count">{count} symbols</div>
+                        )}
+                      </div>
+                    )}
+
+                    {selectedStock && !isSearching && (
+                      <div className="stock-price-info">
+                        Symbol: {selectedStock.symbol} • Exchange: {selectedStock.exchange || 'N/A'}
+                      </div>
+                    )}
+                    
+                    {/* Display API response summary in the price banner */}
+                    {apiResponse && !isSearching && (
+                      <div>
+                        <div className="response-source">
+                          Data Source: <span className="response-source-value">{apiResponse.source || 'API'}</span>
+                        </div>
+                        {apiResponse.source === 'api' && apiResponse.url && (
+                          <div className="response-url" title={apiResponse.url}>
+                            <span className="url-label">Response:</span> 
+                            <span className="url-value">
+                              {typeof apiResponse.data === 'object' ? 
+                                JSON.stringify(apiResponse.data, null, 2).substring(0, 150) + 
+                                (JSON.stringify(apiResponse.data, null, 2).length > 150 ? '...' : '') 
+                                : apiResponse.data || 'No data available'}
+                            </span>
+                          </div>
+                        )}
+                        {apiResponse.error ? (
+                          <div className="response-error">Error: {apiResponse.error}</div>
+                        ) : apiResponse.data ? (
+                          <div className="response-summary">
+                            {typeof apiResponse.data === 'object' ? (
+                              <span className="response-summary-text">
+                                {Array.isArray(apiResponse.data) 
+                                  ? `Received ${apiResponse.data.length} data points` 
+                                  : 'Response received successfully'}
+                              </span>
+                            ) : (
+                              <span className="response-summary-text">Data received</span>
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Price History Display */}
+                  {priceHistory && priceHistory.length > 0 && (
+                    <div className="price-history-container">
+                      <h4 className="price-history-title">7-Day Price History</h4>
+                      <div className="price-chart">
+                        {priceHistory.map((day, index) => {
+                          const maxPrice = Math.max(...priceHistory.map(d => d.high));
+                          const minPrice = Math.min(...priceHistory.map(d => d.low));
+                          const priceRange = maxPrice - minPrice;
+                          const heightPercent = priceRange > 0 
+                            ? ((day.close - minPrice) / priceRange) * 100 
+                            : 50;
+                          
+                          // Calculate bar color based on price change from previous day
+                          const prevDay = index > 0 ? priceHistory[index - 1] : null;
+                          const priceChange = prevDay ? day.close - prevDay.close : 0;
+                          const barColor = priceChange > 0 ? '#4ade80' : priceChange < 0 ? '#f87171' : '#94a3b8';
+                          
+                          return (
+                            <div key={day.date} className="price-bar-wrapper">
+                              <div 
+                                className="price-bar" 
+                                style={{ 
+                                  height: `${Math.max(heightPercent, 5)}%`,
+                                  backgroundColor: barColor
+                                }}
+                                title={`${day.date}: $${day.close}`}
+                              ></div>
+                              <div className="price-date">{day.date.split('-')[2]}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="price-inputs">
+                    <div className="form-row price-inputs-container">
+                      <div className="form-group col-md-6 target-price-group">
+                        <label htmlFor="targetPrice">Target Price</label>
+                        <div className="price-input-with-percentage">
+                          <div className="currency-symbol-prefix">
+                            {getCurrencySymbol(selectedStock?.country)}
+                          </div>
+                          <input
+                            type="number"
+                            className="form-control with-currency-symbol"
+                            id="targetPrice"
+                            value={targetPrice}
+                            onChange={(e) => {
+                              updateField('targetPrice', e.target.value);
+                              // Calculate new percentage
+                              if (currentPrice && !isNaN(currentPrice) && !isNaN(e.target.value)) {
+                                const newPercentage = (((parseFloat(e.target.value) / currentPrice) - 1) * 100).toFixed(1);
+                                updateField('targetPercentage', parseFloat(newPercentage));
+                              }
+                            }}
+                            placeholder="Target Price"
+                          />
+                          <div className="price-percentage-edit">
+                            <input 
+                              type="number" 
+                              className="percentage-input target-input" 
+                              value={targetPercentage}
+                              onChange={(e) => {
+                                const newPercentage = parseFloat(e.target.value);
+                                updateField('targetPercentage', newPercentage);
+                                // تحديث سعر الهدف بناءً على النسبة الجديدة
+                                if (currentPrice && !isNaN(currentPrice) && !isNaN(newPercentage)) {
+                                  const newTargetPrice = (currentPrice * (1 + newPercentage/100)).toFixed(2);
+                                  updateField('targetPrice', newTargetPrice);
+                                }
+                              }}
+                              step="0.1"
+                              aria-label="Target percentage"
+                            />
+                            <span className="percentage-symbol">%</span>
                           </div>
                         </div>
-                      );
-                    })}
+                      </div>
+                      
+                      <div className="form-group col-md-6 stop-loss-price-group">
+                        <label htmlFor="stopLossPrice">Stop Loss</label>
+                        <div className="price-input-with-percentage">
+                          <div className="currency-symbol-prefix">
+                            {getCurrencySymbol(selectedStock?.country)}
+                          </div>
+                          <input
+                            type="number"
+                            className="form-control with-currency-symbol"
+                            id="stopLossPrice"
+                            value={stopLossPrice}
+                            onChange={(e) => {
+                              updateField('stopLossPrice', e.target.value);
+                              // Calculate new percentage
+                              if (currentPrice && !isNaN(currentPrice) && !isNaN(e.target.value)) {
+                                const newPercentage = ((1 - (parseFloat(e.target.value) / currentPrice)) * 100).toFixed(1);
+                                updateField('stopLossPercentage', parseFloat(newPercentage));
+                              }
+                            }}
+                            placeholder="Stop Loss Price"
+                          />
+                          <div className="price-percentage-edit">
+                            <input 
+                              type="number" 
+                              className="percentage-input stop-loss-input" 
+                              value={stopLossPercentage}
+                              onChange={(e) => {
+                                const newPercentage = parseFloat(e.target.value);
+                                updateField('stopLossPercentage', newPercentage);
+                                // تحديث سعر إيقاف الخسارة بناءً على النسبة الجديدة
+                                if (currentPrice && !isNaN(currentPrice) && !isNaN(newPercentage)) {
+                                  const newStopLossPrice = (currentPrice * (1 - newPercentage/100)).toFixed(2);
+                                  updateField('stopLossPrice', newStopLossPrice);
+                                }
+                              }}
+                              step="0.1"
+                              aria-label="Stop loss percentage"
+                            />
+                            <span className="percentage-symbol">%</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* حقل اختيار استراتيجية التداول */}
+                  <div className="form-group strategy-form-group">
+                    <label htmlFor="strategy" className="form-label">Trading Strategy</label>
+                    
+                    <div 
+                      className="strategy-field-container"
+                      onClick={openStrategyDialog}
+                      role="button"
+                      tabIndex="0"
+                      aria-haspopup="dialog"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          openStrategyDialog();
+                          e.preventDefault();
+                        }
+                      }}
+                    >
+                      <div className="select-field">
+                        {selectedStrategy ? (
+                          <div className="selected-strategy">
+                            <span className="strategy-name">{selectedStrategy}</span>
+                            <button 
+                              type="button" 
+                              className="clear-strategy-button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateField('selectedStrategy', '');
+                              }}
+                              aria-label="Clear selected strategy"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="placeholder">Select a trading strategy</span>
+                        )}
+                        <div className="select-field-icon">
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M4 6L8 10L12 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
+              </div>
+            </div>
+          )}
+
+          <div className="form-group">
+            <div className="user-info">
+              <div 
+                className="user-avatar user-avatar-cursor"
+                onDrop={handleAvatarDrop}
+                onDragOver={handleAvatarDragOver}
+                title="Drop new avatar image here"
+              >
+                <img src={avatarUrl} alt="User avatar" />
+              </div>
+              <span className="user-email">{user?.email}</span>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="description" className="form-label">What's on your mind?</label>
+            <textarea
+              id="description"
+              value={description}
+              onChange={(e) => updateField('description', e.target.value)}
+              placeholder="Share your thoughts..."
+              className="form-control"
+            ></textarea>
+            <div className="focus-ring"></div>
+            {description && (
+              <div className={`char-counter ${description.length > 500 ? 'warning' : ''} ${description.length > 1000 ? 'danger' : ''}`}>
+                {description.length} / 1000
+              </div>
+            )}
+          </div>
+
+          {/* Image Upload */}
+          <div className="form-group">
+            <label className="form-label">Add Image</label>
+            <div className="file-upload">
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="file-upload-input"
+                accept="image/*"
+                onChange={handleImageChange}
+              />
+              <div className="file-upload-label" onClick={() => fileInputRef.current?.click()}>
+                <span className="file-upload-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                  </svg>
+                </span>
+                <span className="file-upload-text">Click to upload an image or drag and drop</span>
+              </div>
             </div>
             
-            <div className="search-field-container">
-              <label htmlFor="stockSearch" className="form-label">Symbol or Name</label>
-              <div className="search-container">
+            <div className="form-actions">
+              <button className="btn btn-outline" onClick={() => setShowImageUrlInput(!showImageUrlInput)}>
+                {showImageUrlInput ? 'Hide URL input' : 'Use Image URL'}
+              </button>
+            </div>
+            
+            {showImageUrlInput && (
+              <div className="form-group">
+                <label htmlFor="imageUrl" className="form-label">Image URL</label>
                 <input
-                  id="stockSearch"
-                  ref={searchInputRef}
-                  type="text"
-                  value={stockSearch}
-                  onChange={(e) => setStockSearch(e.target.value)}
-                  placeholder="Enter symbol or name"
-                  className="form-control visible-input"
+                  id="imageUrl"
+                  type="url"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="Enter image URL"
+                  className="form-control"
                 />
                 <div className="focus-ring"></div>
-                {stockSearch && (
-                  <button 
-                    className="clear-search-button" 
-                    onClick={handleCancelSearch}
-                    aria-label="Clear search"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18"></line>
-                      <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                  </button>
-                )}
-                {isSearching && (
-                  <div className="search-loader"></div>
-                )}
               </div>
-              
-              {searchResults.length > 0 && (
-                <div className="search-results-wrapper">
-                  <div className="search-results" ref={stockSearchResultsRef}>
-                    <div className="search-results-header">
-                      <span className="search-results-count-wrapper">
-                        <span className="search-results-count">{searchResults.length} symbols found</span>
-                      </span>
+            )}
+          </div>
+                
+          {/* Stock Search Section */}
+          <div className="form-group stock-search-container">
+            <label className="form-label">Search for a stock</label>
+            
+            <div className="stock-search-wrapper">
+              <div className="category-select">
+                <label htmlFor="countrySelect" className="form-label">Country</label>
+                <div 
+                  className={`select-field ${searchResults.length > 0 ? 'open' : ''}`}
+                  onClick={() => {
+                    setShowStockSearch(!showStockSearch);
+                  }}
+                >
+                  <span>
+                    {selectedCountry === 'all' ? (
+                      'All Countries'
+                    ) : (
+                      <>
+                        <div className="country-flag-wrapper">
+                          <span className={`fi fi-${selectedCountry} country-flag`}></span>
+                        </div>
+                        {Object.entries(COUNTRY_ISO_CODES).find(([_, code]) => 
+                          code.toLowerCase() === selectedCountry
+                        )?.[0] || selectedCountry}
+                      </>
+                    )}
+                  </span>
+                  <span className="select-field-icon">▼</span>
+                </div>
+                
+                {showStockSearch && (
+                  <div className="category-dropdown show category-dropdown-z">
+                    <div className="search-results-header country-dropdown-header">
+                      <span className="search-results-count">Select a country</span>
                       <button 
                         className="btn btn-sm btn-cancel"
-                        onClick={handleCancelSearch}
-                        aria-label="Cancel search"
+                        onClick={() => setShowStockSearch(false)}
+                        aria-label="Cancel country selection"
                       >
                         Cancel
                       </button>
                     </div>
-                    <div className="search-results-list">
-                      {searchResults.map((stock) => {
-                        // Special handling for no-data messages
-                        if (stock.uniqueId === "no-symbols-message" || stock.uniqueId === "error-message") {
+                    <div 
+                      className={`category-option ${selectedCountry === 'all' ? 'selected' : ''}`}
+                      onClick={() => {
+                        handleCountryChange('all');
+                        setShowStockSearch(false);
+                      }}
+                    >
+                      <div className="category-option-content">
+                        <div className="category-option-name">All Countries</div>
+                        <div className="category-option-count">{countrySymbolCounts['all'] || 0} symbols</div>
+                      </div>
+                    </div>
+                    
+                    {Object.entries(COUNTRY_ISO_CODES)
+                      .filter(([_, code]) => {
+                        const countCode = code.toLowerCase();
+                        const count = countrySymbolCounts[countCode] || 0;
+                        return count > 0; // Only show countries with at least one stock
+                      })
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([country, code]) => {
+                        const countCode = code.toLowerCase();
+                        const count = countrySymbolCounts[countCode] || 0;
+                        
+                        return (
+                          <div 
+                            key={`country-${countCode}`}
+                            className={`category-option ${selectedCountry === countCode ? 'selected' : ''}`}
+                            onClick={() => {
+                              handleCountryChange(countCode);
+                              setShowStockSearch(false);
+                            }}
+                          >
+                            <div className="country-flag-wrapper">
+                              <span className={`fi fi-${countCode} country-flag`}></span>
+                            </div>
+                            <div className="category-option-content">
+                              <div className="category-option-name">{country}</div>
+                              <div className="category-option-count">{count} symbols</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+              
+              <div className="search-field-container">
+                <label htmlFor="stockSearch" className="form-label">Symbol or Name</label>
+                <div className="search-container">
+                  <input
+                    id="stockSearch"
+                    ref={searchInputRef}
+                    type="text"
+                    value={stockSearch}
+                    onChange={(e) => updateField('stockSearch', e.target.value)}
+                    placeholder="Enter symbol or name"
+                    className="form-control visible-input"
+                  />
+                  <div className="focus-ring"></div>
+                  {stockSearch && (
+                    <button 
+                      className="clear-search-button" 
+                      onClick={handleCancelSearch}
+                      aria-label="Clear search"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                  )}
+                  {isSearching && (
+                    <div className="search-loader"></div>
+                  )}
+                </div>
+                
+                {searchResults.length > 0 && (
+                  <div className="search-results-wrapper">
+                    <div className="search-results" ref={stockSearchResultsRef}>
+                      <div className="search-results-header">
+                        <span className="search-results-count-wrapper">
+                          <span className="search-results-count">{searchResults.length} symbols found</span>
+                        </span>
+                        <button 
+                          className="btn btn-sm btn-cancel"
+                          onClick={handleCancelSearch}
+                          aria-label="Cancel search"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <div className="search-results-list">
+                        {searchResults.map((stock) => {
+                          // Special handling for no-data messages
+                          if (stock.uniqueId === "no-symbols-message" || stock.uniqueId === "error-message") {
+                            return (
+                              <div 
+                                key={stock.uniqueId}
+                                className="category-option message-item"
+                              >
+                                <div className="stock-flag">
+                                  <span 
+                                    className={`fi fi-${stock.country.toLowerCase()}`} 
+                                    title={stock.country}
+                                  ></span>
+                                </div>
+                                <div className="category-option-content">
+                                  <div className="category-option-name">{stock.symbol}</div>
+                                  <div className="stock-name">{stock.name}</div>
+                                </div>
+                              </div>
+                            );
+                          }
+                          
+                          // Regular stock item rendering
+                          const countryCode = Object.entries(COUNTRY_ISO_CODES).find(
+                            ([countryName]) => countryName.toLowerCase() === stock.country.toLowerCase()
+                          )?.[1]?.toLowerCase() || stock.country.toLowerCase();
+                          
                           return (
                             <div 
-                              key={stock.uniqueId}
-                              className="category-option message-item"
+                              key={stock.uniqueId || `${stock.symbol}-${stock.country}`}
+                              className={`category-option ${selectedStock && selectedStock.symbol === stock.symbol ? 'selected' : ''}`}
+                              onClick={() => handleStockSelect(stock)}
+                              tabIndex="0"
                             >
                               <div className="stock-flag">
                                 <span 
-                                  className={`fi fi-${stock.country.toLowerCase()}`} 
+                                  className={`fi fi-${countryCode}`} 
                                   title={stock.country}
                                 ></span>
                               </div>
                               <div className="category-option-content">
                                 <div className="category-option-name">{stock.symbol}</div>
                                 <div className="stock-name">{stock.name}</div>
+                                <div className="category-option-count">
+                                  {Object.entries(COUNTRY_ISO_CODES).find(([_, code]) => 
+                                    code.toLowerCase() === countryCode
+                                  )?.[0] || stock.country}
+                                </div>
                               </div>
                             </div>
                           );
-                        }
-                        
-                        // Regular stock item rendering
-                        const countryCode = Object.entries(COUNTRY_ISO_CODES).find(
-                          ([countryName]) => countryName.toLowerCase() === stock.country.toLowerCase()
-                        )?.[1]?.toLowerCase() || stock.country.toLowerCase();
-                        
-                        return (
-                          <div 
-                            key={stock.uniqueId || `${stock.symbol}-${stock.country}`}
-                            className={`category-option ${selectedStock && selectedStock.symbol === stock.symbol ? 'selected' : ''}`}
-                            onClick={() => handleStockSelect(stock)}
-                            tabIndex="0"
-                          >
-                            <div className="stock-flag">
-                              <span 
-                                className={`fi fi-${countryCode}`} 
-                                title={stock.country}
-                              ></span>
-                            </div>
-                            <div className="category-option-content">
-                              <div className="category-option-name">{stock.symbol}</div>
-                              <div className="stock-name">{stock.name}</div>
-                              <div className="category-option-count">
-                                {Object.entries(COUNTRY_ISO_CODES).find(([_, code]) => 
-                                  code.toLowerCase() === countryCode
-                                )?.[0] || stock.country}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* نافذة اختيار الاستراتيجية */}
-      <div 
-        className={`strategy-dialog-backdrop ${showStrategyDialog ? 'show' : ''}`}
-        onClick={(e) => {
-          // إغلاق الديالوج عند النقر على الخلفية فقط
-          if (e.target.className && e.target.className.includes('strategy-dialog-backdrop')) {
-            closeStrategyDialog();
-          }
-        }}
-      >
+        {/* نافذة اختيار الاستراتيجية */}
         <div 
-          className="strategy-dialog"
-          ref={strategySelectRef}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="strategy-dialog-title"
-        >
-          <div className="strategy-dialog-header">
-            <h3 className="strategy-dialog-title" id="strategy-dialog-title">
-              Select a strategy
-            </h3>
-            <button 
-              type="button"
-              className="dialog-close-button" 
-              onClick={closeStrategyDialog}
-              aria-label="Close dialog"
-            >
-              Close
-            </button>
-          </div>
-          
-          <div className="strategy-dialog-content">
-            {/* عرض الاستراتيجيات الافتراضية */}
-            {DEFAULT_STRATEGIES.map((strategy, index) => (
-              <div 
-                key={`strategy-${index}`}
-                className={`strategy-option ${selectedStrategy === strategy ? 'selected' : ''}`}
-                onClick={() => {
-                  setSelectedStrategy(strategy);
-                  closeStrategyDialog();
-                }}
-                tabIndex="0"
-                role="option"
-                aria-selected={selectedStrategy === strategy}
-              >
-                <div className="strategy-option-name">{strategy}</div>
-                <div className="strategy-option-desc">Trading strategy</div>
-              </div>
-            ))}
-            
-            {/* Add strategy section */}
-            <div className="add-strategy-container">
-              <div className="add-strategy-header">Add New Strategy</div>
-              <div className="add-strategy-form">
-                <input
-                  type="text"
-                  value={newStrategy}
-                  onChange={(e) => setNewStrategy(e.target.value)}
-                  placeholder="Enter a new strategy name"
-                  className="form-control"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && newStrategy.trim()) {
-                      handleAddStrategy();
-                      closeStrategyDialog();
-                    } else if (e.key === 'Escape') {
-                      closeStrategyDialog();
-                    }
-                  }}
-                />
-                <button 
-                  type="button"
-                  className="btn btn-primary btn-sm" 
-                  onClick={() => {
-                    if (newStrategy.trim()) {
-                      handleAddStrategy();
-                      closeStrategyDialog();
-                    }
-                  }}
-                  disabled={!newStrategy.trim()}
-                >
-                  Add
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Submit Buttons - Fixed at bottom */}
-      <div className="form-actions form-actions-bottom">
-        <button
-          onClick={handleSubmit}
-          disabled={isSubmitting || !description}
-          className={`btn btn-primary ${isSubmitting ? 'is-submitting' : ''}`}
-        >
-          {isSubmitting ? 'Posting...' : 'Post'}
-        </button>
-        <button 
-          className="btn btn-secondary" 
+          className={`strategy-dialog-backdrop ${showStrategyDialog ? 'show' : ''}`}
           onClick={(e) => {
-            if (isSubmitting) {
-              // Show posting message but still allow dialog to close
-              setSubmissionProgress('Posting in progress, your post will complete in the background...');
+            // إغلاق الديالوج عند النقر على الخلفية فقط
+            if (e.target.className && e.target.className.includes('strategy-dialog-backdrop')) {
+              closeStrategyDialog();
             }
-            // Always call onCancel to close the dialog
-            onCancel();
           }}
         >
-          Cancel
-        </button>
+          <div 
+            className="strategy-dialog"
+            ref={strategySelectRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="strategy-dialog-title"
+          >
+            <div className="strategy-dialog-header">
+              <h3 className="strategy-dialog-title" id="strategy-dialog-title">
+                Select a strategy
+              </h3>
+              <button 
+                type="button"
+                className="dialog-close-button" 
+                onClick={closeStrategyDialog}
+                aria-label="Close dialog"
+              >
+                Close
+              </button>
+            </div>
+            
+            <div className="strategy-dialog-content">
+              {/* عرض الاستراتيجيات الافتراضية */}
+              {DEFAULT_STRATEGIES.map((strategy, index) => (
+                <div 
+                  key={`strategy-${index}`}
+                  className={`strategy-option ${selectedStrategy === strategy ? 'selected' : ''}`}
+                  onClick={() => {
+                    updateField('selectedStrategy', strategy);
+                    closeStrategyDialog();
+                  }}
+                  tabIndex="0"
+                  role="option"
+                  aria-selected={selectedStrategy === strategy}
+                >
+                  <div className="strategy-option-name">{strategy}</div>
+                  <div className="strategy-option-desc">Trading strategy</div>
+                </div>
+              ))}
+              
+              {/* Add strategy section */}
+              <div className="add-strategy-container">
+                <div className="add-strategy-header">Add New Strategy</div>
+                <div className="add-strategy-form">
+                  <input
+                    type="text"
+                    value={newStrategy}
+                    onChange={(e) => setNewStrategy(e.target.value)}
+                    placeholder="Enter a new strategy name"
+                    className="form-control"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newStrategy.trim()) {
+                        handleAddStrategy();
+                        closeStrategyDialog();
+                      } else if (e.key === 'Escape') {
+                        closeStrategyDialog();
+                      }
+                    }}
+                  />
+                  <button 
+                    type="button"
+                    className="btn btn-primary btn-sm" 
+                    onClick={() => {
+                      if (newStrategy.trim()) {
+                        handleAddStrategy();
+                        closeStrategyDialog();
+                      }
+                    }}
+                    disabled={!newStrategy.trim()}
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Submit Buttons - Fixed at bottom */}
+        <div className="form-actions form-actions-bottom">
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting || !description}
+            className={`btn btn-primary ${isSubmitting ? 'is-submitting' : ''}`}
+          >
+            {isSubmitting ? 'Posting...' : 'Post'}
+          </button>
+          <button 
+            className="btn btn-secondary" 
+            onClick={(e) => {
+              if (isSubmitting) {
+                updateField('submissionProgress', 'Posting in progress, your post will complete in the background...');
+              }
+              // Close the dialog
+              forceCloseDialog();
+            }}
+          >
+            Cancel
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -3,19 +3,23 @@
 import { useState, useEffect } from "react";
 import { useRouter } from 'next/navigation';
 import { useAuth } from "@/hooks/useAuth";
-import { getPosts } from "@/utils/supabase";
+import { useFetchPosts } from "@/hooks/useFetchPosts";
 
 export default function MainPage() {
   const router = useRouter();
   const { isAuthenticated, loading } = useAuth();
   const [isRedirecting, setIsRedirecting] = useState(true);
   const [isVisible, setIsVisible] = useState(false);
-  const [posts, setPosts] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [error, setError] = useState(null);
   const [errorDetails, setErrorDetails] = useState(null);
+  
+  // Use the useFetchPosts hook instead of implementing the fetchPosts function directly
+  const { 
+    posts, 
+    isLoading, 
+    error, 
+    fetchPosts, 
+    handleLoadMore 
+  } = useFetchPosts();
 
   useEffect(() => {
     if (!loading) {
@@ -28,55 +32,23 @@ export default function MainPage() {
     }
   }, [isAuthenticated, loading, router]);
 
-  // Fetch posts when authenticated
-  const fetchPosts = async (pageNum = 1) => {
-    try {
-      setIsLoading(true);
-      setError(null); // Reset error state
-      setErrorDetails(null); // Reset error details
-      
-      const { data, error, hasMorePages } = await getPosts(pageNum);
-      
-      if (error) {
-        console.error('Error fetching posts:', error);
-        setError(error.message || 'Failed to load posts');
-        setErrorDetails({
-          details: error.details,
-          hint: error.hint
-        });
-        return;
-      }
-      
-      if (pageNum === 1) {
-        setPosts(data || []);
-      } else {
-        setPosts(prev => [...prev, ...(data || [])]);
-      }
-      
-      setHasMore(hasMorePages || false);
-      setPage(pageNum);
-    } catch (error) {
-      console.error('Unexpected error fetching posts:', error);
-      setError('An unexpected error occurred while fetching posts');
+  // Set error details when error changes
+  useEffect(() => {
+    if (error) {
       setErrorDetails({
-        details: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        details: typeof error === 'object' ? error.details : error,
+        hint: typeof error === 'object' ? error.hint : undefined
       });
-    } finally {
-      setIsLoading(false);
+    } else {
+      setErrorDetails(null);
     }
-  };
+  }, [error]);
 
   // Handle new post creation
   const handlePostCreated = (newPost) => {
-    setPosts(prevPosts => [newPost, ...(prevPosts || [])]);
-  };
-
-  // Handle load more
-  const handleLoadMore = () => {
-    if (hasMore && !isLoading) {
-      fetchPosts(page + 1);
-    }
+    // We would need to update this to work with the posts from useFetchPosts
+    // For now, just trigger a refetch
+    fetchPosts(1);
   };
 
   // Render error message
@@ -92,7 +64,7 @@ export default function MainPage() {
             </svg>
           </div>
           <div className="ml-3">
-            <h3 className="text-sm font-medium text-red-800">{error}</h3>
+            <h3 className="text-sm font-medium text-red-800">{typeof error === 'string' ? error : 'Error fetching posts'}</h3>
             {errorDetails && (
               <div className="mt-2 text-sm text-red-700">
                 {errorDetails.hint && <p className="mb-1"><strong>Hint:</strong> {errorDetails.hint}</p>}
@@ -114,9 +86,9 @@ export default function MainPage() {
   useEffect(() => {
     // Only fetch posts if authenticated
     if (!loading && isAuthenticated) {
-      fetchPosts();
+      fetchPosts(1);
     }
-  }, [isAuthenticated, loading]);
+  }, [isAuthenticated, loading, fetchPosts]);
 
   useEffect(() => {
     setIsVisible(true);

@@ -6,6 +6,8 @@ import { ProfileProvider } from '@/contexts/ProfileContext';
 import { SupabaseProvider } from '@/hooks/useSupabase';
 import { ClientSideLayout } from "@/components/ClientSideLayout";
 import ClientImagePreloader from '@/components/ClientImagePreloader';
+import { CreatePostFormProvider } from '@/contexts/CreatePostFormContext';
+import GlobalStatusIndicator from '@/components/GlobalStatusIndicator';
 import { Roboto_Mono } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
@@ -34,6 +36,17 @@ export default function RootLayout({ children }) {
         {/* Add metadata if needed */}
       </head>
       <body>
+        {/* Initialize the global abort function */}
+        <Script id="global-abort-init" strategy="beforeInteractive">
+          {`
+            // Initialize the global abort function to ensure it's always available
+            window.abortPostsFetch = function() {
+              console.log('Initial abort function called - no active fetch to cancel');
+              return Promise.resolve();
+            };
+          `}
+        </Script>
+        
         {/* Add console suppression script */}
         <Script id="console-suppressor" strategy="beforeInteractive">
           {`
@@ -61,10 +74,13 @@ export default function RootLayout({ children }) {
           <AuthProvider>
             <ProfileProvider>
               <ThemeProvider defaultTheme="dark" attribute="class">
-                <ClientSideLayout>
-                  <ClientImagePreloader />
-                  {children}
-                </ClientSideLayout>
+                <CreatePostFormProvider>
+                  <ClientSideLayout>
+                    <ClientImagePreloader />
+                    {children}
+                  </ClientSideLayout>
+                  <GlobalStatusIndicator />
+                </CreatePostFormProvider>
               </ThemeProvider>
             </ProfileProvider>
           </AuthProvider>
