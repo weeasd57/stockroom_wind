@@ -38,7 +38,7 @@ export default function RootLayout({ children }) {
         {/* Add console suppression script */}
         <Script id="console-suppressor" strategy="beforeInteractive">
           {`
-            if (process.env.NODE_ENV === 'production') {
+            if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
               // Keep error and warn for debugging
               const originalLog = console.log;
               const originalInfo = console.info;

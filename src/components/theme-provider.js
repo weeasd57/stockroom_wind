@@ -45,6 +45,9 @@ export function ThemeProvider({
   useEffect(() => {
     if (!mounted) return;
     
+    // Only access window/document in the browser
+    if (typeof window === 'undefined') return;
+    
     const root = window.document.documentElement;
     
     // Remove old data attribute/class
@@ -66,6 +69,9 @@ export function ThemeProvider({
   useEffect(() => {
     if (!mounted || !enableSystem) return;
     
+    // Only access window/document in the browser
+    if (typeof window === 'undefined') return;
+    
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     
     const handleChange = () => {
@@ -86,10 +92,16 @@ export function ThemeProvider({
   useEffect(() => {
     if (!mounted || !disableTransitionOnChange) return;
     
+    // Only access document in the browser
+    if (typeof document === 'undefined') return;
+    
     document.documentElement.classList.add("disable-transitions");
-    window.setTimeout(() => {
-      document.documentElement.classList.remove("disable-transitions");
-    }, 0);
+    
+    if (typeof window !== 'undefined') {
+      window.setTimeout(() => {
+        document.documentElement.classList.remove("disable-transitions");
+      }, 0);
+    }
   }, [theme, disableTransitionOnChange, mounted]);
 
   const value = {
