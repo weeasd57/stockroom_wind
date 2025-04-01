@@ -1,9 +1,10 @@
-.container {
+.profileContainer {
   max-width: 1200px;
   margin: 0 auto;
   padding: 1rem;
   animation: fadeIn 0.5s ease-out;
   position: relative;
+  overflow-x: hidden;
 }
 
 .profileHeader {
@@ -241,6 +242,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 1.5rem;
+  margin-bottom: 2rem;
 }
 
 .usersGrid {
@@ -1036,4 +1038,312 @@
 
 .loginButton:active {
   transform: translateY(-1px);
+}
+
+/* New post card styles added for enhanced design */
+
+.postImageContainer {
+  margin: -1.25rem -1.25rem 1rem;
+  height: 180px;
+  overflow: hidden;
+  position: relative;
+}
+
+.postImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.postCard:hover .postImage {
+  transform: scale(1.05);
+}
+
+.imageFallback {
+  opacity: 0.6;
+}
+
+.postHeader {
+  margin-bottom: 1rem;
+}
+
+.postTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  color: hsl(var(--foreground));
+  line-height: 1.4;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.stockSymbol {
+  color: hsl(var(--primary));
+  font-weight: 700;
+  font-size: 0.9rem;
+  display: inline-block;
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.postDate, .targetPrice, .strategy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.targetPrice, .strategy {
+  background-color: hsla(var(--muted)/0.3);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.postActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.viewButton {
+  background-color: transparent;
+  color: hsl(var(--primary));
+  border: 1px solid hsl(var(--primary));
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.viewButton:hover {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.emptyPostsContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem;
+  background-color: hsla(var(--card)/0.5);
+  border-radius: 12px;
+  border: 1px dashed hsla(var(--border)/0.3);
+  grid-column: 1 / -1;
+  gap: 1.5rem;
+}
+
+.emptyActionButton {
+  margin-top: 0.5rem;
+}
+
+/* Add loading and error container styles */
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 2rem;
+  grid-column: 1 / -1; /* span all columns */
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: var(--primary-color);
+  animation: spin 1s ease-in-out infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.errorContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 2rem;
+  grid-column: 1 / -1; /* span all columns */
+}
+
+.errorMessage {
+  color: var(--error-color, #ff4d4f);
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.retryButton {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.retryButton:hover {
+  background-color: var(--primary-color-dark);
+}
+
+/* Filter Controls */
+.filterControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  background-color: rgba(15, 23, 42, 0.3);
+  border-radius: 10px;
+  padding: 12px 16px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.filterItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filterLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+}
+
+.filterSelectContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.filterLoading {
+  position: absolute;
+  right: 32px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.filterSpinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(56, 189, 248, 0.2);
+  border-top: 2px solid rgba(56, 189, 248, 0.8);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Disable interactions while loading */
+.filterSelect:disabled {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Responsive styles for filters */
+@media (max-width: 768px) {
+  .filterControls {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 12px;
+  }
+  
+  .filterItem {
+    width: 100%;
+  }
+  
+  .filterSelect {
+    flex-grow: 1;
+    width: 100%;
+  }
+}
+
+.activeFilter {
+  border-color: rgba(56, 189, 248, 0.6);
+  background-color: rgba(56, 189, 248, 0.15);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.4);
+}
+
+.clearFilterButton {
+  background-color: rgba(239, 68, 68, 0.2);
+  border: none;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: 4px;
+}
+
+.clearFilterButton:hover {
+  background-color: rgba(239, 68, 68, 0.4);
+  transform: scale(1.1);
+}
+
+.activeFilterIndicator {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.filterBadge {
+  background-color: rgba(56, 189, 248, 0.2);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #38bdf8;
+  display: inline-flex;
+  align-items: center;
+}
+
+.filterSelect {
+  padding: 8px 12px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: white;
+  font-size: 14px;
+  min-width: 160px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filterSelect:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.filterSelect:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.5);
+  border-color: rgba(56, 189, 248, 0.8);
 }

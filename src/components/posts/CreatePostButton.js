@@ -21,8 +21,8 @@ export default function CreatePostButton({ className = '', inDialog = false, chi
     dialogOpen, 
     openDialog, 
     closeDialog,
-    formState: { isSubmitting } 
-  } = useCreatePostForm();
+    isSubmitting = false 
+  } = useCreatePostForm() || {};
 
   // If not using dialog mode, just render a link to the create post page
   if (!inDialog) {

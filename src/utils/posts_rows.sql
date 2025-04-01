@@ -1,0 +1,1 @@
+INSERT INTO "public"."posts" ("id", "user_id", "content", "image_url", "symbol", "company_name", "country", "exchange", "current_price", "target_price", "stop_loss_price", "strategy", "created_at", "updated_at", "description")

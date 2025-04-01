@@ -3435,3 +3435,59 @@ input.visible-input::placeholder {
 }
 
 /* End of removed status indicator styles */
+
+/* Styles for posting status */
+.posting-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: hsla(var(--primary)/0.1);
+  padding: 8px 16px;
+  border-radius: 8px;
+  animation: pulse-bg 2s infinite;
+}
+
+.posting-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid hsla(var(--primary)/0.3);
+  border-top-color: hsl(var(--primary));
+  border-radius: 50%;
+  animation: spinner 1s linear infinite;
+}
+
+.posting-text {
+  font-weight: 500;
+  color: hsl(var(--primary));
+}
+
+.btn-cancel {
+  background: transparent;
+  color: hsl(var(--foreground));
+  border: 1px solid hsla(var(--border)/0.8);
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.btn-cancel:hover {
+  background-color: hsla(var(--muted)/0.5);
+  border-color: transparent;
+}
+
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-bg {
+  0%, 100% {
+    background: hsla(var(--primary)/0.1);
+  }
+  50% {
+    background: hsla(var(--primary)/0.15);
+  }
+}

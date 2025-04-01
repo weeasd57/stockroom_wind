@@ -632,123 +632,50 @@ export const checkFileExists = async (bucket, path) => {
   }
 };
 
-// Enhanced createPost function with graceful timeout handling and background retries
-async function createPost(post, userId) {
-  const startTime = performance.now();
+// Post helpers
+/**
+ * Create a post with performance tracking
+ * @param {object} postData - Post data to insert
+ * @returns {Promise<object>} - Created post data and error
+ */
+export async function createPost(postData) {
+  const createStart = performance.now();
   console.log(`[POST DEBUG] 🚀 Starting post creation at ${new Date().toISOString()}`);
-  console.log(`[POST DEBUG] 📦 Post data:`, { title: post.title, content: post.content?.substring(0, 50), imageCount: post.images?.length });
-  
-  // Create a sanitized post object without the images field
-  const { images, ...sanitizedPost } = post;
-  
-  // Prepare a simplified version for retries (with just essential data)
-  const essentialPostData = {
-    title: post.title,
-    content: post.content,
-    user_id: userId,
-    strategy: post.strategy || null,
-    created_at: new Date().toISOString(),
-  };
+  console.log(`[POST DEBUG] 📊 Post data:`, JSON.stringify(postData, null, 2));
   
   try {
-    // Step 1: Create the post with an explicit timeout (extended from default 5s)
-    console.log(`[POST DEBUG] 📝 Inserting post to database`);
+    // Track database operation time
+    console.log(`[POST DEBUG] 🔄 Preparing to insert post into database`);
+    const dbInsertStart = performance.now();
+    
     const { data, error } = await supabase
       .from('posts')
-      .insert([sanitizedPost]) // Use sanitized post without images
-      .select();
+      .insert(postData)
+      .select()
+      .single();
     
-    const insertDuration = performance.now() - startTime;
-    console.log(`[POST DEBUG] ⏱️ Database insert took ${insertDuration.toFixed(1)}ms`);
+    const dbInsertEnd = performance.now();
+    console.log(`[POST DEBUG] ⏱️ Database insert took ${(dbInsertEnd - dbInsertStart).toFixed(2)}ms`);
     
     if (error) {
-      console.error(`[POST DEBUG] ❌ Error inserting post:`, error);
-      
-      // Start background retry process for timeouts and network errors
-      if (error.message?.includes('timeout') || error.code === 'ETIMEDOUT' || 
-          error.code === 'NETWORK_ERROR' || error.message?.includes('network')) {
-        
-        // Launch background retry attempts without blocking UI
-        console.log(`[POST DEBUG] 🔄 Scheduling background retry attempts`);
-        
-        // First retry after 2 seconds
-        setTimeout(() => {
-          console.log(`[POST DEBUG] 🔄 First retry attempt starting`);
-          supabase
-            .from('posts')
-            .insert([essentialPostData])
-            .then(({ data, error }) => {
-              if (error) {
-                console.error(`[POST DEBUG] ❌ First retry failed:`, error);
-                
-                // Second retry after another 5 seconds with longer timeout
-                setTimeout(() => {
-                  console.log(`[POST DEBUG] 🔄 Second retry attempt starting`);
-                  supabase
-                    .from('posts')
-                    .insert([essentialPostData])
-                    .then(({ data, error }) => {
-                      if (error) {
-                        console.error(`[POST DEBUG] ❌ Second retry failed:`, error);
-                        
-                        // Third and final retry after 10 more seconds with even longer timeout
-                        setTimeout(() => {
-                          console.log(`[POST DEBUG] 🔄 Final retry attempt starting`);
-                          supabase
-                            .from('posts')
-                            .insert([essentialPostData])
-                            .then(({ data, error }) => {
-                              if (error) {
-                                console.error(`[POST DEBUG] ❌ All retries failed. Final error:`, error);
-                              } else {
-                                console.log(`[POST DEBUG] ✅ Final retry succeeded! Post saved.`);
-                                // No need to invalidate cache here - it will be refreshed on next visit
-                              }
-                            });
-                        }, 10000);
-                      } else {
-                        console.log(`[POST DEBUG] ✅ Second retry succeeded! Post saved.`);
-                        // No need to invalidate cache here - it will be refreshed on next visit
-                      }
-                    });
-                }, 5000);
-              } else {
-                console.log(`[POST DEBUG] ✅ First retry succeeded! Post saved.`);
-                // No need to invalidate cache here - it will be refreshed on next visit
-              }
-            });
-        }, 2000);
-        
-        // For timeout errors, return a special response for optimistic UI
-        return { 
-          data: [{ 
-            ...sanitizedPost, // Use sanitized post
-            id: `temp-${Date.now()}`,
-            created_at: new Date().toISOString(),
-            syncing: true 
-          }], 
-          error: { 
-            message: 'Post will sync when connection improves',
-            isTimeout: true
-          } 
-        };
-      }
-      
-      // For other errors, throw normally
-      throw error;
+      console.error(`[POST DEBUG] ❌ Post creation error:`, error);
+      const createEnd = performance.now();
+      console.log(`[POST DEBUG] ⏱️ Total post creation attempt time: ${(createEnd - createStart).toFixed(2)}ms (failed)`);
+      return { data: null, error };
     }
     
-    // Clear caches after successful post creation
-    console.log(`[POST DEBUG] 🧹 Clearing post caches`);
-    clearPostCache();
+    // Invalidate cache after successful post creation
+    invalidatePostsCache();
+    console.log(`[POST DEBUG] 🧹 Cache invalidated after post creation`);
     
-    console.log(`[POST DEBUG] ✅ Post created successfully in ${performance.now() - startTime}ms`);
+    const createEnd = performance.now();
+    console.log(`[POST DEBUG] ✅ Post created successfully in ${(createEnd - createStart).toFixed(2)}ms with ID: ${data.id}`);
+    
     return { data, error: null };
   } catch (error) {
-    console.error(`[POST DEBUG] 💥 Exception in createPost:`, error);
-    const duration = performance.now() - startTime;
-    console.log(`[POST DEBUG] ⏱️ Total attempt time: ${duration.toFixed(1)}ms`);
-    
+    console.error(`[POST DEBUG] ❌ Unexpected error during post creation:`, error);
+    const createEnd = performance.now();
+    console.log(`[POST DEBUG] ⏱️ Total post creation attempt time: ${(createEnd - createStart).toFixed(2)}ms (exception)`);
     return { data: null, error };
   }
 }
@@ -919,7 +846,7 @@ const userPostsCache = {
  * @param {AbortSignal} signal - AbortController signal for cancellation
  * @returns {Promise<object>} - Posts and pagination info
  */
-async function getPosts(page = 1, limit = 10, signal) {
+export async function getPosts(page = 1, limit = 10, signal) {
   try {
     const cacheKey = `posts_${page}_${limit}`;
     const cachedData = postsCache.data.get(cacheKey);
@@ -949,32 +876,87 @@ async function getPosts(page = 1, limit = 10, signal) {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    // Always use posts table directly, not post_details view
-    console.log('Fetching posts directly from posts table');
+    // First try to get the table structure
+    const { data: tableInfo, error: tableError } = await supabase
+      .from('post_details')
+      .select('*')
+      .limit(1)
+      .abortSignal(signal); // Add abort signal support
+
+    if (tableError && tableError.code === '42P01') {
+      console.log('post_details view not found, falling back to posts table');
+      
+      // Check if cancelled before fallback
+      if (signal && signal.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      
+      // Try posts table instead
+      const { data: postsData, error: postsError, count } = await supabase
+        .from('posts')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, to)
+        .abortSignal(signal); // Add abort signal support
+
+      if (postsError) {
+        console.error('Error fetching from posts table:', postsError);
+        throw postsError;
+      }
+
+      const totalPages = Math.ceil((count || 0) / limit);
+      const response = {
+        data: postsData || [],
+        error: null,
+        hasMorePages: page < totalPages,
+        totalCount: count || 0,
+        currentPage: page,
+        totalPages
+      };
+
+      // Don't cache results if the request was aborted
+      if (!signal || !signal.aborted) {
+        postsCache.data.set(cacheKey, response);
+        postsCache.timestamp.set(cacheKey, Date.now());
+      }
+
+      return response;
+    } else if (tableError) {
+      console.error('Error fetching table info:', tableError);
+      throw tableError;
+    }
     
-    // Try posts table
-    const { data: postsData, error: postsError, count } = await supabase
-      .from('posts')
+    // Check if cancelled after table check
+    if (signal && signal.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
+
+    // If we got here, post_details exists. Let's see what columns we have
+    console.log('Available columns in post_details:', Object.keys(tableInfo[0] || {}));
+
+    // Now fetch the actual data with all available columns
+    const { data, error, count } = await supabase
+      .from('post_details')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, to)
       .abortSignal(signal); // Add abort signal support
 
-    if (postsError) {
-      console.error('Error fetching from posts table:', postsError);
-      throw postsError;
+    if (error) {
+      console.error('Error fetching from post_details:', error);
+      throw error;
     }
 
     const totalPages = Math.ceil((count || 0) / limit);
     const response = {
-      data: postsData || [],
+      data: data || [],
       error: null,
       hasMorePages: page < totalPages,
       totalCount: count || 0,
       currentPage: page,
       totalPages
     };
-
+    
     // Don't cache results if the request was aborted
     if (!signal || !signal.aborted) {
       postsCache.data.set(cacheKey, response);
@@ -1014,9 +996,6 @@ export function invalidatePostsCache() {
   userPostsCache.timestamp.clear();
 }
 
-// Alias for invalidatePostsCache for backward compatibility
-export const clearPostCache = invalidatePostsCache;
-
 /**
  * Get posts by user ID
  * @param {string} userId - User ID
@@ -1026,7 +1005,7 @@ export const clearPostCache = invalidatePostsCache;
  * @param {string} strategy - Optional strategy to filter posts by
  * @returns {Promise<object>} - Posts and pagination info
  */
-async function getUserPosts(userId, page = 1, limit = 10, signal, strategy = null) {
+export async function getUserPosts(userId, page = 1, limit = 10, signal, strategy = null) {
   const fetchStart = performance.now();
   console.log(`[FETCH DEBUG] 🚀 Starting getUserPosts for user ${userId}${strategy ? ` with strategy ${strategy}` : ''} at ${new Date().toISOString()}`);
   
@@ -1114,13 +1093,18 @@ async function getUserPosts(userId, page = 1, limit = 10, signal, strategy = nul
     
     // Optimize query by selecting only needed columns for performance
     // This reduces data transfer and speeds up the query
-    const columns = '*'; // Select all columns from posts table
+    const columns = [
+      'id', 'user_id', 'content', 'description', 'image_url', 
+      'symbol', 'company_name', 'strategy', 'created_at',
+      'target_price', 'current_price', 'stop_loss_price',
+      'user_avatar', 'username'
+    ].join(',');
     
     const from = (page - 1) * limit;
     const to = from + limit - 1;
     
     let query = supabase
-      .from('posts')
+      .from('post_details')
       .select(columns, { count: 'exact' })
       .eq('user_id', userId);
       
@@ -1345,7 +1329,7 @@ export const getFollowing = async (userId) => {
  */
 export const getPostById = async (postId) => {
   const { data, error } = await supabase
-    .from('posts')
+    .from('post_details')
     .select('*')
     .eq('id', postId)
     .single();
@@ -1511,16 +1495,6 @@ function withDebug(fn, name) {
   };
 }
 
-// Apply debug wrappers to the functions
-const getPostsWithDebug = withDebug(getPosts, 'getPosts');
-const getUserPostsWithDebug = withDebug(getUserPosts, 'getUserPosts');
-const createPostWithDebug = withDebug(createPost, 'createPost');
-
-// Export the wrapped versions only
-export { 
-  getPostsWithDebug as getPosts,
-  getUserPostsWithDebug as getUserPosts,
-  createPostWithDebug as createPost
-};
-
-// The file now ends here. All duplicate exports have been removed.
+// Remove these problematic lines completely
+const originalGetPosts = getPosts;
+export const getPosts = withDebug(originalGetPosts, 'getPosts');

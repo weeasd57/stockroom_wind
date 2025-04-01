@@ -6,11 +6,18 @@ import { useProfile } from '@/contexts/ProfileContext';
 import { generateEodLastCloseUrl, countries, BASE_URL, API_KEY } from '@/utils/stockApi';
 import { getCountrySymbolCounts, searchStocks, COUNTRY_ISO_CODES } from '@/utils/symbolSearch';
 import { formatSymbolForApi, getExchangeCodeFromData, getSymbolPriceFromLocalData, getEodApiUrlParams } from '@/utils/symbolUtils';
-import { createPost as supabaseCreatePost, uploadPostImage, createUserStrategy, getUserStrategies } from '@/utils/supabase';
+import { uploadPostImage } from '@/utils/supabase';
 import { useCreatePostForm } from '@/contexts/CreatePostFormContext';
+import useProfileStore from '@/store/profileStore'; // Import profile store
+import { createClient } from '@supabase/supabase-js';
 import 'flag-icons/css/flag-icons.min.css';
 import '@/styles/create-post-page.css';
 import '@/styles/animation.css';
+
+// Create reusable Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 // Near the top of the file
 const COUNTRY_CODE_TO_NAME = {
@@ -188,7 +195,6 @@ const COUNTRY_CURRENCY_SYMBOLS = {
   'jm': 'J$',   // جامايكا
   
   // دول أخرى
-  'il': '₪',    // إسرائيل
   'az': '₼',    // أذربيجان
   'by': 'Br',   // بيلاروسيا
   'kz': '₸',    // كازاخستان
@@ -214,31 +220,37 @@ const getCurrencySymbol = (country) => {
 export default function CreatePostForm() {
   const { user } = useAuth();
   const { profile, getEffectiveAvatarUrl } = useProfile();
+  
+  // Since there's no formState, directly destructure values from context with defaults
   const { 
-    formState, 
     updateField, 
-    updateFields, 
-    resetForm, 
-    forceCloseDialog 
-  } = useCreatePostForm();
+    resetForm,
+    closeDialog,
+    title = '',
+    content = '',
+    description: contextDescription = '',
+    imageFile = null,
+    imagePreview = '',
+    imageUrl = '',
+    preview = [],
+    stockSearch = '',
+    searchResults = [],
+    selectedStock = null,
+    selectedCountry: contextSelectedCountry = 'all',
+    currentPrice = null,
+    targetPrice = '',
+    stopLossPrice = '',
+    selectedStrategy = '',
+    targetPercentage = '',
+    stopLossPercentage = '',
+    isSubmitting: contextIsSubmitting = false,
+    submissionProgress = '',
+    setGlobalStatus,
+    setSubmitState
+  } = useCreatePostForm() || {};
 
-  const {
-    description,
-    imageFile,
-    imagePreview,
-    imageUrl,
-    stockSearch,
-    searchResults,
-    selectedStock,
-    currentPrice,
-    targetPrice,
-    stopLossPrice,
-    selectedStrategy,
-    targetPercentage,
-    stopLossPercentage,
-    isSubmitting,
-    submissionProgress
-  } = formState;
+  // Get the addPost function from profile store
+  const addPost = useProfileStore(state => state.addPost);
 
   const [strategies, setStrategies] = useState([]);
   const [newStrategy, setNewStrategy] = useState('');
@@ -253,6 +265,19 @@ export default function CreatePostForm() {
   const [countrySymbolCounts, setCountrySymbolCounts] = useState({});
   const [priceHistory, setPriceHistory] = useState([]);
   const [apiResponse, setApiResponse] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
+  const [images, setImages] = useState([]);
+  const [capturedImage, setCapturedImage] = useState(null);
+  const [categoryId, setCategoryId] = useState(null);
+  const [errors, setErrors] = useState({});
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [stockSymbol, setStockSymbol] = useState('');
+  const [status, setStatus] = useState('idle'); // 'idle', 'uploading', 'success', 'error'
+  const [currentAvatar, setCurrentAvatar] = useState(null);
+  const [previewAvatar, setPreviewAvatar] = useState(null);
+  const [isAddingStrategy, setIsAddingStrategy] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(contextIsSubmitting);
+  
   const fileInputRef = useRef(null);
   const searchTimeoutRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -317,46 +342,111 @@ export default function CreatePostForm() {
 
   // Fetch user strategies on component mount
   useEffect(() => {
-    // تعيين الاستراتيجيات الافتراضية على الفور عند تحميل المكون
-    setStrategies(DEFAULT_STRATEGIES);
-    
-    // إذا كان المستخدم مسجل الدخول، حاول أيضًا جلب الاستراتيجيات المخصصة له
     if (user) {
-      fetchUserStrategies();
+      fetchStrategies();
     }
   }, [user]);
 
-  // Fetch user strategies
-  const fetchUserStrategies = async () => {
+  // Keep local isSubmitting state in sync with context
+  useEffect(() => {
+    setIsSubmitting(contextIsSubmitting);
+  }, [contextIsSubmitting]);
+
+  // Fetch user's strategies
+  const fetchStrategies = async () => {
+    if (!user?.id) return;
+    
     try {
-      // دائمًا ابدأ بالاستراتيجيات الافتراضية
-      let allStrategies = [...DEFAULT_STRATEGIES];
+      // First set default strategies to ensure UI is responsive
+      if (strategies.length === 0) {
+        setStrategies(DEFAULT_STRATEGIES);
+      }
       
-      if (user && user.id) {
-        // حاول الحصول على استراتيجيات المستخدم من قاعدة البيانات
-        const userStrategies = await getUserStrategies(user.id);
-        
-        if (userStrategies && userStrategies.length > 0) {
-          // استخراج أسماء الاستراتيجيات من النتيجة
-          const strategyNames = userStrategies.map(s => s.strategy_name);
-          
-          // إضافة استراتيجيات المستخدم الفريدة (غير المكررة) إلى القائمة
-          strategyNames.forEach(name => {
-            if (!allStrategies.includes(name)) {
-              allStrategies.push(name);
-            }
-          });
+      // Then try to load from database if supabase is available
+      if (supabase) {
+        try {
+          // Fetch from user_strategies table
+          const { data, error } = await supabase
+            .from('user_strategies')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+            
+          if (error) {
+            console.error('Error fetching strategies from database:', error);
+            // Keep using default strategies
+          } else if (data && data.length > 0) {
+            console.log('Retrieved user strategies from database:', data);
+            // Combine user strategies with default ones
+            const userStrategyNames = data.map(s => s.name);
+            const combinedStrategies = [...userStrategyNames, ...DEFAULT_STRATEGIES.filter(s => !userStrategyNames.includes(s))];
+            setStrategies(combinedStrategies);
+          } else {
+            console.log('No user strategies found, using default strategies');
+            // Already set to default strategies above
+          }
+        } catch (dbError) {
+          console.error('Database error fetching strategies:', dbError);
+          // Keep using default strategies
+        }
+      } else {
+        console.log('Supabase client not available, using default strategies');
+      }
+    } catch (error) {
+      console.error('Error fetching strategies:', error);
+      // Fallback to default strategies on error
+      setStrategies(DEFAULT_STRATEGIES);
+    }
+  };
+
+  // Create a new strategy
+  const handleAddStrategy = async () => {
+    if (!newStrategy.trim() || !user) return;
+    
+    try {
+      setIsAddingStrategy(true);
+      
+      // Add strategy locally first (for immediate UI feedback)
+      const strategyName = newStrategy.trim();
+      setStrategies(prev => [...prev, strategyName]);
+      updateField('selectedStrategy', strategyName);
+      
+      // Then try to save it to database if supabase is available
+      if (supabase) {
+        try {
+          // Save to user_strategies table
+          const { data, error } = await supabase
+            .from('user_strategies')
+            .insert({
+              user_id: user.id,
+              name: strategyName,
+              created_at: new Date().toISOString()
+            })
+            .select()
+            .single();
+            
+          if (error) {
+            console.error('Error saving strategy to database:', error);
+            // Already added locally, so continue silently
+          } else {
+            console.log('Strategy saved to database:', data);
+          }
+        } catch (dbError) {
+          console.error('Database error saving strategy:', dbError);
+          // Already added locally, so continue silently
         }
       }
       
-      // تحديث قائمة الاستراتيجيات المتاحة
-      setStrategies(allStrategies);
-      console.log('Strategies loaded:', allStrategies);
-      
+      // Reset the input field
+      setNewStrategy('');
+      setShowStrategyInput(false);
     } catch (error) {
-      console.error('Error fetching strategies:', error);
-      // في حالة حدوث خطأ، استخدم الاستراتيجيات الافتراضية
-      setStrategies(DEFAULT_STRATEGIES);
+      console.error('Error creating strategy:', error);
+      // Still add strategy locally in case of error
+      setStrategies(prev => [...prev, newStrategy.trim()]);
+      updateField('selectedStrategy', newStrategy.trim());
+    } finally {
+      setIsAddingStrategy(false);
     }
   };
 
@@ -817,218 +907,118 @@ export default function CreatePostForm() {
     updateField('imagePreview', '');
   };
 
-  // Handle adding a new strategy
-  const handleAddStrategy = async () => {
-    if (!newStrategy.trim()) return;
-    
-    try {
-      // التحقق مما إذا كانت الاستراتيجية موجودة بالفعل
-      if (strategies.includes(newStrategy.trim())) {
-        // إذا كانت الاستراتيجية موجودة بالفعل، حدد فقط
-        updateField('selectedStrategy', newStrategy.trim());
-        setNewStrategy('');
-        setShowStrategyInput(false);
-        return;
-      }
-      
-      // إضافة الاستراتيجية إلى القائمة المحلية أولاً للتحديث الفوري
-      const updatedStrategies = [...strategies, newStrategy.trim()];
-      setStrategies(updatedStrategies);
-      updateField('selectedStrategy', newStrategy.trim());
-      setNewStrategy('');
-      setShowStrategyInput(false);
-      
-      // حفظ الاستراتيجية في Supabase إذا كان المستخدم مسجل الدخول
-      if (user && user.id) {
-        await createUserStrategy(user.id, newStrategy.trim());
-        console.log('Strategy added to database:', newStrategy.trim());
-      }
-      
-    } catch (error) {
-      console.error('Error adding strategy:', error);
-      // حتى في حالة فشل الإضافة إلى قاعدة البيانات، اترك الاستراتيجية في القائمة المحلية
-    }
-  };
-
-  // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Close strategy dialog if open
-    if (showStrategyDialog) {
-      closeStrategyDialog();
-    }
-    
-    if (!description.trim()) {
-      return;
-    }
-    
-    updateField('isSubmitting', true);
-    updateField('submissionProgress', 'Preparing your post...');
-    
-    try {
-      let uploadedImageUrl = imageUrl;
-      
-      // Upload image if file is selected
-      if (imageFile) {
-        updateField('submissionProgress', 'Uploading image...');
-        uploadedImageUrl = await uploadPostImage(imageFile, user.id);
-      }
-      
-      // Create post data object
-      const postData = {
-        user_id: user.id,
-        content: description.trim(),
-        image_url: uploadedImageUrl || null,
-        strategy: selectedStrategy || null,
-      };
-      
-      // Add stock data if selected
-      if (selectedStock) {
-        postData.symbol = selectedStock.symbol;
-        postData.company_name = selectedStock.name;
-        postData.country = selectedStock.country;
-        postData.current_price = currentPrice;
-        postData.target_price = targetPrice ? parseFloat(targetPrice) : null;
-        postData.stop_loss_price = stopLossPrice ? parseFloat(stopLossPrice) : null;
-      }
-      
-      // Create post in database
-      updateField('submissionProgress', 'Creating your post...');
-      const { data: newPost, error } = await supabaseCreatePost(postData);
-      
-      if (error) {
-        throw error;
-      }
-      
-      // Show success message in the global status indicator
-      updateField('submissionProgress', 'Post created successfully! Your post is now visible.');
-      
-      // Reset form data
-      resetForm();
-      
-      // Close the dialog after a delay to allow the user to see the success message
-      setTimeout(() => {
-        forceCloseDialog();
-      }, 1500);
-      
-    } catch (error) {
-      console.error('Error creating post:', error);
-      // Show error message in the status indicator
-      updateField('submissionProgress', `Error: ${error.message || 'Failed to create post'}`);
-    }
-  };
-
-  // Handle scroll in stock search results to maintain focus
-  const handleStockResultsScroll = useCallback((e) => {
-    // Prevent the default scroll behavior
-    e.stopPropagation();
-  }, []);
-
-  // Handle keyboard navigation in stock search results
-  const handleStockResultsKeyDown = useCallback((e) => {
-    if (!showStockSearch || searchResults.length === 0) return;
-    
-    const resultsElement = stockSearchResultsRef.current;
-    if (!resultsElement) return;
-    
-    // Get all stock items
-    const stockItems = resultsElement.querySelectorAll('.category-option');
-    if (stockItems.length === 0) return;
-    
-    // Find the currently focused item
-    const focusedItem = document.activeElement;
-    const isFocusedItemStock = focusedItem && focusedItem.classList && focusedItem.classList.contains('category-option');
-    
-    // Only handle Enter key for selection, disable arrow key navigation
-    if (e.key === 'Enter' && isFocusedItemStock) {
-      e.preventDefault();
-      
-      // Simulate a click on the focused item
-      focusedItem.click();
-    }
-    
-    // Close results on Escape key
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      updateField('searchResults', []);
-      updateField('stockSearch', '');
-      searchInputRef.current?.focus();
-    }
-  }, [showStockSearch, searchResults.length, updateField]);
-
-  // Add event listeners for the stock search results
-  useEffect(() => {
-    const resultsElement = stockSearchResultsRef.current;
-    if (resultsElement) {
-      resultsElement.addEventListener('scroll', handleStockResultsScroll);
-      resultsElement.addEventListener('keydown', handleStockResultsKeyDown);
-    }
-    
-    return () => {
-      if (resultsElement) {
-        resultsElement.removeEventListener('scroll', handleStockResultsScroll);
-        resultsElement.removeEventListener('keydown', handleStockResultsKeyDown);
-      }
-    };
-  }, [showStockSearch, searchResults.length, handleStockResultsScroll, handleStockResultsKeyDown]);
-
-  const handleRemoveImage = () => {
-    updateField('imageFile', null);
-    updateField('imagePreview', '');
-    updateField('imageUrl', '');
-    // Clear the file input value
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  // Add ARIA attributes and improved keyboard navigation
-  useEffect(() => {
-    const handleEscapeKey = (e) => {
-      if (e.key === 'Escape') {
-        if (searchResults.length > 0) {
-          setSearchResults([]);
-          setStockSearch('');
-        }
-      }
-    };
-    
-    window.addEventListener('keydown', handleEscapeKey);
-    
-    return () => {
-      window.removeEventListener('keydown', handleEscapeKey);
-    };
-  }, [searchResults.length]);
-
-  // Add drag and drop handlers for avatar
+  /**
+   * Handle avatar drop to update profile image
+   */
   const handleAvatarDrop = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) {
+
+    try {
+      const file = e.dataTransfer.files[0];
+      if (!file || !file.type.startsWith('image/')) {
+        updateGlobalStatus('Please drop an image file', 'error');
+        return;
+      }
+      
+      // Create a preview URL for instant feedback
+      const previewUrl = URL.createObjectURL(file);
+      setPreviewAvatar(previewUrl);
+      setStatus('uploading');
+      updateGlobalStatus('Uploading avatar...', 'processing');
+      
       try {
-        // Create object URL for preview
-        const previewUrl = URL.createObjectURL(file);
-        setAvatarUrl(previewUrl);
+        // Upload the image directly to storage
+        const uploadedUrl = await uploadPostImage(file, user?.id);
         
-        // Update profile context with new avatar
-        await profile.updateAvatar(file);
+        if (uploadedUrl) {
+          // Check if we have Supabase client initialized
+          if (!supabase) {
+            throw new Error('Supabase client not initialized. Check your environment variables.');
+          }
+          
+          // Get the profile ID from the user ID
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', user?.id)
+            .single();
+            
+          if (profileError) {
+            throw new Error(`Failed to find profile: ${profileError.message}`);
+          }
+          
+          // Update the profile with the new avatar URL
+          const { data, error } = await supabase
+            .from('profiles')
+            .update({ avatarUrl: uploadedUrl })
+            .eq('id', profileData.id)
+            .select()
+            .single();
+      
+      if (error) {
+            throw new Error(`Failed to update profile: ${error.message}`);
+          }
+          
+          console.log('Profile updated with new avatar:', data);
+          
+          // Update the avatar in the UI
+          setAvatarUrl(uploadedUrl);
+          
+          // Update local state and global status
+          setCurrentAvatar(uploadedUrl);
+          setStatus('idle');
+          updateGlobalStatus('Avatar updated successfully!', 'success');
+          
+          // Auto-close status after 3 seconds
+      setTimeout(() => {
+            updateGlobalStatus(null);
+          }, 3000);
+        }
+      } catch (uploadError) {
+        throw new Error(`Failed to update avatar: ${uploadError.message}`);
+      }
         
         // Clean up the object URL
         URL.revokeObjectURL(previewUrl);
       } catch (error) {
         console.error('Error updating avatar:', error);
-        // Revert to previous avatar if update fails
-        setAvatarUrl(profile?.avatarUrl || '/default-avatar.svg');
-      }
+      // Revert to previous avatar
+      setPreviewAvatar(currentAvatar);
+      setStatus('error');
+      updateGlobalStatus(`Error updating avatar: ${error.message}`, 'error');
     }
   };
 
   const handleAvatarDragOver = (e) => {
     e.preventDefault();
     e.stopPropagation();
+  };
+
+  /**
+   * Upload and process images for post
+   */
+  const uploadPostImages = async (images) => {
+    if (!images || images.length === 0) return null;
+    
+    console.log(`Processing ${images.length} images for post`);
+    try {
+      const imageUrls = await Promise.all(
+        images.map(async (img) => {
+          // Skip upload for already uploaded images (URLs)
+          if (typeof img === 'string' && img.startsWith('http')) {
+            return img;
+          }
+          return await uploadPostImage(img, user?.id);
+        })
+      );
+      
+      console.log(`Successfully processed ${imageUrls.length} images`);
+      return imageUrls[0]; // Return the first image URL
+    } catch (error) {
+      console.error(`Error uploading images: ${error.message}`);
+      throw error;
+    }
   };
 
   // Handle strategy dropdown display
@@ -1282,21 +1272,6 @@ export default function CreatePostForm() {
     }, 100);
   };
 
-  // إضافة استماع لمفتاح Escape
-  useEffect(() => {
-    const handleEscapeKeyForStrategy = (e) => {
-      if (e.key === 'Escape' && showStrategyDialog) {
-        closeStrategyDialog();
-      }
-    };
-    
-    document.addEventListener('keydown', handleEscapeKeyForStrategy);
-    
-    return () => {
-      document.removeEventListener('keydown', handleEscapeKeyForStrategy);
-    };
-  }, [showStrategyDialog]);
-
   // 4. تحسين استجابة مفتاح Escape
   useEffect(() => {
     const handleEscapeKey = (event) => {
@@ -1327,6 +1302,275 @@ export default function CreatePostForm() {
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [showStrategyDialog]);
+
+  // Function to update global status - declare once here
+  const updateGlobalStatus = (message, type = 'processing') => {
+    // This would connect to your global status context or state
+    console.log(`Status: ${type} - ${message}`);
+    // If you have a global status component, update it here
+    if (setGlobalStatus) {
+      setGlobalStatus({
+        visible: !!message,
+        type,
+        message
+      });
+    }
+  };
+
+  // New improved handleSubmit function with better timeout handling
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setErrors({}); // Reset errors
+
+    // Simple validation checks
+    if (!contextDescription && !imageFile) {
+      setErrors({ description: 'Please add a description or upload an image' });
+      return;
+    }
+
+    try {
+      // Start the submission process
+      setStatus('uploading');
+      setIsSubmitting(true); // Set submitting state
+      if (setSubmitState) {
+        setSubmitState('submitting');
+      }
+      updateGlobalStatus('Uploading post content...', 'processing');
+
+      // Prepare post data with all required fields matching Supabase posts table
+      const postData = {
+        // Required fields
+        user_id: user?.id,
+        content: contextDescription,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        
+        // Optional fields matching posts table columns exactly
+        description: contextDescription, // For backwards compatibility
+        image_url: undefined, // Will be set after upload if needed
+        symbol: selectedStock?.symbol || undefined,
+        company_name: selectedStock?.name || undefined,
+        country: selectedStock?.country || undefined,
+        exchange: selectedStock?.exchange || undefined,
+        current_price: currentPrice || undefined,
+        target_price: targetPrice ? parseFloat(targetPrice) : undefined,
+        stop_loss_price: stopLossPrice ? parseFloat(stopLossPrice) : undefined,
+        strategy: selectedStrategy || undefined
+      };
+
+      // Process image uploads
+      if (imageFile) {
+        try {
+          updateGlobalStatus('Uploading image...', 'processing');
+          const uploadedUrl = await uploadPostImage(imageFile, user?.id);
+          if (uploadedUrl) {
+            postData.image_url = uploadedUrl;
+          }
+        } catch (error) {
+          console.error('Error uploading image:', error);
+          updateGlobalStatus(`Error uploading image: ${error.message}`, 'error');
+          setIsSubmitting(false); // Reset submitting state on error
+          if (setSubmitState) {
+            setSubmitState('error');
+          }
+          throw error;
+        }
+      } else if (imageUrl) {
+        postData.image_url = imageUrl;
+      }
+
+      // Save post directly to Supabase
+      updateGlobalStatus('Creating your post...', 'processing');
+      console.log('Creating post with data:', postData);
+      
+      // Check if we have Supabase client initialized
+      if (!supabase) {
+        setIsSubmitting(false); // Reset submitting state on error
+        if (setSubmitState) {
+          setSubmitState('error');
+        }
+        throw new Error('Supabase client not initialized. Check your environment variables.');
+      }
+      
+      // Insert post into 'posts' table
+      const { data: post, error } = await supabase
+        .from('posts')
+        .insert(postData)
+        .select()
+        .single();
+      
+      if (error) {
+        setIsSubmitting(false); // Reset submitting state on error
+        if (setSubmitState) {
+          setSubmitState('error');
+        }
+        throw new Error(`Failed to save post to database: ${error.message}`);
+      }
+      
+      console.log('Post saved successfully:', post);
+      
+      // Add post to profile store for immediate UI update
+      if (post && addPost) {
+        console.log('Adding post to profile store for immediate display');
+        
+        // Ensure the post has all the required fields for display
+        const enrichedPost = {
+          ...post,
+          user: {
+            id: user?.id,
+            email: user?.email,
+            avatar_url: avatarUrl
+          },
+          created_at_formatted: new Date().toLocaleString()
+        };
+        
+        // Add the post to the store to immediately display it in the profile
+        addPost(enrichedPost);
+      }
+      
+      // Reset form after successful submission
+      updateField('description', '');
+      
+      // Reset all form fields
+      updateField('imageFile', null);
+      updateField('imagePreview', '');
+      updateField('imageUrl', '');
+      updateField('selectedStock', null);
+      updateField('selectedStrategy', '');
+      updateField('targetPrice', '');
+      updateField('stopLossPrice', '');
+      
+      setStatus('idle');
+      setIsSubmitting(false); // Reset submitting state after success
+      if (setSubmitState) {
+        setSubmitState('success');
+      }
+      updateGlobalStatus('Post created successfully! It is now visible on your profile.', 'success');
+
+      // Auto-close status after 3 seconds
+      setTimeout(() => {
+        updateGlobalStatus(null);
+      }, 3000);
+      
+      // Close form if in dialog
+      setTimeout(() => {
+        if (closeDialog) {
+          closeDialog();
+        }
+      }, 1500);
+    } catch (error) {
+      console.error('Error creating post:', error);
+      setStatus('error');
+      setIsSubmitting(false); // Reset submitting state on error
+      if (setSubmitState) {
+        setSubmitState('error');
+      }
+      updateGlobalStatus(`Error creating post: ${error.message}`, 'error');
+    }
+  };
+
+  // Cancel ongoing post submission
+  const cancelPosting = () => {
+    if (isSubmitting) {
+      updateGlobalStatus('Posting cancelled', 'info');
+      setIsSubmitting(false);
+      setStatus('idle');
+      
+      // Also update the context state if available
+      if (setSubmitState) {
+        setSubmitState('idle');
+      }
+      
+      // Close dialog if in dialog mode
+      if (closeDialog) {
+        closeDialog();
+      }
+    }
+  };
+
+  // Handle scroll in stock search results to maintain focus
+  const handleStockResultsScroll = useCallback((e) => {
+    // Prevent the default scroll behavior
+    e.stopPropagation();
+  }, []);
+
+  // Handle keyboard navigation in stock search results
+  const handleStockResultsKeyDown = useCallback((e) => {
+    if (!showStockSearch || searchResults.length === 0) return;
+    
+    const resultsElement = stockSearchResultsRef.current;
+    if (!resultsElement) return;
+    
+    // Get all stock items
+    const stockItems = resultsElement.querySelectorAll('.category-option');
+    if (stockItems.length === 0) return;
+    
+    // Find the currently focused item
+    const focusedItem = document.activeElement;
+    const isFocusedItemStock = focusedItem && focusedItem.classList && focusedItem.classList.contains('category-option');
+    
+    // Only handle Enter key for selection, disable arrow key navigation
+    if (e.key === 'Enter' && isFocusedItemStock) {
+      e.preventDefault();
+      
+      // Simulate a click on the focused item
+      focusedItem.click();
+    }
+    
+    // Close results on Escape key
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      updateField('searchResults', []);
+      updateField('stockSearch', '');
+      searchInputRef.current?.focus();
+    }
+  }, [showStockSearch, searchResults.length, updateField]);
+
+  // Add event listeners for the stock search results
+  useEffect(() => {
+    const resultsElement = stockSearchResultsRef.current;
+    if (resultsElement) {
+      resultsElement.addEventListener('scroll', handleStockResultsScroll);
+      resultsElement.addEventListener('keydown', handleStockResultsKeyDown);
+    }
+    
+    return () => {
+      if (resultsElement) {
+        resultsElement.removeEventListener('scroll', handleStockResultsScroll);
+        resultsElement.removeEventListener('keydown', handleStockResultsKeyDown);
+      }
+    };
+  }, [showStockSearch, searchResults.length, handleStockResultsScroll, handleStockResultsKeyDown]);
+
+  const handleRemoveImage = () => {
+    updateField('imageFile', null);
+    updateField('imagePreview', '');
+    updateField('imageUrl', '');
+    // Clear the file input value
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Add ARIA attributes and improved keyboard navigation
+  useEffect(() => {
+    const handleEscapeKey = (e) => {
+      if (e.key === 'Escape') {
+        if (searchResults.length > 0) {
+          if (updateField) {
+            updateField('searchResults', []);
+            updateField('stockSearch', '');
+          }
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleEscapeKey);
+    
+    return () => {
+      window.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [searchResults.length, updateField]);
 
   return (
     <>
@@ -1654,15 +1898,18 @@ export default function CreatePostForm() {
             <label htmlFor="description" className="form-label">What's on your mind?</label>
             <textarea
               id="description"
-              value={description}
+              value={contextDescription}
               onChange={(e) => updateField('description', e.target.value)}
               placeholder="Share your thoughts..."
-              className="form-control"
+              className={`form-control ${formErrors.content ? 'is-invalid' : ''}`}
             ></textarea>
             <div className="focus-ring"></div>
-            {description && (
-              <div className={`char-counter ${description.length > 500 ? 'warning' : ''} ${description.length > 1000 ? 'danger' : ''}`}>
-                {description.length} / 1000
+            {formErrors.content && (
+              <div className="invalid-feedback">{formErrors.content}</div>
+            )}
+            {contextDescription && (
+              <div className={`char-counter ${contextDescription.length > 500 ? 'warning' : ''} ${contextDescription.length > 1000 ? 'danger' : ''}`}>
+                {contextDescription.length} / 1000
               </div>
             )}
           </div>
@@ -1998,21 +2245,38 @@ export default function CreatePostForm() {
 
         {/* Submit Buttons - Fixed at bottom */}
         <div className="form-actions form-actions-bottom">
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting || !description}
-            className={`btn btn-primary ${isSubmitting ? 'is-submitting' : ''}`}
-          >
-            {isSubmitting ? 'Posting...' : 'Post'}
-          </button>
+          {!isSubmitting ? (
+            <button
+              onClick={handleSubmit}
+              disabled={!contextDescription.trim()}
+              className="btn btn-primary"
+            >
+              Post
+            </button>
+          ) : (
+            <div className="posting-status">
+              <div className="posting-spinner"></div>
+              <span className="posting-text">Posting...</span>
+              <button 
+                className="btn btn-cancel" 
+                onClick={cancelPosting}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
           <button 
             className="btn btn-secondary" 
             onClick={(e) => {
+              // If posting is in progress, confirm cancellation
               if (isSubmitting) {
-                updateField('submissionProgress', 'Posting in progress, your post will complete in the background...');
+                if (window.confirm('Posting in progress. Are you sure you want to cancel?')) {
+                  cancelPosting();
+                }
+                return;
               }
-              // Close the dialog
-              forceCloseDialog();
+              // Otherwise just close the dialog
+              closeDialog();
             }}
           >
             Cancel

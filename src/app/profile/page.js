@@ -33,7 +33,10 @@ export default function Profile() {
     isInitialized,
     setActiveTab,
     initializeData,
-    refreshData
+    refreshData,
+    selectedStrategy,
+    setSelectedStrategy,
+    clearSelectedStrategy
   } = useProfileStore();
 
   const [showEditModal, setShowEditModal] = useState(false);
@@ -58,6 +61,7 @@ export default function Profile() {
   const fileInputRef = useRef(null);
   const backgroundInputRef = useRef(null);
   const refreshInterval = useRef(null);
+  const [localSelectedStrategy, setLocalSelectedStrategy] = useState(null);
 
   // Initialize data once when authenticated
   useEffect(() => {
@@ -80,16 +84,37 @@ export default function Profile() {
     }
   }, [user, contextAvatarUrl, contextBackgroundUrl, profile, profileLoading, isAuthenticated, isInitialized, initializeData]);
 
-  // Set up background refresh interval
+  // Set up background refresh interval with reduced frequency
   useEffect(() => {
     if (user && isAuthenticated) {
-      // Initial background refresh
-      refreshData(user.id);
-
-      // Set up interval for background refresh (every 30 seconds)
-      refreshInterval.current = setInterval(() => {
+      // Don't refresh immediately if data is less than 2 minutes old
+      const { lastFetched } = useProfileStore.getState();
+      const now = Date.now();
+      const twoMinutesAgo = now - 2 * 60 * 1000; // 2 minutes in milliseconds
+      
+      if (!lastFetched || lastFetched < twoMinutesAgo) {
+        // Only refresh if data is stale
+        console.log('Initial background refresh - data is stale or not loaded yet');
         refreshData(user.id);
-      }, 30000);
+      } else {
+        console.log('Skipping initial refresh - data is recent');
+      }
+
+      // Set up interval for background refresh (every 2 minutes instead of 30 seconds)
+      refreshInterval.current = setInterval(() => {
+        // Get the latest lastFetched value
+        const { lastFetched, isRefreshing } = useProfileStore.getState();
+        const now = Date.now();
+        const twoMinutesAgo = now - 2 * 60 * 1000;
+        
+        // Only refresh if not already refreshing and data is older than 2 minutes
+        if (!isRefreshing && (!lastFetched || lastFetched < twoMinutesAgo)) {
+          console.log('Background refresh triggered');
+          refreshData(user.id);
+        } else {
+          console.log('Skipping background refresh - data is recent or refresh in progress');
+        }
+      }, 120000); // 2 minutes interval instead of 30 seconds
     }
 
     return () => {
@@ -237,6 +262,12 @@ export default function Profile() {
       return () => clearTimeout(timer);
     }
   }, [backgroundUploadProgress, forceRefreshBackground]);
+
+  // Add a useEffect to update the local state when the store's selectedStrategy changes
+  useEffect(() => {
+    // Update local state when store state changes
+    setLocalSelectedStrategy(selectedStrategy);
+  }, [selectedStrategy]);
 
   // Only show loading state during initial load
   if (authLoading || (profileLoading && !isInitialized)) {
@@ -702,28 +733,42 @@ export default function Profile() {
     }
   };
 
-  // Update avatar img element to handle loading errors better
-  const avatarImgElement = (imgSrc) => (
-    <div className={styles.avatarPreviewContainer}>
-      <img
-        src={imgSrc || '/default-avatar.svg'}
-        alt={profile?.username || 'User'}
-        className={styles.avatarPreview}
-        key={`avatar-${Date.now()}`} // Ensure re-render on URL change with unique key
-        onError={(e) => {
-          console.error('Error loading avatar image in dialog:', e);
-          e.target.onerror = null; // Prevent infinite error loop
-          e.target.src = '/default-avatar.svg';
-        }}
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          display: 'block'
-        }}
-      />
-    </div>
-  );
+
+  // Update the onChange handler in the select element
+  const handleStrategyChange = (e) => {
+    const value = e.target.value;
+    console.log(`[UI DEBUG] 🔍 Strategy selection changed to: "${value || 'All Strategies'}"`);
+    
+    const selectionTime = new Date().toISOString();
+    console.log(`[UI DEBUG] ⏱️ Strategy selection time: ${selectionTime}`);
+    
+    if (value === '') {
+      console.log('[UI DEBUG] 🧹 Clearing strategy filter');
+      console.time('[UI DEBUG] ⏱️ Clear strategy filter operation');
+      clearSelectedStrategy();
+    } else {
+      console.log(`[UI DEBUG] 🔎 Setting strategy filter to: ${value}`);
+      console.time('[UI DEBUG] ⏱️ Set strategy filter operation');
+      setSelectedStrategy(value);
+    }
+    
+    // Monitor when loading state changes back to false (completed)
+    const checkLoadingComplete = () => {
+      if (!isLoading) {
+        console.timeEnd(value === '' 
+          ? '[UI DEBUG] ⏱️ Clear strategy filter operation' 
+          : '[UI DEBUG] ⏱️ Set strategy filter operation');
+        console.log(`[UI DEBUG] ✅ Strategy filter operation completed at ${new Date().toISOString()}`);
+        return;
+      }
+      
+      // Check again in 100ms
+      setTimeout(checkLoadingComplete, 100);
+    };
+    
+    // Start monitoring
+    setTimeout(checkLoadingComplete, 100);
+  };
 
   return (
     <div className={styles.profileContainer}>
@@ -871,24 +916,143 @@ export default function Profile() {
       {/* Content Section */}
       <div className={styles.contentSection}>
         {activeTab === 'posts' && (
-          <div className={styles.postsGrid}>
-            
-            
-            {posts.length > 0 ? (
-              posts.map(post => (
-                <div key={post.id} className={styles.postCard}>
-                  <p className={styles.postContent}>{post.content}</p>
-                  <div className={styles.postMeta}>
-                    <span className={styles.postDate}>
-                      {new Date(post.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
+          <>
+            <div className={styles.filterControls}>
+              <div className={styles.filterItem}>
+                <label htmlFor="strategyFilter" className={styles.filterLabel}>Filter by Strategy:</label>
+                <div className={styles.filterSelectContainer}>
+                  <select
+                    id="strategyFilter"
+                    className={`${styles.filterSelect} ${localSelectedStrategy ? styles.activeFilter : ''}`}
+                    value={localSelectedStrategy || ''}
+                    onChange={handleStrategyChange}
+                    disabled={isLoading}
+                  >
+                    <option value="">All Strategies</option>
+                    {Array.from(new Set(posts.map(post => post.strategy).filter(Boolean))).map(strategy => (
+                      <option key={strategy} value={strategy}>{strategy}</option>
+                    ))}
+                  </select>
+                  
+                  {isLoading && (
+                    <div className={styles.filterLoading}>
+                      <div className={styles.filterSpinner}></div>
+                    </div>
+                  )}
+                  
+                  {localSelectedStrategy && !isLoading && (
+                    <button 
+                      className={styles.clearFilterButton}
+                      onClick={() => clearSelectedStrategy()}
+                      aria-label="Clear filter"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
-              ))
-            ) : (
-              <p className={styles.emptyMessage}>No posts yet</p>
-            )}
-          </div>
+              </div>
+              
+              {localSelectedStrategy && (
+                <div className={styles.activeFilterIndicator}>
+                  <span className={styles.filterBadge}>
+                    Filtered by: {localSelectedStrategy}
+                  </span>
+                </div>
+              )}
+            </div>
+          
+            <div className={styles.postsGrid}>
+              {isLoading ? (
+                <div className={styles.loadingContainer}>
+                  <div className={styles.spinner}></div>
+                  <p>Loading your posts...</p>
+                </div>
+              ) : error ? (
+                <div className={styles.errorContainer}>
+                  <p className={styles.errorMessage}>{error}</p>
+                  <button 
+                    className={styles.retryButton} 
+                    onClick={() => {
+                      if (user) {
+                        setActiveTab('posts');
+                        initializeData(user.id);
+                      }
+                    }}
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : posts.length > 0 ? (
+                posts.map(post => (
+                  <div key={post.id} className={styles.postCard}>
+                    {post.image_url && (
+                      <div className={styles.postImageContainer}>
+                        <img 
+                          src={post.image_url} 
+                          alt="Post image" 
+                          className={styles.postImage}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = '/placeholder-image.jpg';
+                            e.target.classList.add(styles.imageFallback);
+                          }}
+                        />
+                      </div>
+                    )}
+                    
+                    <div className={styles.postHeader}>
+                      <h3 className={styles.postTitle}>
+                        {post.stock_symbol && (
+                          <span className={styles.stockSymbol}>{post.stock_symbol}</span>
+                        )}
+                        {post.title || (post.content && post.content.substring(0, 60) + '...') || 'Stock Analysis'}
+                      </h3>
+                    </div>
+                    
+                    <p className={styles.postContent}>
+                      {post.content || 'No content provided'}
+                    </p>
+                    
+                    <div className={styles.postMeta}>
+                      <div className={styles.metaRow}>
+                        {post.created_at && (
+                          <span className={styles.postDate}>
+                            {new Date(post.created_at).toLocaleDateString(undefined, { 
+                              year: 'numeric', 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })}
+                          </span>
+                        )}
+                        
+                        {post.target_price && (
+                          <span className={styles.targetPrice}>
+                            Target: {post.target_price}
+                          </span>
+                        )}
+                        
+                        {post.strategy && (
+                          <span className={styles.strategy}>
+                            Strategy: {post.strategy}
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className={styles.postActions}>
+                        <button className={styles.viewButton}>
+                          View Details
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className={styles.emptyPostsContainer}>
+                  <p className={styles.emptyMessage}>No posts yet</p>
+                </div>
+              )}
+            </div>
+          </>
         )}
         
         {activeTab === 'followers' && (

@@ -1,5 +1,5 @@
-import { Inter } from 'next/font/google';
-import '@/styles/globals.css'
+import { Inter, Roboto_Mono } from 'next/font/google';
+import '@/styles/globals.css';
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProfileProvider } from '@/contexts/ProfileContext';
@@ -7,10 +7,9 @@ import { SupabaseProvider } from '@/hooks/useSupabase';
 import { ClientSideLayout } from "@/components/ClientSideLayout";
 import ClientImagePreloader from '@/components/ClientImagePreloader';
 import { CreatePostFormProvider } from '@/contexts/CreatePostFormContext';
-import GlobalStatusIndicator from '@/components/GlobalStatusIndicator';
-import { Roboto_Mono } from 'next/font/google';
+import PostsStoreUpdater from '@/components/PostsStoreUpdater';
 import Script from 'next/script';
-import './globals.css';
+import { Suspense } from 'react';
 
 // Replace Geist with Inter as the primary font
 const inter = Inter({
@@ -31,9 +30,10 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`scroll-smooth dark ${inter.variable} ${robotoMono.variable}`}>
+    <html lang="en" className={`scroll-smooth dark ${inter.variable} ${robotoMono.variable}`} suppressHydrationWarning>
       <head>
         {/* Add metadata if needed */}
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
       </head>
       <body>
         {/* Initialize the global abort function */}
@@ -77,9 +77,11 @@ export default function RootLayout({ children }) {
                 <CreatePostFormProvider>
                   <ClientSideLayout>
                     <ClientImagePreloader />
-                    {children}
+                    <div className="app-wrapper">
+                      {children}
+                    </div>
                   </ClientSideLayout>
-                  <GlobalStatusIndicator />
+                  <PostsStoreUpdater />
                 </CreatePostFormProvider>
               </ThemeProvider>
             </ProfileProvider>

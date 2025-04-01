@@ -10,7 +10,7 @@ import CreatePostButton from '@/components/posts/CreatePostButton';
 export default function HomePage() {
   const router = useRouter();
   const { isAuthenticated, loading, user } = useAuth();
-  const { formState } = useCreatePostForm();
+  const contextValues = useCreatePostForm() || {};
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {

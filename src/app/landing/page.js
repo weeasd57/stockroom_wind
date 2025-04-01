@@ -69,7 +69,7 @@ export default function LandingPage() {
   ];
 
   return (
-    <div className={styles.landingPage}>
+    <div className={`${styles.landingPage} no-scroll`} style={{ overflow: 'visible' }}>
      
       
       <section className={`${styles.heroSection} ${styles.fadeSection}`} ref={heroRef}>

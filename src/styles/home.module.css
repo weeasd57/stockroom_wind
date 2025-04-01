@@ -972,4 +972,73 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.buttonsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  width: 100%;
+  max-width: 300px;
+}
+
+@media (min-width: 640px) {
+  .buttonsContainer {
+    flex-direction: row;
+    max-width: none;
+    justify-content: center;
+  }
+}
+
+.fetchButton {
+  padding: 0.6rem 1.5rem;
+  background-color: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.fetchButton:hover {
+  background-color: hsla(var(--secondary)/0.8);
+}
+
+.fetchButton.loading {
+  opacity: 0.7;
+  cursor: not-allowed;
+  position: relative;
+}
+
+.fetchButton.loading::after {
+  content: '';
+  position: absolute;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  animation: spin 0.8s linear infinite;
+  margin-left: 0.5rem;
+}
+
+.errorText {
+  color: hsl(var(--destructive));
+  font-size: 0.875rem;
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.postsPreview {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background-color: hsl(var(--card));
+  border-radius: 0.5rem;
+  text-align: center;
 } 

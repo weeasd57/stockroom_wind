@@ -101,6 +101,149 @@ Users can create posts with:
 - Following/follower relationship system
 - Trading history and activity feed
 
+## Database Schema for Posts
+
+```sql
+CREATE TABLE posts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id),
+    content TEXT NOT NULL,
+    image_url TEXT,
+    symbol TEXT,
+    company_name TEXT,
+    country TEXT,
+    exchange TEXT,
+    current_price NUMERIC,
+    target_price NUMERIC,
+    stop_loss_price NUMERIC,
+    strategy TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    description TEXT
+);
+```
+
+## Post Creation Process Mind Map
+
+```
+Post Creation Process
+├── Initial Form Preparation
+│   ├── Load User Data
+│   │   ├── Fetch avatar from profile
+│   │   └── Get user credentials
+│   ├── Initialize Form State
+│   │   ├── Set up empty fields (content, image, stock)
+│   │   ├── Initialize validation rules
+│   │   └── Configure default strategies
+│   └── Set Up UI Components
+│       ├── Textarea for post content
+│       ├── Image upload/preview section
+│       └── Stock search interface
+│
+├── Stock Selection Flow
+│   ├── Country Selection
+│   │   ├── Display country dropdown with flags
+│   │   ├── Filter by country symbols
+│   │   └── Load country-specific data
+│   ├── Stock Search
+│   │   ├── Real-time symbol search
+│   │   ├── Debounced API calls
+│   │   └── Results formatting with flags
+│   ├── Stock Data Retrieval
+│   │   ├── Symbol (e.g., "AAPL")
+│   │   ├── Company name (e.g., "Apple Inc")
+│   │   ├── Country (e.g., "US")
+│   │   ├── Exchange (e.g., "NASDAQ")
+│   │   └── Current price (numerical value)
+│   └── Trading Parameters
+│       ├── Target price (numerical value)
+│       ├── Stop loss price (numerical value)
+│       └── Trading strategy (text)
+│
+├── Content Creation
+│   ├── Primary Content
+│   │   ├── Main post content (required)
+│   │   ├── Character counter with limits
+│   │   └── Validation for minimum content
+│   ├── Image Handling
+│   │   ├── Direct file upload
+│   │   ├── Drag and drop support
+│   │   ├── URL-based images
+│   │   └── Generate image previews
+│   └── Strategy Selection
+│       ├── Choose from existing strategies
+│       ├── Create custom strategies
+│       └── Save strategies to user profile
+│
+├── Submission Process
+│   ├── Form Validation
+│   │   ├── Check required fields (user_id, content)
+│   │   ├── Verify data formats (numbers, dates)
+│   │   └── Display validation errors
+│   ├── Data Processing
+│   │   ├── Format post data for database schema
+│   │   ├── Upload images to storage
+│   │   └── Set timestamps (created_at, updated_at)
+│   ├── Database Interaction
+│   │   ├── Create Supabase client connection
+│   │   ├── Insert post data to posts table
+│   │   └── Process response and handle errors
+│   └── Post-Submission Actions
+│       ├── Update UI with success message
+│       ├── Add post to local state for instant display
+│       ├── Reset form fields for new posts
+│       └── Close dialog after completion
+│
+└── Error Handling & Recovery
+    ├── Network Error Management
+    │   ├── Retry mechanisms for API calls
+    │   ├── Fallback data sources
+    │   └── Offline mode support
+    ├── User Feedback
+    │   ├── Loading indicators
+    │   ├── Error messages with context
+    │   └── Success confirmations
+    └── State Recovery
+        ├── Save form progress
+        ├── Restore partial submissions
+        └── Attempt auto-recovery from failures
+```
+
+This mind map outlines the complete flow of the post creation process in FireStocks, from initial form preparation to successful submission. Each major stage aligns with the Supabase database schema, ensuring all required and optional fields are properly collected, validated, and stored.
+
+## Data Flow for Post Creation
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│                 │     │                 │     │                 │
+│  User Interface │────▶│  Form Context   │────▶│  Post Creation  │
+│                 │     │                 │     │                 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+         │                      │                       │
+         ▼                      ▼                       ▼
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│                 │     │                 │     │                 │
+│   Image Upload  │────▶│  Supabase Store │◀───▶│  Database Table │
+│                 │     │                 │     │                 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                               │
+                               ▼
+                        ┌─────────────────┐
+                        │                 │
+                        │    UI Update    │
+                        │                 │
+                        └─────────────────┘
+```
+
+The data flow diagram demonstrates how information moves through the system during post creation:
+
+1. User inputs data through the UI components
+2. Form Context manages and validates the state
+3. Post Creation logic processes the validated data
+4. Images are uploaded to storage
+5. Post data is stored in the Supabase database
+6. UI is updated with the new post and success message
+
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request.
 

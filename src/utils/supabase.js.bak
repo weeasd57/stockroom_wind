@@ -638,9 +638,6 @@ async function createPost(post, userId) {
   console.log(`[POST DEBUG] 🚀 Starting post creation at ${new Date().toISOString()}`);
   console.log(`[POST DEBUG] 📦 Post data:`, { title: post.title, content: post.content?.substring(0, 50), imageCount: post.images?.length });
   
-  // Create a sanitized post object without the images field
-  const { images, ...sanitizedPost } = post;
-  
   // Prepare a simplified version for retries (with just essential data)
   const essentialPostData = {
     title: post.title,
@@ -652,11 +649,12 @@ async function createPost(post, userId) {
   
   try {
     // Step 1: Create the post with an explicit timeout (extended from default 5s)
-    console.log(`[POST DEBUG] 📝 Inserting post to database`);
+    console.log(`[POST DEBUG] 📝 Inserting post to database with 10s timeout`);
     const { data, error } = await supabase
       .from('posts')
-      .insert([sanitizedPost]) // Use sanitized post without images
-      .select();
+      .insert([post])
+      .select()
+      .timeout(10000); // Explicit 10 second timeout
     
     const insertDuration = performance.now() - startTime;
     console.log(`[POST DEBUG] ⏱️ Database insert took ${insertDuration.toFixed(1)}ms`);
@@ -677,6 +675,7 @@ async function createPost(post, userId) {
           supabase
             .from('posts')
             .insert([essentialPostData])
+            .timeout(15000)
             .then(({ data, error }) => {
               if (error) {
                 console.error(`[POST DEBUG] ❌ First retry failed:`, error);
@@ -687,6 +686,7 @@ async function createPost(post, userId) {
                   supabase
                     .from('posts')
                     .insert([essentialPostData])
+                    .timeout(20000)
                     .then(({ data, error }) => {
                       if (error) {
                         console.error(`[POST DEBUG] ❌ Second retry failed:`, error);
@@ -697,6 +697,7 @@ async function createPost(post, userId) {
                           supabase
                             .from('posts')
                             .insert([essentialPostData])
+                            .timeout(30000)
                             .then(({ data, error }) => {
                               if (error) {
                                 console.error(`[POST DEBUG] ❌ All retries failed. Final error:`, error);
@@ -722,7 +723,7 @@ async function createPost(post, userId) {
         // For timeout errors, return a special response for optimistic UI
         return { 
           data: [{ 
-            ...sanitizedPost, // Use sanitized post
+            ...post, 
             id: `temp-${Date.now()}`,
             created_at: new Date().toISOString(),
             syncing: true 
@@ -949,32 +950,87 @@ async function getPosts(page = 1, limit = 10, signal) {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    // Always use posts table directly, not post_details view
-    console.log('Fetching posts directly from posts table');
+    // First try to get the table structure
+    const { data: tableInfo, error: tableError } = await supabase
+      .from('post_details')
+      .select('*')
+      .limit(1)
+      .abortSignal(signal); // Add abort signal support
+
+    if (tableError && tableError.code === '42P01') {
+      console.log('post_details view not found, falling back to posts table');
+      
+      // Check if cancelled before fallback
+      if (signal && signal.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      
+      // Try posts table instead
+      const { data: postsData, error: postsError, count } = await supabase
+        .from('posts')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, to)
+        .abortSignal(signal); // Add abort signal support
+
+      if (postsError) {
+        console.error('Error fetching from posts table:', postsError);
+        throw postsError;
+      }
+
+      const totalPages = Math.ceil((count || 0) / limit);
+      const response = {
+        data: postsData || [],
+        error: null,
+        hasMorePages: page < totalPages,
+        totalCount: count || 0,
+        currentPage: page,
+        totalPages
+      };
+
+      // Don't cache results if the request was aborted
+      if (!signal || !signal.aborted) {
+        postsCache.data.set(cacheKey, response);
+        postsCache.timestamp.set(cacheKey, Date.now());
+      }
+
+      return response;
+    } else if (tableError) {
+      console.error('Error fetching table info:', tableError);
+      throw tableError;
+    }
     
-    // Try posts table
-    const { data: postsData, error: postsError, count } = await supabase
-      .from('posts')
+    // Check if cancelled after table check
+    if (signal && signal.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
+
+    // If we got here, post_details exists. Let's see what columns we have
+    console.log('Available columns in post_details:', Object.keys(tableInfo[0] || {}));
+
+    // Now fetch the actual data with all available columns
+    const { data, error, count } = await supabase
+      .from('post_details')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, to)
       .abortSignal(signal); // Add abort signal support
 
-    if (postsError) {
-      console.error('Error fetching from posts table:', postsError);
-      throw postsError;
+    if (error) {
+      console.error('Error fetching from post_details:', error);
+      throw error;
     }
 
     const totalPages = Math.ceil((count || 0) / limit);
     const response = {
-      data: postsData || [],
+      data: data || [],
       error: null,
       hasMorePages: page < totalPages,
       totalCount: count || 0,
       currentPage: page,
       totalPages
     };
-
+    
     // Don't cache results if the request was aborted
     if (!signal || !signal.aborted) {
       postsCache.data.set(cacheKey, response);
@@ -1013,9 +1069,6 @@ export function invalidatePostsCache() {
   userPostsCache.data.clear();
   userPostsCache.timestamp.clear();
 }
-
-// Alias for invalidatePostsCache for backward compatibility
-export const clearPostCache = invalidatePostsCache;
 
 /**
  * Get posts by user ID
@@ -1114,13 +1167,18 @@ async function getUserPosts(userId, page = 1, limit = 10, signal, strategy = nul
     
     // Optimize query by selecting only needed columns for performance
     // This reduces data transfer and speeds up the query
-    const columns = '*'; // Select all columns from posts table
+    const columns = [
+      'id', 'user_id', 'content', 'description', 'image_url', 
+      'symbol', 'company_name', 'strategy', 'created_at',
+      'target_price', 'current_price', 'stop_loss_price',
+      'user_avatar', 'username'
+    ].join(',');
     
     const from = (page - 1) * limit;
     const to = from + limit - 1;
     
     let query = supabase
-      .from('posts')
+      .from('post_details')
       .select(columns, { count: 'exact' })
       .eq('user_id', userId);
       
@@ -1345,7 +1403,7 @@ export const getFollowing = async (userId) => {
  */
 export const getPostById = async (postId) => {
   const { data, error } = await supabase
-    .from('posts')
+    .from('post_details')
     .select('*')
     .eq('id', postId)
     .single();
@@ -1511,16 +1569,17 @@ function withDebug(fn, name) {
   };
 }
 
-// Apply debug wrappers to the functions
+// Apply debug wrappers directly to the original functions
+// Instead of reassigning const variables, create wrapped versions
 const getPostsWithDebug = withDebug(getPosts, 'getPosts');
 const getUserPostsWithDebug = withDebug(getUserPosts, 'getUserPosts');
 const createPostWithDebug = withDebug(createPost, 'createPost');
 
-// Export the wrapped versions only
+// Export the wrapped versions instead
 export { 
   getPostsWithDebug as getPosts,
   getUserPostsWithDebug as getUserPosts,
   createPostWithDebug as createPost
 };
 
-// The file now ends here. All duplicate exports have been removed.
+// The file now ends here. All TypeScript-style exports have been removed.

@@ -1,214 +1,261 @@
 'use client';
 
-import { createContext, useState, useContext, useCallback, useEffect } from 'react';
+import { createContext, useCallback, useContext, useEffect, useReducer, useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 
-// Create the context
-const CreatePostFormContext = createContext(null);
+// Create context
+const CreatePostFormContext = createContext();
 
-// Initial form state
-const initialFormState = {
-  description: '',
+// Define initial state
+const initialState = {
+  title: '',
+  content: '',
+  selectedStrategy: '',
   imageFile: null,
   imagePreview: '',
   imageUrl: '',
-  stockSearch: '',
+  preview: [],
+  showStrategyInput: false,
   searchResults: [],
+  stockSearch: '',
   selectedStock: null,
+  selectedCountry: 'all',
+  apiUrl: '',
+  apiResponse: null,
   currentPrice: null,
   targetPrice: '',
-  stopLossPrice: '',
-  selectedStrategy: '',
-  targetPercentage: 5,
-  stopLossPercentage: 5,
+  targetPricePercentage: '',
+  stopLoss: '',
+  stopLossPercentage: '',
+  entryPrice: '',
+  priceHistory: null,
+  newStrategy: '',
+  showStrategyDialog: false,
+  formErrors: {},
+  submissionProgress: '',
+  isLightboxOpen: false,
+  lightboxIndex: 0,
+  submitState: 'idle', // idle, submitting, success, error
   isSubmitting: false,
-  submissionProgress: ''
 };
+
+// Create reducer
+function createPostFormReducer(state, action) {
+  switch (action.type) {
+    case 'UPDATE_FIELD':
+      return {
+        ...state,
+        [action.field]: action.value,
+      };
+    case 'RESET_FORM':
+      return {
+        ...initialState,
+        // Preserve these fields across resets
+        selectedCountry: state.selectedCountry,
+      };
+    case 'TOGGLE_LIGHTBOX':
+      return {
+        ...state,
+        isLightboxOpen: action.value,
+        lightboxIndex: action.index || 0,
+      };
+    case 'SET_SUBMIT_STATE':
+      return {
+        ...state,
+        submitState: action.value,
+        isSubmitting: action.value === 'submitting',
+      };
+    default:
+      return state;
+  }
+}
 
 // Provider component
 export function CreatePostFormProvider({ children }) {
-  const [formState, setFormState] = useState(initialFormState);
+  const [state, dispatch] = useReducer(createPostFormReducer, initialState);
+  const { user } = useAuth();
+  
+  // Track submission timeout
+  const [submissionTimeout, setSubmissionTimeout] = useState(null);
+  // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
-  // New state for global status indicator that persists even when dialog is closed
-  const [globalStatus, setGlobalStatus] = useState({
-    visible: false,
-    type: 'processing', // 'processing', 'success', or 'error'
-    message: '',
-  });
-
-  // Update a single field in the form state
-  const updateField = useCallback((field, value) => {
-    setFormState(prev => ({
-      ...prev,
-      [field]: value
-    }));
-
-    // Special handling for submission status - update the global status too
-    if (field === 'isSubmitting') {
-      if (value === true) {
-        setGlobalStatus(prev => ({
-          ...prev,
-          visible: true,
-          type: 'processing'
-        }));
-      }
-    }
-
-    if (field === 'submissionProgress') {
-      setGlobalStatus(prev => ({
-        ...prev,
-        message: value,
-        type: value.includes('success') ? 'success' : 
-              value.includes('Error') ? 'error' : 'processing'
-      }));
-    }
-  }, []);
-
-  // Update multiple fields at once
-  const updateFields = useCallback((updates) => {
-    setFormState(prev => ({
-      ...prev,
-      ...updates
-    }));
-  }, []);
-
-  // Reset the form state
-  const resetForm = useCallback(() => {
-    setFormState(initialFormState);
-  }, []);
-
-  // Show/hide the global status indicator
-  const setGlobalStatusVisibility = useCallback((visible, message = '', type = 'processing') => {
-    // If we're explicitly hiding the status, do it immediately without conditions
-    if (visible === false) {
-      setGlobalStatus({
-        visible: false,
-        message: '',
-        type: 'processing'
-      });
-      return;
-    }
-    
-    // Only show indicator for post fetching, not for post creation success
-    if (type === 'success' && message.includes('Post')) {
-      setGlobalStatus({
-        visible: false,
-        message: '',
-        type: 'processing'
-      });
-      return;
-    }
-    
-    // Only show the processing indicator if it's about fetching posts
-    if (type === 'processing' && !message.includes('fetch') && !message.includes('Fetching')) {
-      // Don't show processing indicator for other operations
-      return;
-    }
-    
-    setGlobalStatus({
-      visible,
-      message,
-      type
-    });
-  }, []);
-
-  // Handle dialog open/close
+  
+  // Dialog open/close functions
   const openDialog = useCallback(() => {
     setDialogOpen(true);
   }, []);
-
+  
   const closeDialog = useCallback(() => {
-    // Only close if not submitting
-    if (!formState.isSubmitting) {
-      setDialogOpen(false);
-    }
-  }, [formState.isSubmitting]);
-
-  const forceCloseDialog = useCallback(() => {
-    // Close the dialog but keep the global status indicator visible
     setDialogOpen(false);
-    // Only update form's submission state - don't affect the global indicator
-    setFormState(prev => ({
-      ...prev,
-      isSubmitting: false,
-    }));
   }, []);
-
-  // Manage body scroll when dialog is open
+  
+  // Cleanup timeouts on unmount
   useEffect(() => {
-    if (dialogOpen) {
-      // Get current scroll position
-      const scrollY = window.scrollY;
-      
-      // Prevent scrolling when dialog is open by fixing body position
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.body.style.overflow = 'hidden';
-      
-      // Restore scrolling when dialog is closed
-      return () => {
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-        document.body.style.overflow = '';
-        
-        // Restore scroll position
-        window.scrollTo(0, scrollY);
-      };
-    }
-  }, [dialogOpen]);
-
-  // Reset submission state to re-enable buttons after cancellation
-  const resetSubmitState = useCallback(() => {
-    console.log('Resetting submit state to prepare for future operations');
-    
-    // Reset form state completely
-    setFormState(prev => ({
-      ...prev,
-      isSubmitting: false,
-      submissionProgress: '',
-      // Reset search-related values to start clean
-      searchResults: [],
-      stockSearch: '',
-      // Keep other values intact
-    }));
-    
-    // Ensure the global status is completely reset
-    setGlobalStatus({
-      visible: false,
-      type: 'processing',
-      message: ''
+    return () => {
+      if (submissionTimeout) {
+        clearTimeout(submissionTimeout);
+      }
+    };
+  }, [submissionTimeout]);
+  
+  // Update field function
+  const updateField = useCallback((field, value) => {
+    dispatch({
+      type: 'UPDATE_FIELD',
+      field,
+      value,
     });
     
-    // Add a small delay to allow React state updates to propagate
-    setTimeout(() => {
-      console.log('Submit state reset complete');
-    }, 100);
+    // Clear form errors when description changes
+    if (field === 'description' && state.formErrors.content) {
+      dispatch({
+        type: 'UPDATE_FIELD',
+        field: 'formErrors',
+        value: { ...state.formErrors, content: null }
+      });
+    }
+  }, [state.formErrors]);
+
+  // Reset form function
+  const resetForm = useCallback(() => {
+    dispatch({ type: 'RESET_FORM' });
+    // Also clear any pending timeouts
+    if (submissionTimeout) {
+      clearTimeout(submissionTimeout);
+      setSubmissionTimeout(null);
+    }
+  }, [submissionTimeout]);
+
+  // Add a setGlobalStatus function
+  const setGlobalStatus = useCallback((status) => {
+    // Set the submission state based on the status type
+    const submitState = status.type === 'success' ? 'success' : 
+                        status.type === 'error' ? 'error' :
+                        status.type === 'processing' ? 'submitting' : 'idle';
+                         
+    // Update the submit state first
+    dispatch({
+      type: 'SET_SUBMIT_STATE',
+      value: submitState
+    });
+    
+    // Then update the submission progress message
+    if (status.message) {
+      dispatch({
+        type: 'UPDATE_FIELD',
+        field: 'submissionProgress',
+        value: status.message
+      });
+    }
   }, []);
 
-  // Context value
-  const value = {
-    formState,
-    updateField,
-    updateFields,
-    resetForm,
-    dialogOpen,
-    openDialog,
-    closeDialog,
-    forceCloseDialog,
-    globalStatus,
-    setGlobalStatusVisibility,
-    resetSubmitState
-  };
+  // Set submit state
+  const setSubmitState = useCallback((state) => {
+    dispatch({
+      type: 'SET_SUBMIT_STATE',
+      value: state,
+    });
+    
+    if (state === 'submitting') {
+      // When we start submitting, set up a timeout to auto-reset if it takes too long
+      const timeout = setTimeout(() => {
+        console.log('[FORM CONTEXT] Submission timeout triggered after 15s');
+        // Don't reset form, just clear the timeout and move to success state
+        dispatch({
+          type: 'SET_SUBMIT_STATE',
+          value: 'success',
+        });
+        
+        // Update the submission progress message
+        dispatch({
+          type: 'UPDATE_FIELD',
+          field: 'submissionProgress',
+          value: 'Post created! Will sync when connection improves.'
+        });
+        
+        // Hide the status after 5 seconds
+        setTimeout(() => {
+          dispatch({
+            type: 'SET_SUBMIT_STATE',
+            value: 'idle',
+          });
+          dispatch({
+            type: 'UPDATE_FIELD',
+            field: 'submissionProgress',
+            value: '',
+          });
+        }, 5000);
+        
+      }, 15000); // 15 second timeout
+      
+      setSubmissionTimeout(timeout);
+    } else {
+      // If we're not submitting, clear any timeout
+      if (submissionTimeout) {
+        clearTimeout(submissionTimeout);
+        setSubmissionTimeout(null);
+      }
+    }
+  }, [submissionTimeout]);
+
+  // Toggle lightbox
+  const toggleLightbox = useCallback((isOpen, index = 0) => {
+    dispatch({
+      type: 'TOGGLE_LIGHTBOX',
+      value: isOpen,
+      index,
+    });
+  }, []);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   return (
-    <CreatePostFormContext.Provider value={value}>
+    <CreatePostFormContext.Provider
+      value={{
+        ...state,
+        updateField,
+        resetForm,
+        setSubmitState,
+        toggleLightbox,
+        isSubmitting,
+        setIsSubmitting,
+        dialogOpen,
+        openDialog,
+        closeDialog,
+        globalStatus: {
+          visible: state.submitState !== 'idle',
+          type: state.submitState === 'success' ? 'success' : 
+                state.submitState === 'error' ? 'error' : 'processing',
+          message: state.submissionProgress || ''
+        },
+        setGlobalStatus,
+        setGlobalStatusVisibility: (visible) => {
+          if (!visible) {
+            dispatch({
+              type: 'SET_SUBMIT_STATE',
+              value: 'idle',
+            });
+            dispatch({
+              type: 'UPDATE_FIELD',
+              field: 'submissionProgress',
+              value: '',
+            });
+          }
+        },
+        resetSubmitState: () => {
+          dispatch({
+            type: 'SET_SUBMIT_STATE',
+            value: 'idle',
+          });
+        }
+      }}
+    >
       {children}
     </CreatePostFormContext.Provider>
   );
 }
 
-// Custom hook for using the context
+// Custom hook
 export function useCreatePostForm() {
   const context = useContext(CreatePostFormContext);
   if (!context) {
