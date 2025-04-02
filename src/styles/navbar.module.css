@@ -40,7 +40,6 @@
 
 .logoImage {
   transition: transform 0.3s ease;
-  filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.3));
 }
 
 .logo:hover .logoImage {
@@ -54,13 +53,9 @@
   display: inline-block;
 }
 
-/* Add gold gradient for the Fire part in dark mode */
+/* Remove gold gradient and update to use primary color */
 :global(.dark) .logoText :global(.text-gradient) {
-  background: linear-gradient(to right, hsl(45, 100%, 60%), hsl(45, 80%, 70%));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+  color: hsl(var(--primary));
 }
 
 /* Placeholder styles */
@@ -131,10 +126,10 @@
   transition: all 0.3s ease;
 }
 
-/* Gold menu icon in dark mode */
+/* Update menu icon colors */
 :global(.dark) .menuIcon span {
-  background-color: hsl(45, 100%, 60%);
-  box-shadow: 0 0 3px rgba(255, 215, 0, 0.3);
+  background-color: hsl(var(--foreground));
+  box-shadow: none;
 }
 
 .menuIcon span:nth-child(1) {
@@ -282,19 +277,67 @@
 }
 
 .themeToggle {
-  background: transparent;
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: hsl(var(--background) / 0.5);
+  backdrop-filter: blur(4px);
   border: none;
   cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: hsl(var(--foreground));
+  transition: all 0.3s ease-in-out;
 }
 
 .themeToggle:hover {
-  background-color: hsla(var(--primary), 0.1);
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+  transform: scale(1.1);
+}
+
+.dark .themeToggle {
+  box-shadow: 0 0 0 2px hsl(var(--border));
+}
+
+.dark .themeToggle:hover {
+  box-shadow: 0 0 0 2px hsl(var(--primary)),
+              0 4px 8px hsl(var(--primary) / 0.25);
+}
+
+.light .themeToggle {
+  box-shadow: 0 0 0 2px hsl(var(--border));
+}
+
+.light .themeToggle:hover {
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.5);
+}
+
+.sunIcon,
+.moonIcon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 1.3rem;
+  height: 1.3rem;
+  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.sunIcon {
+  color: hsl(var(--foreground));
+}
+
+.moonIcon {
+  color: hsl(var(--foreground));
+}
+
+.iconHidden {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0) rotate(-90deg);
+}
+
+.iconVisible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1) rotate(0);
 }
 
 .userMenu {
@@ -310,14 +353,17 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem;
+  border-radius: var(--radius);
   text-decoration: none;
   color: hsl(var(--foreground));
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
+  background-color: hsla(var(--primary), 0.1);
 }
 
 .profileLink:hover {
-  background-color: hsla(var(--primary), 0.1);
+  background-color: hsla(var(--primary), 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .avatar {
@@ -344,39 +390,141 @@
 
 .profileText {
   font-weight: 500;
+  display: none; /* Hidden by default on mobile */
+}
+
+/* Show the profile text on larger screens */
+@media (min-width: 768px) {
+  .profileText {
+    display: inline-block;
+  }
+  
+  .profileLink {
+    min-width: 120px;
+    justify-content: center;
+  }
 }
 
 .loginButton,
 .logoutButton {
-  padding: 0.5rem 1.5rem;
-  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
   font-weight: 500;
+  cursor: pointer;
   transition: all 0.2s ease;
-  text-align: center;
-  width: 100%;
-  max-width: 200px;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .loginButton {
   background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
-  border: none;
 }
 
 .loginButton:hover {
-  background-color: hsl(var(--primary-highlight));
+  background-color: hsl(var(--primary) / 0.9);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px hsla(var(--foreground), 0.1);
 }
 
 .logoutButton {
-  background-color: transparent;
-  border: 1px solid hsl(var(--border));
-  color: hsl(var(--foreground));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: hsl(var(--destructive));
+  color: white;
+  border: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .logoutButton:hover {
-  background-color: hsla(var(--destructive), 0.1);
-  border-color: hsl(var(--destructive));
-  color: hsl(var(--destructive));
+  background-color: hsl(var(--destructive) / 0.9);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.logoutButton:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.logoutButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.signInButton {
+  padding: 0.6rem 1.2rem;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-radius: var(--radius);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  gap: 0.5rem;
+  box-shadow: 0 0 10px hsla(var(--primary), 0.2);
+}
+
+.signInButton:hover {
+  background-color: hsl(var(--primary) / 0.9);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px hsla(var(--primary), 0.25);
+}
+
+.signInButton:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px hsla(var(--primary), 0.2);
+}
+
+.signInButton::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsla(var(--primary-foreground), 0.2),
+    transparent
+  );
+  transition: left 0.8s ease;
+  z-index: -1;
+}
+
+.signInButton:hover::before {
+  left: 100%;
+}
+
+.signInButton::after {
+  content: '→';
+  display: inline-block;
+  transition: transform 0.2s ease;
+  font-size: 1.1em;
+}
+
+.signInButton:hover::after {
+  transform: translateX(3px);
 }
 
 @media (min-width: 768px) {
@@ -467,8 +615,8 @@
   }
   
   .dark .navList {
-    border-color: hsl(45, 30%, 30%);
-    background-color: hsl(0, 0%, 12%);
+    border-color: hsl(var(--border));
+    background-color: hsl(var(--card));
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   }
   
@@ -479,7 +627,7 @@
   }
   
   .dark .navItem {
-    border-color: hsl(45, 30%, 30%, 0.5);
+    border-color: hsl(var(--border) / 0.5);
   }
   
   .navItem:last-child {
@@ -522,8 +670,8 @@
   }
   
   .dark .userMenu {
-    border-color: hsl(45, 30%, 30%);
-    background-color: hsl(0, 0%, 12%);
+    border-color: hsl(var(--border));
+    background-color: hsl(var(--card));
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   }
   
@@ -531,5 +679,89 @@
   .logoutButton {
     height: 40px;
     padding: 0.5rem 1rem;
+  }
+}
+
+.switchButton:hover {
+  color: hsl(var(--primary) / 0.8);
+  text-decoration: none;
+}
+
+/* Dark mode gold accents for navbar */
+@media (prefers-color-scheme: dark) {
+  .header {
+    background-color: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    border-bottom-color: var(--gold-border);
+    box-shadow: 0 4px 20px var(--gold-shadow);
+  }
+  
+  .logo .logoText {
+    color: var(--gold-primary);
+  }
+  
+  .logo:hover .logoImage {
+    filter: drop-shadow(0 0 5px var(--gold-shadow));
+  }
+  
+  .menuIcon span {
+    background-color: var(--gold-primary);
+  }
+  
+  .navLink {
+    color: var(--gold-muted) !important;
+  }
+  
+  .navLink:hover {
+    color: var(--gold-primary) !important;
+    text-shadow: 0 0 5px var(--gold-shadow);
+  }
+  
+  .navLink.active {
+    color: var(--gold-primary) !important;
+  }
+  
+  .navLink.active::after {
+    background-color: var(--gold-primary);
+    box-shadow: 0 0 5px var(--gold-shadow);
+  }
+  
+  .userMenu .avatar {
+    border: 2px solid var(--gold-border);
+    box-shadow: 0 0 10px var(--gold-shadow);
+  }
+  
+  .userMenu .avatar:hover {
+    border-color: var(--gold-primary);
+    box-shadow: 0 0 15px var(--gold-shadow);
+  }
+  
+  .profileText {
+    color: var(--gold-muted);
+  }
+  
+  .signInButton {
+    background: linear-gradient(to bottom, var(--gold-gradient-start), var(--gold-gradient-end));
+    color: #2d3748;
+    border: none;
+    box-shadow: 0 2px 10px var(--gold-shadow);
+  }
+  
+  .signInButton:hover {
+    background: linear-gradient(to bottom, var(--gold-highlight), var(--gold-secondary));
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px var(--gold-shadow);
+  }
+  
+  .logoutButton {
+    background: linear-gradient(to right, #d35400, #e74c3c);
+    color: white;
+    border: 1px solid var(--gold-border);
+    box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
+  }
+  
+  .logoutButton:hover {
+    background: linear-gradient(to right, #e74c3c, #c0392b);
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
   }
 }

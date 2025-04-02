@@ -1,0 +1,130 @@
+/* Mode Toggle Styles */
+.theme-toggle {
+  background: transparent;
+  border: none;
+  color: var(--foreground);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.theme-toggle:hover {
+  background-color: hsla(var(--foreground), 0.1);
+}
+
+.sun-icon,
+.moon-icon {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.icon-visible {
+  transform: translateY(0) rotate(0);
+  opacity: 1;
+}
+
+.icon-hidden {
+  transform: translateY(100%) rotate(90deg);
+  opacity: 0;
+}
+
+/* Gold styling for dark mode */
+.dark .theme-toggle {
+  color: var(--gold-primary);
+  box-shadow: none;
+}
+
+.dark .theme-toggle:hover {
+  background-color: rgba(245, 215, 110, 0.1);
+  box-shadow: 0 0 10px var(--gold-shadow);
+}
+
+.dark .moon-icon {
+  color: var(--gold-primary);
+  filter: drop-shadow(0 0 5px var(--gold-shadow));
+}
+
+/* Gold pulse animation for toggle in dark mode */
+.dark .theme-toggle::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  animation: goldPulseToggle 3s infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes goldPulseToggle {
+  0% {
+    border-color: rgba(245, 215, 110, 0);
+    box-shadow: 0 0 0 0 rgba(245, 215, 110, 0);
+  }
+  50% {
+    border-color: rgba(245, 215, 110, 0.5);
+    box-shadow: 0 0 10px 2px rgba(245, 215, 110, 0.3);
+  }
+  100% {
+    border-color: rgba(245, 215, 110, 0);
+    box-shadow: 0 0 0 0 rgba(245, 215, 110, 0);
+  }
+}
+
+/* Enhanced gold toggle styling */
+.dark .theme-toggle {
+  border: 1px solid var(--gold-border);
+  background: rgba(0, 0, 0, 0.4);
+  transition: all 0.3s ease;
+}
+
+.dark .theme-toggle:hover {
+  border-color: var(--gold-primary);
+  background: linear-gradient(145deg, rgba(0, 0, 0, 0.6), rgba(25, 25, 25, 0.4));
+  box-shadow: 
+    0 0 10px var(--gold-shadow), 
+    inset 0 0 5px var(--gold-shadow);
+  transform: translateY(-1px);
+}
+
+.dark .theme-toggle:active {
+  transform: translateY(1px);
+  box-shadow: 
+    0 0 5px var(--gold-shadow), 
+    inset 0 0 2px var(--gold-shadow);
+}
+
+.dark .moon-icon {
+  fill: var(--gold-primary);
+  stroke: var(--gold-primary);
+  filter: drop-shadow(0 0 3px var(--gold-shadow));
+  animation: moonGlow 4s infinite alternate;
+}
+
+@keyframes moonGlow {
+  0% {
+    filter: drop-shadow(0 0 2px var(--gold-shadow));
+  }
+  100% {
+    filter: drop-shadow(0 0 5px var(--gold-shadow));
+  }
+}
+
+/* Gold rays around the sun icon when transitioning */
+.dark .sun-icon.icon-hidden {
+  transform: translateY(100%) rotate(180deg);
+  opacity: 0;
+  filter: drop-shadow(0 0 8px var(--gold-primary));
+} 

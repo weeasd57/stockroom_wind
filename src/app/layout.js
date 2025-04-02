@@ -1,23 +1,18 @@
 import { Inter, Roboto_Mono } from 'next/font/google';
 import '@/styles/globals.css';
-import { ThemeProvider } from "@/components/theme-provider";
-import { AuthProvider } from "@/hooks/useAuth";
-import { ProfileProvider } from '@/contexts/ProfileContext';
-import { SupabaseProvider } from '@/hooks/useSupabase';
-import { ClientSideLayout } from "@/components/ClientSideLayout";
-import ClientImagePreloader from '@/components/ClientImagePreloader';
-import { CreatePostFormProvider } from '@/contexts/CreatePostFormContext';
-import PostsStoreUpdater from '@/components/PostsStoreUpdater';
+import { ThemeProvider } from "@/providers/theme-provider";
+import { SupabaseProvider, UserProvider, CreatePostFormProvider } from '@/providers';
+import { ProfileProvider } from '@/providers/ProfileProvider';
+import { AuthGuard } from '@/providers/AuthGuard';
+import { ClientSideLayout } from '@/providers/ClientSideLayout';
+import ClientImagePreloader from '@/providers/ClientImagePreloader';
 import Script from 'next/script';
-import { Suspense } from 'react';
 
-// Replace Geist with Inter as the primary font
 const inter = Inter({
   subsets: ['latin'],
   variable: "--font-geist-sans",
 });
 
-// Use Roboto Mono as a replacement for Geist Mono
 const robotoMono = Roboto_Mono({
   subsets: ['latin'],
   variable: "--font-geist-mono",
@@ -30,16 +25,16 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`scroll-smooth dark ${inter.variable} ${robotoMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`scroll-smooth ${inter.variable} ${robotoMono.variable}`} suppressHydrationWarning>
       <head>
-        {/* Add metadata if needed */}
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="preload" as="image" href="/logo.png" />
+        <link rel="preload" as="image" href="/profile-bg.jpg" />
+        <link rel="preload" as="image" href="/default-avatar.svg" />
       </head>
       <body>
-        {/* Initialize the global abort function */}
         <Script id="global-abort-init" strategy="beforeInteractive">
           {`
-            // Initialize the global abort function to ensure it's always available
             window.abortPostsFetch = function() {
               console.log('Initial abort function called - no active fetch to cancel');
               return Promise.resolve();
@@ -47,21 +42,17 @@ export default function RootLayout({ children }) {
           `}
         </Script>
         
-        {/* Add console suppression script */}
         <Script id="console-suppressor" strategy="beforeInteractive">
           {`
             if (process.env.NODE_ENV === 'production') {
-              // Keep error and warn for debugging
               const originalLog = console.log;
               const originalInfo = console.info;
               const originalDebug = console.debug;
               
-              // Replace with empty functions
               console.log = function() {};
               console.info = function() {};
               console.debug = function() {};
               
-              // Add a way to restore if needed
               window._restoreConsole = function() {
                 console.log = originalLog;
                 console.info = originalInfo;
@@ -70,22 +61,53 @@ export default function RootLayout({ children }) {
             }
           `}
         </Script>
+        <Script id="image-cache-manager" strategy="beforeInteractive">
+          {`
+            window.imageCacheManager = {
+              cache: {},
+              preload: function(urls) {
+                if (!Array.isArray(urls)) urls = [urls];
+                urls.forEach(url => {
+                  if (!url || this.cache[url]) return;
+                  
+                  const img = new Image();
+                  img.onload = () => {
+                    this.cache[url] = true;
+                    console.log('Image preloaded:', url);
+                  };
+                  img.src = url;
+                });
+              },
+              getAvatarUrl: function(userId) {
+                const key = 'avatar_' + userId;
+                return localStorage.getItem(key);
+              },
+              setAvatarUrl: function(userId, url) {
+                if (!userId || !url) return;
+                const key = 'avatar_' + userId;
+                localStorage.setItem(key, url);
+                this.preload(url);
+              }
+            };
+          `}
+        </Script>
         <SupabaseProvider>
-          <AuthProvider>
+          <UserProvider>
             <ProfileProvider>
-              <ThemeProvider defaultTheme="dark" attribute="class">
+              <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={true}>
                 <CreatePostFormProvider>
                   <ClientSideLayout>
-                    <ClientImagePreloader />
-                    <div className="app-wrapper">
-                      {children}
-                    </div>
+                    <AuthGuard>
+                      <ClientImagePreloader />
+                      <div className="app-wrapper">
+                        {children}
+                      </div>
+                    </AuthGuard>
                   </ClientSideLayout>
-                  <PostsStoreUpdater />
                 </CreatePostFormProvider>
               </ThemeProvider>
             </ProfileProvider>
-          </AuthProvider>
+          </UserProvider>
         </SupabaseProvider>
       </body>
     </html>

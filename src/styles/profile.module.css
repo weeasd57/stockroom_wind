@@ -915,30 +915,7 @@
   cursor: not-allowed;
 }
 
-.createPostButton {
-  padding: 0.75rem 2rem;
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  border-radius: 8px;
-  font-size: 1.1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.75rem;
-  border: none;
-  text-decoration: none;
-}
-
-.createPostButton:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 25px hsla(var(--primary)/0.25);
-}
-
-.createPostButton:active {
-  transform: translateY(-1px);
-}
+/* Removed createPostButton styles as they are now in a dedicated CSS module */
 
 .emptyHomeContainer {
   display: flex;
@@ -984,9 +961,9 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  min-height: 70vh;
   padding: 2rem;
-  background-color: hsl(var(--background));
+  min-height: 60vh;
+  gap: 1.5rem;
 }
 
 .notAuthenticated h1 {
@@ -1015,29 +992,72 @@
   color: hsla(var(--primary)/0.8);
 }
 
-.loginButton {
-  padding: 0.75rem 2rem;
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground)) !important;
+.debugInfo {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 1rem;
   border-radius: 8px;
-  font-size: 1.1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: inline-flex;
-  align-items: center;
-  text-decoration: none !important;
-  border: none;
-  box-shadow: 0 4px 12px hsla(var(--primary)/0.25);
+  text-align: left;
+  margin: 1rem 0;
+  max-width: 400px;
+  width: 100%;
+}
+
+.debugInfo h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  opacity: 0.8;
+}
+
+.debugInfo ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.debugInfo li {
+  padding: 0.25rem 0;
+  font-family: monospace;
+  font-size: 0.9rem;
+}
+
+.authButtons {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.loginButton {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  background-color: hsl(var(--primary));
+  color: white;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
 }
 
 .loginButton:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px hsla(var(--primary)/0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.loginButton:active {
-  transform: translateY(-1px);
+.reloadButton {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  background-color: transparent;
+  color: hsl(var(--primary));
+  border: 1px solid hsl(var(--primary));
+  border-radius: 0.5rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.reloadButton:hover {
+  background-color: hsla(var(--primary), 0.1);
 }
 
 /* New post card styles added for enhanced design */

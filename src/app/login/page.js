@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/utils/supabase';
 import styles from '@/styles/login.module.css';
 
@@ -14,8 +13,16 @@ export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, register } = useAuth();
+  const [visible, setVisible] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    // Add fade-in effect when component mounts
+    const timer = setTimeout(() => {
+      setVisible(true);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,17 +31,37 @@ export default function Login() {
 
     try {
       if (isSignUp) {
-        const { success, error } = await register(email, password);
-        if (!success) throw new Error(error);
-        router.push('/profile');
+        // Use Supabase signUp function directly
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email, 
+          password,
+          options: {
+            data: {
+              username: email.split('@')[0]
+            }
+          }
+        });
+        
+        if (signUpError) throw signUpError;
+        
+        // Fade out before navigation
+        setVisible(false);
+        setTimeout(() => router.push('/profile'), 300);
       } else {
-        const { success, error } = await login(email, password);
-        if (!success) throw new Error(error);
-        router.push('/');
+        // Use Supabase signIn function directly
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+        
+        if (signInError) throw signInError;
+        
+        // Fade out before navigation
+        setVisible(false);
+        setTimeout(() => router.push('/'), 300);
       }
     } catch (err) {
-      setError(err.message);
-    } finally {
+      setError(err.message || 'Authentication failed');
       setLoading(false);
     }
   };
@@ -57,6 +84,11 @@ export default function Login() {
       setError(err.message || 'Failed to sign in with Google');
       setLoading(false);
     }
+  };
+
+  const navigateToLanding = () => {
+    setVisible(false);
+    setTimeout(() => router.push('/landing'), 300);
   };
 
   return (

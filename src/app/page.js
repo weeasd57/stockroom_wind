@@ -1,35 +1,22 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { useRouter } from 'next/navigation';
-import { useAuth } from "@/hooks/useAuth";
+import { useState, useEffect } from 'react';
 
-export default function HomePage() {
-  const router = useRouter();
-  const { user, loading } = useAuth();
+export default function RootPage() {
   const [isVisible, setIsVisible] = useState(false);
-  const [errorDetails, setErrorDetails] = useState(null);
 
-  // Check authentication and redirect if needed
-  useEffect(() => {
-    if (loading) return;
-    
-    if (user) {
-      router.push('/home');
-    } else {
-      router.push('/landing');
-    }
-  }, [user, loading, router]);
-
-  // Animation effect
+  // Animation effect only
   useEffect(() => {
     setIsVisible(true);
   }, []);
 
-  // Show loading spinner while checking auth and redirecting
+  // Just show a loading spinner - AuthGuard will handle redirection
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background">
-      <div className="animate-spin h-10 w-10 border-t-2 border-b-2 border-primary rounded-full"></div>
+    <div className="auth-loading-container">
+      <div className={isVisible ? 'auth-fade-in' : ''}>
+        <div className="auth-spinner large"></div>
+        <p className="auth-loading-text">Preparing your experience...</p>
+      </div>
     </div>
   );
 }

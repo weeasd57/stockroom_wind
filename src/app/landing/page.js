@@ -2,25 +2,38 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import styles from '@/styles/landing.module.css';
 
 export default function LandingPage() {
   const [visible, setVisible] = useState(false);
   const [hoverButton, setHoverButton] = useState(null);
-  
+  const router = useRouter();
+
+  const login = () => {
+    // Apply fade-out effect before navigation
+    setVisible(false);
+    setTimeout(() => {
+      router.push('/login');
+    }, 300);
+  };
+
   const heroRef = useRef(null);
   const featuresRef = useRef(null);
   const statsRef = useRef(null);
 
   useEffect(() => {
-    setVisible(true);
+    // Short delay to ensure smooth animation
+    const timer = setTimeout(() => {
+      setVisible(true);
+    }, 100);
     
     // Setup intersection observer for animations
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
-            entry.target.classList.add(styles.animate);
+            entry.target.classList.add(styles.fadeIn);
           }
         });
       },
@@ -34,6 +47,7 @@ export default function LandingPage() {
     });
     
     return () => {
+      clearTimeout(timer);
       sections.forEach(section => {
         if (section) observer.unobserve(section);
       });
@@ -69,45 +83,45 @@ export default function LandingPage() {
   ];
 
   return (
-    <div className={`${styles.landingPage} no-scroll`} style={{ overflow: 'visible' }}>
-     
-      
-      <section className={`${styles.heroSection} ${styles.fadeSection}`} ref={heroRef}>
+    <div className={`${styles.landingPage} ${visible ? 'auth-fade-in' : 'auth-fade-out'}`}>
+      <section className={styles.heroSection} ref={heroRef}>
         <div className={styles.heroContent}>
-          <h1 className={`${styles.heroTitle} ${styles.slideInLeft}`}>
+          <h1 className={styles.heroTitle}>
             Real-time Stock Analysis and Portfolio Management
           </h1>
-          <p className={`${styles.heroSubtitle} ${styles.slideInRight}`}>
+          <p className={styles.heroSubtitle}>
             Powerful tools for investors to track, analyze, and optimize their portfolios with market-beating strategies.
           </p>
           <div className={styles.heroCta}>
             <button 
               className={`${styles.primaryButton} ${hoverButton === 'signup' ? styles.pulse : ''}`}
               onMouseEnter={() => handleButtonHover('signup')}
+              onClick={login}
             >
               Sign Up
             </button>
           </div>
         </div>
-        <div className={`${styles.heroImage} ${styles.slideInUp}`}>
-          {/* Hero Image */}
-          <div className={styles.mockup}>
-            <Image 
-              src="/favicon.ico" 
-              alt="FireStocks Logo" 
-              width={128} 
-              height={128}
-              className={styles.faviconImage}
-            />
-          </div>
+        
+        <div className={styles.heroImageContainer}>
+          <div className={styles.heroShape}></div>
+          <div className={styles.heroShape}></div>
+          <Image 
+            src="/profile-bg.jpg" 
+            alt="FireStocks Trading Platform" 
+            width={500} 
+            height={300}
+            className={styles.heroImage}
+            priority
+          />
         </div>
       </section>
 
-      <section className={`${styles.featuresSection} ${styles.fadeSection}`} ref={featuresRef}>
+      <section className={styles.featuresSection} ref={featuresRef}>
         <h2 className={styles.sectionTitle}>Platform Features</h2>
         <div className={styles.featuresGrid}>
           {features.map((feature, index) => (
-            <div key={index} className={`${styles.featureCard} ${styles.fadeIn}`}>
+            <div key={index} className={styles.featureCard}>
               <div className={styles.featureIcon}>
                 <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <rect width="40" height="40" rx="8" fill="currentColor" fillOpacity="0.1" />
@@ -121,7 +135,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className={`${styles.statsSection} ${styles.fadeSection}`} ref={statsRef}>
+      <section className={styles.statsSection} ref={statsRef}>
         <div className={styles.statsContainer}>
           <div className={`${styles.statCard} ${styles.slideInLeft}`}>
             <h3>50K+</h3>
@@ -139,4 +153,4 @@ export default function LandingPage() {
       </section>
     </div>
   );
-} 
+}

@@ -1,19 +1,17 @@
-"use client";
+'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSupabase } from '@/providers/SupabaseProvider';
+import { useProfile } from '@/providers/ProfileProvider';
 import Link from 'next/link';
-import { useAuth } from '@/hooks/useAuth';
-import { useProfile } from '@/contexts/ProfileContext';
-import { 
-  updateProfile,
-  uploadImage
-} from '@/utils/supabase';
 import styles from '@/styles/profile.module.css';
+import editStyles from '@/styles/editProfile.module.css';
 import useProfileStore from '@/store/profileStore';
-import CreatePostButton from '@/components/posts/CreatePostButton';
+import { CreatePostButton } from '@/components/posts/CreatePostButton';
+import { uploadImage } from '@/utils/supabase';
 
 export default function Profile() {
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useSupabase();
   const { 
     profile, 
     loading: profileLoading,
@@ -21,6 +19,20 @@ export default function Profile() {
     backgroundUrl: contextBackgroundUrl,
     updateProfile
   } = useProfile();
+
+  // Debug authentication on mount
+  useEffect(() => {
+    console.log("[PROFILE] Authentication Status:", { 
+      isAuthenticated, 
+      user: !!user, 
+      userId: user?.id,
+      authLoading,
+      profileLoading
+    });
+    
+    // Debug the profile data
+    console.log("[PROFILE] Profile data:", profile);
+  }, [isAuthenticated, user, authLoading, profileLoading, profile]);
 
   // Profile store state and actions
   const {
@@ -138,19 +150,38 @@ export default function Profile() {
   // Add this effect to load images when profile or context data updates
   useEffect(() => {
     if (user && isAuthenticated) {
-      // Set avatar URL from context when it becomes available
-      if (contextAvatarUrl && contextAvatarUrl !== avatarUrl) {
-        console.log('Updating avatar from context:', contextAvatarUrl);
-        setAvatarUrl(contextAvatarUrl);
-      }
+      const loadImages = async () => {
+        try {
+          // Only update if context URLs exist and are different from current URLs
+          const shouldUpdateAvatar = contextAvatarUrl && 
+            (!avatarUrl || !avatarUrl.includes(contextAvatarUrl.split('?')[0]));
+            
+          const shouldUpdateBackground = contextBackgroundUrl && 
+            (!backgroundUrl || !backgroundUrl.includes(contextBackgroundUrl.split('?')[0]));
+          
+          if (shouldUpdateAvatar || shouldUpdateBackground) {
+            console.log('Loading profile images from context - detected changes');
+            
+            if (shouldUpdateAvatar) {
+              console.log('Setting avatar URL:', contextAvatarUrl);
+              setAvatarUrl(contextAvatarUrl);
+            }
+            
+            if (shouldUpdateBackground) {
+              console.log('Setting background URL:', contextBackgroundUrl);
+              setBackgroundUrl(contextBackgroundUrl);
+            }
+          } else {
+            console.log('Skipping profile image update - no changes detected');
+          }
+        } catch (error) {
+          console.error('Error setting profile images:', error);
+        }
+      };
       
-      // Set background URL from context when it becomes available
-      if (contextBackgroundUrl && contextBackgroundUrl !== backgroundUrl) {
-        console.log('Updating background from context:', contextBackgroundUrl);
-        setBackgroundUrl(contextBackgroundUrl);
-      }
+      loadImages();
     }
-  }, [user, isAuthenticated, contextAvatarUrl, contextBackgroundUrl, avatarUrl, backgroundUrl]);
+  }, [user, isAuthenticated, contextAvatarUrl, contextBackgroundUrl]);
 
   // Memoized handlers
   const handleTabChange = useCallback((tab) => {
@@ -279,9 +310,32 @@ export default function Profile() {
       <div className={styles.notAuthenticated}>
         <h1>Not Authenticated</h1>
         <p>You need to be logged in to view and manage your profile</p>
-        <Link href="/login" className={styles.loginButton}>
-          Log In to Continue
-        </Link>
+        
+        {/* Debuging info in development */}
+        {process.env.NODE_ENV !== 'production' && (
+          <div className={styles.debugInfo}>
+            <h3>Debug Information</h3>
+            <ul>
+              <li>Authentication State: {String(isAuthenticated)}</li>
+              <li>User Present: {String(!!user)}</li>
+              <li>Auth Loading: {String(authLoading)}</li>
+              <li>Profile Loading: {String(profileLoading)}</li>
+              <li>Session Time: {new Date().toISOString()}</li>
+            </ul>
+          </div>
+        )}
+        
+        <div className={styles.authButtons}>
+          <Link href="/login" className={styles.loginButton}>
+            Log In to Continue
+          </Link>
+          <button 
+            onClick={() => window.location.reload()} 
+            className={styles.reloadButton}
+          >
+            Refresh Page
+          </button>
+        </div>
       </div>
     );
   }
@@ -295,13 +349,7 @@ export default function Profile() {
     fileInputRef.current.click();
   };
 
-  // Handle background image click to open file picker
-  const handleBackgroundClick = () => {
-    if (showEditModal) {
-      document.getElementById('background-file-input').click();
-    }
-  };
-
+ 
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -773,9 +821,9 @@ export default function Profile() {
   return (
     <div className={styles.profileContainer}>
       {isSaving && (
-        <div className={styles.savingOverlay}>
-          <div className={styles.savingProgress}>
-            <div className={styles.savingBar}></div>
+        <div className={editStyles.savingOverlay}>
+          <div className={editStyles.savingProgress}>
+            <div className={editStyles.savingBar}></div>
             <p>Saving changes...</p>
           </div>
         </div>
@@ -792,18 +840,13 @@ export default function Profile() {
       <div 
         className={styles.profileHeader}
         style={{ 
-          backgroundImage: `url(${backgroundPreview || backgroundUrl})`,
+          backgroundImage: `url(${backgroundPreview || backgroundUrl || '/profile-bg.jpg'})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           imageRendering: 'auto',
         }}
-        key={backgroundUrl} // Add a key attribute to force re-render when URL changes
+        key="profile-background" // Use stable key instead of dynamic timestamp
         aria-label="Profile background image"
-        onError={(e) => {
-          console.error('Error loading background image');
-          // Directly set the background to the default image in case of error
-          e.target.style.backgroundImage = `url('/profile-bg.jpg')`;
-        }}
       >
         <div className={styles.profileHeaderOverlay}>
           <div className={styles.profileInfo}>
@@ -818,7 +861,7 @@ export default function Profile() {
                 src={avatarPreview || avatarUrl || '/default-avatar.svg'} 
                 alt={profile?.username || 'User'}
                 className={styles.avatar}
-                key={`profile-avatar-${Date.now()}`}
+                key="profile-avatar" // Use stable key instead of dynamic timestamp
                 onError={(e) => {
                   console.error('Error loading profile avatar image');
                   e.target.onerror = null;
@@ -888,7 +931,7 @@ export default function Profile() {
         <div className={styles.createPostContainer}>
           <h1 className={styles.emptyHomeTitle}>Create a New Post</h1>
           <p className={styles.emptyHomeText}>Share your stock analysis with the community</p>
-          <CreatePostButton className={styles.createPostButton} inDialog={true} />
+          <CreatePostButton inDialog={true} />
         </div>
       </div>
       {/* Content Tabs */}
@@ -1100,18 +1143,18 @@ export default function Profile() {
       
       {/* Edit Profile Modal */}
       {showEditModal && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
-            <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>Edit Profile</h2>
-              <button className={styles.closeButton} onClick={handleCloseModal} disabled={isSaving}>×</button>
+        <div className={editStyles.modalOverlay}>
+          <div className={editStyles.modalContent}>
+            <div className={editStyles.modalHeader}>
+              <h2 className={editStyles.modalTitle}>Edit Profile</h2>
+              <button className={editStyles.closeButton} onClick={handleCloseModal} disabled={isSaving}>×</button>
             </div>
             
             {saveError && (
-              <div className={styles.errorMessage}>
+              <div className={editStyles.errorMessage}>
                 {saveError}
                 <button 
-                  className={styles.dismissError} 
+                  className={editStyles.dismissError} 
                   onClick={() => setSaveError(null)}
                   aria-label="Dismiss error"
                 >
@@ -1120,8 +1163,8 @@ export default function Profile() {
               </div>
             )}
             
-            <form onSubmit={handleSaveProfile} className={styles.editForm}>
-              <div className={styles.formGroup}>
+            <form onSubmit={handleSaveProfile} className={editStyles.editForm}>
+              <div className={editStyles.formGroup}>
                 <label htmlFor="username">Username</label>
                 <input
                   type="text"
@@ -1135,7 +1178,7 @@ export default function Profile() {
                 />
               </div>
               
-              <div className={styles.formGroup}>
+              <div className={editStyles.formGroup}>
                 <label htmlFor="bio">Bio</label>
                 <textarea
                   id="bio"
@@ -1148,14 +1191,14 @@ export default function Profile() {
                 />
               </div>
               
-              <div className={styles.formGroup}>
+              <div className={editStyles.formGroup}>
                 <label>Profile Picture</label>
-                <div className={styles.avatarUpload}>
-                  <div className={styles.avatarPreviewContainer}>
+                <div className={editStyles.avatarUpload}>
+                  <div className={editStyles.avatarPreviewContainer}>
                     {avatarUploadProgress > 0 && (
-                      <div className={styles.imageLoadingOverlay}>
-                        <div className={styles.uploadProgress}>
-                          <div className={styles.progressBar} style={{width: `${avatarUploadProgress}%`}}></div>
+                      <div className={editStyles.imageLoadingOverlay}>
+                        <div className={editStyles.uploadProgress}>
+                          <div className={editStyles.progressBar} style={{width: `${avatarUploadProgress}%`}}></div>
                           <span>{Math.round(avatarUploadProgress)}%</span>
                         </div>
                       </div>
@@ -1163,8 +1206,8 @@ export default function Profile() {
                     <img
                       src={avatarPreview || avatarUrl || '/default-avatar.svg'}
                       alt={profile?.username || 'User'}
-                      className={styles.avatarPreview}
-                      key={`avatar-${Date.now()}`}
+                      className={editStyles.avatarPreview}
+                      key="profile-avatar"
                       onError={(e) => {
                         console.error('Error loading avatar image in dialog');
                         e.target.onerror = null;
@@ -1173,11 +1216,11 @@ export default function Profile() {
                     />
                   </div>
                   {avatarUploadError && (
-                    <p className={styles.uploadError}>{avatarUploadError}</p>
+                    <p className={editStyles.uploadError}>{avatarUploadError}</p>
                   )}
                   <button 
                     type="button" 
-                    className={styles.changeAvatarButton}
+                    className={editStyles.changeAvatarButton}
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isSaving || avatarUploadProgress > 0}
                   >
@@ -1194,10 +1237,10 @@ export default function Profile() {
                 </div>
               </div>
               
-              <div className={styles.formGroup}>
+              <div className={editStyles.formGroup}>
                 <label>Background Image</label>
                 <div 
-                  className={styles.backgroundPreview}
+                  className={editStyles.backgroundPreview}
                   style={{
                     backgroundImage: `url(${backgroundPreview || backgroundUrl})`,
                     backgroundSize: 'cover',
@@ -1207,23 +1250,23 @@ export default function Profile() {
                   onClick={() => backgroundUploadProgress === 0 && !isSaving && document.getElementById('background-file-input').click()}
                 >
                   {backgroundUploadProgress > 0 && (
-                    <div className={styles.imageLoadingOverlay}>
-                      <div className={styles.uploadProgress}>
-                        <div className={styles.progressBar} style={{width: `${backgroundUploadProgress}%`}}></div>
+                    <div className={editStyles.imageLoadingOverlay}>
+                      <div className={editStyles.uploadProgress}>
+                        <div className={editStyles.progressBar} style={{width: `${backgroundUploadProgress}%`}}></div>
                         <span>{Math.round(backgroundUploadProgress)}%</span>
                       </div>
                     </div>
                   )}
-                  <div className={styles.backgroundOverlay}>
+                  <div className={editStyles.backgroundOverlay}>
                     <span>{backgroundUploadProgress > 0 ? `Uploading (${Math.round(backgroundUploadProgress)}%)` : 'Change Background'}</span>
                   </div>
                 </div>
                 {backgroundUploadError && (
-                  <div className={styles.errorContainer}>
-                    <p className={styles.uploadError}>{backgroundUploadError}</p>
+                  <div className={editStyles.errorContainer}>
+                    <p className={editStyles.uploadError}>{backgroundUploadError}</p>
                     <button 
                       type="button" 
-                      className={styles.dismissError} 
+                      className={editStyles.dismissError} 
                       onClick={() => setBackgroundUploadError(null)}
                       aria-label="Dismiss error"
                     >
@@ -1241,7 +1284,7 @@ export default function Profile() {
                 />
                 <button 
                   type="button" 
-                  className={styles.changeBackgroundButton}
+                  className={editStyles.changeBackgroundButton}
                   onClick={() => document.getElementById('background-file-input').click()}
                   disabled={isSaving || backgroundUploadProgress > 0}
                 >
@@ -1249,10 +1292,10 @@ export default function Profile() {
                 </button>
               </div>
               
-              <div className={styles.formActions}>
+              <div className={editStyles.formActions}>
                 <button 
                   type="button" 
-                  className={styles.cancelButton}
+                  className={editStyles.cancelButton}
                   onClick={handleCloseModal}
                   disabled={isSaving}
                 >
@@ -1260,7 +1303,7 @@ export default function Profile() {
                 </button>
                 <button 
                   type="submit" 
-                  className={styles.saveButton}
+                  className={editStyles.saveButton}
                   disabled={isSaving}
                 >
                   {isSaving ? 'Saving...' : 'Save Changes'}

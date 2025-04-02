@@ -1,0 +1,501 @@
+/* Authentication Styles */
+
+/* Loading Spinner */
+.auth-loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: var(--background);
+  transition: opacity 0.3s ease-in-out;
+}
+
+.auth-spinner {
+  height: 3rem;
+  width: 3rem;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: var(--primary);
+  border-bottom-color: var(--primary);
+  animation: spin 1s linear infinite;
+}
+
+.auth-spinner.large {
+  height: 4rem;
+  width: 4rem;
+  border-width: 3px;
+}
+
+.auth-loading-text {
+  margin-top: 1rem;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  text-align: center;
+  animation: pulse 2s infinite;
+}
+
+.auth-fade-in {
+  opacity: 0;
+  animation: fadeIn 0.5s ease-in-out forwards;
+}
+
+.auth-fade-out {
+  opacity: 1;
+  animation: fadeOut 0.5s ease-in-out forwards;
+}
+
+/* Brand Logo for Auth Pages */
+.auth-logo {
+  display: block;
+  width: 120px;
+  height: auto;
+  margin-bottom: 1.5rem;
+}
+
+/* Animation Keyframes */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Authentication Guard Styles */
+.auth-guard-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  background-color: var(--background);
+}
+
+.auth-guard-content {
+  text-align: center;
+  max-width: 90%;
+}
+
+.auth-guard-message {
+  margin-top: 1rem;
+  font-weight: 500;
+}
+
+/* Animation for page transitions */
+.page-transition-enter {
+  opacity: 0;
+}
+
+.page-transition-enter-active {
+  opacity: 1;
+  transition: opacity 300ms;
+}
+
+.page-transition-exit {
+  opacity: 1;
+}
+
+.page-transition-exit-active {
+  opacity: 0;
+  transition: opacity 300ms;
+}
+
+/* Login Form Styles */
+.login-form-container {
+  background-color: var(--card);
+  border-radius: 8px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background-color: var(--input);
+  color: var(--foreground);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.25);
+}
+
+.auth-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.auth-button:active {
+  transform: translateY(1px);
+}
+
+.auth-button-primary {
+  background-color: var(--primary);
+  color: white;
+}
+
+.auth-button-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+.auth-button-secondary {
+  background-color: transparent;
+  color: var(--muted-foreground);
+}
+
+.auth-button-secondary:hover {
+  color: var(--foreground);
+  background-color: var(--accent);
+}
+
+.auth-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.auth-error {
+  background-color: rgba(var(--destructive-rgb), 0.1);
+  border-left: 4px solid var(--destructive);
+  color: var(--destructive);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 0 4px 4px 0;
+}
+
+.auth-link {
+  color: var(--primary);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.auth-link:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+
+/* Persistent Image Styles */
+/* Apply these styles to any images that should persist across page changes */
+
+.persistent-image {
+  /* Use GPU acceleration for smoother rendering */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  
+  /* Apply caching hints to browser */
+  image-rendering: optimizeQuality;
+  will-change: opacity;
+  
+  /* Prevent flash of unstyled content */
+  opacity: 1 !important;
+  transition: none !important;
+}
+
+/* For user avatars specifically */
+.user-avatar img,
+.profile-avatar img {
+  transform: translateZ(0);
+  will-change: opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  
+  /* Prevent loading indicators */
+  background-size: cover !important;
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+}
+
+/* For background images */
+.profile-bg-image,
+.profile-header-bg,
+.user-background {
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  
+  /* Fade transitions for background changes only */
+  transition: background-image 0.3s ease-out !important;
+  background-size: cover !important;
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+}
+
+/* Preload placeholder styles */
+.image-placeholder {
+  position: relative;
+  background-color: var(--muted);
+  overflow: hidden;
+}
+
+.image-placeholder::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 100%
+  );
+  animation: placeholderShimmer 1.5s infinite;
+}
+
+@keyframes placeholderShimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Gold-themed dark mode styles for authentication */
+.dark .auth-loading-container {
+  background-color: #000;
+  background-image: radial-gradient(circle at center, #111 0%, #000 100%);
+}
+
+.dark .auth-spinner {
+  border-top-color: var(--gold-primary);
+  border-bottom-color: var(--gold-primary);
+  box-shadow: 0 0 15px var(--gold-shadow);
+}
+
+.dark .auth-loading-text {
+  color: var(--gold-muted);
+}
+
+.dark .auth-guard-container {
+  background-color: #000;
+  background-image: radial-gradient(circle at center, #111 0%, #000 100%);
+}
+
+.dark .auth-guard-message {
+  color: var(--gold-muted);
+}
+
+/* Enhanced gold styling for authentication forms */
+.dark .login-form-container {
+  background: linear-gradient(135deg, rgba(10, 10, 10, 0.9), rgba(0, 0, 0, 0.85));
+  border: 1px solid var(--gold-border);
+  box-shadow: 
+    0 10px 30px rgba(0, 0, 0, 0.5),
+    0 0 0 1px var(--gold-border),
+    inset 0 0 15px rgba(245, 215, 110, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.dark .login-form-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(to right, transparent, var(--gold-primary), transparent);
+  opacity: 0.7;
+}
+
+.dark .form-group label {
+  color: var(--gold-primary);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.dark .form-group input {
+  background-color: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--gold-border);
+  color: var(--gold-primary);
+  transition: all 0.3s ease;
+  padding: 0.75rem 1rem;
+}
+
+.dark .form-group input:focus {
+  background-color: rgba(0, 0, 0, 0.6);
+  border-color: var(--gold-primary);
+  box-shadow: 
+    0 0 0 1px var(--gold-border),
+    0 0 8px var(--gold-shadow);
+  color: var(--gold-highlight);
+}
+
+.dark .auth-button-primary {
+  background: linear-gradient(to bottom, var(--gold-gradient-start), var(--gold-gradient-end));
+  color: #2d3748;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: none;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  box-shadow: 
+    0 2px 10px var(--gold-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.dark .auth-button-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: left 0.7s ease;
+  z-index: -1;
+}
+
+.dark .auth-button-primary:hover::before {
+  left: 100%;
+}
+
+.dark .auth-button-secondary {
+  background-color: transparent;
+  color: var(--gold-muted);
+  border: 1px solid var(--gold-border);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.dark .auth-button-secondary:hover {
+  background-color: rgba(245, 215, 110, 0.1);
+  color: var(--gold-primary);
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 8px var(--gold-shadow);
+}
+
+.dark .auth-error {
+  background-color: rgba(231, 76, 60, 0.1);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  border-left: 4px solid #e74c3c;
+  color: #f5b7b1;
+  box-shadow: 0 2px 10px rgba(231, 76, 60, 0.1);
+}
+
+.dark .auth-link {
+  color: var(--gold-link);
+  position: relative;
+  display: inline-block;
+}
+
+.dark .auth-link::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  transform: scaleX(0);
+  height: 1px;
+  bottom: -2px;
+  left: 0;
+  background-color: var(--gold-primary);
+  transform-origin: bottom right;
+  transition: transform 0.3s ease-out;
+}
+
+.dark .auth-link:hover::after {
+  transform: scaleX(1);
+  transform-origin: bottom left;
+}
+
+.dark .auth-link:hover {
+  color: var(--gold-highlight);
+  text-shadow: 0 0 5px var(--gold-shadow);
+}
+
+/* Gold animations for dark mode */
+.dark .auth-fade-in {
+  animation: goldFadeIn 0.5s ease-in-out forwards;
+}
+
+.dark .auth-fade-out {
+  animation: goldFadeOut 0.5s ease-in-out forwards;
+}
+
+@keyframes goldFadeIn {
+  from {
+    opacity: 0;
+    filter: brightness(0.5) saturate(0.8);
+  }
+  to {
+    opacity: 1;
+    filter: brightness(1) saturate(1);
+  }
+}
+
+@keyframes goldFadeOut {
+  from {
+    opacity: 1;
+    filter: brightness(1) saturate(1);
+  }
+  to {
+    opacity: 0;
+    filter: brightness(0.5) saturate(0.8);
+  }
+} 

@@ -87,8 +87,7 @@ body {
   text-rendering: optimizeLegibility;
   min-height: 100vh;
   position: relative;
-  /* Ensure body doesn't have its own scrollbar */
-  overflow: hidden !important;
+  overflow-x: hidden;
 }
 
 /* Fix Next.js containers */
@@ -97,8 +96,6 @@ body {
   width: 100%;
   max-width: 100vw;
   position: relative;
-  /* Prevent containers from having their own scrollbars */
-  overflow: hidden !important;
   display: flex;
   flex-direction: column;
 }
@@ -107,13 +104,12 @@ body {
 .app-wrapper {
   width: 100%;
   max-width: 100vw;
-  /* Prevent container from having its own scrollbar */
-  overflow: hidden !important;
   display: flex;
   flex-direction: column;
   align-items: center;
   min-height: 100vh;
   position: relative;
+  flex: 1 0 auto; /* Make it grow and not shrink */
 }
 
 /* ========== SCROLLBAR STYLING ========== */
@@ -149,7 +145,7 @@ body, div, section, article, aside, nav, header, footer, #__next, main {
 
 /* Special class for the landing page container */
 .no-scroll {
-  overflow: visible !important;
+  overflow-y: auto !important;
   overflow-x: hidden !important;
 }
 
@@ -181,12 +177,13 @@ p {
 
 a {
   color: hsl(var(--primary));
-  text-decoration: none;
+  text-decoration: none !important;
   transition: color var(--transition-fast);
 }
 
 a:hover {
   color: hsl(var(--primary)/0.8);
+  text-decoration: none !important;
 }
 
 /* ========== UTILITIES ========== */

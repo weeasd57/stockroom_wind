@@ -1,224 +1,49 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useAuth } from '@/hooks/useAuth';
-import { useProfile } from '@/contexts/ProfileContext';
+import { useSupabase } from '@/providers/SupabaseProvider'; // Updated from useAuth
+import { useProfile } from '@/providers/ProfileProvider'; // Updated from contexts/ProfileContext
 import { generateEodLastCloseUrl, countries, BASE_URL, API_KEY } from '@/utils/stockApi';
-import { getCountrySymbolCounts, searchStocks, COUNTRY_ISO_CODES } from '@/utils/symbolSearch';
+import { getCountrySymbolCounts, searchStocks } from '@/utils/symbolSearch';
 import { formatSymbolForApi, getExchangeCodeFromData, getSymbolPriceFromLocalData, getEodApiUrlParams } from '@/utils/symbolUtils';
 import { uploadPostImage } from '@/utils/supabase';
-import { useCreatePostForm } from '@/contexts/CreatePostFormContext';
-import useProfileStore from '@/store/profileStore'; // Import profile store
+import { useCreatePostForm } from '@/providers/CreatePostFormProvider'; // Updated from contexts/CreatePostFormContext
 import { createClient } from '@supabase/supabase-js';
+import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData'; // Import from models
+import { CURRENCY_SYMBOLS, getCurrencySymbol, COUNTRY_ISO_CODES } from '@/models/CurrencyData'; // Import from models
 import 'flag-icons/css/flag-icons.min.css';
 import '@/styles/create-post-page.css';
 import '@/styles/animation.css';
+import countrySummaryData from '@/symbols_data/country_summary_20250304_171206.json';
 
 // Create reusable Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
-// Near the top of the file
-const COUNTRY_CODE_TO_NAME = {
-  'eg': 'Egypt',
-  'us': 'USA',
-  'gb': 'UK',
-  'ca': 'Canada',
-  'de': 'Germany',
-  'lu': 'Luxembourg',
-  'at': 'Austria',
-  'fr': 'France',
-  'be': 'Belgium',
-  'es': 'Spain',
-  'ch': 'Switzerland',
-  'pt': 'Portugal',
-  'nl': 'Netherlands',
-  'is': 'Iceland',
-  'ie': 'Ireland',
-  'fi': 'Finland',
-  'no': 'Norway',
-  'dk': 'Denmark',
-  'se': 'Sweden',
-  'zw': 'Zimbabwe',
-  'zm': 'Zambia',
-  'ug': 'Uganda',
-  'tz': 'Tanzania',
-  'cz': 'Czech Republic',
-  'rw': 'Rwanda',
-  'bw': 'Botswana',
-  'ng': 'Nigeria',
-  'gh': 'Ghana',
-  'mw': 'Malawi',
-  'ci': 'Ivory Coast',
-  'ke': 'Kenya',
-  'ma': 'Morocco',
-  'mu': 'Mauritius',
-  'kr': 'Korea',
-  'hu': 'Hungary',
-  'pl': 'Poland',
-  'ph': 'Philippines',
-  'id': 'Indonesia',
-  'au': 'Australia',
-  'cn': 'China',
-  'in': 'India',
-  'za': 'South Africa',
-  'pk': 'Pakistan',
-  'my': 'Malaysia',
-  'vn': 'Vietnam',
-  'lk': 'Sri Lanka',
-  'th': 'Thailand',
-  'cl': 'Chile',
-  'gr': 'Greece',
-  'ar': 'Argentina',
-  'br': 'Brazil',
-  'ro': 'Romania',
-  'tr': 'Turkey',
-  'pe': 'Peru',
-  'tw': 'Taiwan',
-  'hr': 'Croatia',
-  'mx': 'Mexico',
-  'ae': 'United Arab Emirates',
-  'hk': 'Hong Kong',
-  'it': 'Italy',
-  'jp': 'Japan',
-  'jo': 'Jordan',
-  'kw': 'Kuwait',
-  'lb': 'Lebanon',
-  'nz': 'New Zealand',
-  'om': 'Oman',
-  'qa': 'Qatar',
-  'ru': 'Russia',
-  'sa': 'Saudi Arabia',
-  'sg': 'Singapore'
-};
-
-// إضافة قاموس لرموز العملات للبلدان المختلفة
-const COUNTRY_CURRENCY_SYMBOLS = {
-  // العملات الأساسية
-  'eg': 'EGP',  // مصر
-  'us': '$',    // الولايات المتحدة
-  'gb': '£',    // المملكة المتحدة
-  'ca': 'CA$',  // كندا
-  'au': 'A$',   // أستراليا
-  'de': '€ ',    // ألمانيا
-  'fr': '€ ',    // فرنسا
-  'es': '€ ',    // إسبانيا
-  'it': '€ ',    // إيطاليا
-  'jp': '¥ ',    // اليابان
-  'cn': '¥ ',    // الصين
-  'hk': 'HK$ ',  // هونج كونج
-  'in': '₹ ',    // الهند
-  'sa': 'SAR ',  // السعودية
-  'ae': 'AED ',  // الإمارات
-  'za': 'R ',    // جنوب أفريقيا
-  'br': 'R$ ',   // البرازيل
-  'ru': '₽ ',    // روسيا
-  'ch': 'CHF ',  // سويسرا
-  'kr': '₩ ',    // كوريا الجنوبية
-  'sg': 'S$ ',   // سنغافورة
-  'nl': '€ ',    // هولندا
-  'be': '€',    // بلجيكا
-  'gr': '€',    // اليونان
-  'pt': '€',    // البرتغال
-  'ie': '€',    // أيرلندا
-  'at': '€',    // النمسا
-  'fi': '€',    // فنلندا
-  'no': 'kr',   // النرويج
-  'se': 'kr',   // السويد
-  'dk': 'kr',   // الدنمارك
-  'pl': 'zł',   // بولندا
-  'hu': 'Ft',   // المجر
-  'cz': 'Kč',   // جمهورية التشيك
-  'tr': '₺',    // تركيا
-  'mx': 'MX$',  // المكسيك
-  'nz': 'NZ$',  // نيوزيلندا
-  'th': '฿',    // تايلاند
-  'my': 'RM',   // ماليزيا
-  'id': 'Rp',   // إندونيسيا
-  'ph': '₱',    // الفلبين
-  'vn': '₫',    // فيتنام
-  'ar': '$',    // الأرجنتين
-  'cl': 'CLP',  // تشيلي
-  'co': 'COP',  // كولومبيا
-  'pe': 'S/',   // بيرو
-  'lu': '€',    // لوكسمبورغ
+// Add a function to load country symbol counts from the JSON file
+const loadCountrySymbolCounts = () => {
+  const counts = {};
+  let total = 0;
   
-  // عملات إفريقية
-  'ng': '₦',    // نيجيريا
-  'ke': 'KES',  // كينيا
-  'ma': 'MAD',  // المغرب
-  'gh': 'GHS',  // غانا
-  'mu': 'MUR',  // موريشيوس
-  'tz': 'TZS',  // تنزانيا
-  'bw': 'P',    // بوتسوانا
-  'zw': 'Z$',   // زيمبابوي
-  'zm': 'ZMW',  // زامبيا
-  'ug': 'UGX',  // أوغندا
-  'rw': 'RWF',  // رواندا
-  'mw': 'MWK',  // ملاوي
-  'ci': 'CFA',  // ساحل العاج
+  // Process the country summary data
+  Object.keys(countrySummaryData).forEach(country => {
+    // Convert country names to ISO codes
+    const countryData = countrySummaryData[country];
+    const isoCode = COUNTRY_ISO_CODES[country] || country.toLowerCase();
+    
+    if (countryData && countryData.TotalSymbols) {
+      counts[isoCode] = countryData.TotalSymbols;
+      total += countryData.TotalSymbols;
+    }
+  });
   
-  // الشرق الأوسط والخليج
-  'jo': 'JOD',  // الأردن
-  'kw': 'KWD',  // الكويت
-  'qa': 'QAR',  // قطر
-  'bh': 'BHD',  // البحرين
-  'om': 'OMR',  // عمان
-  'lb': 'L£',   // لبنان
-  
-  // آسيا
-  'tw': 'NT$',  // تايوان
-  'pk': '₨',    // باكستان
-  'lk': 'LKR',  // سريلانكا
-  'bd': '৳',    // بنغلاديش
-  
-  // أوروبا الشرقية
-  'ro': 'RON',  // رومانيا
-  'bg': 'BGN',  // بلغاريا
-  'hr': 'HRK',  // كرواتيا
-  'rs': 'RSD',  // صربيا
-  'ua': '₴',    // أوكرانيا
-  'ee': '€',    // إستونيا
-  'lt': '€',    // ليتوانيا
-  'lv': '€',    // لاتفيا
-  'si': '€',    // سلوفينيا
-  'sk': '€',    // سلوفاكيا
-  'mt': '€',    // مالطا
-  'cy': '€',    // قبرص
-  'is': 'kr',   // أيسلندا
-  
-  // أمريكا اللاتينية
-  'pa': 'B/.',  // بنما
-  'uy': '$U',   // أوروغواي
-  'cr': '₡',    // كوستاريكا
-  'jm': 'J$',   // جامايكا
-  
-  // دول أخرى
-  'az': '₼',    // أذربيجان
-  'by': 'Br',   // بيلاروسيا
-  'kz': '₸',    // كازاخستان
-};
-
-// دالة مساعدة للحصول على رمز العملة المناسب
-const getCurrencySymbol = (country) => {
-  if (!country) return '$'; // افتراضي
-
-  // التحقق أولاً مما إذا كان رمز البلد ثنائي الحروف
-  if (country.length === 2) {
-    return COUNTRY_CURRENCY_SYMBOLS[country.toLowerCase()] || '$';
-  }
-  
-  // البحث عن رمز البلد من الاسم
-  const countryCode = Object.entries(COUNTRY_ISO_CODES).find(
-    ([countryName]) => countryName.toLowerCase() === country.toLowerCase()
-  )?.[1]?.toLowerCase();
-  
-  return countryCode ? (COUNTRY_CURRENCY_SYMBOLS[countryCode] || '$') : '$';
+  counts.total = total;
+  return counts;
 };
 
 export default function CreatePostForm() {
-  const { user } = useAuth();
+  const { user } = useSupabase();
   const { profile, getEffectiveAvatarUrl } = useProfile();
   
   // Since there's no formState, directly destructure values from context with defaults
@@ -250,7 +75,6 @@ export default function CreatePostForm() {
   } = useCreatePostForm() || {};
 
   // Get the addPost function from profile store
-  const addPost = useProfileStore(state => state.addPost);
 
   const [strategies, setStrategies] = useState([]);
   const [newStrategy, setNewStrategy] = useState('');
@@ -307,8 +131,8 @@ export default function CreatePostForm() {
     // Load popular countries data
     const loadPopularCountriesData = () => {
       try {
-        // Get counts directly from the getCountrySymbolCounts function
-        const counts = getCountrySymbolCounts();
+        // Get counts directly from our JSON file
+        const counts = loadCountrySymbolCounts();
         setCountrySymbolCounts(counts);
         console.log("Loaded country symbol counts:", counts);
       } catch (error) {
@@ -546,7 +370,8 @@ export default function CreatePostForm() {
 
   // Handle country selection change
   const handleCountryChange = (value) => {
-    setSelectedCountry(value === 'all' ? 'all' : value);
+    // Store the selected country
+    setSelectedCountry(value);
     
     // Update API URL if a stock is selected
     if (stockSearch) {
@@ -557,51 +382,69 @@ export default function CreatePostForm() {
     if (value !== 'all') {
       setIsSearching(true);
       
-      // Convert ISO country code to country name if needed
-      let searchCountry = value;
-      if (searchCountry && COUNTRY_CODE_TO_NAME[searchCountry]) {
-        searchCountry = COUNTRY_CODE_TO_NAME[searchCountry];
-        console.log(`Loading all symbols for country: ${searchCountry}`);
+      // Convert ISO country code to country name
+      let countryName = value;
+      if (countryName.length === 2 && COUNTRY_CODE_TO_NAME[countryName.toLowerCase()]) {
+        countryName = COUNTRY_CODE_TO_NAME[countryName.toLowerCase()];
       }
       
-      // Use our local symbol search with empty query to get all symbols
-      // We pass an empty string to get all symbols, and limit to 250 to show a good amount
-      searchStocks('', searchCountry, 250)
+      console.log(`Loading all symbols for country: ${countryName}`);
+      
+      // Use empty query to load all symbols for the country
+      searchStocks('', countryName, 250)
         .then(results => {
           if (results && results.length > 0) {
-            console.log(`Loaded ${results.length} symbols for ${searchCountry}`);
+            console.log(`Loaded ${results.length} symbols for ${countryName}`);
+            
+            // Check if the first result is an error message
+            if (results[0].uniqueId && (
+                results[0].uniqueId.includes('error') || 
+                results[0].uniqueId.includes('unavailable') || 
+                results[0].uniqueId.includes('no-symbols'))) {
+              console.warn("Received error message in results:", results[0]);
+              // Still show these as regular results for better UX
+            }
             
             // Format the results to match the expected structure
             const formattedResults = results.map(item => ({
-              symbol: item.Symbol,
-              name: item.Name,
-              country: item.Country,
-              exchange: item.Exchange,
-              uniqueId: item.uniqueId
+              symbol: item.Symbol || item.symbol,
+              name: item.Name || item.name,
+              country: item.Country || item.country,
+              exchange: item.Exchange || item.exchange,
+              uniqueId: item.uniqueId || `${item.symbol || item.Symbol}-${item.country || item.Country}-${Math.random().toString(36).substring(7)}`
             }));
             
             updateField('searchResults', formattedResults);
           } else {
-            // If no results are returned from the search, attempt to directly import the symbols file
-            console.log(`No symbols returned from search for ${searchCountry}, attempting direct file import`);
-
-            // Create a placeholder loading result
+            console.warn(`No symbols returned for ${countryName}`);
+            // Show a friendly message within the search results if no symbols are found
             updateField('searchResults', [{
-              symbol: `Loading symbols for ${searchCountry}...`,
-              name: "Please wait while we load the symbols",
-              country: searchCountry,
+              symbol: `${countryName} - No symbols available`,
+              name: "Please try another country",
+              country: value,
               exchange: "",
-              uniqueId: "loading-message"
+              uniqueId: "no-symbols-message"
             }]);
           }
         })
         .catch(error => {
           console.error('Error loading symbols:', error);
-          // Handle error
+          // Show error message in search results instead of form error
+          updateField('searchResults', [{
+            symbol: `${countryName} - Temporarily unavailable`,
+            name: "Please try again later or select another country",
+            country: value,
+            exchange: "",
+            uniqueId: "error-message"
+          }]);
+        })
+        .finally(() => {
+          setIsSearching(false);
         });
     } else {
       // If 'All Countries' is selected, clear results until user types search
       updateField('searchResults', []);
+      setIsSearching(false);
     }
   };
 
@@ -1572,6 +1415,336 @@ export default function CreatePostForm() {
     };
   }, [searchResults.length, updateField]);
 
+  // At the beginning of the component, after imports but before class definition
+
+  // Add autofocus to the text area and ensure form is properly sized for dialog
+  useEffect(() => {
+    // Focus the description field after the component mounts
+    const descriptionField = document.getElementById('description');
+    if (descriptionField) {
+      setTimeout(() => {
+        descriptionField.focus();
+      }, 100);
+    }
+
+    // Listen for dialog open/close to properly manage layout 
+    const handleResize = () => {
+      if (formWrapperRef.current) {
+        const formHeight = formWrapperRef.current.scrollHeight;
+        const viewportHeight = window.innerHeight;
+        
+        // If form is taller than viewport, make it scrollable
+        if (formHeight > viewportHeight * 0.8) {
+          formWrapperRef.current.style.maxHeight = `${viewportHeight * 0.8}px`;
+          formWrapperRef.current.style.overflow = 'auto';
+        } else {
+          formWrapperRef.current.style.maxHeight = 'none';
+        }
+      }
+    };
+
+    // Call once on mount and add resize listener
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  // Find the section handling dialog and dropdown visibility
+  // Add this new effect to ensure dropdowns are visible and positioned correctly
+
+  useEffect(() => {
+    // Function to ensure dropdowns appear above other elements
+    const fixDropdownPosition = () => {
+      const categoryDropdown = document.querySelector('.category-dropdown');
+      const searchResults = document.querySelector('.search-results');
+      
+      if (categoryDropdown) {
+        categoryDropdown.style.zIndex = '5000';
+      }
+      
+      if (searchResults) {
+        searchResults.style.zIndex = '5000';
+      }
+    };
+    
+    // Call once immediately
+    fixDropdownPosition();
+    
+    // Set up a mutation observer to detect when dropdown becomes visible
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && 
+            (mutation.target.classList.contains('category-dropdown') || 
+             mutation.target.classList.contains('search-results'))) {
+          if (mutation.target.classList.contains('show')) {
+            fixDropdownPosition();
+          }
+        }
+      });
+    });
+    
+    // Observe dropdown elements
+    const categoryDropdown = document.querySelector('.category-dropdown');
+    const searchResults = document.querySelector('.search-results');
+    
+    if (categoryDropdown) {
+      observer.observe(categoryDropdown, { attributes: true });
+    }
+    
+    if (searchResults) {
+      observer.observe(searchResults, { attributes: true });
+    }
+    
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  // Find the stock search container or country dropdown and update with this code:
+
+  // Update the country selection rendering to ensure dropdown visibility
+  const renderCountrySelect = () => {
+    return (
+      <div className="category-select" style={{ position: 'relative', zIndex: 3000 }}>
+        <div
+          className="select-field"
+          onClick={() => {
+            document.querySelector('.category-dropdown').classList.toggle('show');
+          }}
+        >
+          <span className="select-field-text">
+            {selectedCountry === 'all' 
+              ? 'All Countries' 
+              : COUNTRY_CODE_TO_NAME[selectedCountry] || selectedCountry}
+            {selectedCountry !== 'all' && CURRENCY_SYMBOLS[selectedCountry] && 
+              <span className="currency-symbol-indicator"> ({CURRENCY_SYMBOLS[selectedCountry]})</span>}
+          </span>
+          <div className="select-field-icon">
+            <svg viewBox="0 0 24 24" width="16" height="16">
+              <path
+                fill="currentColor"
+                d="M7 10l5 5 5-5z"
+              />
+            </svg>
+          </div>
+        </div>
+        
+        <div className="category-dropdown" style={{ zIndex: 3000, maxHeight: '400px', overflowY: 'auto' }}>
+          <div className="category-option" onClick={() => handleCountryChange('all')}>
+            <div className="category-option-content">
+              <span className="category-option-name">All Countries</span>
+              <span className="category-option-count">
+                {countrySymbolCounts.total || ''}
+              </span>
+            </div>
+          </div>
+          
+          {/* Map through country ISO codes to display all countries with their currency symbols */}
+          {Object.entries(COUNTRY_ISO_CODES).map(([countryName, isoCode]) => (
+            <div
+              key={isoCode}
+              className={`category-option ${selectedCountry === isoCode ? 'selected' : ''}`}
+              onClick={() => handleCountryChange(isoCode)}
+            >
+              <div className="category-option-content">
+                <span className="category-option-name">
+                  <span className={`fi fi-${isoCode.toLowerCase()}`}></span>
+                  {countryName}
+                  {CURRENCY_SYMBOLS[isoCode] && 
+                    <span className="currency-symbol"> ({CURRENCY_SYMBOLS[isoCode]})</span>}
+                </span>
+                <span className="category-option-count">
+                  {countrySymbolCounts[isoCode] || '0'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // Update the stock search section to display currency symbols with stock search results
+  const renderStockSearch = () => (
+    <div className="search-field-container">
+      <label htmlFor="stockSearch" className="form-label">Symbol or Name</label>
+      <div className="search-container">
+        <input
+          id="stockSearch"
+          ref={searchInputRef}
+          type="text"
+          value={stockSearch}
+          onChange={(e) => updateField('stockSearch', e.target.value)}
+          placeholder="Enter symbol or name"
+          className="form-control visible-input"
+        />
+        <div className="focus-ring"></div>
+        {stockSearch && (
+          <button 
+            className="clear-search-button" 
+            onClick={handleCancelSearch}
+            aria-label="Clear search"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        )}
+        {isSearching && (
+          <div className="search-loader"></div>
+        )}
+      </div>
+      
+      {searchResults.length > 0 && (
+        <div className="search-results-wrapper">
+          <div className="search-results" ref={stockSearchResultsRef}>
+            <div className="search-results-header">
+              <span className="search-results-count-wrapper">
+                <span className="search-results-count">{searchResults.length} symbols found</span>
+              </span>
+              <button 
+                className="btn btn-sm btn-cancel"
+                onClick={handleCancelSearch}
+                aria-label="Cancel search"
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="search-results-list">
+              {searchResults.map((stock) => {
+                // Special handling for no-data messages or error messages
+                const isMessageItem = stock.uniqueId && (
+                  stock.uniqueId.includes('error') || 
+                  stock.uniqueId.includes('unavailable') || 
+                  stock.uniqueId.includes('no-') ||
+                  stock.uniqueId.includes('message')
+                );
+
+                if (isMessageItem) {
+                  return (
+                    <div 
+                      key={stock.uniqueId}
+                      className="category-option message-item"
+                      data-uniqueid={stock.uniqueId}
+                      data-error={stock.uniqueId.includes('error')}
+                    >
+                      <div className="stock-flag">
+                        <span 
+                          className={`fi fi-${stock.country?.toLowerCase() || 'xx'}`} 
+                          title={stock.country}
+                        ></span>
+                      </div>
+                      <div className="category-option-content">
+                        <div className="category-option-name">{stock.symbol}</div>
+                        <div className="stock-name">{stock.name}</div>
+                      </div>
+                    </div>
+                  );
+                }
+                
+                // Regular stock item rendering
+                const countryCode = Object.entries(COUNTRY_ISO_CODES).find(
+                  ([countryName]) => countryName.toLowerCase() === stock.country.toLowerCase()
+                )?.[1]?.toLowerCase() || stock.country.toLowerCase();
+                
+                // Get currency symbol for this country
+                const currencySymbol = CURRENCY_SYMBOLS[countryCode] || '$';
+                
+                return (
+                  <div 
+                    key={stock.uniqueId || `${stock.symbol}-${stock.country}`}
+                    className={`category-option ${selectedStock && selectedStock.symbol === stock.symbol ? 'selected' : ''}`}
+                    onClick={() => handleStockSelect(stock)}
+                    tabIndex="0"
+                  >
+                    <div className="stock-flag">
+                      <span 
+                        className={`fi fi-${countryCode}`} 
+                        title={stock.country}
+                      ></span>
+                    </div>
+                    <div className="category-option-content">
+                      <div className="category-option-name">
+                        {stock.symbol}
+                        <span className="currency-symbol-badge">{currencySymbol}</span>
+                      </div>
+                      <div className="stock-name">{stock.name}</div>
+                      <div className="category-option-count">
+                        {Object.entries(COUNTRY_ISO_CODES).find(([_, code]) => 
+                          code.toLowerCase() === countryCode
+                        )?.[0] || stock.country}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // Update the Stock Info Container to show currency symbols
+  const updateSelectedStockDisplay = () => {
+    // When updating selected stock UI in the return JSX:
+    if (selectedStock) {
+      const countryCode = selectedStock.country.toLowerCase();
+      const currencySymbol = CURRENCY_SYMBOLS[countryCode] || '$';
+      
+      // Update the display to include currency symbol
+      return (
+        <div className="stock-info-container">
+          {/* Background flag with opacity */}
+          <div
+            className="stock-info-bg-flag persistent-image"
+            style={{
+              backgroundImage: `url(https://flagcdn.com/${Object.entries(COUNTRY_ISO_CODES).find(
+                ([countryName]) => countryName.toLowerCase() === selectedStock.country.toLowerCase()
+              )?.[1]?.toLowerCase() || selectedStock.country.toLowerCase()}.svg)`
+            }}
+          ></div>
+          
+          <div className="stock-info-overlay">
+            {/* Stock Item */}
+            <div className="stock-item selected">
+              <div className="stock-info">
+                <div className="stock-symbol">
+                  {selectedStock.symbol}
+                  <span className="currency-badge">{currencySymbol}</span>
+                </div>
+                <div className="stock-name">{selectedStock.name}</div>
+                <div className="stock-country">
+                  {Object.entries(COUNTRY_ISO_CODES).find(
+                    ([countryName]) => countryName.toLowerCase() === selectedStock.country.toLowerCase()
+                  )?.[0] || selectedStock.country}
+                </div>
+              </div>
+              <button 
+                className="btn btn-icon" 
+                onClick={() => updateField('selectedStock', null)}
+                aria-label="Remove stock"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            {/* Rest of the stock info container */}
+            {/* ... */}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <>
       <div className="create-post-form-container" ref={formWrapperRef}>
@@ -1606,7 +1779,7 @@ export default function CreatePostForm() {
               <div className="stock-info-container">
                 {/* Background flag with opacity */}
                 <div
-                  className="stock-info-bg-flag"
+                  className="stock-info-bg-flag persistent-image"
                   style={{
                     backgroundImage: `url(https://flagcdn.com/${Object.entries(COUNTRY_ISO_CODES).find(
                       ([countryName]) => countryName.toLowerCase() === selectedStock.country.toLowerCase()
@@ -1618,7 +1791,12 @@ export default function CreatePostForm() {
                   {/* Stock Item */}
                   <div className="stock-item selected">
                     <div className="stock-info">
-                      <div className="stock-symbol">{selectedStock.symbol}</div>
+                      <div className="stock-symbol">
+                        {selectedStock.symbol}
+                        {CURRENCY_SYMBOLS[selectedStock.country.toLowerCase()] && (
+                          <span className="currency-badge">{CURRENCY_SYMBOLS[selectedStock.country.toLowerCase()]}</span>
+                        )}
+                      </div>
                       <div className="stock-name">{selectedStock.name}</div>
                       <div className="stock-country">
                         {Object.entries(COUNTRY_ISO_CODES).find(
@@ -1649,7 +1827,7 @@ export default function CreatePostForm() {
                       </div>
                     ) : currentPrice !== null && !isNaN(currentPrice) ? (
                       <div className="stock-price stock-price-value">
-                        {getCurrencySymbol(selectedStock?.country)} {typeof currentPrice === 'number' ? currentPrice.toFixed(2) : parseFloat(currentPrice).toFixed(2)}
+                        {CURRENCY_SYMBOLS[selectedStock.country.toLowerCase()] || '$'} {typeof currentPrice === 'number' ? currentPrice.toFixed(2) : parseFloat(currentPrice).toFixed(2)}
                       </div>
                     ) : (
                       <div className="stock-price-unavailable">
@@ -1666,6 +1844,9 @@ export default function CreatePostForm() {
                     {selectedStock && !isSearching && (
                       <div className="stock-price-info">
                         Symbol: {selectedStock.symbol} • Exchange: {selectedStock.exchange || 'N/A'}
+                        {CURRENCY_SYMBOLS[selectedStock.country.toLowerCase()] && (
+                          <span className="currency-info"> • Currency: {CURRENCY_SYMBOLS[selectedStock.country.toLowerCase()]}</span>
+                        )}
                       </div>
                     )}
                     
@@ -1731,7 +1912,7 @@ export default function CreatePostForm() {
                                   height: `${Math.max(heightPercent, 5)}%`,
                                   backgroundColor: barColor
                                 }}
-                                title={`${day.date}: $${day.close}`}
+                                title={`${day.date}: ${CURRENCY_SYMBOLS[selectedStock.country.toLowerCase()] || '$'}${day.close}`}
                               ></div>
                               <div className="price-date">{day.date.split('-')[2]}</div>
                             </div>
@@ -1747,7 +1928,7 @@ export default function CreatePostForm() {
                         <label htmlFor="targetPrice">Target Price</label>
                         <div className="price-input-with-percentage">
                           <div className="currency-symbol-prefix">
-                            {getCurrencySymbol(selectedStock?.country)}
+                            {CURRENCY_SYMBOLS[selectedStock.country.toLowerCase()] || '$'}
                           </div>
                           <input
                             type="number"
@@ -1790,7 +1971,7 @@ export default function CreatePostForm() {
                         <label htmlFor="stopLossPrice">Stop Loss</label>
                         <div className="price-input-with-percentage">
                           <div className="currency-symbol-prefix">
-                            {getCurrencySymbol(selectedStock?.country)}
+                            {CURRENCY_SYMBOLS[selectedStock.country.toLowerCase()] || '$'}
                           </div>
                           <input
                             type="number"
@@ -1888,7 +2069,14 @@ export default function CreatePostForm() {
                 onDragOver={handleAvatarDragOver}
                 title="Drop new avatar image here"
               >
-                <img src={avatarUrl} alt="User avatar" />
+                <img 
+                  src={avatarUrl} 
+                  alt="User avatar" 
+                  className="persistent-image" 
+                  loading="eager"
+                  fetchpriority="high"
+                  decoding="sync"
+                />
               </div>
               <span className="user-email">{user?.email}</span>
             </div>
@@ -1902,6 +2090,7 @@ export default function CreatePostForm() {
               onChange={(e) => updateField('description', e.target.value)}
               placeholder="Share your thoughts..."
               className={`form-control ${formErrors.content ? 'is-invalid' : ''}`}
+              autoFocus
             ></textarea>
             <div className="focus-ring"></div>
             {formErrors.content && (
@@ -2048,109 +2237,7 @@ export default function CreatePostForm() {
                 )}
               </div>
               
-              <div className="search-field-container">
-                <label htmlFor="stockSearch" className="form-label">Symbol or Name</label>
-                <div className="search-container">
-                  <input
-                    id="stockSearch"
-                    ref={searchInputRef}
-                    type="text"
-                    value={stockSearch}
-                    onChange={(e) => updateField('stockSearch', e.target.value)}
-                    placeholder="Enter symbol or name"
-                    className="form-control visible-input"
-                  />
-                  <div className="focus-ring"></div>
-                  {stockSearch && (
-                    <button 
-                      className="clear-search-button" 
-                      onClick={handleCancelSearch}
-                      aria-label="Clear search"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                      </svg>
-                    </button>
-                  )}
-                  {isSearching && (
-                    <div className="search-loader"></div>
-                  )}
-                </div>
-                
-                {searchResults.length > 0 && (
-                  <div className="search-results-wrapper">
-                    <div className="search-results" ref={stockSearchResultsRef}>
-                      <div className="search-results-header">
-                        <span className="search-results-count-wrapper">
-                          <span className="search-results-count">{searchResults.length} symbols found</span>
-                        </span>
-                        <button 
-                          className="btn btn-sm btn-cancel"
-                          onClick={handleCancelSearch}
-                          aria-label="Cancel search"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                      <div className="search-results-list">
-                        {searchResults.map((stock) => {
-                          // Special handling for no-data messages
-                          if (stock.uniqueId === "no-symbols-message" || stock.uniqueId === "error-message") {
-                            return (
-                              <div 
-                                key={stock.uniqueId}
-                                className="category-option message-item"
-                              >
-                                <div className="stock-flag">
-                                  <span 
-                                    className={`fi fi-${stock.country.toLowerCase()}`} 
-                                    title={stock.country}
-                                  ></span>
-                                </div>
-                                <div className="category-option-content">
-                                  <div className="category-option-name">{stock.symbol}</div>
-                                  <div className="stock-name">{stock.name}</div>
-                                </div>
-                              </div>
-                            );
-                          }
-                          
-                          // Regular stock item rendering
-                          const countryCode = Object.entries(COUNTRY_ISO_CODES).find(
-                            ([countryName]) => countryName.toLowerCase() === stock.country.toLowerCase()
-                          )?.[1]?.toLowerCase() || stock.country.toLowerCase();
-                          
-                          return (
-                            <div 
-                              key={stock.uniqueId || `${stock.symbol}-${stock.country}`}
-                              className={`category-option ${selectedStock && selectedStock.symbol === stock.symbol ? 'selected' : ''}`}
-                              onClick={() => handleStockSelect(stock)}
-                              tabIndex="0"
-                            >
-                              <div className="stock-flag">
-                                <span 
-                                  className={`fi fi-${countryCode}`} 
-                                  title={stock.country}
-                                ></span>
-                              </div>
-                              <div className="category-option-content">
-                                <div className="category-option-name">{stock.symbol}</div>
-                                <div className="stock-name">{stock.name}</div>
-                                <div className="category-option-count">
-                                  {Object.entries(COUNTRY_ISO_CODES).find(([_, code]) => 
-                                    code.toLowerCase() === countryCode
-                                  )?.[0] || stock.country}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              {renderStockSearch()}
             </div>
           </div>
         </div>
@@ -2286,3 +2373,6 @@ export default function CreatePostForm() {
     </>
   );
 }
+
+// Add a named export to support both default and named imports
+export { CreatePostForm };

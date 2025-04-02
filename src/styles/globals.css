@@ -25,28 +25,53 @@
   --radius: 0.5rem;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  
+  /* Add scrollbar styling to the body and all elements */
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary) / 0.3) transparent;
 }
 
 .dark {
-  --background: 0 0% 10%; /* Near black */
-  --foreground: 0 0% 100%; /* White text */
-  --card: 0 0% 12%; /* Slightly lighter black for cards */
-  --card-foreground: 0 0% 100%; /* White text */
-  --popover: 0 0% 12%; /* Slightly lighter black for popovers */
-  --popover-foreground: 0 0% 100%; /* White text */
-  --primary: 45 100% 60%; /* Gold primary color */
-  --primary-foreground: 0 0% 10%; /* Black text on gold backgrounds */
-  --secondary: 0 0% 15%; /* Dark gray for secondary elements */
-  --secondary-foreground: 0 0% 100%; /* White text */
-  --muted: 0 0% 15%; /* Dark gray for muted elements */
-  --muted-foreground: 0 0% 70%; /* Light gray text */
-  --accent: 45 80% 20%; /* Dark gold accent */
-  --accent-foreground: 0 0% 100%; /* White text */
-  --destructive: 0 70% 40%; /* Dark red */
-  --destructive-foreground: 0 0% 100%; /* White text */
-  --border: 45 30% 30%; /* Dark gold border */
-  --input: 0 0% 15%; /* Dark gray for inputs */
-  --ring: 45 100% 60%; /* Gold ring */
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --card: 0 0% 0%;
+  --card-foreground: 0 0% 100%;
+  --popover: 0 0% 0%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 0 0% 100%;
+  --primary-foreground: 0 0% 0%;
+  --secondary: 0 0% 5%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 0 0% 10%;
+  --muted-foreground: 0 0% 70%;
+  --accent: 0 0% 5%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 20%;
+  --input: 0 0% 5%;
+  --ring: 0 0% 100%;
+  
+  /* Enhanced Gold theme variables */
+  --gold-primary: #f5d76e;
+  --gold-secondary: #f9ca24;
+  --gold-accent: #ffd700;
+  --gold-highlight: #ffee58;
+  --gold-muted: rgba(245, 215, 110, 0.7);
+  --gold-border: rgba(245, 215, 110, 0.3);
+  --gold-shadow: rgba(245, 215, 110, 0.15);
+  --gold-gradient-start: #f9ca24;
+  --gold-gradient-end: #f1c40f;
+  --gold-text: #f5d76e;
+  --gold-link: #ffd700;
+  --gold-button: #f9ca24;
+  --gold-hover: #ffee58;
+  
+  /* Override text colors with gold in dark mode */
+  --foreground: 45 100% 70%;
+  --card-foreground: 45 100% 70%;
+  --popover-foreground: 45 100% 70%;
+  --border: 45 70% 30%;
 }
 
 .disable-transitions * {
@@ -57,14 +82,72 @@
   * {
     @apply border-border;
   }
-  body {
-    @apply bg-background text-foreground;
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
   }
   
-  /* Add gradient background to dark mode */
+  body {
+    @apply bg-background text-foreground;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background: hsla(var(--foreground), 0.1);
+    color: hsl(var(--foreground));
+  }
+  
+  /* Remove gradient and set pure black background in dark mode */
   .dark body {
-    background: linear-gradient(135deg, hsl(0, 0%, 0%), hsl(0, 0%, 0%));
-    background-attachment: fixed;
+    background: hsl(0, 0%, 0%);
+  }
+  
+  /* Gold text selection in dark mode */
+  .dark ::selection {
+    background: var(--gold-shadow);
+    color: var(--gold-primary);
+  }
+  
+  /* Gold text styling in dark mode */
+  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+    color: var(--gold-primary);
+    text-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  }
+  
+  .dark p {
+    color: var(--gold-muted);
+  }
+  
+  .dark strong, .dark b {
+    color: var(--gold-primary);
+    font-weight: 600;
+  }
+  
+  .dark hr {
+    border-color: var(--gold-border);
+  }
+  
+  .dark blockquote {
+    border-left-color: var(--gold-secondary);
+    color: var(--gold-muted);
+  }
+  
+  .dark code, .dark pre {
+    color: var(--gold-primary);
+    background-color: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--gold-border);
+  }
+  
+  .dark a:not([class]) {
+    color: var(--gold-link);
+    text-decoration-color: var(--gold-border);
+  }
+  
+  .dark a:not([class]):hover {
+    color: var(--gold-highlight);
+    text-decoration-color: var(--gold-primary);
   }
 }
 
@@ -88,66 +171,201 @@
     @apply text-primary underline-offset-4 hover:underline;
   }
   
-  /* Gold gradient buttons for dark mode */
+  /* Update dark mode button styles to use gold theme */
   .dark .btn-primary {
-    background: linear-gradient(to right, hsl(45, 100%, 60%), hsl(45, 80%, 50%));
-    color: hsl(0, 0%, 10%);
-    font-weight: 600;
+    background: linear-gradient(to bottom, var(--gold-gradient-start), var(--gold-gradient-end));
+    color: #2d3748;
     border: none;
-    transition: all 0.3s ease;
+    font-weight: 600;
+    box-shadow: 0 2px 10px var(--gold-shadow);
   }
   
   .dark .btn-primary:hover {
-    background: linear-gradient(to right, hsl(45, 100%, 65%), hsl(45, 80%, 55%));
-    box-shadow: 0 0 10px hsl(45, 100%, 60%, 0.5);
+    background: linear-gradient(to bottom, var(--gold-highlight), var(--gold-secondary));
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px var(--gold-shadow);
   }
   
   .dark .btn-outline {
-    border-color: hsl(45, 70%, 50%, 0.5);
-    color: hsl(0, 0%, 100%);
+    border-color: var(--gold-border);
+    color: var(--gold-primary);
   }
   
   .dark .btn-outline:hover {
-    background-color: hsl(45, 70%, 15%);
-    color: hsl(45, 100%, 80%);
+    background-color: rgba(245, 215, 110, 0.1);
+    color: var(--gold-highlight);
+    border-color: var(--gold-primary);
   }
   
+  .dark .btn-ghost {
+    color: var(--gold-muted);
+  }
+  
+  .dark .btn-ghost:hover {
+    background-color: rgba(245, 215, 110, 0.1);
+    color: var(--gold-primary);
+  }
+  
+  .dark .btn-link {
+    color: var(--gold-link);
+  }
+  
+  .dark .btn-link:hover {
+    color: var(--gold-highlight);
+  }
+  
+  /* Gold-themed form elements */
   .dark input, 
   .dark textarea, 
   .dark select {
-    background-color: hsl(0, 0%, 12%);
-    border-color: hsl(45, 30%, 30%, 0.5);
-    color: hsl(0, 0%, 100%);
+    background-color: hsl(0, 0%, 5%);
+    border-color: var(--gold-border);
+    color: var(--gold-primary);
   }
   
   .dark input:focus, 
   .dark textarea:focus, 
   .dark select:focus {
-    border-color: hsl(45, 70%, 50%);
-    box-shadow: 0 0 0 2px hsl(45, 70%, 50%, 0.2);
+    border-color: var(--gold-primary);
+    box-shadow: 0 0 0 2px var(--gold-shadow);
   }
   
+  .dark input::placeholder,
+  .dark textarea::placeholder {
+    color: var(--gold-muted);
+    opacity: 0.7;
+  }
+  
+  /* Gold-themed links */
   .dark a {
-    color: hsl(0, 0%, 100%);
+    color: var(--gold-link);
+    transition: all 0.2s ease;
   }
   
   .dark a:hover {
-    color: hsl(45, 100%, 80%);
+    color: var(--gold-highlight);
+    text-shadow: 0 0 5px var(--gold-shadow);
   }
   
-  /* Gold accent for active elements */
+  /* Update active elements to use gold */
   .dark .active {
-    color: hsl(45, 100%, 70%) !important;
+    color: var(--gold-primary) !important;
+    text-shadow: 0 0 5px var(--gold-shadow);
   }
   
-  /* Gold accent for links */
-  .dark a.link {
-    color: hsl(45, 100%, 70%);
+  /* Gold-themed navigation */
+  .dark nav a,
+  .dark .nav-link {
+    color: var(--gold-muted);
   }
   
-  .dark a.link:hover {
-    color: hsl(45, 100%, 80%);
-    text-decoration: underline;
+  .dark nav a:hover,
+  .dark .nav-link:hover {
+    color: var(--gold-primary);
+  }
+  
+  .dark nav a.active,
+  .dark .nav-link.active {
+    color: var(--gold-primary) !important;
+    text-shadow: 0 0 5px var(--gold-shadow);
+  }
+  
+  /* Gold-themed cards and panels */
+  .dark .card,
+  .dark .panel,
+  .dark [class*="card-"],
+  .dark [class*="panel-"] {
+    border-color: var(--gold-border);
+    box-shadow: 0 4px 20px var(--gold-shadow);
+  }
+  
+  .dark .card:hover,
+  .dark .panel:hover {
+    border-color: var(--gold-muted);
+    box-shadow: 0 6px 25px var(--gold-shadow);
+  }
+  
+  /* Gold-themed headings */
+  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6,
+  .dark [class*="heading-"],
+  .dark [class*="title-"] {
+    color: var(--gold-primary);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Gold-themed text elements */
+  .dark .text-primary {
+    color: var(--gold-primary) !important;
+  }
+  
+  .dark .text-secondary {
+    color: var(--gold-secondary) !important;
+  }
+  
+  .dark .text-muted {
+    color: var(--gold-muted) !important;
+  }
+  
+  .dark .text-accent {
+    color: var(--gold-accent) !important;
+  }
+  
+  /* Gold-themed borders */
+  .dark .border {
+    border-color: var(--gold-border) !important;
+  }
+  
+  .dark .border-primary {
+    border-color: var(--gold-primary) !important;
+  }
+  
+  .dark .border-t, .dark .border-b, .dark .border-l, .dark .border-r {
+    border-color: var(--gold-border) !important;
+  }
+  
+  /* Gold-themed dividers */
+  .dark .divider, 
+  .dark hr,
+  .dark .separator {
+    border-color: var(--gold-border) !important;
+  }
+  
+  /* Gold glow for important elements */
+  .dark .gold-glow {
+    box-shadow: 0 0 10px var(--gold-shadow);
+    border-color: var(--gold-border);
+    transition: all 0.3s ease;
+  }
+  
+  .dark .gold-glow:hover {
+    box-shadow: 0 0 15px var(--gold-shadow);
+    border-color: var(--gold-primary);
+  }
+  
+  /* Gold-themed tables */
+  .dark table {
+    border-color: var(--gold-border);
+  }
+  
+  .dark th {
+    color: var(--gold-primary);
+    border-bottom-color: var(--gold-border);
+    background-color: rgba(0, 0, 0, 0.3);
+  }
+  
+  .dark td {
+    color: var(--gold-muted);
+    border-color: var(--gold-border);
+  }
+  
+  .dark tr:hover td {
+    background-color: rgba(245, 215, 110, 0.05);
+  }
+  
+  /* Gold-themed lists */
+  .dark ul li::before,
+  .dark ol li::marker {
+    color: var(--gold-secondary);
   }
 }
 
@@ -325,4 +543,24 @@ button path[d*="triangle"] {
     fill: var(--system-nav-color) !important;
     stroke: var(--system-nav-color) !important;
   }
+}
+
+/* Webkit scrollbar styles (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--primary) / 0.3);
+  border-radius: 20px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--primary) / 0.5);
 }

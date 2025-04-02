@@ -85,7 +85,7 @@ export function ClientSideLayout({ children }) {
       suppressHydrationWarning
     >
       <Navbar />
-      <main className="flex-grow pt-16">
+      <main className="flex-grow pt-16 w-full">
         {children}
       </main>
       <Footer />

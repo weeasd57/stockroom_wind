@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useTheme } from '@/components/theme-provider';
+import { useTheme } from '@/providers/theme-provider';
 import styles from '@/styles/footer.module.css';
 
 export default function Footer() {
