@@ -25,7 +25,24 @@ const globalProfileState = {
 
 // Provider component
 export function ProfileProvider({ children }) {
-  const { user } = useSupabase();
+  // Handle the case where SupabaseProvider might not be available during SSR
+  let user = null;
+  let supabaseContextAvailable = true;
+  
+  try {
+    // Try to use the SupabaseProvider
+    const supabaseContext = useSupabase();
+    user = supabaseContext?.user;
+    
+    // If we got here without errors, SupabaseProvider is available
+  } catch (error) {
+    // If this fails, it means we're not within a SupabaseProvider
+    // This can happen during server-side rendering on Vercel
+    console.warn('SupabaseProvider not available - rendering with null user');
+    supabaseContextAvailable = false;
+    user = null;
+  }
+  
   const [profile, setProfile] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [backgroundUrl, setBackgroundUrl] = useState(null);
@@ -85,106 +102,121 @@ export function ProfileProvider({ children }) {
   };
 
   useEffect(() => {
-    if (user) {
-      console.log('Fetching user profile data for user ID:', user.id);
-      getUserProfile(user.id)
-        .then((response) => {
-          console.log('Profile response received:', response);
-          if (response.data) {
-            setProfile(response.data);
-            console.log('Profile data set:', response.data);
-          } else if (response.error) {
-            setError(handleError(response.error));
-            console.error('Error in profile response:', response.error);
-          }
-          setLoading(false);
-        })
-        .catch((error) => {
-          console.error('Error fetching profile data:', error);
-          setError(handleError(error));
-          setLoading(false);
-        });
-    } else {
-      // Reset profile when user is not available
-      setProfile(null);
+    // Skip if SupabaseProvider is not available or user is not logged in
+    if (!supabaseContextAvailable || !user) {
+      // If we're not in a SupabaseProvider context, just set loading to false
+      if (!supabaseContextAvailable) {
+        setLoading(false);
+      }
+      return;
     }
-  }, [user]);
+    
+    console.log('Fetching user profile data for user ID:', user.id);
+    getUserProfile(user.id)
+      .then((response) => {
+        console.log('Profile response received:', response);
+        if (response.data) {
+          setProfile(response.data);
+          console.log('Profile data set:', response.data);
+        } else if (response.error) {
+          setError(handleError(response.error));
+          console.error('Error in profile response:', response.error);
+        }
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error('Error fetching profile data:', error);
+        setError(handleError(error));
+        setLoading(false);
+      });
+  }, [user, supabaseContextAvailable]);
 
   useEffect(() => {
-    if (profile) {
-      // Check if we have cached images first
-      if (user?.id) {
-        // Try to use the imageCacheManager for persistent caching
-        if (typeof window !== 'undefined' && window.imageCacheManager) {
-          const cachedAvatar = window.imageCacheManager.getAvatarUrl(user.id);
-          if (cachedAvatar) {
-            console.log('Using cached avatar from global cache manager');
-            setAvatarUrl(cachedAvatar);
-          }
-        }
-        
-        // Local cache as fallback
-        if (!avatarUrl && imageCache.current.has(`avatar_${user.id}`)) {
-          const cached = imageCache.current.get(`avatar_${user.id}`);
-          console.log('Using cached avatar from local cache');
-          setAvatarUrl(cached);
-        }
-        
-        if (!backgroundUrl && imageCache.current.has(`background_${user.id}`)) {
-          const cached = imageCache.current.get(`background_${user.id}`);
-          console.log('Using cached background from local cache');
-          setBackgroundUrl(cached);
+    // Skip if no profile or SupabaseProvider is not available
+    if (!profile || !supabaseContextAvailable) {
+      return;
+    }
+    
+    // Check if we have cached images first
+    if (user?.id) {
+      // Try to use the imageCacheManager for persistent caching
+      if (typeof window !== 'undefined' && window.imageCacheManager) {
+        const cachedAvatar = window.imageCacheManager.getAvatarUrl(user.id);
+        if (cachedAvatar) {
+          console.log('Using cached avatar from global cache manager');
+          setAvatarUrl(cachedAvatar);
         }
       }
       
-      // Only fetch new images if it's been more than 5 minutes since last fetch
-      // or if we don't have urls yet
-      const now = Date.now();
-      const shouldRefresh = !avatarUrl || !backgroundUrl || now - lastImageRefresh.current > 300000; // 5 minutes
+      // Local cache as fallback
+      if (!avatarUrl && imageCache.current.has(`avatar_${user.id}`)) {
+        const cached = imageCache.current.get(`avatar_${user.id}`);
+        console.log('Using cached avatar from local cache');
+        setAvatarUrl(cached);
+      }
       
-      if (shouldRefresh) {
-        console.log('Refreshing profile images - time elapsed or first load');
-        const fetchImages = async () => {
-          try {
-            if (user && profile) {
-              // Get avatar image
-              const avatar = await getAvatarImageUrl(user.id);
-              // Store in both local and persistent cache
-              imageCache.current.set(`avatar_${user.id}`, avatar);
-              if (typeof window !== 'undefined' && window.imageCacheManager) {
-                window.imageCacheManager.setAvatarUrl(user.id, avatar);
-                window.imageCacheManager.preload(avatar);
-              }
-              
-              // Get background image
-              const background = await getBackgroundImageUrl(user.id);
-              imageCache.current.set(`background_${user.id}`, background);
-              if (typeof window !== 'undefined' && window.imageCacheManager) {
-                window.imageCacheManager.preload(background);
-              }
-              
-              // Set state
-              setAvatarUrl(avatar);
-              setBackgroundUrl(background);
-              lastImageRefresh.current = now;
-              console.log('Profile images refreshed from server');
-            }
-          } catch (error) {
-            console.error('Error loading profile images:', error);
-            // Fallback to defaults
-            setAvatarUrl('/default-avatar.svg');
-            setBackgroundUrl('/profile-bg.jpg');
-          }
-        };
-        
-        fetchImages();
-      } else {
-        console.log('Skipping image refresh - recently refreshed');
+      if (!backgroundUrl && imageCache.current.has(`background_${user.id}`)) {
+        const cached = imageCache.current.get(`background_${user.id}`);
+        console.log('Using cached background from local cache');
+        setBackgroundUrl(cached);
       }
     }
-  }, [profile, user, avatarUrl, backgroundUrl]);
+    
+    // Only fetch new images if it's been more than 5 minutes since last fetch
+    // or if we don't have urls yet
+    const now = Date.now();
+    const shouldRefresh = !avatarUrl || !backgroundUrl || now - lastImageRefresh.current > 300000; // 5 minutes
+    
+    if (shouldRefresh) {
+      console.log('Refreshing profile images - time elapsed or first load');
+      const fetchImages = async () => {
+        try {
+          if (user && profile) {
+            // Get avatar image
+            const avatar = await getAvatarImageUrl(user.id);
+            // Store in both local and persistent cache
+            imageCache.current.set(`avatar_${user.id}`, avatar);
+            if (typeof window !== 'undefined' && window.imageCacheManager) {
+              window.imageCacheManager.setAvatarUrl(user.id, avatar);
+              window.imageCacheManager.preload(avatar);
+            }
+            
+            // Get background image
+            const background = await getBackgroundImageUrl(user.id);
+            imageCache.current.set(`background_${user.id}`, background);
+            if (typeof window !== 'undefined' && window.imageCacheManager) {
+              window.imageCacheManager.preload(background);
+            }
+            
+            // Set state
+            setAvatarUrl(avatar);
+            setBackgroundUrl(background);
+            lastImageRefresh.current = now;
+            console.log('Profile images refreshed from server');
+          }
+        } catch (error) {
+          console.error('Error loading profile images:', error);
+          // Fallback to defaults
+          setAvatarUrl('/default-avatar.svg');
+          setBackgroundUrl('/profile-bg.jpg');
+        }
+      };
+      
+      fetchImages();
+    } else {
+      console.log('Skipping image refresh - recently refreshed');
+    }
+  }, [profile, user, avatarUrl, backgroundUrl, supabaseContextAvailable]);
 
   const updateProfile = async (updates) => {
+    // Check if SupabaseProvider is available and user is logged in
+    if (!supabaseContextAvailable || !user) {
+      console.error('Cannot update profile: user not available');
+      const error = new Error('User not authenticated');
+      setError(handleError(error));
+      return { success: false, error: handleError(error) };
+    }
+    
     setLoading(true);
     try {
       console.log('Updating profile with data:', updates);
@@ -231,6 +263,14 @@ export function ProfileProvider({ children }) {
   };
 
   const uploadProfileImage = async (image) => {
+    // Check if SupabaseProvider is available and user is logged in
+    if (!supabaseContextAvailable || !user) {
+      console.error('Cannot upload profile image: user not available');
+      const error = new Error('User not authenticated');
+      setError(handleError(error));
+      throw error;
+    }
+    
     setLoading(true);
     try {
       const url = await uploadImage(image);
@@ -253,7 +293,7 @@ export function ProfileProvider({ children }) {
   };
 
   const getEffectiveAvatarUrl = async () => {
-    if (!user || !profile) return '/default-avatar.svg';
+    if (!supabaseContextAvailable || !user || !profile) return '/default-avatar.svg';
     
     // First try the imageCacheManager
     if (typeof window !== 'undefined' && window.imageCacheManager) {
@@ -289,6 +329,14 @@ export function ProfileProvider({ children }) {
 
   // Added functions from ProfileStore
   const initializeData = async (userId) => {
+    // Check if we're properly authenticated
+    if (!supabaseContextAvailable) {
+      console.error('Cannot initialize data: SupabaseProvider not available');
+      const error = new Error('SupabaseProvider not available');
+      setError(handleError(error));
+      return;
+    }
+    
     // Don't initialize if already initialized or loading
     if (isInitialized || isLoading) return;
     
@@ -394,6 +442,14 @@ export function ProfileProvider({ children }) {
   };
   
   const refreshData = async (userId) => {
+    // Check if we're properly authenticated
+    if (!supabaseContextAvailable) {
+      console.error('Cannot refresh data: SupabaseProvider not available');
+      const error = new Error('SupabaseProvider not available');
+      setError(handleError(error));
+      return;
+    }
+    
     // Don't refresh if already refreshing
     if (isRefreshing) return;
     
