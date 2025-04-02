@@ -4,3 +4,4 @@ export * from './CommentProvider';
 export * from './SupabaseProvider';
 export * from './CreatePostFormProvider';
 export * from './AuthGuard';
+export * from './ProfileProvider';

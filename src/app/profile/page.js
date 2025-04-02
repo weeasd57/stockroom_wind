@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
+// No longer needed since we're using the ProfileProvider
+// import useProfileStore from '@/store/profileStore';
 import Link from 'next/link';
 import styles from '@/styles/profile.module.css';
 import editStyles from '@/styles/editProfile.module.css';
-import useProfileStore from '@/store/profileStore';
 import { CreatePostButton } from '@/components/posts/CreatePostButton';
 import { uploadImage } from '@/utils/supabase';
 
@@ -17,7 +18,21 @@ export default function Profile() {
     loading: profileLoading,
     avatarUrl: contextAvatarUrl,
     backgroundUrl: contextBackgroundUrl,
-    updateProfile
+    updateProfile,
+    // Additional values from ProfileProvider that were previously in useProfileStore
+    posts,
+    followers,
+    following,
+    activeTab,
+    isLoading,
+    error,
+    isInitialized,
+    setActiveTab,
+    initializeData,
+    refreshData,
+    selectedStrategy,
+    setSelectedStrategy,
+    clearSelectedStrategy
   } = useProfile();
 
   // Debug authentication on mount
@@ -34,23 +49,7 @@ export default function Profile() {
     console.log("[PROFILE] Profile data:", profile);
   }, [isAuthenticated, user, authLoading, profileLoading, profile]);
 
-  // Profile store state and actions
-  const {
-    posts,
-    followers,
-    following,
-    activeTab,
-    isLoading,
-    error,
-    isInitialized,
-    setActiveTab,
-    initializeData,
-    refreshData,
-    selectedStrategy,
-    setSelectedStrategy,
-    clearSelectedStrategy
-  } = useProfileStore();
-
+  
   const [showEditModal, setShowEditModal] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
@@ -100,7 +99,7 @@ export default function Profile() {
   useEffect(() => {
     if (user && isAuthenticated) {
       // Don't refresh immediately if data is less than 2 minutes old
-      const { lastFetched } = useProfileStore.getState();
+      const { lastFetched } = useProfile.getState();
       const now = Date.now();
       const twoMinutesAgo = now - 2 * 60 * 1000; // 2 minutes in milliseconds
       
@@ -115,7 +114,7 @@ export default function Profile() {
       // Set up interval for background refresh (every 2 minutes instead of 30 seconds)
       refreshInterval.current = setInterval(() => {
         // Get the latest lastFetched value
-        const { lastFetched, isRefreshing } = useProfileStore.getState();
+        const { lastFetched, isRefreshing } = useProfile.getState();
         const now = Date.now();
         const twoMinutesAgo = now - 2 * 60 * 1000;
         
@@ -831,8 +830,8 @@ export default function Profile() {
 
       {error && (
         <div className={styles.errorToast}>
-          {error}
-          <button onClick={() => useProfileStore.getState().setError(null)}>×</button>
+          {typeof error === 'object' ? (error.message || JSON.stringify(error)) : error}
+          <button onClick={() => useProfile.getState().setError(null)}>×</button>
         </div>
       )}
 
@@ -1012,7 +1011,9 @@ export default function Profile() {
                 </div>
               ) : error ? (
                 <div className={styles.errorContainer}>
-                  <p className={styles.errorMessage}>{error}</p>
+                  <p className={styles.errorMessage}>
+                    {typeof error === 'object' ? (error.message || JSON.stringify(error)) : error}
+                  </p>
                   <button 
                     className={styles.retryButton} 
                     onClick={() => {
@@ -1152,13 +1153,12 @@ export default function Profile() {
             
             {saveError && (
               <div className={editStyles.errorMessage}>
-                {saveError}
+                {typeof saveError === 'object' ? (saveError.message || JSON.stringify(saveError)) : saveError}
                 <button 
-                  className={editStyles.dismissError} 
-                  onClick={() => setSaveError(null)}
-                  aria-label="Dismiss error"
+                  onClick={() => setSaveError(null)} 
+                  className={editStyles.dismissError}
                 >
-                  ✕
+                  ×
                 </button>
               </div>
             )}
@@ -1216,7 +1216,9 @@ export default function Profile() {
                     />
                   </div>
                   {avatarUploadError && (
-                    <p className={editStyles.uploadError}>{avatarUploadError}</p>
+                    <p className={editStyles.uploadError}>
+                      {typeof avatarUploadError === 'object' ? (avatarUploadError.message || JSON.stringify(avatarUploadError)) : avatarUploadError}
+                    </p>
                   )}
                   <button 
                     type="button" 
@@ -1263,7 +1265,9 @@ export default function Profile() {
                 </div>
                 {backgroundUploadError && (
                   <div className={editStyles.errorContainer}>
-                    <p className={editStyles.uploadError}>{backgroundUploadError}</p>
+                    <p className={editStyles.uploadError}>
+                      {typeof backgroundUploadError === 'object' ? (backgroundUploadError.message || JSON.stringify(backgroundUploadError)) : backgroundUploadError}
+                    </p>
                     <button 
                       type="button" 
                       className={editStyles.dismissError} 

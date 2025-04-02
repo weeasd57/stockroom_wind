@@ -8,11 +8,20 @@ import {
   updateUserProfile, 
   uploadImage,
   getAvatarImageUrl,
-  getBackgroundImageUrl
+  getBackgroundImageUrl,
+  supabase
 } from '@/utils/supabase';
 
 // Create the context
 const ProfileContext = createContext(null);
+
+// Create a global store object to mimic Zustand's behavior
+// This will store the latest state values needed by getState
+const globalProfileState = {
+  lastFetched: null,
+  isRefreshing: false,
+  setError: null
+};
 
 // Provider component
 export function ProfileProvider({ children }) {
@@ -25,6 +34,56 @@ export function ProfileProvider({ children }) {
   const lastImageRefresh = useRef(Date.now());
   const imageCache = useRef(new Map()); // Local cache for image URLs
 
+  // Additional state from ProfileStore
+  const [posts, setPosts] = useState([]);
+  const [followers, setFollowers] = useState([]);
+  const [following, setFollowing] = useState([]);
+  const [activeTab, setActiveTab] = useState('posts');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [lastFetched, setLastFetched] = useState(null);
+  const [selectedStrategy, setSelectedStrategy] = useState(null);
+
+  // Update global state when local state changes
+  useEffect(() => {
+    globalProfileState.lastFetched = lastFetched;
+    globalProfileState.isRefreshing = isRefreshing;
+    // Make sure setError handles error objects properly
+    globalProfileState.setError = (newError) => {
+      // Ensure we're not directly rendering objects
+      if (typeof newError === 'object' && newError !== null) {
+        // If error has message property, use it
+        if (newError.message) {
+          console.error('Error object:', newError);
+          setError(newError.message);
+        } else {
+          // Otherwise stringify the object
+          console.error('Error object without message:', newError);
+          setError(JSON.stringify(newError));
+        }
+      } else {
+        setError(newError);
+      }
+    };
+  }, [lastFetched, isRefreshing]);
+
+  // Helper function to handle error objects consistently
+  const handleError = (err) => {
+    if (typeof err === 'object' && err !== null) {
+      // If error has message property, use it
+      if (err.message) {
+        console.error('Error object:', err);
+        return err.message;
+      } else {
+        // Otherwise stringify the object
+        console.error('Error object without message:', err);
+        return JSON.stringify(err);
+      }
+    }
+    return err;
+  };
+
   useEffect(() => {
     if (user) {
       console.log('Fetching user profile data for user ID:', user.id);
@@ -35,14 +94,14 @@ export function ProfileProvider({ children }) {
             setProfile(response.data);
             console.log('Profile data set:', response.data);
           } else if (response.error) {
-            setError(response.error);
+            setError(handleError(response.error));
             console.error('Error in profile response:', response.error);
           }
           setLoading(false);
         })
         .catch((error) => {
           console.error('Error fetching profile data:', error);
-          setError(error);
+          setError(handleError(error));
           setLoading(false);
         });
     } else {
@@ -133,8 +192,8 @@ export function ProfileProvider({ children }) {
       
       if (error) {
         console.error('Error updating profile:', error);
-        setError(error);
-        return { success: false, error };
+        setError(handleError(error));
+        return { success: false, error: handleError(error) };
       }
       
       console.log('Profile updated successfully:', data);
@@ -164,8 +223,8 @@ export function ProfileProvider({ children }) {
       return { success: true, data };
     } catch (error) {
       console.error('Exception in updateProfile:', error);
-      setError(error);
-      return { success: false, error };
+      setError(handleError(error));
+      return { success: false, error: handleError(error) };
     } finally {
       setLoading(false);
     }
@@ -186,7 +245,7 @@ export function ProfileProvider({ children }) {
       setAvatarUrl(url);
       return url;
     } catch (error) {
-      setError(error);
+      setError(handleError(error));
       throw error;
     } finally {
       setLoading(false);
@@ -228,8 +287,216 @@ export function ProfileProvider({ children }) {
     }
   };
 
+  // Added functions from ProfileStore
+  const initializeData = async (userId) => {
+    // Don't initialize if already initialized or loading
+    if (isInitialized || isLoading) return;
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Fetch user posts
+      const { data: postsData, error: postsError } = await supabase
+        .from('posts')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+        
+      if (postsError) throw postsError;
+      
+      // First, let's inspect the followers table structure to get the correct column names
+      try {
+        // Attempt to get a single row to see the column structure
+        const { data: tableInfo, error: tableInfoError } = await supabase
+          .from('followers')
+          .select('*')
+          .limit(1);
+          
+        console.log('Followers table structure:', tableInfo);
+        
+        if (tableInfoError) {
+          console.error('Error getting followers table structure:', tableInfoError);
+        }
+      } catch (inspectError) {
+        console.error('Error inspecting followers table:', inspectError);
+      }
+      
+      // Modified queries using more commonly used column names - we'll adjust based on your actual schema
+      // Try with followed_id instead of user_id
+      let followersData, followingData;
+      
+      // First approach for followers
+      const followersResult = await supabase
+        .from('followers')
+        .select('follower_id, profiles!followers_follower_id_fkey(id, username, avatar_url)')
+        .eq('followed_id', userId);
+        
+      if (followersResult.error) {
+        console.error('First followers query failed:', followersResult.error);
+        
+        // If the first query fails, try with another common column name pattern
+        const altFollowersResult = await supabase
+          .from('followers')
+          .select('follower_id, profiles!followers_follower_id_fkey(id, username, avatar_url)')
+          .eq('following_id', userId);
+          
+        if (altFollowersResult.error) {
+          console.error('Alternative followers query failed:', altFollowersResult.error);
+          followersData = []; // Set empty array as fallback
+        } else {
+          // Use alternative data if the second query succeeded
+          followersData = altFollowersResult.data || [];
+        }
+      } else {
+        followersData = followersResult.data || [];
+      }
+      
+      // Try with followed_id instead of user_id for following
+      const followingResult = await supabase
+        .from('followers')
+        .select('followed_id, profiles!followers_followed_id_fkey(id, username, avatar_url)')
+        .eq('follower_id', userId);
+        
+      if (followingResult.error) {
+        console.error('First following query failed:', followingResult.error);
+        
+        // If the first query fails, try with another common column name pattern
+        const altFollowingResult = await supabase
+          .from('followers')
+          .select('following_id, profiles!followers_following_id_fkey(id, username, avatar_url)')
+          .eq('follower_id', userId);
+          
+        if (altFollowingResult.error) {
+          console.error('Alternative following query failed:', altFollowingResult.error);
+          followingData = []; // Set empty array as fallback
+        } else {
+          // Use alternative data if the second query succeeded
+          followingData = altFollowingResult.data || [];
+        }
+      } else {
+        followingData = followingResult.data || [];
+      }
+      
+      // Set the data
+      setPosts(postsData || []);
+      setFollowers(followersData);
+      setFollowing(followingData);
+      setIsInitialized(true);
+      setLastFetched(Date.now());
+      
+    } catch (error) {
+      console.error('Error initializing profile data:', error);
+      setError(handleError(error));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const refreshData = async (userId) => {
+    // Don't refresh if already refreshing
+    if (isRefreshing) return;
+    
+    try {
+      setIsRefreshing(true);
+      setError(null);
+      
+      // Similar fetch logic as initializeData
+      const { data: postsData, error: postsError } = await supabase
+        .from('posts')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+        
+      if (postsError) throw postsError;
+      
+      // Modified queries using more commonly used column names - using the same pattern as in initializeData
+      // Try with followed_id instead of user_id
+      let followersData, followingData;
+      
+      // First approach for followers
+      const followersResult = await supabase
+        .from('followers')
+        .select('follower_id, profiles!followers_follower_id_fkey(id, username, avatar_url)')
+        .eq('followed_id', userId);
+        
+      if (followersResult.error) {
+        console.error('First followers query failed:', followersResult.error);
+        
+        // If the first query fails, try with another common column name pattern
+        const altFollowersResult = await supabase
+          .from('followers')
+          .select('follower_id, profiles!followers_follower_id_fkey(id, username, avatar_url)')
+          .eq('following_id', userId);
+          
+        if (altFollowersResult.error) {
+          console.error('Alternative followers query failed:', altFollowersResult.error);
+          followersData = []; // Set empty array as fallback
+        } else {
+          // Use alternative data if the second query succeeded
+          followersData = altFollowersResult.data || [];
+        }
+      } else {
+        followersData = followersResult.data || [];
+      }
+      
+      // Try with followed_id instead of user_id for following
+      const followingResult = await supabase
+        .from('followers')
+        .select('followed_id, profiles!followers_followed_id_fkey(id, username, avatar_url)')
+        .eq('follower_id', userId);
+        
+      if (followingResult.error) {
+        console.error('First following query failed:', followingResult.error);
+        
+        // If the first query fails, try with another common column name pattern
+        const altFollowingResult = await supabase
+          .from('followers')
+          .select('following_id, profiles!followers_following_id_fkey(id, username, avatar_url)')
+          .eq('follower_id', userId);
+          
+        if (altFollowingResult.error) {
+          console.error('Alternative following query failed:', altFollowingResult.error);
+          followingData = []; // Set empty array as fallback
+        } else {
+          // Use alternative data if the second query succeeded
+          followingData = altFollowingResult.data || [];
+        }
+      } else {
+        followingData = followingResult.data || [];
+      }
+      
+      // Update the data
+      setPosts(postsData || []);
+      setFollowers(followersData);
+      setFollowing(followingData);
+      setLastFetched(Date.now());
+      
+    } catch (error) {
+      console.error('Error refreshing profile data:', error);
+      setError(handleError(error));
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+  
+  const clearSelectedStrategy = () => {
+    setSelectedStrategy(null);
+  };
+
+  // Modified getState function to update the global store
+  const getState = () => {
+    return {
+      lastFetched,
+      isRefreshing,
+      // Add other state as needed
+      setError: (newError) => globalProfileState.setError(newError)
+    };
+  };
+
   return (
     <ProfileContext.Provider value={{
+      // Original ProfileProvider values
       profile,
       avatarUrl,
       backgroundUrl,
@@ -237,7 +504,28 @@ export function ProfileProvider({ children }) {
       error,
       updateProfile,
       uploadProfileImage,
-      getEffectiveAvatarUrl
+      getEffectiveAvatarUrl,
+      
+      // Added values from ProfileStore
+      posts,
+      followers,
+      following,
+      activeTab,
+      isLoading,
+      isRefreshing,
+      isInitialized,
+      lastFetched,
+      selectedStrategy,
+      
+      // Added actions from ProfileStore
+      setActiveTab,
+      initializeData,
+      refreshData, 
+      setSelectedStrategy,
+      clearSelectedStrategy,
+      
+      // Static methods
+      getState
     }}>
       {children}
     </ProfileContext.Provider>
@@ -252,3 +540,10 @@ export function useProfile() {
   }
   return context;
 }
+
+// Static getState method to mimic Zustand's behavior
+// This version doesn't use hooks outside component functions
+useProfile.getState = () => {
+  // Return the global state instead of using useContext
+  return globalProfileState;
+};
