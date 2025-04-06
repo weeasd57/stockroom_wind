@@ -469,14 +469,8 @@
   text-shadow: 0 0 5px var(--gold-shadow);
 }
 
-/* Gold animations for dark mode */
-.dark .auth-fade-in {
-  animation: goldFadeIn 0.5s ease-in-out forwards;
-}
 
-.dark .auth-fade-out {
-  animation: goldFadeOut 0.5s ease-in-out forwards;
-}
+
 
 @keyframes goldFadeIn {
   from {

@@ -111,24 +111,24 @@ export function ProfileProvider({ children }) {
       return;
     }
     
-    console.log('Fetching user profile data for user ID:', user.id);
-    getUserProfile(user.id)
-      .then((response) => {
-        console.log('Profile response received:', response);
-        if (response.data) {
-          setProfile(response.data);
-          console.log('Profile data set:', response.data);
-        } else if (response.error) {
+      console.log('Fetching user profile data for user ID:', user.id);
+      getUserProfile(user.id)
+        .then((response) => {
+          console.log('Profile response received:', response);
+          if (response.data) {
+            setProfile(response.data);
+            console.log('Profile data set:', response.data);
+          } else if (response.error) {
           setError(handleError(response.error));
-          console.error('Error in profile response:', response.error);
-        }
-        setLoading(false);
-      })
-      .catch((error) => {
-        console.error('Error fetching profile data:', error);
+            console.error('Error in profile response:', response.error);
+          }
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error('Error fetching profile data:', error);
         setError(handleError(error));
-        setLoading(false);
-      });
+          setLoading(false);
+        });
   }, [user, supabaseContextAvailable]);
 
   useEffect(() => {
@@ -137,75 +137,75 @@ export function ProfileProvider({ children }) {
       return;
     }
     
-    // Check if we have cached images first
-    if (user?.id) {
-      // Try to use the imageCacheManager for persistent caching
-      if (typeof window !== 'undefined' && window.imageCacheManager) {
-        const cachedAvatar = window.imageCacheManager.getAvatarUrl(user.id);
-        if (cachedAvatar) {
-          console.log('Using cached avatar from global cache manager');
-          setAvatarUrl(cachedAvatar);
-        }
-      }
-      
-      // Local cache as fallback
-      if (!avatarUrl && imageCache.current.has(`avatar_${user.id}`)) {
-        const cached = imageCache.current.get(`avatar_${user.id}`);
-        console.log('Using cached avatar from local cache');
-        setAvatarUrl(cached);
-      }
-      
-      if (!backgroundUrl && imageCache.current.has(`background_${user.id}`)) {
-        const cached = imageCache.current.get(`background_${user.id}`);
-        console.log('Using cached background from local cache');
-        setBackgroundUrl(cached);
-      }
-    }
-    
-    // Only fetch new images if it's been more than 5 minutes since last fetch
-    // or if we don't have urls yet
-    const now = Date.now();
-    const shouldRefresh = !avatarUrl || !backgroundUrl || now - lastImageRefresh.current > 300000; // 5 minutes
-    
-    if (shouldRefresh) {
-      console.log('Refreshing profile images - time elapsed or first load');
-      const fetchImages = async () => {
-        try {
-          if (user && profile) {
-            // Get avatar image
-            const avatar = await getAvatarImageUrl(user.id);
-            // Store in both local and persistent cache
-            imageCache.current.set(`avatar_${user.id}`, avatar);
-            if (typeof window !== 'undefined' && window.imageCacheManager) {
-              window.imageCacheManager.setAvatarUrl(user.id, avatar);
-              window.imageCacheManager.preload(avatar);
-            }
-            
-            // Get background image
-            const background = await getBackgroundImageUrl(user.id);
-            imageCache.current.set(`background_${user.id}`, background);
-            if (typeof window !== 'undefined' && window.imageCacheManager) {
-              window.imageCacheManager.preload(background);
-            }
-            
-            // Set state
-            setAvatarUrl(avatar);
-            setBackgroundUrl(background);
-            lastImageRefresh.current = now;
-            console.log('Profile images refreshed from server');
+      // Check if we have cached images first
+      if (user?.id) {
+        // Try to use the imageCacheManager for persistent caching
+        if (typeof window !== 'undefined' && window.imageCacheManager) {
+          const cachedAvatar = window.imageCacheManager.getAvatarUrl(user.id);
+          if (cachedAvatar) {
+            console.log('Using cached avatar from global cache manager');
+            setAvatarUrl(cachedAvatar);
           }
-        } catch (error) {
-          console.error('Error loading profile images:', error);
-          // Fallback to defaults
-          setAvatarUrl('/default-avatar.svg');
-          setBackgroundUrl('/profile-bg.jpg');
         }
-      };
+        
+        // Local cache as fallback
+        if (!avatarUrl && imageCache.current.has(`avatar_${user.id}`)) {
+          const cached = imageCache.current.get(`avatar_${user.id}`);
+          console.log('Using cached avatar from local cache');
+          setAvatarUrl(cached);
+        }
+        
+        if (!backgroundUrl && imageCache.current.has(`background_${user.id}`)) {
+          const cached = imageCache.current.get(`background_${user.id}`);
+          console.log('Using cached background from local cache');
+          setBackgroundUrl(cached);
+        }
+      }
       
-      fetchImages();
-    } else {
-      console.log('Skipping image refresh - recently refreshed');
-    }
+      // Only fetch new images if it's been more than 5 minutes since last fetch
+      // or if we don't have urls yet
+      const now = Date.now();
+      const shouldRefresh = !avatarUrl || !backgroundUrl || now - lastImageRefresh.current > 300000; // 5 minutes
+      
+      if (shouldRefresh) {
+        console.log('Refreshing profile images - time elapsed or first load');
+        const fetchImages = async () => {
+          try {
+            if (user && profile) {
+              // Get avatar image
+              const avatar = await getAvatarImageUrl(user.id);
+              // Store in both local and persistent cache
+              imageCache.current.set(`avatar_${user.id}`, avatar);
+              if (typeof window !== 'undefined' && window.imageCacheManager) {
+                window.imageCacheManager.setAvatarUrl(user.id, avatar);
+                window.imageCacheManager.preload(avatar);
+              }
+              
+              // Get background image
+              const background = await getBackgroundImageUrl(user.id);
+              imageCache.current.set(`background_${user.id}`, background);
+              if (typeof window !== 'undefined' && window.imageCacheManager) {
+                window.imageCacheManager.preload(background);
+              }
+              
+              // Set state
+              setAvatarUrl(avatar);
+              setBackgroundUrl(background);
+              lastImageRefresh.current = now;
+              console.log('Profile images refreshed from server');
+            }
+          } catch (error) {
+            console.error('Error loading profile images:', error);
+            // Fallback to defaults
+            setAvatarUrl('/default-avatar.svg');
+            setBackgroundUrl('/profile-bg.jpg');
+          }
+        };
+        
+        fetchImages();
+      } else {
+        console.log('Skipping image refresh - recently refreshed');
+      }
   }, [profile, user, avatarUrl, backgroundUrl, supabaseContextAvailable]);
 
   const updateProfile = async (updates) => {

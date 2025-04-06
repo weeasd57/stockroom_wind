@@ -8,7 +8,7 @@ export default function Footer() {
   const { theme } = useTheme();
   
   return (
-    <footer className={styles.footer}>
+    <footer className={`${styles.footer} ${theme === 'dark' ? styles.darkFooter : ''}`}>
       <div className={styles.container}>
         <div className={styles.content}>
           <div className={styles.section}>
@@ -21,18 +21,18 @@ export default function Footer() {
           <div className={styles.section}>
             <h3 className={styles.title}>Links</h3>
             <ul className={styles.links}>
-              <li><Link href="/">Home</Link></li>
-              <li><Link href="/explore">Explore</Link></li>
-              <li><Link href="/stocks">Stocks</Link></li>
-              <li><Link href="/news">News</Link></li>
+              <li><Link href="/" className={styles.link}>Home</Link></li>
+              <li><Link href="/explore" className={styles.link}>Explore</Link></li>
+              <li><Link href="/stocks" className={styles.link}>Stocks</Link></li>
+              <li><Link href="/news" className={styles.link}>News</Link></li>
             </ul>
           </div>
           
           <div className={styles.section}>
             <h3 className={styles.title}>Legal</h3>
             <ul className={styles.links}>
-              <li><Link href="/terms">Terms</Link></li>
-              <li><Link href="/privacy">Privacy</Link></li>
+              <li><Link href="/terms" className={styles.link}>Terms</Link></li>
+              <li><Link href="/privacy" className={styles.link}>Privacy</Link></li>
             </ul>
           </div>
         </div>
@@ -41,6 +41,9 @@ export default function Footer() {
           <p className={styles.copyright}>
             &copy; {new Date().getFullYear()} FireStocks. All rights reserved.
           </p>
+        </div>
+        <div className={styles.appname}>
+          FireStocks
         </div>
       </div>
     </footer>

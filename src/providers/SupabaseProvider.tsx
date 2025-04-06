@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
+import { useRouter } from 'next/navigation';
 
 interface SupabaseContextType {
   supabase: SupabaseClient;
@@ -13,6 +14,7 @@ interface SupabaseContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, userData: any) => Promise<void>;
   signOut: () => Promise<void>;
+  handleLogout: () => Promise<void>;
   refreshSession: () => Promise<{ success: boolean; authenticated: boolean; }>;
   // Database functions
   getProfile: (userId: string) => Promise<any>;
@@ -45,6 +47,8 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     // Check active session
@@ -293,6 +297,21 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    
+    try {
+      setIsLoggingOut(true);
+      await signOut();
+      console.log('User logged out successfully');
+      router.push('/landing');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
     <SupabaseContext.Provider value={{
       supabase,
@@ -303,6 +322,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signUp,
       signOut,
+      handleLogout,
       refreshSession,
       getProfile,
       updateProfile,

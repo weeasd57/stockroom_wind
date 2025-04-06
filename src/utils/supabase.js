@@ -103,12 +103,19 @@ export const signIn = async (email, password) => {
 
 /**
  * Sign out the current user
+ * @param {object} router - Next.js router for redirection (optional)
  * @returns {Promise<object>} - Sign out error
  */
-export const signOut = async () => {
+export const signOut = async (router = null) => {
   try {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+    
+    // If router is provided, redirect to landing page
+    if (router) {
+      router.push('/landing');
+    }
+    
     return { error: null };
   } catch (e) {
     console.error('Sign out error:', e);
@@ -127,8 +134,7 @@ export const getCurrentUser = async () => {
     // If there's an authentication error (like invalid refresh token)
     if (error) {
       console.warn('Auth error getting current user:', error.message);
-      // Clear any potentially corrupted session data
-      await supabase.auth.signOut();
+      // Just return null instead of signing out automatically
       return null;
     }
     

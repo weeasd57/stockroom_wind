@@ -88,7 +88,6 @@ export function ClientSideLayout({ children }) {
       <main className="flex-grow pt-16 w-full">
         {children}
       </main>
-      <Footer />
     </div>
   );
 }

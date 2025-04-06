@@ -8,8 +8,7 @@ import { CreatePostForm } from '@/components/posts/CreatePostForm';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
 import { createPortal } from 'react-dom';
 import styles from '@/styles/home.module.css';
-import '@/styles/auth.css'; // Import the auth styles
-import '@/styles/create-post-page.css'; // Import create post styles
+import '@/styles/create-post-page.css'; 
 
 export default function HomePage() {
   const { user } = useSupabase();

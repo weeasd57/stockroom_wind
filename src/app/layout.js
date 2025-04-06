@@ -99,9 +99,7 @@ export default function RootLayout({ children }) {
                   <ClientSideLayout>
                     <AuthGuard>
                       <ClientImagePreloader />
-                      <div className="app-wrapper">
                         {children}
-                      </div>
                     </AuthGuard>
                   </ClientSideLayout>
                 </CreatePostFormProvider>

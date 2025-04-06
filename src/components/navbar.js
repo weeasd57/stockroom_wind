@@ -27,7 +27,7 @@ const getNavLinks = (isAuthenticated) => {
 export default function Navbar() {
   const pathname = useRouter();
   const router = useRouter();
-  const { user, signOut, isAuthenticated } = useSupabase();
+  const { user, signOut, handleLogout, isAuthenticated } = useSupabase();
   const profileContext = useProfile();
   const profile = profileContext?.profile;
   const getEffectiveAvatarUrl = profileContext?.getEffectiveAvatarUrl;
@@ -109,16 +109,14 @@ export default function Navbar() {
     }
   };
 
-  // Handler for logout
-  const handleLogout = async () => {
+  // Handler for logout - use the provider's handleLogout instead
+  const logoutHandler = async () => {
     if (isLoggingOut) return;
     
     try {
       setIsLoggingOut(true);
       closeMenu();
-      await signOut();
-      console.log('User logged out successfully');
-      router.push('/landing');
+      await handleLogout(); // Use handleLogout from SupabaseProvider
     } catch (error) {
       console.error('Error logging out:', error);
     } finally {
@@ -224,7 +222,7 @@ export default function Navbar() {
                 
                 <button 
                   className={styles.logoutButton} 
-                  onClick={handleLogout}
+                  onClick={logoutHandler}
                   disabled={isLoggingOut}
                 >
                   {isLoggingOut ? 'Logging out...' : 'Logout'}
