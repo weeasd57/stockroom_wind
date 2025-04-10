@@ -1,6 +1,6 @@
 .landingPage {
   width: 100%;
-  height: 150vh;
+  height: 100vh;
   background: var(--background);
   color: var(--foreground);
   overflow: hidden;
@@ -36,8 +36,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  will-change: transform;
-  transition: transform 0.2s ease-out;
   z-index: 200;
   background: var(--background);
   overflow: hidden;
@@ -48,7 +46,7 @@
 
 :global(.dark) .heroSection {
   background: linear-gradient(to bottom, #3f3f3f, #000000);
-  border-bottom: 1px solid #a78003;
+  border-bottom: 1px solid #fffb0b;
 }
 
 :global(.light) .heroSection {
@@ -74,7 +72,7 @@
 }
 
 :global(.dark) .heroTitle {
-  background: linear-gradient(90deg, #ffd700, #a78003);
+  background: linear-gradient(90deg, #fffffc, #ffee00);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

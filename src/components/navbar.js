@@ -229,7 +229,7 @@ export default function Navbar() {
                 </button>
               </>
             ) : (
-              <Link href="/login" className={styles.signInButton} style={{ textDecoration: 'none' }}>
+              <Link href="/login" className={styles.signInButton} style={{ textDecoration: 'none' }} onClick={closeMenu}>
                 Sign In
               </Link>
             )}

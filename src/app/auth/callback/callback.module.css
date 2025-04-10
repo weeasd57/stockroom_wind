@@ -12,6 +12,10 @@
   flex-direction: column;
   align-items: center;
   gap: 1.5rem;
+  padding: 2rem;
+  border-radius: 8px;
+  background-color: hsl(var(--background));
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .loadingWrapper p {
@@ -84,6 +88,13 @@
   font-weight: bold;
   margin-bottom: 0.5rem;
   animation: scaleIn 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.errorMessage {
+  color: hsl(var(--destructive));
+  font-size: 0.9rem;
+  max-width: 300px;
+  margin-top: -0.5rem;
 }
 
 @keyframes scaleIn {

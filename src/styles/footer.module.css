@@ -89,6 +89,8 @@
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
+  z-index: 2;
+
 }
 
 .links a, .link {
@@ -130,6 +132,7 @@
   width: 100%;
   display: flex;
   justify-content: center;
+  z-index: 2;
 }
 
 .copyright {
@@ -140,17 +143,16 @@
 
 .appname{
   position: relative;
-  transform: translateY(10px);
-  bottom: 0;
+  bottom: -30px;
   width: 100%;
   border: 4px solid ;
   background-color: red;
   color: hsl(var(--foreground));
-  height: 10vw;
+  height: 11vw;
   font-size:15vw;
   line-height: 1;
   font-weight: 700;
-
+  z-index: 1;
 }
 
 :global(.dark) .copyright {
@@ -165,7 +167,6 @@
   .content {
     gap: 2rem;
   }
-  
   .section {
     min-width: 140px;
   }
@@ -177,7 +178,10 @@
   }
   
   .content {
-    gap: 1.5rem;
+    flex-direction: column;
+  }
+  .links{
+    flex-direction: row;
   }
   
   .section {

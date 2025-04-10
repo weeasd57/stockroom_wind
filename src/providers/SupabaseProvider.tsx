@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 
@@ -49,26 +49,74 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const refreshTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
 
   useEffect(() => {
     // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const hasUser = !!session?.user;
-      setUser(session?.user ?? null);
-      setIsAuthenticated(hasUser);
-      setLoading(false);
-    });
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error.message);
+          setError(error);
+          setLoading(false);
+          return;
+        }
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const hasUser = !!session?.user;
-      setUser(session?.user ?? null);
-      setIsAuthenticated(hasUser);
-      setLoading(false);
-    });
+        const hasUser = !!session?.user;
+        setUser(session?.user ?? null);
+        setIsAuthenticated(hasUser);
+        
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+          console.log('[Auth] State change:', event);
+          
+          const hasUser = !!session?.user;
+          setUser(session?.user ?? null);
+          setIsAuthenticated(hasUser);
 
-    return () => subscription.unsubscribe();
-  }, [supabase.auth]);
+          // Clear any pending refresh
+          if (refreshTimeout.current) {
+            clearTimeout(refreshTimeout.current);
+            refreshTimeout.current = undefined;
+          }
+          
+          // Only attempt refresh if we have a session and it's not a SIGNED_OUT event
+          if (session && event !== 'SIGNED_OUT') {
+            // If session exists but is expired or will expire soon
+            const expiresAt = new Date(session.expires_at! * 1000);
+            const timeUntilExpiry = expiresAt.getTime() - Date.now();
+            
+            if (timeUntilExpiry < 600000) { // Less than 10 minutes until expiry
+              refreshTimeout.current = setTimeout(() => {
+                refreshTimeout.current = undefined;
+                if (!isRefreshing) {
+                  refreshSession();
+                }
+              }, 1000); // Small delay to prevent immediate refresh
+            }
+          }
+        });
+
+        setLoading(false);
+        return () => {
+          subscription.unsubscribe();
+          if (refreshTimeout.current) {
+            clearTimeout(refreshTimeout.current);
+            refreshTimeout.current = undefined;
+          }
+        };
+      } catch (err) {
+        console.error('Error initializing auth:', err);
+        setError(err instanceof Error ? err : new Error('Failed to initialize auth'));
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
+  }, []);  // Remove supabase.auth from dependencies as it's stable
 
   // Auth functions
   const signIn = async (email: string, password: string) => {
@@ -107,30 +155,46 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshSession = async () => {
+    if (isRefreshing) return { success: false, authenticated: isAuthenticated };
+    
     try {
+      setIsRefreshing(true);
       console.log('Refreshing authentication session...');
+      
+      // First check if we have a current session
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      
+      if (!currentSession) {
+        console.log('No current session found');
+        setIsAuthenticated(false);
+        setUser(null);
+        return { success: false, authenticated: false };
+      }
+
+      // Try to refresh the session
       const { data, error } = await supabase.auth.refreshSession();
       
       if (error) {
         console.error('Error refreshing session:', error.message);
+        setIsAuthenticated(false);
+        setUser(null);
         throw error;
       }
       
-      // Get the updated session
       const { data: { session } } = await supabase.auth.getSession();
-      console.log('Session refreshed:', !!session);
-      
-      // Update user and authentication state
       const isUserAuthenticated = !!session?.user;
       setUser(session?.user ?? null);
       setIsAuthenticated(isUserAuthenticated);
       
-      console.log('Authentication state updated. Authenticated:', isUserAuthenticated);
       return { success: true, authenticated: isUserAuthenticated };
     } catch (err) {
       console.error('Failed to refresh session:', err);
       setError(err instanceof Error ? err : new Error('Failed to refresh session'));
+      setIsAuthenticated(false);
+      setUser(null);
       throw err;
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
