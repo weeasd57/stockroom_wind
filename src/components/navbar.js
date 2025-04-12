@@ -194,7 +194,7 @@ export default function Navbar() {
             {isAuthenticated ? (
               <>
                 <div className={styles.userMenu}>
-                  <Link href="/profile" className={styles.profileLink} style={{ textDecoration: 'none' }}>
+                  <Link href="/profile" className={styles.profileLink} style={{ textDecoration: 'none' }} onClick={closeMenu}>
                     <div className={styles.avatar}>
                       {avatarLoading ? (
                         <div className="rounded-full w-10 h-10 border-2 border-primary bg-primary/10 flex items-center justify-center animate-pulse">

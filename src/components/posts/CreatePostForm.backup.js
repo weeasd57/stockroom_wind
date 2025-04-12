@@ -9,7 +9,7 @@ import { uploadPostImage } from '@/utils/supabase';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider'; // Updated from contexts/CreatePostFormContext
 import { createClient } from '@supabase/supabase-js';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData'; // Import from models
-import { CURRENCY_SYMBOLS, getCurrencySymbol, COUNTRY_ISO_CODES } from '@/models/CurrencyData'; // Import from models
+import { CURRENCY_SYMBOLS, getCurrencySymbol, COUNTRY_ISO_CODES } from '@/models/CurrencyData.js'; // Import from models
 import 'flag-icons/css/flag-icons.min.css';
 import '@/styles/create-post-page.css';
 import '@/styles/animation.css';
@@ -19,6 +19,35 @@ import countrySummaryData from '@/symbols_data/country_summary_20250304_171206.j
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+
+// Format price with appropriate decimal places based on value
+const formatPrice = (price) => {
+  if (price === null || isNaN(price)) return '0.00';
+  
+  const numPrice = typeof price === 'number' ? price : parseFloat(price);
+  
+  // For very small values (< 0.01), show more decimal places
+  if (numPrice < 0.01 && numPrice > 0) {
+    // Find the first non-zero digit after decimal
+    const priceStr = numPrice.toString();
+    const decimalIndex = priceStr.indexOf('.');
+    
+    if (decimalIndex !== -1) {
+      let significantDigitIndex = decimalIndex + 1;
+      while (significantDigitIndex < priceStr.length && 
+             (priceStr[significantDigitIndex] === '0' || priceStr[significantDigitIndex] === '.')) {
+        significantDigitIndex++;
+      }
+      
+      // Show at least 2 significant digits
+      const decimalPlaces = Math.max(significantDigitIndex - decimalIndex + 1, 3);
+      return numPrice.toFixed(decimalPlaces);
+    }
+  }
+  
+  // For regular values, use 2 decimal places
+  return numPrice.toFixed(2);
+};
 
 // Add a function to load country symbol counts from the JSON file
 const loadCountrySymbolCounts = () => {
@@ -41,7 +70,7 @@ const loadCountrySymbolCounts = () => {
   return counts;
 };
 
-export default function CreatePostForm() {
+function CreatePostForm() {
   const { user } = useSupabase();
   const { profile, getEffectiveAvatarUrl } = useProfile();
   
@@ -475,13 +504,13 @@ export default function CreatePostForm() {
         countryName = COUNTRY_CODE_TO_NAME[countryName.toLowerCase()];
       }
       
-      // Always use the API directly
+      // Always use the API directly - no local data lookup
       console.log(`Fetching price directly from API for ${stock.symbol} (${countryName})`);
-      
-      // No local data available, proceed directly to API call
       
       // Generate the API URL using the utility function
       const currentApiUrl = generateEodLastCloseUrl(stock.symbol, countryName);
+      setApiUrl(currentApiUrl);
+      setFormattedApiUrl(currentApiUrl);
       
       // Store the properly formatted API URL for display
       setApiUrl(currentApiUrl);
@@ -622,10 +651,10 @@ export default function CreatePostForm() {
         }
       }
       
-      // Scroll to the stock info container after a short delay to ensure it's rendered
+      // Scroll to the stock info container immediately after selection
       setTimeout(() => {
         scrollToStockInfo();
-      }, 300); // 300ms delay to ensure the component is fully rendered
+      }, 100); // Reduced delay for faster response
 
     } catch (error) {
       console.error('Error selecting stock/exchange:', error);
@@ -642,21 +671,54 @@ export default function CreatePostForm() {
 
   // Helper function to scroll to stock info
   const scrollToStockInfo = () => {
-    const stockInfoElement = document.querySelector('.stock-info-container');
-    if (stockInfoElement) {
-      // First scroll the form to the top
-      if (formWrapperRef.current) {
-        formWrapperRef.current.scrollTop = 0;
+    // Check if we're in dialog mode
+    const inDialog = document.querySelector('.dialog-overlay') !== null;
+    console.log('Scrolling to stock info section, in dialog mode:', inDialog);
+    
+    // For dialog mode, we need to handle scrolling differently
+    if (inDialog) {
+      // Force the dialog content to scroll to top
+      const dialogContent = document.querySelector('.dialog-content');
+      if (dialogContent) {
+        console.log('Scrolling dialog content to top');
+        // Use setTimeout to ensure this happens after the DOM updates
+        setTimeout(() => {
+          dialogContent.scrollTop = 0;
+          
+          // Add highlight to stock info after scrolling
+          const stockInfoElement = document.querySelector('.stock-info-container');
+          if (stockInfoElement) {
+            stockInfoElement.classList.add('highlight-selection');
+            setTimeout(() => {
+              stockInfoElement.classList.remove('highlight-selection');
+            }, 1000);
+          }
+        }, 50);
       }
-      
-      // Then scroll the stock info element into view
+      return;
+    }
+    
+    // For non-dialog mode
+    const stockInfoElement = document.querySelector('.stock-info-container');
+    if (!stockInfoElement) return;
+    
+    // If we have a form wrapper reference, scroll it
+    if (formWrapperRef.current) {
+      formWrapperRef.current.scrollTop = 0;
+    }
+    
+    // Also try to scroll the element into view
+    try {
       stockInfoElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      
-      // Add highlight effect
-      stockInfoElement.classList.add('highlight-selection');
-      setTimeout(() => {
-        stockInfoElement.classList.remove('highlight-selection');
-      }, 1000);
+    } catch (e) {
+      console.error('Error scrolling to element:', e);
+    }
+    
+    // Add highlight effect
+    stockInfoElement.classList.add('highlight-selection');
+    setTimeout(() => {
+      stockInfoElement.classList.remove('highlight-selection');
+    }, 1000);
       
       // Force focus on price value to ensure it's visible
       const priceElement = document.querySelector('.stock-price-value');
@@ -880,7 +942,7 @@ export default function CreatePostForm() {
         window.removeEventListener('keydown', handleKeyDown);
       };
     }
-  }, [showStrategyInput]);
+  }, []);
 
   // Add this function to properly cancel search
   const handleCancelSearch = () => {
@@ -1293,6 +1355,52 @@ export default function CreatePostForm() {
     }
   };
 
+  // Function to scroll to stock info section when a stock is selected
+  const scrollToStockInfo = useCallback(() => {
+    if (selectedStock && formWrapperRef.current) {
+      const stockInfoContainer = formWrapperRef.current.querySelector('.stock-info-container');
+      if (stockInfoContainer) {
+        // Check if we're in a dialog (modal) or regular page
+        const isInDialog = document.querySelector('.dialog-content') !== null;
+        
+        if (isInDialog) {
+          // For dialog mode, scroll the dialog content
+          const dialogContent = document.querySelector('.dialog-content');
+          if (dialogContent) {
+            // Get position relative to the dialog content
+            const containerTopInDialog = stockInfoContainer.offsetTop;
+            
+            // Scroll the dialog content
+            dialogContent.scrollTo({
+              top: containerTopInDialog - 80, // Smaller offset for dialog
+              behavior: 'smooth'
+            });
+          }
+        } else {
+          // For regular page mode, scroll the window
+          const containerTop = stockInfoContainer.getBoundingClientRect().top;
+          const scrollPosition = window.scrollY + containerTop - 100; // 100px offset for better visibility
+          
+          // Smooth scroll to the stock info container
+          window.scrollTo({
+            top: scrollPosition,
+            behavior: 'smooth'
+          });
+        }
+      }
+    }
+  }, [selectedStock]);
+
+  // Scroll to stock info when a stock is selected
+  useEffect(() => {
+    if (selectedStock) {
+      // Small delay to ensure the DOM has updated
+      setTimeout(() => {
+        scrollToStockInfo();
+      }, 100);
+    }
+  }, [selectedStock, scrollToStockInfo]);
+
   // Handle scroll in stock search results to maintain focus
   const handleStockResultsScroll = useCallback((e) => {
     // Prevent the default scroll behavior
@@ -1467,70 +1575,11 @@ export default function CreatePostForm() {
 
   // Find the stock search container or country dropdown and update with this code:
 
-  // Update the country selection rendering to ensure dropdown visibility
-  const renderCountrySelect = () => {
-    return (
-      <div className="category-select" style={{ position: 'relative', zIndex: 3000 }}>
-        <div
-          className="select-field"
-          onClick={() => {
-            document.querySelector('.category-dropdown').classList.toggle('show');
-          }}
-        >
-          <span className="select-field-text">
-            {selectedCountry === 'all' 
-              ? 'All Countries' 
-              : COUNTRY_CODE_TO_NAME[selectedCountry] || selectedCountry}
-            {selectedCountry !== 'all' && CURRENCY_SYMBOLS[selectedCountry] && 
-              <span className="currency-symbol-indicator"> ({CURRENCY_SYMBOLS[selectedCountry]})</span>}
-          </span>
-          <div className="select-field-icon">
-            <svg viewBox="0 0 24 24" width="16" height="16">
-              <path
-                fill="currentColor"
-                d="M7 10l5 5 5-5z"
-              />
-            </svg>
-          </div>
-        </div>
-        
-        <div className="category-dropdown" style={{ zIndex: 3000, maxHeight: '400px', overflowY: 'auto' }}>
-          <div className="category-option" onClick={() => handleCountryChange('all')}>
-            <div className="category-option-content">
-              <span className="category-option-name">All Countries</span>
-              <span className="category-option-count">
-                {countrySymbolCounts.total || ''}
-              </span>
-            </div>
-          </div>
-          
-          {/* Map through country ISO codes to display all countries with their currency symbols */}
-          {Object.entries(COUNTRY_ISO_CODES).map(([countryName, isoCode]) => (
-            <div
-              key={isoCode}
-              className={`category-option ${selectedCountry === isoCode ? 'selected' : ''}`}
-              onClick={() => handleCountryChange(isoCode)}
-            >
-              <div className="category-option-content">
-                <span className="category-option-name">
-                  <span className={`fi fi-${isoCode.toLowerCase()}`}></span>
-                  {countryName}
-                  {getCurrencySymbol(isoCode) && 
-                    <span className="currency-symbol"> ({getCurrencySymbol(isoCode)})</span>}
-                </span>
-                <span className="category-option-count">
-                  {countrySymbolCounts[isoCode] || '0'}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
+  
 
   // Update the stock search section to display currency symbols with stock search results
-  const renderStockSearch = () => (
+  const renderStockSearch = () => {  
+    return (
     <div className="search-field-container">
       <label htmlFor="stockSearch" className="form-label">Symbol or Name</label>
       <div className="search-container">
@@ -1649,63 +1698,9 @@ export default function CreatePostForm() {
       )}
     </div>
   );
-
-  // Update the Stock Info Container to show currency symbols
-  const updateSelectedStockDisplay = () => {
-    // When updating selected stock UI in the return JSX:
-    if (selectedStock) {
-      const countryCode = selectedStock.country.toLowerCase();
-      const currencySymbol = CURRENCY_SYMBOLS[countryCode] || '$';
-      
-      // Update the display to include currency symbol
-      return (
-        <div className="stock-info-container">
-          {/* Background flag with opacity */}
-          <div
-            className="stock-info-bg-flag persistent-image"
-            style={{
-              backgroundImage: `url(https://flagcdn.com/${Object.entries(COUNTRY_ISO_CODES).find(
-                ([countryName]) => countryName.toLowerCase() === selectedStock.country.toLowerCase()
-              )?.[1]?.toLowerCase() || selectedStock.country.toLowerCase()}.svg)`
-            }}
-          ></div>
-          
-          <div className="stock-info-overlay">
-            {/* Stock Item */}
-            <div className="stock-item selected">
-              <div className="stock-info">
-                <div className="stock-symbol">
-                  {selectedStock.symbol}
-                  <span className="currency-badge">{currencySymbol}</span>
-                </div>
-                <div className="stock-name">{selectedStock.name}</div>
-                <div className="stock-country">
-                  {Object.entries(COUNTRY_ISO_CODES).find(
-                    ([countryName]) => countryName.toLowerCase() === selectedStock.country.toLowerCase()
-                  )?.[0] || selectedStock.country}
-                </div>
-              </div>
-              <button 
-                className="btn btn-icon" 
-                onClick={() => updateField('selectedStock', null)}
-                aria-label="Remove stock"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            </div>
-
-            {/* Rest of the stock info container */}
-            {/* ... */}
-          </div>
-        </div>
-      );
-    }
-    return null;
   };
 
+  /* Render the main component */
   return (
     <>
       <div className="create-post-form-container" ref={formWrapperRef}>
@@ -1748,7 +1743,7 @@ export default function CreatePostForm() {
                   }}
                 ></div>
                 
-                {/* Gray layer between flag and content */}
+                {/* Gray overlay layer */}
                 <div className="stock-info-gray-layer"></div>
                 
                 <div className="stock-info-overlay">
@@ -1757,8 +1752,8 @@ export default function CreatePostForm() {
                     <div className="stock-info">
                       <div className="stock-symbol">
                         {selectedStock.symbol}
-                        {getCurrencySymbol(selectedStock.country) && (
-                          <span className="currency-badge">{getCurrencySymbol(selectedStock.country)}</span>
+                        {CURRENCY_SYMBOLS[selectedStock.country.toLowerCase()] && (
+                          <span className="currency-badge">{CURRENCY_SYMBOLS[selectedStock.country.toLowerCase()]}</span>
                         )}
                       </div>
                       <div className="stock-name">{selectedStock.name}</div>
@@ -1789,9 +1784,9 @@ export default function CreatePostForm() {
                       <div className="stock-price-loading">
                         Loading...
                       </div>
-                    ) : currentPrice !== null && !isNaN(currentPrice) ? (
+                    ) : (currentPrice !== null && !isNaN(parseFloat(currentPrice))) ? (
                       <div className="stock-price stock-price-value">
-                        {getCurrencySymbol(selectedStock.country) || '$'} {typeof currentPrice === 'number' ? currentPrice.toFixed(2) : parseFloat(currentPrice).toFixed(2)}
+                        {getCurrencySymbol(selectedStock.country, selectedStock.exchange)} {formatPrice(currentPrice)}
                       </div>
                     ) : (
                       <div className="stock-price-unavailable">
@@ -1816,7 +1811,7 @@ export default function CreatePostForm() {
                     
                     {/* Display API response summary in the price banner */}
                     {apiResponse && !isSearching && (
-                      <div>
+                      <div className="api-response-container">
                         <div className="response-source">
                           Data Source: <span className="response-source-value">{apiResponse.source || 'API'}</span>
                         </div>
@@ -1825,8 +1820,8 @@ export default function CreatePostForm() {
                             <span className="url-label">Response:</span> 
                             <span className="url-value">
                               {typeof apiResponse.data === 'object' ? 
-                                JSON.stringify(apiResponse.data, null, 2).substring(0, 150) + 
-                                (JSON.stringify(apiResponse.data, null, 2).length > 150 ? '...' : '') 
+                                JSON.stringify(apiResponse.data, null, 2).substring(0, 100) + 
+                                (JSON.stringify(apiResponse.data, null, 2).length > 100 ? '...' : '') 
                                 : apiResponse.data || 'No data available'}
                             </span>
                           </div>
@@ -2331,7 +2326,8 @@ export default function CreatePostForm() {
       </div>
     </>
   );
-}
+} // End of CreatePostForm function
 
-// Add a named export to support both default and named imports
+// Add both default and named exports to support different import styles
 export { CreatePostForm };
+export default CreatePostForm;

@@ -1,4 +1,4 @@
-import { COUNTRY_ISO_CODES } from '@/models/CurrencyData';
+import { COUNTRY_ISO_CODES } from '@/models/CurrencyData.js';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 import countrySummaryData from '@/symbols_data/country_summary_20250304_171206.json';
 

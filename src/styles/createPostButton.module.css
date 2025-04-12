@@ -13,6 +13,12 @@
   transition: all 0.2s ease;
   border: none;
   box-shadow: 0 2px 10px hsla(var(--primary) / 0.2);
+  width: auto;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 1rem auto;
 }
 
 .createPostButton:hover {
@@ -45,6 +51,8 @@
   color: hsl(var(--primary-foreground));
   border-radius: 9999px;
   box-shadow: 0 4px 14px hsla(var(--primary) / 0.25);
+  margin: 1.5rem auto 1rem;
+  align-self: center;
 }
 
 .inDialog:hover {
@@ -114,4 +122,56 @@
 
 .pulse {
   animation: pulse 1.5s infinite;
-} 
+}
+
+/* Responsive styles for different screen sizes */
+@media (max-width: 768px) {
+  .createPostButton {
+    padding: 0.625rem 1.25rem;
+    font-size: 0.85rem;
+  }
+  
+  .inDialog {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.9rem;
+  }
+  
+  .fab {
+    right: 1rem;
+    bottom: 1rem;
+    width: 50px;
+    height: 50px;
+  }
+}
+
+@media (max-width: 480px) {
+  .createPostButton {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  .createPostButton svg {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .inDialog {
+    padding: 0.625rem 1.25rem;
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .fab {
+    right: 0.75rem;
+    bottom: 0.75rem;
+    width: 45px;
+    height: 45px;
+  }
+  
+  .fab svg {
+    width: 20px;
+    height: 20px;
+  }
+}

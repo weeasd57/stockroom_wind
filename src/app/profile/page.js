@@ -10,6 +10,10 @@ import styles from '@/styles/profile.module.css';
 import editStyles from '@/styles/editProfile.module.css';
 import { CreatePostButton } from '@/components/posts/CreatePostButton';
 import { uploadImage } from '@/utils/supabase';
+import { CreatePostForm } from '@/components/posts/CreatePostForm';
+import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
+import { createPortal } from 'react-dom';
+import '@/styles/create-post-page.css'; 
 
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useSupabase();
@@ -817,6 +821,12 @@ export default function Profile() {
     setTimeout(checkLoadingComplete, 100);
   };
 
+  // We'll handle the dialog rendering directly in the JSX rather than using portals
+  // This avoids the need for additional hooks that might cause issues
+
+  // Get dialog state at the component level to avoid hooks in render functions
+  const { isOpen, closeDialog } = useCreatePostForm();
+
   return (
     <div className={styles.profileContainer}>
       {isSaving && (
@@ -1314,6 +1324,30 @@ export default function Profile() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      
+      {/* Create Post Dialog - rendered directly in the component */}
+      {isOpen && (
+        <div className="dialog-overlay">
+          <div className="dialog-content">
+            <div className="dialog-header">
+              <h2>Create Post</h2>
+              <button 
+                className="dialog-close-button" 
+                onClick={closeDialog}
+                aria-label="Close dialog"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            <div className="dialog-body">
+              <CreatePostForm />
+            </div>
           </div>
         </div>
       )}

@@ -282,22 +282,11 @@ Major styling updates include:
 
 ```
 src/
-├── app/
-│   └── home/
-│       └── page.js       # Main homepage using PostList component
-├── components/
-│   └── posts/
-│       ├── CreatePostButton.js  # Button with dialog functionality
-│       ├── CreatePostForm.js    # Form using dialogStore for state
-│       ├── PostCard.js          # Card using CSS modules
-│       └── PostList.js          # Extracted list component
-├── store/
-│   ├── dialogStore.js    # Dialog state management
-│   └── postsStore.js     # Posts data management
-└── styles/
-    ├── globals.css       # Global styles and CSS variables
-    ├── home.module.css   # HomePage specific styles
-    └── postCard.module.css  # PostCard specific styles
+├── app/          # Next.js pages
+├── components/   # Reusable components
+├── styles/      # CSS modules
+├── providers/   # Context providers
+└── utils/       # Helper functions
 ```
 
 ## Features

@@ -922,7 +922,6 @@
   justify-content: center;
   align-items: center;
   width: 100%;
-  padding: 1rem;
 }
 
 .createPostContainer {
@@ -930,14 +929,14 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  width: 100%;
+  width: 90%;
   padding: 2rem;
-  background-color: hsl(var(--card));
+  background-color: hsl(var(--background));
   border-radius: 16px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
   border: 1px solid hsla(var(--border)/0.2);
   animation: fadeIn 0.5s ease-out;
-  margin-bottom: 1.5rem;
+  margin: 0 auto 1.5rem 1.5rem;
 }
 
 .emptyHomeTitle {
@@ -946,6 +945,7 @@
   margin-bottom: 1rem;
   background: linear-gradient(90deg, hsla(var(--primary)), hsla(var(--secondary)));
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
