@@ -11,7 +11,7 @@
   
   /* Colors - Light Theme */
   --foreground: 0 0% 10%;
-  --background: 0 0% 100%;
+  --background: 0 0% 45%; /* Changed from 100% (white) to 95% (light gray) */
   --primary: 222 89% 58%;
   --primary-foreground: 0 0% 100%;
   --secondary: 210 40% 90%;

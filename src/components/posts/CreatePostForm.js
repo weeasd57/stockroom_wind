@@ -37,13 +37,39 @@ const loadCountrySymbolCounts = () => {
     }
   });
   
+  // Set the total count for all countries
   counts.total = total;
+  
+  // Also set 'all' as an alias for total to fix the 'All Countries' display
+  counts.all = total;
+  
   return counts;
+};
+
+// Format symbol for API use
+const formatSymbolForApi = (symbol, country) => {
+  if (!symbol) return '';
+  
+  // Remove any exchange suffix if present (e.g., AAPL.US -> AAPL)
+  let formattedSymbol = symbol.split('.')[0];
+  
+  // For some countries, we need to add specific formatting
+  if (country && typeof country === 'string') {
+    const countryCode = country.length === 2 ? country.toUpperCase() : 
+                       (COUNTRY_ISO_CODES[country] ? COUNTRY_ISO_CODES[country].toUpperCase() : '');
+    
+    // Add country code for certain markets if not already present
+    if (countryCode && !symbol.includes('.')) {
+      formattedSymbol = `${formattedSymbol}.${countryCode}`;
+    }
+  }
+  
+  return formattedSymbol;
 };
 
 export default function CreatePostForm() {
   const { user } = useSupabase();
-  const { profile, getEffectiveAvatarUrl } = useProfile();
+  const { profile, getEffectiveAvatarUrl, addPost } = useProfile();
   
   // Since there's no formState, directly destructure values from context with defaults
   const { 
@@ -73,7 +99,7 @@ export default function CreatePostForm() {
     setSubmitState
   } = useCreatePostForm() || {};
 
-  // Get the addPost function from profile store
+  // addPost function is imported from ProfileProvider
 
   const [strategies, setStrategies] = useState([]);
   const [newStrategy, setNewStrategy] = useState('');
@@ -464,6 +490,7 @@ export default function CreatePostForm() {
       updateField('searchResults', []);
       // Show loading state
       setIsSearching(true);
+      scrollToStockInfo();
       
       // First, let's properly format the symbol for consistent API use
       const formattedSymbol = formatSymbolForApi(stock.symbol, stock.country);
@@ -622,10 +649,15 @@ export default function CreatePostForm() {
         }
       }
       
-      // Scroll to the stock info container after a short delay to ensure it's rendered
+      // Scroll to the stock info container with a slightly longer delay to ensure it's fully rendered
+      // This is especially important when API data is being loaded
       setTimeout(() => {
         scrollToStockInfo();
-      }, 300); // 300ms delay to ensure the component is fully rendered
+        // If the first attempt doesn't work well, try again after a short delay
+        setTimeout(() => {
+          scrollToStockInfo();
+        }, 500);
+      }, 500); // 500ms delay to ensure the component is fully rendered with data
 
     } catch (error) {
       console.error('Error selecting stock/exchange:', error);
@@ -640,58 +672,84 @@ export default function CreatePostForm() {
     }
   };
 
-  // Helper function to scroll to stock info
+  // Helper function to scroll to stock info with improved reliability
   const scrollToStockInfo = () => {
-    const stockInfoElement = document.querySelector('.stock-info-container');
-    if (stockInfoElement) {
-      // First scroll the form to the top
-      if (formWrapperRef.current) {
-        formWrapperRef.current.scrollTop = 0;
-      }
+    // Use a more reliable approach with multiple attempts
+    const attemptScroll = (attempt = 0) => {
+      const stockInfoElement = document.querySelector('.stock-info-container');
       
-      // Then scroll the stock info element into view
-      stockInfoElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      
-      // Add highlight effect
-      stockInfoElement.classList.add('highlight-selection');
-      setTimeout(() => {
-        stockInfoElement.classList.remove('highlight-selection');
-      }, 1000);
-      
-      // Force focus on price value to ensure it's visible
-      const priceElement = document.querySelector('.stock-price-value');
-      if (priceElement) {
-        priceElement.focus();
-      }
-      
-      // Force focus on API response when available
-      if (apiResponse) {
-        // Try to focus on response URL if available
-        const responseUrlElement = document.querySelector('.response-url');
-        if (responseUrlElement) {
+      if (stockInfoElement) {
+        console.log('Stock info element found, scrolling to it...');
+        
+        // Calculate the position of the element relative to the form wrapper
+        const formWrapper = formWrapperRef.current;
+        if (formWrapper) {
+          // Get the element's position relative to the form
+          const formRect = formWrapper.getBoundingClientRect();
+          const elementRect = stockInfoElement.getBoundingClientRect();
+          const relativeTop = elementRect.top - formRect.top;
+          
+          // Scroll the form to this position
+          formWrapper.scrollTo({
+            top: relativeTop - 20, // Add some padding at the top
+            behavior: 'smooth'
+          });
+          
+          console.log(`Scrolled form to position: ${relativeTop}px`);
+        }
+        
+        // Add highlight effect to make it more noticeable
+        stockInfoElement.classList.add('highlight-selection');
+        setTimeout(() => {
+          stockInfoElement.classList.remove('highlight-selection');
+        }, 1500);
+        
+        // Force focus on price value to ensure it's visible
+        const priceElement = document.querySelector('.stock-price-value');
+        if (priceElement) {
           setTimeout(() => {
-            responseUrlElement.focus();
+            priceElement.focus();
+            console.log('Focused on price element');
           }, 300);
         }
         
-        // Highlight the API response section
-        const apiResponseElement = document.querySelector('.stock-price-api-response');
-        if (apiResponseElement) {
-          apiResponseElement.classList.add('highlight-selection');
-          setTimeout(() => {
-            apiResponseElement.classList.remove('highlight-selection');
-          }, 1500);
+        // Force focus on API response when available
+        if (apiResponse) {
+          // Try to focus on response URL if available
+          const responseUrlElement = document.querySelector('.response-url');
+          if (responseUrlElement) {
+            setTimeout(() => {
+              responseUrlElement.focus();
+            }, 500);
+          }
+          
+          // Highlight the API response section
+          const apiResponseElement = document.querySelector('.stock-price-api-response');
+          if (apiResponseElement) {
+            apiResponseElement.classList.add('highlight-selection');
+            setTimeout(() => {
+              apiResponseElement.classList.remove('highlight-selection');
+            }, 1500);
+          }
+        } else {
+          // If no API response, focus on API URL element
+          const apiUrlElement = document.querySelector('.api-url-code');
+          if (apiUrlElement) {
+            apiUrlElement.focus();
+          }
         }
+      } else if (attempt < 5) {
+        // Element not found yet, retry after a short delay
+        console.log(`Stock info element not found, retrying... (attempt ${attempt + 1})`);
+        setTimeout(() => attemptScroll(attempt + 1), 200);
       } else {
-        // If no API response, focus on API URL element
-        const apiUrlElement = document.querySelector('.api-url-code');
-        if (apiUrlElement) {
-          apiUrlElement.focus();
-        }
+        console.log('Failed to find stock info element after multiple attempts');
       }
-    }
+    };
+    
+    // Start the scroll attempt
+    attemptScroll();
   };
-
   // Handle image selection
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -1915,7 +1973,6 @@ export default function CreatePostForm() {
                               onChange={(e) => {
                                 const newPercentage = parseFloat(e.target.value);
                                 updateField('targetPercentage', newPercentage);
-                                // تحديث سعر الهدف بناءً على النسبة الجديدة
                                 if (currentPrice && !isNaN(currentPrice) && !isNaN(newPercentage)) {
                                   const newTargetPrice = (currentPrice * (1 + newPercentage/100)).toFixed(2);
                                   updateField('targetPrice', newTargetPrice);

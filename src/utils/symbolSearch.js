@@ -162,14 +162,70 @@ export async function searchStocks(query, country = null, limit = 50) {
         } catch (fileError) {
           console.error(`Error loading country symbols file: ${fileError.message}`);
           
-          // Return friendly error message as a result
-          return [{
-            Symbol: `Could not load symbols for ${countryName}`,
-            Name: fileError.message,
-            Country: country,
-            Exchange: "",
-            uniqueId: "error-message"
-          }];
+          // Try to load from all_symbols_by_country file
+          console.log(`Attempting to load ${countryName} symbols from all_symbols_by_country file`);
+          try {
+            const allSymbolsResponse = await fetch(`/symbols_data/all_symbols_by_country_20250304_171206.json`);
+            
+            if (!allSymbolsResponse.ok) {
+              throw new Error(`Failed to load all_symbols_by_country file (${allSymbolsResponse.status})`);
+            }
+            
+            const allSymbolsData = await allSymbolsResponse.json();
+            
+            // Filter symbols for the requested country
+            const countrySymbols = allSymbolsData.filter(item => 
+              item.Country && item.Country.toLowerCase() === countryName.toLowerCase()
+            );
+            
+            if (countrySymbols.length === 0) {
+              console.warn(`No symbols found for ${countryName} in all_symbols_by_country file`);
+              return [{
+                Symbol: `No symbols found for ${countryName}`,
+                Name: "Try another country or check spelling",
+                Country: country,
+                Exchange: "",
+                uniqueId: "no-symbols-message"
+              }];
+            }
+            
+            console.log(`Found ${countrySymbols.length} symbols for ${countryName} in all_symbols_by_country file`);
+            
+            // Process data to ensure consistent format
+            const processedSymbols = countrySymbols.map((item, index) => ({
+              ...item,
+              Country: countryName,
+              uniqueId: `${item.Symbol || item.symbol}-${countryName}-${index}`
+            }));
+            
+            // Cache the processed data
+            countrySymbolsCache.set(countryName, processedSymbols);
+            
+            // If no query, return all symbols (up to limit)
+            if (!query || query.length < 2) {
+              return processedSymbols.slice(0, limit);
+            }
+            
+            // Filter by query
+            const normalizedQuery = query.toLowerCase();
+            return processedSymbols
+              .filter(stock => 
+                stock.Symbol.toLowerCase().includes(normalizedQuery) || 
+                stock.Name.toLowerCase().includes(normalizedQuery)
+              )
+              .slice(0, limit);
+          } catch (allSymbolsError) {
+            console.error(`Error loading from all_symbols_by_country file: ${allSymbolsError.message}`);
+            
+            // Return friendly error message as a result
+            return [{
+              Symbol: `Could not load symbols for ${countryName}`,
+              Name: fileError.message,
+              Country: country,
+              Exchange: "",
+              uniqueId: "error-message"
+            }];
+          }
         }
       } catch (countryError) {
         console.error(`Error handling country symbols: ${countryError.message}`);
@@ -307,12 +363,47 @@ async function loadCountrySymbols(country) {
   try {
     // Use the safe filename helper to get the proper filename format
     const fileCountryName = getCountryFilenameSafe(country);
-    const response = await fetch(`/symbols_data/${fileCountryName}.json`);
+    let response = await fetch(`/symbols_data/${fileCountryName}.json`);
     
+    // If country-specific file not found, try to extract from all_symbols_by_country file
     if (!response.ok) {
-      throw new Error(`Failed to load symbols for ${country} (${response.status})`);
+      console.log(`Country file not found for ${country}, trying to extract from all_symbols_by_country file`);
+      
+      // Get the all_symbols_by_country file
+      const allSymbolsResponse = await fetch(`/symbols_data/all_symbols_by_country_20250304_171206.json`);
+      
+      if (!allSymbolsResponse.ok) {
+        throw new Error(`Failed to load all_symbols_by_country file (${allSymbolsResponse.status})`);
+      }
+      
+      const allSymbolsData = await allSymbolsResponse.json();
+      
+      // Filter symbols for the requested country
+      const countrySymbols = allSymbolsData.filter(item => 
+        item.Country && item.Country.toLowerCase() === country.toLowerCase()
+      );
+      
+      if (countrySymbols.length === 0) {
+        console.warn(`No symbols found for ${country} in all_symbols_by_country file`);
+        return null;
+      }
+      
+      console.log(`Found ${countrySymbols.length} symbols for ${country} in all_symbols_by_country file`);
+      
+      // Process data to ensure consistent format
+      const processedData = countrySymbols.map((item, index) => ({
+        ...item,
+        Country: country,
+        uniqueId: `${item.Symbol || item.symbol}-${country}-${index}`
+      }));
+      
+      // Cache the processed data
+      countrySymbolsCache.set(country, processedData);
+      
+      return processedData;
     }
 
+    // If we got here, the country-specific file was found
     const data = await response.json();
     
     // Process data to ensure consistent format

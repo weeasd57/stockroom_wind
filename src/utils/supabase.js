@@ -778,18 +778,33 @@ export async function uploadPostImage(file, userId) {
     const timestamp = Date.now();
     const fileExt = file.name.split('.').pop().toLowerCase();
     const fileName = `${userId}-post-${timestamp}.${fileExt}`;
-    const filePath = `posts/${fileName}`;
     
-    console.log(`[UPLOAD DEBUG] 🔄 Preparing to upload to path: ${filePath}`);
+    // First try to use the 'posts' bucket
+    let bucketName = 'post_images';
+    let filePath = `${fileName}`;
+    
+    // Check if the 'posts' bucket exists by trying to list its contents
+    const { data: bucketCheck, error: bucketError } = await supabase.storage
+      .from(bucketName)
+      .list();
+    
+    // If there's an error with the 'posts' bucket, fall back to 'avatars' bucket
+    if (bucketError) {
+      console.log(`[UPLOAD DEBUG] ⚠️ Posts bucket not found, falling back to avatars bucket`);
+      bucketName = 'avatars';
+      filePath = `posts/${fileName}`; // Store in a 'posts' subfolder
+    }
+    
+    console.log(`[UPLOAD DEBUG] 🔄 Preparing to upload to bucket: ${bucketName}, path: ${filePath}`);
     
     // Track storage upload operation
     const storageUploadStart = performance.now();
     
     const { data, error } = await supabase.storage
-      .from('posts')
+      .from(bucketName)
       .upload(filePath, file, {
         cacheControl: '3600',
-        upsert: false
+        upsert: true // Changed to true to overwrite if needed
       });
     
     const storageUploadEnd = performance.now();
@@ -805,7 +820,7 @@ export async function uploadPostImage(file, userId) {
     console.log(`[UPLOAD DEBUG] 🔄 Generating public URL for uploaded file`);
     
     const { data: publicUrlData } = supabase.storage
-      .from('posts')
+      .from(bucketName)
       .getPublicUrl(filePath);
     
     const publicUrl = publicUrlData.publicUrl;

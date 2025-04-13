@@ -16,7 +16,15 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
-    // Don't do anything while still loading
+    // If we're on the root path, redirect immediately without waiting for auth
+    if (pathname === '/') {
+      // Start immediate redirection to landing page
+      // We'll redirect to home later if authenticated
+      router.push('/landing');
+      return;
+    }
+    
+    // Don't do anything else while still loading
     if (loading) return;
 
     // Authentication check is complete
@@ -26,20 +34,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     if (PUBLIC_PATHS.includes(pathname)) {
       return;
     }
-
-    // Root path needs special handling - redirect based on auth status
-    if (pathname === '/') {
-      // Start the fade out animation
-      setFadeOut(true);
-      
-      // Wait for animation to complete before redirecting
-      setTimeout(() => {
-        if (isAuthenticated) {
-          router.push('/home');
-        } else {
-          router.push('/landing');
-        }
-      }, 300);
+    
+    // If we're on landing page and user is authenticated, redirect to home
+    if (pathname === '/landing' && isAuthenticated) {
+      router.push('/home');
       return;
     }
 
@@ -58,8 +56,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthenticated, loading, pathname, router]);
 
-  // Show loading state while checking auth
-  if (loading || !authChecked) {
+  // Only show loading state for non-public paths when authentication is required
+  // This allows public pages to render immediately
+  if ((loading || !authChecked) && !PUBLIC_PATHS.includes(pathname) && pathname !== '/landing') {
     return (
       <div className={`auth-guard-container ${fadeOut ? 'auth-fade-out' : 'auth-fade-in'}`}>
         <div className="auth-guard-content">

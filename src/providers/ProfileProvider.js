@@ -540,6 +540,11 @@ export function ProfileProvider({ children }) {
     setSelectedStrategy(null);
   };
 
+  // Add a new post to the posts array
+  const addPost = (post) => {
+    setPosts(prevPosts => [post, ...prevPosts]);
+  };
+
   // Modified getState function to update the global store
   const getState = () => {
     return {
@@ -579,6 +584,7 @@ export function ProfileProvider({ children }) {
       refreshData, 
       setSelectedStrategy,
       clearSelectedStrategy,
+      addPost,
       
       // Static methods
       getState

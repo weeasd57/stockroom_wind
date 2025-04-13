@@ -188,6 +188,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  width: 100%;
   position: relative;
   overflow: hidden;
   scrollbar-width: none; /* Firefox */
@@ -202,6 +203,7 @@ body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  width: 95%;
   height: 100%;
   padding: 20px;
   padding-bottom: 80px; /* Space for the fixed action bar */
@@ -299,21 +301,40 @@ body {
   color: var(--text-color);
 }
 
+/* Primary dialog close button style */
 .dialog-close-button {
-  background: transparent;
-  border: none;
-  color: var(--text-color);
+  background: transparent; /* Transparent background */
+  border: 1px solid var(--border-color);
+  color: var(--text-color); /* Use theme text color */
   cursor: pointer;
-  padding: 4px;
+  padding: 6px 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  transition: background-color 0.2s;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .dialog-close-button:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(0, 0, 0, 0.05); /* Subtle hover effect in light mode */
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Dark mode styles for dialog close button */
+@media (prefers-color-scheme: dark) {
+  .dialog-close-button {
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+  
+  .dialog-close-button:hover {
+    background-color: rgba(255, 255, 255, 0.1); /* Subtle hover effect in dark mode */
+    border-color: var(--primary);
+    color: var(--primary);
+  }
 }
 
 .dialog-body {
@@ -2014,6 +2035,13 @@ input.visible-input::placeholder {
   align-items: center;
   padding: 16px 20px;
   border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  width:95%;
+  left: 0;
+  right: 0;
+  background-color: var(--background-color);
 }
 
 .dialog-header h2 {
@@ -2023,27 +2051,47 @@ input.visible-input::placeholder {
   color: var(--text-color);
 }
 
-.dialog-close-button {
-  background-color: rgba(255, 255, 255, 0.15);
-  border: none;
-  color: white;
+/* Button variant for dialog close - text button style */
+.dialog-close-button.text-button {
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
   cursor: pointer;
   font-size: 14px;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: 4px;
   transition: all 0.2s ease;
   font-weight: 500;
   min-width: 70px;
   text-align: center;
+  display: inline-block;
 }
 
-.dialog-close-button:hover {
-  background-color: rgba(255, 255, 255, 0.25);
+.dialog-close-button.text-button:hover {
+  background-color: rgba(0, 0, 0, 0.05); /* Subtle hover effect in light mode */
+  border-color: var(--primary);
+  color: var(--primary);
   transform: translateY(-1px);
 }
 
+/* Dark mode styles for text button variant */
+@media (prefers-color-scheme: dark) {
+  .dialog-close-button.text-button {
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+  
+  .dialog-close-button.text-button:hover {
+    background-color: rgba(255, 255, 255, 0.1); /* Subtle hover effect in dark mode */
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+}
+
+/* Active state for all dialog close buttons */
 .dialog-close-button:active {
   transform: translateY(1px);
+  opacity: 0.9;
 }
 
 .dialog-body {
@@ -2105,23 +2153,7 @@ input.visible-input::placeholder {
   flex-grow: 1;
 }
 
-/* Improved close button styling */
-.dialog-close-button {
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
-  color: white;
-  cursor: pointer;
-  font-size: 14px;
-  padding: 8px 15px;
-  border-radius: 4px;
-  display: inline-block;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.dialog-close-button:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-}
+/* This section has been consolidated into the main dialog-close-button classes above */
 
 .dialog-close-button:focus {
   outline: none;
@@ -2297,7 +2329,13 @@ input.visible-input::placeholder {
     padding: 12px 10px;
   }
   
+  /* Responsive adjustments for dialog close buttons */
   .dialog-close-button {
+    padding: 6px;
+    font-size: 14px;
+  }
+  
+  .dialog-close-button.text-button {
     padding: 6px 10px;
     font-size: 13px;
   }
@@ -3302,7 +3340,13 @@ input.visible-input::placeholder {
     padding: 12px;
   }
   
+  /* Responsive adjustments for dialog close buttons */
   .dialog-close-button {
+    padding: 5px;
+    font-size: 13px;
+  }
+  
+  .dialog-close-button.text-button {
     padding: 6px 12px;
     font-size: 12px;
   }
@@ -3386,7 +3430,13 @@ input.visible-input::placeholder {
     padding: 12px 10px;
   }
   
+  /* Responsive adjustments for dialog close buttons */
   .dialog-close-button {
+    padding: 4px;
+    font-size: 12px;
+  }
+  
+  .dialog-close-button.text-button {
     padding: 6px 10px;
     font-size: 13px;
     min-width: 60px;
