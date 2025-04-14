@@ -13,7 +13,8 @@ import { uploadImage } from '@/utils/supabase';
 import { CreatePostForm } from '@/components/posts/CreatePostForm';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
 import { createPortal } from 'react-dom';
-import '@/styles/create-post-page.css'; 
+import '@/styles/create-post-page.css';
+import ProfilePostCard from '@/components/profile/ProfilePostCard';
 
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useSupabase();
@@ -1038,67 +1039,7 @@ export default function Profile() {
                 </div>
               ) : posts.length > 0 ? (
                 posts.map(post => (
-                  <div key={post.id} className={styles.postCard}>
-                    {post.image_url && (
-                      <div className={styles.postImageContainer}>
-                        <img 
-                          src={post.image_url} 
-                          alt="Post image" 
-                          className={styles.postImage}
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = '/placeholder-image.jpg';
-                            e.target.classList.add(styles.imageFallback);
-                          }}
-                        />
-                      </div>
-                    )}
-                    
-                    <div className={styles.postHeader}>
-                      <h3 className={styles.postTitle}>
-                        {post.stock_symbol && (
-                          <span className={styles.stockSymbol}>{post.stock_symbol}</span>
-                        )}
-                        {post.title || (post.content && post.content.substring(0, 60) + '...') || 'Stock Analysis'}
-                      </h3>
-                    </div>
-                    
-                    <p className={styles.postContent}>
-                      {post.content || 'No content provided'}
-                    </p>
-                    
-                    <div className={styles.postMeta}>
-                      <div className={styles.metaRow}>
-                        {post.created_at && (
-                          <span className={styles.postDate}>
-                            {new Date(post.created_at).toLocaleDateString(undefined, { 
-                              year: 'numeric', 
-                              month: 'short', 
-                              day: 'numeric' 
-                            })}
-                          </span>
-                        )}
-                        
-                        {post.target_price && (
-                          <span className={styles.targetPrice}>
-                            Target: {post.target_price}
-                          </span>
-                        )}
-                        
-                        {post.strategy && (
-                          <span className={styles.strategy}>
-                            Strategy: {post.strategy}
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className={styles.postActions}>
-                        <button className={styles.viewButton}>
-                          View Details
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <ProfilePostCard key={post.id} post={post} />
                 ))
               ) : (
                 <div className={styles.emptyPostsContainer}>

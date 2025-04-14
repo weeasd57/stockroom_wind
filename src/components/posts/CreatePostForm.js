@@ -858,32 +858,7 @@ export default function CreatePostForm() {
     e.stopPropagation();
   };
 
-  /**
-   * Upload and process images for post
-   */
-  const uploadPostImages = async (images) => {
-    if (!images || images.length === 0) return null;
-    
-    console.log(`Processing ${images.length} images for post`);
-    try {
-      const imageUrls = await Promise.all(
-        images.map(async (img) => {
-          // Skip upload for already uploaded images (URLs)
-          if (typeof img === 'string' && img.startsWith('http')) {
-            return img;
-          }
-          return await uploadPostImage(img, user?.id);
-        })
-      );
-      
-      console.log(`Successfully processed ${imageUrls.length} images`);
-      return imageUrls[0]; // Return the first image URL
-    } catch (error) {
-      console.error(`Error uploading images: ${error.message}`);
-      throw error;
-    }
-  };
-
+ 
   // Handle strategy dropdown display
   useEffect(() => {
     if (showStrategyInput) {
@@ -1186,8 +1161,8 @@ export default function CreatePostForm() {
     setErrors({}); // Reset errors
 
     // Simple validation checks
-    if (!contextDescription && !imageFile) {
-      setErrors({ description: 'Please add a description or upload an image' });
+    if (!selectedStock || !selectedStock.symbol) {
+      setErrors({ stock: 'Please select a stock symbol' });
       return;
     }
 
@@ -2351,7 +2326,7 @@ export default function CreatePostForm() {
           {!isSubmitting ? (
             <button
               onClick={handleSubmit}
-              disabled={!contextDescription.trim()}
+              disabled={!selectedStock || !selectedStock.symbol}
               className="btn btn-primary"
             >
               Post
