@@ -535,7 +535,7 @@
   .nav, 
   .nav.hidden {
     position: static;
-    width: auto;
+    width: 100%;
     height: auto;
     background: none;
     transform: none;

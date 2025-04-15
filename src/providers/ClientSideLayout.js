@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/navbar';
-import Footer from '@/components/Footer';
 
 export function ClientSideLayout({ children }) {
   const [mounted, setMounted] = useState(false);

@@ -972,6 +972,7 @@
   margin-bottom: 1.5rem;
   background: linear-gradient(90deg, hsla(var(--primary)), hsla(var(--secondary)));
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -1305,6 +1306,205 @@
   border-color: rgba(56, 189, 248, 0.6);
   background-color: rgba(56, 189, 248, 0.15);
   box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.4);
+}
+
+/* استايلات زر التحقق من أسعار المنشورات */
+.priceCheckContainer {
+  margin: 1rem 0;
+  display: flex;
+  justify-content: center;
+  position: relative;
+}
+
+.checkPricesButton {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 8px hsla(var(--primary)/0.2);
+}
+
+.checkPricesButton:hover {
+  background-color: hsla(var(--primary)/0.9);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px hsla(var(--primary)/0.3);
+}
+
+.checkPricesButton:disabled {
+  background-color: hsla(var(--primary)/0.6);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.errorMessage {
+  color: hsl(var(--destructive));
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+.resultsDialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 1rem;
+  backdrop-filter: blur(4px);
+}
+
+.resultsDialogContent {
+  background-color: hsl(var(--background));
+  border-radius: 12px;
+  padding: 1.5rem;
+  width: 90%;
+  max-width: 700px;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  border: 1px solid hsla(var(--border)/0.2);
+}
+
+.closeButton {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: hsl(var(--muted-foreground));
+  transition: color 0.2s ease;
+}
+
+.closeButton:hover {
+  color: hsl(var(--foreground));
+}
+
+.usageInfo {
+  background-color: hsla(var(--muted)/0.3);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.resultsList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.resultItem {
+  border: 1px solid hsla(var(--border)/0.5);
+  border-radius: 8px;
+  padding: 1rem;
+  background-color: hsla(var(--card)/0.5);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.resultItem:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.resultHeader {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid hsla(var(--border)/0.3);
+}
+
+.resultDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.priceInfo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.statusInfo {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.targetReached {
+  color: hsl(142, 76%, 36%);
+  background-color: hsla(142, 76%, 36%, 0.1);
+  padding: 0.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stopLossTriggered {
+  color: hsl(var(--destructive));
+  background-color: hsla(var(--destructive)/0.1);
+  padding: 0.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.targetInfo, .stopLossInfo {
+  font-size: 0.9rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.noResults {
+  text-align: center;
+  padding: 2rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.95rem;
+}
+
+.dateInfo {
+  font-size: 0.85rem;
+  margin-top: 0.4rem;
+  opacity: 0.85;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.closedLabel {
+  background-color: hsla(var(--muted)/0.6);
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  margin-left: 0.5rem;
+  color: hsl(var(--background));
+  font-weight: 500;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .clearFilterButton {

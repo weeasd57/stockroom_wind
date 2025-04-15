@@ -15,6 +15,7 @@ import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
 import { createPortal } from 'react-dom';
 import '@/styles/create-post-page.css';
 import ProfilePostCard from '@/components/profile/ProfilePostCard';
+import CheckPostPricesButton from '@/components/profile/CheckPostPricesButton';
 
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useSupabase();
@@ -970,6 +971,9 @@ export default function Profile() {
       <div className={styles.contentSection}>
         {activeTab === 'posts' && (
           <>
+            {/* زر التحقق من أسعار المنشورات */}
+            <CheckPostPricesButton userId={user?.id} />
+            
             <div className={styles.filterControls}>
               <div className={styles.filterItem}>
                 <label htmlFor="strategyFilter" className={styles.filterLabel}>Filter by Strategy:</label>
@@ -1004,47 +1008,39 @@ export default function Profile() {
                   )}
                 </div>
               </div>
-              
-              {localSelectedStrategy && (
-                <div className={styles.activeFilterIndicator}>
-                  <span className={styles.filterBadge}>
-                    Filtered by: {localSelectedStrategy}
-                  </span>
-                </div>
-              )}
             </div>
-          
+
             <div className={styles.postsGrid}>
               {isLoading ? (
                 <div className={styles.loadingContainer}>
-                  <div className={styles.spinner}></div>
-                  <p>Loading your posts...</p>
+                  <div className={styles.loadingSpinner} />
+                  <p>جاري تحميل المنشورات...</p>
                 </div>
               ) : error ? (
-                <div className={styles.errorContainer}>
-                  <p className={styles.errorMessage}>
-                    {typeof error === 'object' ? (error.message || JSON.stringify(error)) : error}
-                  </p>
+                <div className={styles.errorMessage}>
+                  <p>حدث خطأ أثناء تحميل المنشورات. يرجى المحاولة مرة أخرى لاحقًا.</p>
                   <button 
-                    className={styles.retryButton} 
-                    onClick={() => {
-                      if (user) {
-                        setActiveTab('posts');
-                        initializeData(user.id);
-                      }
-                    }}
+                    className={styles.retryButton}
+                    onClick={() => refreshData(user.id)}
                   >
-                    Retry
+                    إعادة المحاولة
                   </button>
                 </div>
-              ) : posts.length > 0 ? (
-                posts.map(post => (
-                  <ProfilePostCard key={post.id} post={post} />
-                ))
-              ) : (
-                <div className={styles.emptyPostsContainer}>
-                  <p className={styles.emptyMessage}>No posts yet</p>
+              ) : posts.length === 0 ? (
+                <div className={styles.emptyState}>
+                  <h3>لا توجد منشورات حتى الآن</h3>
+                  <p>ابدأ بمشاركة تحليلاتك وتوقعاتك للأسهم</p>
+                  <CreatePostButton />
                 </div>
+              ) : (
+                <>
+                  {/* عرض المنشورات */}
+                  {posts
+                    .filter(post => !localSelectedStrategy || post.strategy === localSelectedStrategy)
+                    .map(post => (
+                      <ProfilePostCard key={post.id} post={post} />
+                    ))}
+                </>
               )}
             </div>
           </>
