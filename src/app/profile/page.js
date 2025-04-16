@@ -217,19 +217,7 @@ export default function Profile() {
     return url.includes('?') ? url : `${url}${cacheBuster}`;
   };
 
-  // Simplified function that doesn't refresh images automatically
-  const refreshImages = useCallback(async () => {
-    if (!user) return;
-    
-    try {
-      // Only refresh context data
-      await refreshData(user.id);
-      // No longer refreshing avatar or background images here
-    } catch (error) {
-      console.error('Error refreshing profile data:', error);
-    }
-  }, [user, refreshData]);
-
+ 
   // Add this effect to load images only once when the page loads
   useEffect(() => {
     if (user && isAuthenticated && profile) {
@@ -1014,27 +1002,27 @@ export default function Profile() {
               {isLoading ? (
                 <div className={styles.loadingContainer}>
                   <div className={styles.loadingSpinner} />
-                  <p>جاري تحميل المنشورات...</p>
+                  <p>Loading posts...</p>
                 </div>
               ) : error ? (
                 <div className={styles.errorMessage}>
-                  <p>حدث خطأ أثناء تحميل المنشورات. يرجى المحاولة مرة أخرى لاحقًا.</p>
+                  <p>Error loading posts. Please try again later.</p>
                   <button 
                     className={styles.retryButton}
                     onClick={() => refreshData(user.id)}
                   >
-                    إعادة المحاولة
+                    Retry
                   </button>
                 </div>
               ) : posts.length === 0 ? (
                 <div className={styles.emptyState}>
-                  <h3>لا توجد منشورات حتى الآن</h3>
-                  <p>ابدأ بمشاركة تحليلاتك وتوقعاتك للأسهم</p>
+                  <h3>No posts yet</h3>
+                  <p>Start sharing your stock analysis and predictions</p>
                   <CreatePostButton />
                 </div>
               ) : (
                 <>
-                  {/* عرض المنشورات */}
+                  {/* Display posts */}
                   {posts
                     .filter(post => !localSelectedStrategy || post.strategy === localSelectedStrategy)
                     .map(post => (

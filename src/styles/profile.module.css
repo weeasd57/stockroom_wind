@@ -1567,3 +1567,215 @@
   box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.5);
   border-color: rgba(56, 189, 248, 0.8);
 }
+
+/* Styles for check prices component */
+.resultsDialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.resultsDialogContent {
+  background-color: hsl(var(--background));
+  border-radius: 12px;
+  padding: 1.5rem;
+  max-width: 90%;
+  width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.closeButton {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: hsl(var(--muted-foreground));
+}
+
+.resultsSummary {
+  background-color: rgba(0, 0, 0, 0.03);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+}
+
+.skippedInfo {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+.resultsList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.resultItem {
+  background-color: hsla(var(--card)/0.3);
+  border-radius: 8px;
+  padding: 1rem;
+  border: 1px solid hsla(var(--border)/0.1);
+}
+
+.resultHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.closedLabel {
+  background-color: hsla(var(--muted)/0.7);
+  color: hsl(var(--muted-foreground));
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.resultDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.priceInfo {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.statusInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.targetReached {
+  background-color: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 0.5rem;
+  border-radius: 6px;
+  color: rgb(16, 185, 129);
+  font-weight: 500;
+}
+
+.stopLossTriggered {
+  background-color: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 0.5rem;
+  border-radius: 6px;
+  color: rgb(239, 68, 68);
+  font-weight: 500;
+}
+
+.dateInfo {
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  opacity: 0.8;
+}
+
+.stopLossInfo {
+  color: hsl(var(--muted-foreground));
+  margin-top: 5px;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.targetInfo {
+  color: hsl(var(--muted-foreground));
+  margin-top: 5px;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.closedInfo {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.successResult {
+  color: rgb(0, 150, 0);
+  font-weight: 500;
+}
+
+.dangerResult {
+  color: rgb(200, 30, 30);
+  font-weight: 500;
+}
+
+.checkPricesButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  margin-bottom: 1rem;
+}
+
+.checkPricesButton:hover {
+  background-color: hsla(var(--primary)/0.9);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px hsla(var(--primary)/0.3);
+}
+
+.checkPricesButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.checkStatsContainer {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background-color: rgba(0, 170, 0, 0.1);
+  border: 1px solid rgba(0, 170, 0, 0.2);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  animation: fadeIn 0.3s ease-out;
+  max-width: 400px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

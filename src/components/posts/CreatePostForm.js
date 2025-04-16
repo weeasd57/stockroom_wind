@@ -114,7 +114,10 @@ export default function CreatePostForm() {
   const [countrySymbolCounts, setCountrySymbolCounts] = useState({});
   const [priceHistory, setPriceHistory] = useState([]);
   const [apiResponse, setApiResponse] = useState(null);
-  const [formErrors, setFormErrors] = useState({});
+  const [formErrors, setFormErrors] = useState({
+    targetPrice: null,
+    stopLossPrice: null
+  });
   const [images, setImages] = useState([]);
   const [capturedImage, setCapturedImage] = useState(null);
   const [categoryId, setCategoryId] = useState(null);
@@ -377,10 +380,60 @@ export default function CreatePostForm() {
         updateField('searchResults', formattedResults);
       } catch (error) {
         console.error('Error searching stocks:', error);
-        // Clear search results to indicate error to user
-        updateField('searchResults', []);
-      } finally {
-        setIsSearching(false);
+        
+        // When search fails, load popular stocks from the current country
+        if (selectedCountry !== 'all') {
+          // Don't show loading state as requested
+          setIsSearching(false);
+          
+          // Convert ISO country code to country name
+          let countryName = selectedCountry;
+          if (countryName.length === 2 && COUNTRY_CODE_TO_NAME[countryName.toLowerCase()]) {
+            countryName = COUNTRY_CODE_TO_NAME[countryName.toLowerCase()];
+          }
+          
+          // Load up to 250 popular stocks from the selected country
+          try {
+            const popularStocks = await searchStocks('', countryName, 250);
+            if (popularStocks && popularStocks.length > 0) {
+              console.log(`Loaded ${popularStocks.length} popular stocks for ${countryName}`);
+              
+              // Format the results to match the expected structure
+              const formattedResults = popularStocks.map(item => ({
+                symbol: item.Symbol || item.symbol,
+                name: item.Name || item.name,
+                country: item.Country || item.country,
+                exchange: item.Exchange || item.exchange,
+                uniqueId: item.uniqueId || `${item.symbol || item.Symbol}-${item.country || item.Country}-${Math.random().toString(36).substring(7)}`
+              }));
+              
+              updateField('searchResults', formattedResults);
+            } else {
+              updateField('searchResults', [{
+                symbol: `No stocks available for ${countryName}`,
+                name: "Please try another country",
+                country: selectedCountry,
+                exchange: "",
+                uniqueId: "no-stocks-available"
+              }]);
+            }
+          } catch (popularStocksError) {
+            console.error('Error loading popular stocks:', popularStocksError);
+            updateField('searchResults', [{
+              symbol: `Could not load stocks from ${countryName}`,
+              name: "Please try again later",
+              country: selectedCountry,
+              exchange: "",
+              uniqueId: "popular-stocks-error"
+            }]);
+          } finally {
+            setIsSearching(false);
+          }
+        } else {
+          // For 'All Countries', just clear the results
+          updateField('searchResults', []);
+          setIsSearching(false);
+        }
       }
     }, 500);
 
@@ -1931,9 +1984,31 @@ export default function CreatePostForm() {
                             id="targetPrice"
                             value={targetPrice}
                             onChange={(e) => {
+                              const newTargetPrice = parseFloat(e.target.value);
+                              
+                              // Always update the field to allow editing
                               updateField('targetPrice', e.target.value);
-                              // Calculate new percentage
-                              if (currentPrice && !isNaN(currentPrice) && !isNaN(e.target.value)) {
+                              
+                              // Validate if we have a valid target price and current price
+                              if (!isNaN(newTargetPrice) && !isNaN(currentPrice)) {
+                                // Check if target price is smaller than current price
+                                if (newTargetPrice < currentPrice) {
+                                  // Set validation error
+                                  setFormErrors(prev => ({
+                                    ...prev,
+                                    targetPrice: 'Target price cannot be smaller than current price'
+                                  }));
+                                  // Show error message
+                                  updateGlobalStatus('Target price cannot be smaller than current price', 'error');
+                                } else {
+                                  // Clear error if valid
+                                  setFormErrors(prev => ({
+                                    ...prev,
+                                    targetPrice: null
+                                  }));
+                                }
+                                
+                                // Calculate new percentage
                                 const newPercentage = (((parseFloat(e.target.value) / currentPrice) - 1) * 100).toFixed(1);
                                 updateField('targetPercentage', parseFloat(newPercentage));
                               }
@@ -1971,9 +2046,31 @@ export default function CreatePostForm() {
                             id="stopLossPrice"
                             value={stopLossPrice}
                             onChange={(e) => {
+                              const newStopLossPrice = parseFloat(e.target.value);
+                              
+                              // Always update the field to allow editing
                               updateField('stopLossPrice', e.target.value);
-                              // Calculate new percentage
-                              if (currentPrice && !isNaN(currentPrice) && !isNaN(e.target.value)) {
+                              
+                              // Validate if we have a valid stop loss price and current price
+                              if (!isNaN(newStopLossPrice) && !isNaN(currentPrice)) {
+                                // Check if stop loss price is bigger than current price
+                                if (newStopLossPrice > currentPrice) {
+                                  // Set validation error
+                                  setFormErrors(prev => ({
+                                    ...prev,
+                                    stopLossPrice: 'Stop loss price cannot be bigger than current price'
+                                  }));
+                                  // Show error message
+                                  updateGlobalStatus('Stop loss price cannot be bigger than current price', 'error');
+                                } else {
+                                  // Clear error if valid
+                                  setFormErrors(prev => ({
+                                    ...prev,
+                                    stopLossPrice: null
+                                  }));
+                                }
+                                
+                                // Calculate new percentage
                                 const newPercentage = ((1 - (parseFloat(e.target.value) / currentPrice)) * 100).toFixed(1);
                                 updateField('stopLossPercentage', parseFloat(newPercentage));
                               }
@@ -2326,8 +2423,9 @@ export default function CreatePostForm() {
           {!isSubmitting ? (
             <button
               onClick={handleSubmit}
-              disabled={!selectedStock || !selectedStock.symbol}
+              disabled={!selectedStock || !selectedStock.symbol || formErrors.targetPrice || formErrors.stopLossPrice}
               className="btn btn-primary"
+              title={formErrors.targetPrice || formErrors.stopLossPrice ? 'Please fix validation errors before posting' : ''}
             >
               Post
             </button>
