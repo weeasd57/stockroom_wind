@@ -28,6 +28,7 @@ export async function POST(request) {
 
     
     let userId = body.userId;
+    let experienceUpdated = false;
 
     
     if (!userId) {
@@ -37,17 +38,17 @@ export async function POST(request) {
       });
       
       if (authError) {
-        console.error('خطأ في التحقق من المصادقة:', authError.message);
+        console.error('Error verifying authentication:', authError.message);
         return NextResponse.json(
-          { success: false, message: 'خطأ في المصادقة', details: authError.message },
+          { success: false, message: 'Authentication error', details: authError.message },
           { status: 401 }
         );
       }
       
       if (!session || !session.user) {
-        console.error('لم يتم العثور على جلسة مستخدم نشطة');
+        console.error('No active user session found');
         return NextResponse.json(
-          { success: false, message: 'غير مصرح به', details: 'لا توجد جلسة نشطة' },
+          { success: false, message: 'Unauthorized', details: 'No active session' },
           { status: 401 }
         );
       }
@@ -60,7 +61,7 @@ export async function POST(request) {
     
     if (!userId) {
       return NextResponse.json(
-        { success: false, message: 'معرف المستخدم غير متاح' },
+        { success: false, message: 'User ID not available' },
         { status: 401 }
       );
     }
@@ -82,7 +83,7 @@ export async function POST(request) {
         return NextResponse.json(
           { 
             success: false, 
-            message: 'لقد وصلت إلى الحد الأقصى للتحقق اليوم (مرتين). حاول مرة أخرى غدًا.', 
+            message: 'You have reached the maximum checks for today. Try again tomorrow.', 
             remainingChecks: 0,
             usageCount: usageData.count
           },
@@ -101,7 +102,7 @@ export async function POST(request) {
         .eq('check_date', today);
       
       if (updateError) {
-        console.error('خطأ في تحديث عدد مرات الاستخدام:', updateError);
+        console.error('Error updating usage count:', updateError);
       }
     } else {
       
@@ -112,7 +113,7 @@ export async function POST(request) {
         ]);
       
       if (insertError) {
-        console.error('خطأ في إنشاء سجل استخدام جديد:', insertError);
+        console.error('Error creating new usage record:', insertError);
       }
     }
     
@@ -195,33 +196,79 @@ export async function POST(request) {
         const response = await fetch(historicalUrl);
         
         if (!response.ok) {
-          console.error(`خطأ في الحصول على بيانات السهم ${symbol}:`, response.statusText);
+          console.error(`Error getting stock data for ${symbol}:`, response.statusText);
           continue;
         }
         
-        const historicalData = await response.json();
+        let historicalData = await response.json();
         
         if (!Array.isArray(historicalData) || historicalData.length === 0) {
-          console.warn(`لم يتم العثور على بيانات تاريخية للسهم ${symbol}، سيتم استخدام السعر الحالي من قاعدة البيانات`);
+          console.warn(`No historical data found for stock ${symbol}, trying to get last close price`);
           
-          // Use the current_price from the post record instead of making an API call
-          if (!post.current_price) {
-            console.error(`لا يوجد سعر حالي مخزن للسهم ${symbol}`);
-            continue;
+          try {
+            // Import the generateEodLastCloseUrl function
+            const { generateEodLastCloseUrl } = require('@/utils/stockApi');
+            
+            // Get the country from the post
+            const country = post.country || '';
+            
+            // Generate URL for last close price
+            const lastCloseUrl = generateEodLastCloseUrl(post.symbol, country);
+            console.log(`Trying to get last close price from: ${lastCloseUrl}`);
+            
+            // Fetch the last close price
+            const lastCloseResponse = await fetch(lastCloseUrl);
+            
+            if (lastCloseResponse.ok) {
+              const lastCloseData = await lastCloseResponse.json();
+              
+              if (lastCloseData && (typeof lastCloseData === 'number' || 
+                  (Array.isArray(lastCloseData) && lastCloseData.length > 0 && lastCloseData[0].close))) {
+                
+                // Extract the close price from the response
+                const closePrice = typeof lastCloseData === 'number' ? 
+                  lastCloseData : 
+                  parseFloat(lastCloseData[0].close);
+                
+                console.log(`Successfully got last close price for ${symbol}: ${closePrice}`);
+                
+                // Create a minimal historical data object using the last close price
+                historicalData = [{
+                  date: new Date().toISOString().split('T')[0],
+                  close: closePrice,
+                  high: closePrice,
+                  low: closePrice,
+                  open: closePrice,
+                  volume: 0
+                }];
+              } else {
+                throw new Error('Invalid last close price data format');
+              }
+            } else {
+              throw new Error(`Failed to get last close price: ${lastCloseResponse.status}`);
+            }
+          } catch (lastCloseError) {
+            console.error(`Error getting last close price for ${symbol}:`, lastCloseError);
+            
+            // Fallback to using the current_price from the post record
+            if (!post.current_price) {
+              console.error(`No current price stored for stock ${symbol}`);
+              continue;
+            }
+            
+            // Create a minimal historical data object using the stored current_price
+            const currentPriceValue = parseFloat(post.current_price);
+            console.log(`Falling back to stored current price for ${symbol}: ${currentPriceValue}`);
+            
+            historicalData = [{
+              date: new Date().toISOString().split('T')[0],
+              close: currentPriceValue,
+              high: currentPriceValue,
+              low: currentPriceValue,
+              open: currentPriceValue,
+              volume: 0
+            }];
           }
-          
-          // Create a minimal historical data object using the stored current_price
-          const currentPriceValue = parseFloat(post.current_price);
-          console.log(`Using stored current price for ${symbol}: ${currentPriceValue}`);
-          
-          historicalData = [{
-            date: new Date().toISOString().split('T')[0],
-            close: currentPriceValue,
-            high: currentPriceValue,
-            low: currentPriceValue,
-            open: currentPriceValue,
-            volume: 0
-          }];
         }
         
         
@@ -264,7 +311,7 @@ export async function POST(request) {
           : null;
         
         if (!lastPrice) {
-          console.warn(`لم يتم العثور على سعر إغلاق حديث للسهم ${symbol}`);
+          console.warn(`No recent closing price found for stock ${symbol}`);
           continue;
         }
         
@@ -323,9 +370,20 @@ export async function POST(request) {
           targetReachedDate,
           stopLossTriggeredDate,
           closed: shouldClosePost,
-          percentToTarget: !targetReached && targetPrice > lastPrice 
-            ? ((targetPrice - lastPrice) / lastPrice * 100).toFixed(2)
-            : ((lastPrice - targetPrice) / targetPrice * 100).toFixed(2),
+          percentToTarget: (() => {
+            // Determine if this is an upward target (target price > initial price when post was created)
+            const isUpwardTarget = targetPrice > post.current_price;
+            
+            if (targetPrice !== lastPrice) {
+              if (isUpwardTarget) {
+                return ((targetPrice - lastPrice) / lastPrice * 100).toFixed(2);
+              } else {
+                return ((lastPrice - targetPrice) / lastPrice * 100).toFixed(2);
+              }
+            } else {
+              return '0.00';
+            }
+          })(),
           percentToStopLoss: !stopLossTriggered && stopLossPrice < lastPrice
             ? ((lastPrice - stopLossPrice) / lastPrice * 100).toFixed(2)
             : 0
@@ -337,6 +395,63 @@ export async function POST(request) {
     
     
     let updateSuccess = false;
+    
+    // Track successful and lost posts for experience calculation
+    let successfulPosts = 0;
+    let lostPosts = 0;
+    
+    // Count newly closed posts for experience calculation
+    for (const post of updatedPosts) {
+      // Only count posts that were just closed (not previously closed)
+      if (post.closed === true) {
+        if (post.target_reached) {
+          successfulPosts++;
+        } else if (post.stop_loss_triggered) {
+          lostPosts++;
+        }
+      }
+    }
+    
+    // Update user experience if any posts were closed
+    if (successfulPosts > 0 || lostPosts > 0) {
+      try {
+        // First get current profile data
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('success_posts, loss_posts')
+          .eq('id', userId)
+          .single();
+        
+        if (!profileError && profileData) {
+          // Calculate new totals
+          const newSuccessPosts = (profileData.success_posts || 0) + successfulPosts;
+          const newLossPosts = (profileData.loss_posts || 0) + lostPosts;
+          
+          // Update the profile with new counts
+          const { error: updateProfileError } = await adminSupabase
+            .from('profiles')
+            .update({
+              success_posts: newSuccessPosts,
+              loss_posts: newLossPosts,
+              // Experience is calculated as successful posts minus lost posts
+              experience: newSuccessPosts - newLossPosts
+            })
+            .eq('id', userId);
+          
+          if (updateProfileError) {
+            console.error('Error updating user experience:', updateProfileError);
+          } else {
+            experienceUpdated = true;
+            console.log(`Updated user experience: +${successfulPosts} success, +${lostPosts} loss`);
+          }
+        } else {
+          console.error('Error fetching profile for experience update:', profileError);
+        }
+      } catch (error) {
+        console.error('Error in experience calculation:', error);
+      }
+    }
+    
     if (updatedPosts.length > 0) {
       
       
@@ -417,6 +532,7 @@ export async function POST(request) {
       updatedPosts: updatedPosts.length,
       closedPostsSkipped: closedPostsCount,
       updateSuccess,
+      experienceUpdated,
       results
     });
   } catch (error) {

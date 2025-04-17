@@ -458,7 +458,17 @@ export default function CreatePostForm() {
     
     // When a country is selected, load all symbols for that country
     if (value !== 'all') {
+      // Set loading state to true
       setIsSearching(true);
+      
+      // Show loading state in search results
+      updateField('searchResults', [{
+        symbol: "Loading...",
+        name: "Fetching symbols, please wait",
+        country: value,
+        exchange: "",
+        uniqueId: "loading-symbols"
+      }]);
       
       // Convert ISO country code to country name
       let countryName = value;
@@ -533,6 +543,8 @@ export default function CreatePostForm() {
     }
   }, [stockSearch, selectedCountry]);
 
+  // scrollToStockInfo is defined at line 736
+  
   // Handle stock selection
   const handleStockSelect = async (stock) => {
     try {
@@ -543,6 +555,7 @@ export default function CreatePostForm() {
       updateField('searchResults', []);
       // Show loading state
       setIsSearching(true);
+      // Scroll to the stock info section
       scrollToStockInfo();
       
       // First, let's properly format the symbol for consistent API use
@@ -727,82 +740,89 @@ export default function CreatePostForm() {
 
   // Helper function to scroll to stock info with improved reliability
   const scrollToStockInfo = () => {
-    // Use a more reliable approach with multiple attempts
-    const attemptScroll = (attempt = 0) => {
-      const stockInfoElement = document.querySelector('.stock-info-container');
-      
-      if (stockInfoElement) {
-        console.log('Stock info element found, scrolling to it...');
+    console.log('scrollToStockInfo called');
+    
+    // Force scroll to top immediately for all possible containers
+    const scrollContainers = [
+      formWrapperRef.current,
+      document.querySelector('.form-wrapper'),
+      document.querySelector('.create-post-form-container'),
+      document.querySelector('.dialog-content'),
+      document.querySelector('.modal-content')
+    ];
+    
+    // Try to scroll all possible containers to top
+    scrollContainers.forEach(container => {
+      if (container) {
+        try {
+          // Try both methods
+          container.scrollTo(0, 0);
+          container.scrollTop = 0;
+          console.log('Scrolled container to top');
+        } catch (e) {
+          console.error('Error scrolling container:', e);
+        }
+      }
+    });
+    
+    // Schedule multiple scroll attempts with increasing delays
+    for (let i = 0; i < 5; i++) {
+      setTimeout(() => {
+        // Try to find the stock info container
+        const stockInfoContainer = document.querySelector('.stock-info-container');
+        const stockItem = document.querySelector('.stock-item');
+        const targetElement = stockInfoContainer || stockItem || document.querySelector('.form-group');
         
-        // Calculate the position of the element relative to the form wrapper
-        const formWrapper = formWrapperRef.current;
-        if (formWrapper) {
-          // Get the element's position relative to the form
-          const formRect = formWrapper.getBoundingClientRect();
-          const elementRect = stockInfoElement.getBoundingClientRect();
-          const relativeTop = elementRect.top - formRect.top;
+        if (targetElement) {
+          console.log(`Found target element on attempt ${i+1}`);
           
-          // Scroll the form to this position
-          formWrapper.scrollTo({
-            top: relativeTop - 20, // Add some padding at the top
-            behavior: 'smooth'
+          // Get all possible scroll containers again
+          scrollContainers.forEach(container => {
+            if (container) {
+              try {
+                // Get the position of the element
+                const offsetTop = targetElement.offsetTop;
+                
+                // Scroll to the element
+                container.scrollTo({
+                  top: offsetTop - 20,
+                  behavior: 'smooth'
+                });
+                
+                // Also try direct assignment
+                setTimeout(() => {
+                  container.scrollTop = offsetTop - 20;
+                }, 50);
+                
+                console.log(`Scrolled container to element at ${offsetTop}px`);
+              } catch (e) {
+                console.error('Error scrolling to element:', e);
+              }
+            }
           });
           
-          console.log(`Scrolled form to position: ${relativeTop}px`);
-        }
-        
-        // Add highlight effect to make it more noticeable
-        stockInfoElement.classList.add('highlight-selection');
-        setTimeout(() => {
-          stockInfoElement.classList.remove('highlight-selection');
-        }, 1500);
-        
-        // Force focus on price value to ensure it's visible
-        const priceElement = document.querySelector('.stock-price-value');
-        if (priceElement) {
+          // Add highlight effect
+          targetElement.classList.add('highlight-selection');
           setTimeout(() => {
-            priceElement.focus();
-            console.log('Focused on price element');
-          }, 300);
+            targetElement.classList.remove('highlight-selection');
+          }, 1000);
         }
-        
-        // Force focus on API response when available
-        if (apiResponse) {
-          // Try to focus on response URL if available
-          const responseUrlElement = document.querySelector('.response-url');
-          if (responseUrlElement) {
-            setTimeout(() => {
-              responseUrlElement.focus();
-            }, 500);
-          }
-          
-          // Highlight the API response section
-          const apiResponseElement = document.querySelector('.stock-price-api-response');
-          if (apiResponseElement) {
-            apiResponseElement.classList.add('highlight-selection');
-            setTimeout(() => {
-              apiResponseElement.classList.remove('highlight-selection');
-            }, 1500);
-          }
-        } else {
-          // If no API response, focus on API URL element
-          const apiUrlElement = document.querySelector('.api-url-code');
-          if (apiUrlElement) {
-            apiUrlElement.focus();
-          }
-        }
-      } else if (attempt < 5) {
-        // Element not found yet, retry after a short delay
-        console.log(`Stock info element not found, retrying... (attempt ${attempt + 1})`);
-        setTimeout(() => attemptScroll(attempt + 1), 200);
-      } else {
-        console.log('Failed to find stock info element after multiple attempts');
-      }
-    };
+      }, i * 300); // Increasing delays: 0ms, 300ms, 600ms, 900ms, 1200ms
+    }
     
-    // Start the scroll attempt
-    attemptScroll();
+    // Add additional focus attempts with delay
+    setTimeout(() => {
+      // Force focus on price value to ensure it's visible
+      const priceElement = document.querySelector('.stock-price-value');
+      if (priceElement) {
+        setTimeout(() => {
+          priceElement.focus();
+          console.log('Focused on price element');
+        }, 300);
+      }
+    }, 1500);
   };
+  
   // Handle image selection
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -1664,6 +1684,30 @@ export default function CreatePostForm() {
             </div>
             <div className="search-results-list">
               {searchResults.map((stock) => {
+                // Special handling for loading state
+                if (stock.uniqueId === 'loading-symbols') {
+                  return (
+                    <div 
+                      key="loading-symbols"
+                      className="category-option message-item loading-item"
+                    >
+                      <div className="stock-flag loading-pulse">
+                        <span 
+                          className={`fi fi-${stock.country?.toLowerCase() || 'xx'}`} 
+                          title={stock.country}
+                        ></span>
+                      </div>
+                      <div className="category-option-content">
+                        <div className="category-option-name loading-pulse">{stock.symbol}</div>
+                        <div className="stock-name loading-pulse">
+                          <div className="loading-spinner"></div>
+                          {stock.name}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                
                 // Special handling for no-data messages or error messages
                 const isMessageItem = stock.uniqueId && (
                   stock.uniqueId.includes('error') || 
@@ -1991,15 +2035,15 @@ export default function CreatePostForm() {
                               
                               // Validate if we have a valid target price and current price
                               if (!isNaN(newTargetPrice) && !isNaN(currentPrice)) {
-                                // Check if target price is smaller than current price
-                                if (newTargetPrice < currentPrice) {
+                                // Check if target price is smaller than or equal to current price
+                                if (newTargetPrice <= currentPrice) {
                                   // Set validation error
                                   setFormErrors(prev => ({
                                     ...prev,
-                                    targetPrice: 'Target price cannot be smaller than current price'
+                                    targetPrice: 'Target price must be greater than current price'
                                   }));
                                   // Show error message
-                                  updateGlobalStatus('Target price cannot be smaller than current price', 'error');
+                                  updateGlobalStatus('Target price must be greater than current price', 'error');
                                 } else {
                                   // Clear error if valid
                                   setFormErrors(prev => ({
@@ -2017,18 +2061,51 @@ export default function CreatePostForm() {
                           />
                           <div className="price-percentage-edit">
                             <input 
-                              type="number" 
+                              type="text" 
                               className="percentage-input target-input" 
                               value={targetPercentage}
                               onChange={(e) => {
-                                const newPercentage = parseFloat(e.target.value);
-                                updateField('targetPercentage', newPercentage);
-                                if (currentPrice && !isNaN(currentPrice) && !isNaN(newPercentage)) {
-                                  const newTargetPrice = (currentPrice * (1 + newPercentage/100)).toFixed(2);
-                                  updateField('targetPrice', newTargetPrice);
+                                // Only allow numbers and decimal point
+                                const value = e.target.value.replace(/[^0-9.]/g, '');
+                                
+                                // Limit to one decimal point
+                                const parts = value.split('.');
+                                const formattedValue = parts[0] + (parts.length > 1 ? '.' + parts[1] : '');
+                                
+                                const newPercentage = parseFloat(formattedValue);
+                                
+                                // Limit percentage between 0 and 100
+                                if (!isNaN(newPercentage)) {
+                                  const limitedPercentage = Math.min(Math.max(newPercentage, 0), 100);
+                                  updateField('targetPercentage', limitedPercentage);
+                                  
+                                  if (currentPrice && !isNaN(currentPrice)) {
+                                    const newTargetPrice = (currentPrice * (1 + limitedPercentage/100)).toFixed(2);
+                                    updateField('targetPrice', newTargetPrice);
+                                    
+                                    // Validate the new target price
+                                    if (parseFloat(newTargetPrice) <= currentPrice) {
+                                      // Set validation error
+                                      setFormErrors(prev => ({
+                                        ...prev,
+                                        targetPrice: 'Target price must be greater than current price'
+                                      }));
+                                      // Show error message
+                                      updateGlobalStatus('Target price must be greater than current price', 'error');
+                                    } else {
+                                      // Clear error if valid
+                                      setFormErrors(prev => ({
+                                        ...prev,
+                                        targetPrice: null
+                                      }));
+                                    }
+                                  }
+                                } else {
+                                  // If input is empty or invalid, just update the field value
+                                  updateField('targetPercentage', value === '' ? '' : 0);
                                 }
                               }}
-                              step="0.1"
+                              pattern="[0-9]+(\.[0-9]+)?"
                               aria-label="Target percentage"
                             />
                             <span className="percentage-symbol">%</span>
@@ -2053,15 +2130,15 @@ export default function CreatePostForm() {
                               
                               // Validate if we have a valid stop loss price and current price
                               if (!isNaN(newStopLossPrice) && !isNaN(currentPrice)) {
-                                // Check if stop loss price is bigger than current price
-                                if (newStopLossPrice > currentPrice) {
+                                // Check if stop loss price is bigger than or equal to current price
+                                if (newStopLossPrice >= currentPrice) {
                                   // Set validation error
                                   setFormErrors(prev => ({
                                     ...prev,
-                                    stopLossPrice: 'Stop loss price cannot be bigger than current price'
+                                    stopLossPrice: 'Stop loss price must be less than current price'
                                   }));
                                   // Show error message
-                                  updateGlobalStatus('Stop loss price cannot be bigger than current price', 'error');
+                                  updateGlobalStatus('Stop loss price must be less than current price', 'error');
                                 } else {
                                   // Clear error if valid
                                   setFormErrors(prev => ({
@@ -2079,19 +2156,52 @@ export default function CreatePostForm() {
                           />
                           <div className="price-percentage-edit">
                             <input 
-                              type="number" 
+                              type="text" 
                               className="percentage-input stop-loss-input" 
                               value={stopLossPercentage}
                               onChange={(e) => {
-                                const newPercentage = parseFloat(e.target.value);
-                                updateField('stopLossPercentage', newPercentage);
-                                // تحديث سعر إيقاف الخسارة بناءً على النسبة الجديدة
-                                if (currentPrice && !isNaN(currentPrice) && !isNaN(newPercentage)) {
-                                  const newStopLossPrice = (currentPrice * (1 - newPercentage/100)).toFixed(2);
-                                  updateField('stopLossPrice', newStopLossPrice);
+                                // Only allow numbers and decimal point
+                                const value = e.target.value.replace(/[^0-9.]/g, '');
+                                
+                                // Limit to one decimal point
+                                const parts = value.split('.');
+                                const formattedValue = parts[0] + (parts.length > 1 ? '.' + parts[1] : '');
+                                
+                                const newPercentage = parseFloat(formattedValue);
+                                
+                                // Limit percentage between 0 and 100
+                                if (!isNaN(newPercentage)) {
+                                  const limitedPercentage = Math.min(Math.max(newPercentage, 0), 100);
+                                  updateField('stopLossPercentage', limitedPercentage);
+                                  
+                                  // Update stop loss price based on the new percentage
+                                  if (currentPrice && !isNaN(currentPrice)) {
+                                    const newStopLossPrice = (currentPrice * (1 - limitedPercentage/100)).toFixed(2);
+                                    updateField('stopLossPrice', newStopLossPrice);
+                                    
+                                    // Validate the new stop loss price
+                                    if (parseFloat(newStopLossPrice) >= currentPrice) {
+                                      // Set validation error
+                                      setFormErrors(prev => ({
+                                        ...prev,
+                                        stopLossPrice: 'Stop loss price must be less than current price'
+                                      }));
+                                      // Show error message
+                                      updateGlobalStatus('Stop loss price must be less than current price', 'error');
+                                    } else {
+                                      // Clear error if valid
+                                      setFormErrors(prev => ({
+                                        ...prev,
+                                        stopLossPrice: null
+                                      }));
+                                    }
+                                  }
+                                } else {
+                                  // If input is empty or invalid, just update the field value
+                                  updateField('stopLossPercentage', value === '' ? '' : 0);
                                 }
                               }}
-                              step="0.1"
+                              pattern="[0-9]+(\.[0-9]+)?"
                               aria-label="Stop loss percentage"
                             />
                             <span className="percentage-symbol">%</span>
@@ -2423,9 +2533,16 @@ export default function CreatePostForm() {
           {!isSubmitting ? (
             <button
               onClick={handleSubmit}
-              disabled={!selectedStock || !selectedStock.symbol || formErrors.targetPrice || formErrors.stopLossPrice}
+              disabled={!selectedStock || !selectedStock.symbol || 
+                formErrors.targetPrice || formErrors.stopLossPrice || 
+                (currentPrice && targetPrice && parseFloat(targetPrice) <= parseFloat(currentPrice)) || 
+                (currentPrice && stopLossPrice && parseFloat(stopLossPrice) >= parseFloat(currentPrice))}
               className="btn btn-primary"
-              title={formErrors.targetPrice || formErrors.stopLossPrice ? 'Please fix validation errors before posting' : ''}
+              title={
+                formErrors.targetPrice || formErrors.stopLossPrice ? 'Please fix validation errors before posting' : 
+                (currentPrice && targetPrice && parseFloat(targetPrice) <= parseFloat(currentPrice)) ? 'Target price must be greater than current price' : 
+                (currentPrice && stopLossPrice && parseFloat(stopLossPrice) >= parseFloat(currentPrice)) ? 'Stop loss price must be less than current price' : 
+                ''}
             >
               Post
             </button>

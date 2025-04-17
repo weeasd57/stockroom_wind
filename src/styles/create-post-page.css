@@ -901,6 +901,55 @@ input.visible-input::placeholder {
   z-index: 1010;
 }
 
+/* Loading state styles */
+.loading-item {
+  position: relative;
+  overflow: hidden;
+}
+
+.loading-pulse {
+  position: relative;
+  overflow: hidden;
+}
+
+.loading-pulse::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(var(--primary-color-rgb), 0.3);
+  border-radius: 50%;
+  border-top-color: var(--primary-color);
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Ensure country dropdown is always on top */
 .category-select .category-dropdown {
   z-index: 1020;
@@ -3045,6 +3094,15 @@ input.visible-input::placeholder {
   border: none;
   background: transparent;
   font-size: 0.9rem;
+  /* Hide spinner buttons */
+  -moz-appearance: textfield;
+}
+
+/* Hide spinner for Chrome, Safari, Edge, Opera */
+.percentage-input::-webkit-outer-spin-button,
+.percentage-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .percentage-input:focus {
@@ -3142,6 +3200,15 @@ input.visible-input::placeholder {
   border: none;
   background: transparent;
   font-size: 0.9rem;
+  /* Hide spinner buttons */
+  -moz-appearance: textfield;
+}
+
+/* Hide spinner for Chrome, Safari, Edge, Opera */
+.percentage-input::-webkit-outer-spin-button,
+.percentage-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .percentage-input:focus {

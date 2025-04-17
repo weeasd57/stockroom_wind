@@ -173,10 +173,18 @@ export const ProfilePostCard = ({ post = {} }) => {
           const isUpwardTarget = targetPrice > initialPrice;
           
           // Calculate percentage to target using formula:
-          // Difference: targetPrice - currentPrice
-          // Divide by target price: difference / targetPrice
-          // Multiply by 100: result * 100
-          let percentToTarget = Math.abs(((targetPrice - currentPrice) / targetPrice) * 100).toFixed(2);
+          // For upward targets: ((Target Price - Current Price) / Current Price) × 100%
+          // For downward targets: ((Current Price - Target Price) / Current Price) × 100%
+          let percentToTarget;
+          if (targetPrice !== currentPrice) {
+            if (isUpwardTarget) {
+              percentToTarget = ((targetPrice - currentPrice) / currentPrice * 100).toFixed(2);
+            } else {
+              percentToTarget = ((currentPrice - targetPrice) / currentPrice * 100).toFixed(2);
+            }
+          } else {
+            percentToTarget = '0.00';
+          }
           
           // Determine if we're moving toward or away from target
           const isMovingTowardTarget = 
