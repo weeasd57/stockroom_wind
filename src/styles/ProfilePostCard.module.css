@@ -321,7 +321,7 @@
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .postCard {
-    width: 100%;
+    width: 90%;
   }
 }
 

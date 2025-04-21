@@ -371,14 +371,14 @@ export function ProfileProvider({ children }) {
       }
       
       // Modified queries using more commonly used column names - we'll adjust based on your actual schema
-      // Try with followed_id instead of user_id
+      // Using follower_id/following_id structure for followers
       let followersData, followingData;
       
-      // First approach for followers
+      // First approach for followers - using follower_id/following_id structure
       const followersResult = await supabase
         .from('followers')
         .select('follower_id, profiles!followers_follower_id_fkey(id, username, avatar_url)')
-        .eq('followed_id', userId);
+        .eq('following_id', userId);
         
       if (followersResult.error) {
         console.error('First followers query failed:', followersResult.error);
@@ -400,10 +400,10 @@ export function ProfileProvider({ children }) {
         followersData = followersResult.data || [];
       }
       
-      // Try with followed_id instead of user_id for following
+      // Try with following_id instead of followed_id for following
       const followingResult = await supabase
         .from('followers')
-        .select('followed_id, profiles!followers_followed_id_fkey(id, username, avatar_url)')
+        .select('following_id, profiles!followers_following_id_fkey(id, username, avatar_url)')
         .eq('follower_id', userId);
         
       if (followingResult.error) {
@@ -467,14 +467,14 @@ export function ProfileProvider({ children }) {
       if (postsError) throw postsError;
       
       // Modified queries using more commonly used column names - using the same pattern as in initializeData
-      // Try with followed_id instead of user_id
+      // Using follower_id/following_id structure for followers
       let followersData, followingData;
       
-      // First approach for followers
+      // First approach for followers - using follower_id/following_id structure
       const followersResult = await supabase
         .from('followers')
         .select('follower_id, profiles!followers_follower_id_fkey(id, username, avatar_url)')
-        .eq('followed_id', userId);
+        .eq('following_id', userId);
         
       if (followersResult.error) {
         console.error('First followers query failed:', followersResult.error);
@@ -496,10 +496,10 @@ export function ProfileProvider({ children }) {
         followersData = followersResult.data || [];
       }
       
-      // Try with followed_id instead of user_id for following
+      // Try with following_id instead of followed_id for following
       const followingResult = await supabase
         .from('followers')
-        .select('followed_id, profiles!followers_followed_id_fkey(id, username, avatar_url)')
+        .select('following_id, profiles!followers_following_id_fkey(id, username, avatar_url)')
         .eq('follower_id', userId);
         
       if (followingResult.error) {

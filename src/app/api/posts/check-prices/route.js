@@ -434,21 +434,21 @@ export async function POST(request) {
               success_posts: newSuccessPosts,
               loss_posts: newLossPosts,
               // Experience is calculated as successful posts minus lost posts
-              experience: newSuccessPosts - newLossPosts
+              experience_Score: newSuccessPosts - newLossPosts
             })
             .eq('id', userId);
           
           if (updateProfileError) {
-            console.error('Error updating user experience:', updateProfileError);
+            console.error('Error updating user experience score:', updateProfileError);
           } else {
             experienceUpdated = true;
-            console.log(`Updated user experience: +${successfulPosts} success, +${lostPosts} loss`);
+            console.log(`Updated user experience score: +${successfulPosts} success, +${lostPosts} loss`);
           }
         } else {
-          console.error('Error fetching profile for experience update:', profileError);
+          console.error('Error fetching profile for experience score update:', profileError);
         }
       } catch (error) {
-        console.error('Error in experience calculation:', error);
+        console.error('Error in experience score calculation:', error);
       }
     }
     
@@ -577,7 +577,20 @@ async function ensurePostTableColumns() {
         console.error(`Error adding column ${column.name}:`, alterError);
       }
     }
+    
+    // Ensure experience_Score column exists in profiles table
+    const { error: experienceError } = await supabase
+      .rpc('add_column_if_not_exists', { 
+        p_table_name: 'profiles',
+        p_column_name: 'experience_Score',
+        p_data_type: 'integer',
+        p_default_value: 0
+      });
+    
+    if (experienceError) {
+      console.error('Error adding experience_Score column to profiles table:', experienceError);
+    }
   } catch (error) {
-    console.error('Error ensuring post table columns:', error);
+    console.error('Error ensuring table columns:', error);
   }
 }

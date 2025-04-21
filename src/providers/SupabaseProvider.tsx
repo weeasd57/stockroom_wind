@@ -65,17 +65,17 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const hasUser = !!session?.user;
-        setUser(session?.user ?? null);
-        setIsAuthenticated(hasUser);
-        
-        // Listen for auth changes
+      const hasUser = !!session?.user;
+      setUser(session?.user ?? null);
+      setIsAuthenticated(hasUser);
+
+    // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
           console.log('[Auth] State change:', event);
           
-          const hasUser = !!session?.user;
-          setUser(session?.user ?? null);
-          setIsAuthenticated(hasUser);
+      const hasUser = !!session?.user;
+      setUser(session?.user ?? null);
+      setIsAuthenticated(hasUser);
 
           // Clear any pending refresh
           if (refreshTimeout.current) {

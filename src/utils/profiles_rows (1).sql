@@ -1,0 +1,2 @@
+
+INSERT INTO "public"."profiles" ("id", "username", "full_name", "avatar_url", "bio", "website", "favorite_markets", "created_at", "updated_at", "email", "last_sign_in", "success_posts", "loss_posts", "background_url", "experience_Score") ;

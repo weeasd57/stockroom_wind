@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styles from '@/styles/ProfilePostCard.module.css';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 import { COUNTRY_ISO_CODES } from '@/models/CurrencyData';
 import { getCountryForExchange, EXCHANGE_COUNTRIES } from '@/models/ExchangeData';
 import 'flag-icons/css/flag-icons.min.css';
+import { useRouter } from 'next/navigation';
 
 // Function to format date
 function formatDate(dateString) {
@@ -17,6 +18,7 @@ function formatDate(dateString) {
 }
 
 export const ProfilePostCard = ({ post = {} }) => {
+  const router = useRouter();
   // Add default empty object to prevent errors if post is undefined
   
   // Check for stock_symbol in different possible locations based on API response structure
@@ -276,18 +278,25 @@ export const ProfilePostCard = ({ post = {} }) => {
             </span>
           )}
           
+          {post.exchange && (
+            <span className={styles.postExchange}>
+              {post.exchange}
+            </span>
+          )}
+          
           {post.strategy && (
-            <span className={styles.strategy}>
-              Strategy: {post.strategy}
+            <span className={styles.postStrategy}>
+              {post.strategy}
             </span>
           )}
         </div>
         
-        <div className={styles.postActions}>
-          <button className={styles.viewButton}>
-            View Details
-          </button>
-        </div>
+        <button 
+          className={styles.showDetailsButton}
+          onClick={() => router.push(`/posts/${post.id}`)}
+        >
+          Show Details
+        </button>
       </div>
     </div>
   );

@@ -164,12 +164,50 @@ export const getUserProfile = async (userId) => {
   }
 
   try {
+    // First, get the user profile data
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, username, full_name, email, avatar_url, background_url, bio, experience_level, success_posts, loss_posts')
+      .select('id, username, full_name, email, avatar_url, background_url, bio, success_posts, loss_posts, experience_Score')
       .eq('id', userId);
 
     if (error) throw error;
+    
+    // Count successful and lost posts for this user
+    const { data: postsData, error: postsError } = await supabase
+      .from('posts')
+      .select('target_reached, stop_loss_triggered')
+      .eq('user_id', userId)
+      .eq('closed', true);
+      
+    if (!postsError && postsData) {
+      // Count successful and lost posts
+      const successPosts = postsData.filter(post => post.target_reached).length;
+      const lossPosts = postsData.filter(post => post.stop_loss_triggered).length;
+      
+      // Calculate experience score (success - loss)
+      const experienceScore = successPosts - lossPosts;
+      
+      // If we have profile data, update the counts
+      if (data && data.length > 0) {
+        // Update the profile with the latest counts
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            success_posts: successPosts,
+            loss_posts: lossPosts,
+            experience_Score: experienceScore
+          })
+          .eq('id', userId);
+          
+        if (!updateError) {
+          // Update the data object with the new counts
+          data[0].success_posts = successPosts;
+          data[0].loss_posts = lossPosts;
+          data[0].experience_Score = experienceScore;
+          console.log(`Updated user stats: Success: ${successPosts}, Loss: ${lossPosts}, Experience: ${experienceScore}`);
+        }
+      }
+    }
     
     // If no profile exists, return empty data instead of error
     if (!data || data.length === 0) {
@@ -184,10 +222,25 @@ export const getUserProfile = async (userId) => {
         avatar_url: null,
         background_url: null,
         bio: null,
-        experience_level: 'beginner',
+        experience_Score: 0,
         success_posts: 0,
-        loss_posts: 0
+        loss_posts: 0,
       };
+      
+      // Count successful and lost posts for this user (in case they exist before profile creation)
+      const { data: postsData, error: postsError } = await supabase
+        .from('posts')
+        .select('target_reached, stop_loss_triggered')
+        .eq('user_id', userId)
+        .eq('closed', true);
+        
+      if (!postsError && postsData && postsData.length > 0) {
+        // Count successful and lost posts
+        defaultProfile.success_posts = postsData.filter(post => post.target_reached).length;
+        defaultProfile.loss_posts = postsData.filter(post => post.stop_loss_triggered).length;
+        defaultProfile.experience_Score = defaultProfile.success_posts - defaultProfile.loss_posts;
+        console.log(`Setting initial stats for new profile: Success: ${defaultProfile.success_posts}, Loss: ${defaultProfile.loss_posts}, Experience: ${defaultProfile.experience_Score}`);
+      }
       
       const { error: insertError } = await supabase
         .from('profiles')
@@ -1362,17 +1415,22 @@ export const getFollowing = async (userId) => {
 /**
  * Get a post by ID
  * @param {string} postId - Post ID
- * @returns {Promise<object>} - Post data
+ * @returns {Promise<object>} - Post data and error
  */
 export const getPostById = async (postId) => {
-  const { data, error } = await supabase
-    .from('posts')
-    .select('*')
-    .eq('id', postId)
-    .single();
-    
-  if (error) throw error;
-  return data;
+  try {
+    const { data, error } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('id', postId)
+      .single();
+      
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error fetching post:', error);
+    return { data: null, error };
+  }
 };
 
 // Monitor all fetch requests for performance tracking

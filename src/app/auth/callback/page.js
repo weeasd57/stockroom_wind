@@ -51,7 +51,7 @@ export default function AuthCallbackPage() {
   return (
     <div className={styles.container}>
       <div className={styles.loadingWrapper}>
-        <div className={styles.loadingIndicator}></div>
+            <div className={styles.loadingIndicator}></div>
         <p>Authenticating...</p>
       </div>
     </div>

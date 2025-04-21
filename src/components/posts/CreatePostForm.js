@@ -266,22 +266,37 @@ export default function CreatePostForm() {
       // Then try to save it to database if supabase is available
       if (supabase) {
         try {
-          // Save to user_strategies table
-          const { data, error } = await supabase
+          // Check if user_strategies table exists by attempting a query
+          const { data: checkData, error: checkError } = await supabase
             .from('user_strategies')
-            .insert({
-              user_id: user.id,
-              name: strategyName,
-              created_at: new Date().toISOString()
-            })
-            .select()
-            .single();
+            .select('id')
+            .limit(1);
+          
+          // If table doesn't exist or there's an error, create it
+          if (checkError && checkError.code === '42P01') { // PostgreSQL error code for "relation does not exist"
+            console.log('user_strategies table does not exist, creating it...');
             
-          if (error) {
-            console.error('Error saving strategy to database:', error);
-            // Already added locally, so continue silently
+            // We can't create tables directly from the client, so we'll just log this
+            console.error('Table user_strategies does not exist. Please run the migration script.');
           } else {
-            console.log('Strategy saved to database:', data);
+            // Table exists, proceed with insert
+            const { data, error } = await supabase
+              .from('user_strategies')
+              .insert({
+                user_id: user.id,
+                name: strategyName,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .select()
+              .single();
+              
+            if (error) {
+              console.error('Error saving strategy to database:', error);
+              // Already added locally, so continue silently
+            } else {
+              console.log('Strategy saved to database:', data);
+            }
           }
         } catch (dbError) {
           console.error('Database error saving strategy:', dbError);

@@ -27,7 +27,15 @@ export interface Post {
 export interface User {
   id: string;
   email?: string;
+  username?: string;
   avatar_url?: string;
+  background_url?: string;
+  bio?: string;
+  created_at?: string;
+  updated_at?: string;
+  experience_Score?: number;
+  success_posts?: number;
+  loss_posts?: number;
 }
 
 export interface Profile {
@@ -37,7 +45,7 @@ export interface Profile {
   bio?: string;
   avatar_url?: string;
   background_url?: string;
-  experience_level?: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  experience_Score?: number;
   success_posts?: number;
   loss_posts?: number;
   created_at?: string;

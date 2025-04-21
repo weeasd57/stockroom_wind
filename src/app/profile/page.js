@@ -16,6 +16,7 @@ import { createPortal } from 'react-dom';
 import '@/styles/create-post-page.css';
 import ProfilePostCard from '@/components/profile/ProfilePostCard';
 import CheckPostPricesButton from '@/components/profile/CheckPostPricesButton';
+import StrategyDetailsModal from '@/components/profile/StrategyDetailsModal';
 
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useSupabase();
@@ -38,7 +39,8 @@ export default function Profile() {
     refreshData,
     selectedStrategy,
     setSelectedStrategy,
-    clearSelectedStrategy
+    clearSelectedStrategy,
+    strategies // Add this line to get the strategies from the ProfileProvider
   } = useProfile();
 
   // Debug authentication on mount
@@ -60,7 +62,6 @@ export default function Profile() {
   const [formData, setFormData] = useState({
     username: '',
     bio: '',
-    experience_level: 'beginner',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -79,6 +80,8 @@ export default function Profile() {
   const backgroundInputRef = useRef(null);
   const refreshInterval = useRef(null);
   const [localSelectedStrategy, setLocalSelectedStrategy] = useState(null);
+  const [selectedStrategyForDetails, setSelectedStrategyForDetails] = useState(null);
+  const [isStrategyModalOpen, setIsStrategyModalOpen] = useState(false);
 
   // Initialize data once when authenticated
   useEffect(() => {
@@ -94,7 +97,6 @@ export default function Profile() {
       setFormData({
         username: profile.username || '',
         bio: profile.bio || '',
-        experience_level: profile.experience_level || 'beginner',
       });
       setAvatarUrl(contextAvatarUrl || '/default-avatar.svg');
       setBackgroundUrl(contextBackgroundUrl || '/profile-bg.jpg');
@@ -147,7 +149,6 @@ export default function Profile() {
       setFormData({
         username: profile.username || '',
         bio: profile.bio || '',
-        experience_level: profile.experience_level || 'beginner',
       });
     }
   }, [profile]);
@@ -206,7 +207,6 @@ export default function Profile() {
     setFormData({
       username: profile?.username || '',
       bio: profile?.bio || '',
-      experience_level: profile?.experience_level || 'beginner',
     });
   }, [profile]);
 
@@ -892,20 +892,18 @@ export default function Profile() {
       {/* Trading Statistics */}
       <div className={styles.tradingInfo}>
         <div className={styles.tradingInfoItem}>
-          <span className={styles.tradingInfoLabel}>Experience:</span>
-          <span className={styles.tradingInfoValue}>
-            {profile?.experience_level ? 
-              profile.experience_level.charAt(0).toUpperCase() + profile.experience_level.slice(1) : 
-              'Beginner'}
+          <span className={styles.tradingInfoLabel}>Experience Score:</span>
+          <span className={`${styles.tradingInfoValue} ${(profile?.experience_Score || 0) > 0 ? styles.positiveScore : (profile?.experience_Score || 0) < 0 ? styles.negativeScore : ''}`}>
+            {profile?.experience_Score || 0}
           </span>
         </div>
         <div className={styles.tradingInfoItem}>
           <span className={styles.tradingInfoLabel}>Success Posts:</span>
-          <span className={styles.tradingInfoValue}>{profile?.success_posts || 0}</span>
+          <span className={`${styles.tradingInfoValue} ${styles.positiveScore}`}>{profile?.success_posts || 0}</span>
         </div>
         <div className={styles.tradingInfoItem}>
           <span className={styles.tradingInfoLabel}>Loss Posts:</span>
-          <span className={styles.tradingInfoValue}>{profile?.loss_posts || 0}</span>
+          <span className={`${styles.tradingInfoValue} ${styles.negativeScore}`}>{profile?.loss_posts || 0}</span>
         </div>
       </div>
 
@@ -940,6 +938,12 @@ export default function Profile() {
           onClick={() => handleTabChange('posts')}
         >
           Posts
+        </button>
+        <button 
+          className={`${styles.tabButton} ${activeTab === 'strategies' ? styles.activeTab : ''}`}
+          onClick={() => handleTabChange('strategies')}
+        >
+          Strategies
         </button>
         <button 
           className={`${styles.tabButton} ${activeTab === 'followers' ? styles.activeTab : ''}`}
@@ -1075,7 +1079,91 @@ export default function Profile() {
             )}
           </div>
         )}
+
+        {activeTab === 'strategies' && (
+          <div className={styles.strategiesContainer}>
+            {isLoading ? (
+              <div className={styles.loadingContainer}>
+                <div className={styles.loadingSpinner} />
+                <p>Loading strategies...</p>
+              </div>
+            ) : (
+              <>
+                {/* Get unique strategies from posts */}
+                {(() => {
+                  // Extract all strategies from posts and count their occurrences
+                  const strategyCounts = posts.reduce((acc, post) => {
+                    if (post.strategy) {
+                      acc[post.strategy] = (acc[post.strategy] || 0) + 1;
+                    }
+                    return acc;
+                  }, {});
+                  
+                  // Convert to array and sort by count (descending)
+                  const sortedStrategies = Object.entries(strategyCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([strategy, count]) => ({ strategy, count }));
+                  
+                  if (sortedStrategies.length === 0) {
+                    return (
+                      <div className={styles.emptyState}>
+                        <h3>No strategies used yet</h3>
+                        <p>Create posts with trading strategies to see them here</p>
+                        <CreatePostButton />
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                    <div className={styles.strategiesGrid}>
+                      {sortedStrategies.map(({ strategy, count }) => (
+                        <div key={strategy} className={styles.strategyCard}>
+                          <div className={styles.strategyHeader}>
+                            <h3 className={styles.strategyName}>{strategy}</h3>
+                            <span className={styles.strategyCount}>{count} post{count !== 1 ? 's' : ''}</span>
+                          </div>
+                          <div className={styles.strategyActions}>
+                            <button 
+                              className={styles.viewPostsButton}
+                              onClick={() => {
+                                setSelectedStrategy(strategy);
+                                handleTabChange('posts');
+                              }}
+                            >
+                              View Posts
+                            </button>
+                            <button 
+                              className={styles.detailsButton}
+                              onClick={() => {
+                                setSelectedStrategyForDetails(strategy);
+                                setIsStrategyModalOpen(true);
+                              }}
+                            >
+                              Show Details
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()} 
+              </>
+            )}
+          </div>
+        )}
       </div>
+      
+      {/* Strategy Details Modal */}
+      <StrategyDetailsModal
+        strategy={selectedStrategyForDetails}
+        isOpen={isStrategyModalOpen}
+        onClose={() => setIsStrategyModalOpen(false)}
+        onSave={(strategy, description) => {
+          console.log(`Updated documentation for strategy: ${strategy}`);
+          // Refresh data to get updated strategy information
+          refreshData(user?.id);
+        }}
+      />
       
       {/* Edit Profile Modal */}
       {showEditModal && (
