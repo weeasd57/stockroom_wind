@@ -10,6 +10,13 @@ import { getExchangeForCountry } from '@/models/ExchangeData';
 export function generateEodLastCloseUrl(symbol, country) {
   if (!symbol) return '';
   
+  // Check if symbol already includes an exchange code (e.g., AFMC.EGX)
+  const parts = symbol.split('.');
+  if (parts.length > 1) {
+    // Symbol already has exchange code, use it as is
+    return `${BASE_URL}/eod/${symbol}?filter=last_close&api_token=${API_KEY}&fmt=json`;
+  }
+  
   // Get the exchange code for the country
   let exchangeCode = '';
   
@@ -28,10 +35,10 @@ export function generateEodLastCloseUrl(symbol, country) {
   let formattedSymbol;
   if (exchangeCode) {
     // For Egypt stocks like ESRS on EGX: esrs.egx
-    formattedSymbol = `${symbol.toLowerCase()}.${exchangeCode}`;
+    formattedSymbol = `${symbol}.${exchangeCode}`;
   } else {
     // For US stocks (default): aapl
-    formattedSymbol = symbol.toLowerCase();
+    formattedSymbol = symbol;
   }
   
   // Generate URL with API key and last_close filter

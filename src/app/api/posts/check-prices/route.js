@@ -206,14 +206,18 @@ export async function POST(request) {
           console.warn(`No historical data found for stock ${symbol}, trying to get last close price`);
           
           try {
-            // Import the generateEodLastCloseUrl function
+            // Import the generateEodLastCloseUrl function and ExchangeData
             const { generateEodLastCloseUrl } = require('@/utils/stockApi');
+            const { getExchangeForCountry } = require('@/models/ExchangeData');
             
-            // Get the country from the post
-            const country = post.country || '';
+            // Get the exchange from the post or determine it from the country
+            const exchange = post.exchange || (post.country ? getExchangeForCountry(post.country) : '');
+            
+            // Create the symbol with exchange if available
+            const symbolWithExchange = exchange ? `${post.symbol}.${exchange}` : post.symbol;
             
             // Generate URL for last close price
-            const lastCloseUrl = generateEodLastCloseUrl(post.symbol, country);
+            const lastCloseUrl = generateEodLastCloseUrl(symbolWithExchange, post.country);
             console.log(`Trying to get last close price from: ${lastCloseUrl}`);
             
             // Fetch the last close price

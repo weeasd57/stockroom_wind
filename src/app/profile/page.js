@@ -82,6 +82,9 @@ export default function Profile() {
   const [localSelectedStrategy, setLocalSelectedStrategy] = useState(null);
   const [selectedStrategyForDetails, setSelectedStrategyForDetails] = useState(null);
   const [isStrategyModalOpen, setIsStrategyModalOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [selectedCountry, setSelectedCountry] = useState('');
+  const [filterLoading, setFilterLoading] = useState(false);
 
   // Initialize data once when authenticated
   useEffect(() => {
@@ -968,14 +971,18 @@ export default function Profile() {
             
             <div className={styles.filterControls}>
               <div className={styles.filterItem}>
-                <label htmlFor="strategyFilter" className={styles.filterLabel}>Filter by Strategy:</label>
+                <label htmlFor="strategyFilter" className={styles.filterLabel}>Strategy:</label>
                 <div className={styles.filterSelectContainer}>
                   <select
                     id="strategyFilter"
                     className={`${styles.filterSelect} ${localSelectedStrategy ? styles.activeFilter : ''}`}
                     value={localSelectedStrategy || ''}
-                    onChange={handleStrategyChange}
-                    disabled={isLoading}
+                    onChange={(e) => {
+                      setLocalSelectedStrategy(e.target.value || null);
+                      setFilterLoading(true);
+                      setTimeout(() => setFilterLoading(false), 300);
+                    }}
+                    disabled={filterLoading}
                   >
                     <option value="">All Strategies</option>
                     {Array.from(new Set(posts.map(post => post.strategy).filter(Boolean))).map(strategy => (
@@ -983,23 +990,137 @@ export default function Profile() {
                     ))}
                   </select>
                   
-                  {isLoading && (
-                    <div className={styles.filterLoading}>
-                      <div className={styles.filterSpinner}></div>
-                    </div>
-                  )}
-                  
                   {localSelectedStrategy && !isLoading && (
                     <button 
                       className={styles.clearFilterButton}
-                      onClick={() => clearSelectedStrategy()}
-                      aria-label="Clear filter"
+                      onClick={() => {
+                        setLocalSelectedStrategy(null);
+                        setFilterLoading(true);
+                        setTimeout(() => setFilterLoading(false), 300);
+                      }}
+                      aria-label="Clear strategy filter"
                     >
                       ✕
                     </button>
                   )}
                 </div>
               </div>
+              
+              <div className={styles.filterItem}>
+                <label htmlFor="statusFilter" className={styles.filterLabel}>Status:</label>
+                <div className={styles.filterSelectContainer}>
+                  <select
+                    id="statusFilter"
+                    className={`${styles.filterSelect} ${selectedStatus ? styles.activeFilter : ''}`}
+                    value={selectedStatus}
+                    onChange={(e) => {
+                      setSelectedStatus(e.target.value);
+                      setFilterLoading(true);
+                      setTimeout(() => setFilterLoading(false), 300);
+                    }}
+                    disabled={filterLoading}
+                  >
+                    <option value="">All Status</option>
+                    <option value="success">Success</option>
+                    <option value="loss">Loss</option>
+                    <option value="open">Open</option>
+                  </select>
+                  
+                  {selectedStatus && !filterLoading && (
+                    <button 
+                      className={styles.clearFilterButton}
+                      onClick={() => {
+                        setSelectedStatus('');
+                        setFilterLoading(true);
+                        setTimeout(() => setFilterLoading(false), 300);
+                      }}
+                      aria-label="Clear status filter"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              <div className={styles.filterItem}>
+                <label htmlFor="countryFilter" className={styles.filterLabel}>Country:</label>
+                <div className={styles.filterSelectContainer}>
+                  <select
+                    id="countryFilter"
+                    className={`${styles.filterSelect} ${selectedCountry ? styles.activeFilter : ''}`}
+                    value={selectedCountry}
+                    onChange={(e) => {
+                      setSelectedCountry(e.target.value);
+                      setFilterLoading(true);
+                      setTimeout(() => setFilterLoading(false), 300);
+                    }}
+                    disabled={filterLoading}
+                  >
+                    <option value="">All Countries</option>
+                    {Array.from(new Set(posts
+                      .map(post => {
+                        // Try to get country from post
+                        let countryCode = post.country;
+                        
+                        // If no country code directly, try to extract from symbol
+                        if (!countryCode && post.symbol) {
+                          const parts = post.symbol.split('.');
+                          if (parts.length > 1) {
+                            countryCode = parts[1];
+                          }
+                        }
+                        
+                        return countryCode;
+                      })
+                      .filter(Boolean)))
+                      .map(country => {
+                        // Get country name if available
+                        const countryName = country.length === 2 ? 
+                          (window.COUNTRY_CODE_TO_NAME ? window.COUNTRY_CODE_TO_NAME[country.toLowerCase()] : country) : 
+                          country;
+                        return (
+                          <option key={country} value={country}>{countryName || country}</option>
+                        );
+                      })}
+                  </select>
+                  
+                  {selectedCountry && !filterLoading && (
+                    <button 
+                      className={styles.clearFilterButton}
+                      onClick={() => {
+                        setSelectedCountry('');
+                        setFilterLoading(true);
+                        setTimeout(() => setFilterLoading(false), 300);
+                      }}
+                      aria-label="Clear country filter"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {(localSelectedStrategy || selectedStatus || selectedCountry) && !filterLoading && (
+                <button 
+                  className={styles.clearAllFiltersButton}
+                  onClick={() => {
+                    setLocalSelectedStrategy(null);
+                    setSelectedStatus('');
+                    setSelectedCountry('');
+                    setFilterLoading(true);
+                    setTimeout(() => setFilterLoading(false), 300);
+                  }}
+                  aria-label="Clear all filters"
+                >
+                  Clear All Filters
+                </button>
+              )}
+              
+              {filterLoading && (
+                <div className={styles.filterLoading}>
+                  <div className={styles.filterSpinner}></div>
+                </div>
+              )}
             </div>
 
             <div className={styles.postsGrid}>
@@ -1028,7 +1149,20 @@ export default function Profile() {
                 <>
                   {/* Display posts */}
                   {posts
-                    .filter(post => !localSelectedStrategy || post.strategy === localSelectedStrategy)
+                    .filter(post => {
+                      // Strategy filter
+                      const strategyMatch = !localSelectedStrategy || post.strategy === localSelectedStrategy;
+                      
+                      // Status filter
+                      const statusMatch = !selectedStatus || post.status === selectedStatus;
+                      
+                      // Country filter
+                      const countryMatch = !selectedCountry || post.country === selectedCountry || 
+                                        (post.symbol && post.symbol.split('.')[1] === selectedCountry);
+                      
+                      // All filters must match
+                      return strategyMatch && statusMatch && countryMatch;
+                    })
                     .map(post => (
                       <ProfilePostCard key={post.id} post={post} />
                     ))}

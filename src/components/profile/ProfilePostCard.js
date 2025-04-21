@@ -19,6 +19,7 @@ function formatDate(dateString) {
 
 export const ProfilePostCard = ({ post = {} }) => {
   const router = useRouter();
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
   // Add default empty object to prevent errors if post is undefined
   
   // Check for stock_symbol in different possible locations based on API response structure
@@ -119,7 +120,11 @@ export const ProfilePostCard = ({ post = {} }) => {
             <span className={styles.priceLabel}>Target:</span>
             <span className={styles.priceValue}>{post.target_price}</span>
             {post.target_reached && (
-              <div className={styles.statusBadge} title={`Target reached on ${formatDate(post.target_reached_date)}`}>
+              <div 
+                className={styles.statusBadge} 
+                title={`Target reached on ${formatDate(post.target_reached_date)}`}
+                onClick={() => setShowStatusDialog(true)}
+              >
                 ✓
               </div>
             )}
@@ -243,17 +248,75 @@ export const ProfilePostCard = ({ post = {} }) => {
         })()}
       </div>
       
-      {/* Status indicator for closed posts */}
+      {/* Status indicator for closed posts - now as clickable badge that shows dialog */}
       {post.closed && (
-        <div className={`${styles.postStatus} ${post.target_reached ? styles.successStatus : styles.dangerStatus}`}>
-          {post.target_reached ? 'Target Reached' : 'Stop Loss Triggered'}
-          <span className={styles.statusDate}>
-            {post.target_reached 
-              ? `on ${formatDate(post.target_reached_date)}`
-              : `on ${formatDate(post.stop_loss_triggered_date)}`
-            }
-          </span>
-        </div>
+        <>
+          <div 
+            className={`${styles.postStatus} ${post.target_reached ? styles.successStatus : styles.dangerStatus}`}
+            onClick={() => setShowStatusDialog(true)}
+          >
+            {post.target_reached ? 'Target Reached' : 'Stop Loss Triggered'}
+            <span className={styles.statusDate}>
+              {post.target_reached 
+                ? `on ${formatDate(post.target_reached_date)}`
+                : `on ${formatDate(post.stop_loss_triggered_date)}`
+              }
+            </span>
+          </div>
+          
+          {/* Status dialog */}
+          {showStatusDialog && (
+            <div className={styles.dialogOverlay} onClick={() => setShowStatusDialog(false)}>
+              <div className={styles.statusDialog} onClick={(e) => e.stopPropagation()}>
+                <div className={styles.dialogHeader}>
+                  <h3>{post.target_reached ? 'Target Reached' : 'Stop Loss Triggered'}</h3>
+                  <button className={styles.closeButton} onClick={() => setShowStatusDialog(false)}>×</button>
+                </div>
+                <div className={styles.dialogContent}>
+                  <div className={styles.dialogItem}>
+                    <span className={styles.dialogLabel}>Stock:</span>
+                    <span className={styles.dialogValue}>{post.symbol || post.title?.split(' ')[0] || 'N/A'}</span>
+                  </div>
+                  <div className={styles.dialogItem}>
+                    <span className={styles.dialogLabel}>Initial Price:</span>
+                    <span className={styles.dialogValue}>{post.current_price || 'N/A'}</span>
+                  </div>
+                  <div className={styles.dialogItem}>
+                    <span className={styles.dialogLabel}>Final Price:</span>
+                    <span className={styles.dialogValue}>{post.last_price || 'N/A'}</span>
+                  </div>
+                  {post.target_reached && (
+                    <div className={styles.dialogItem}>
+                      <span className={styles.dialogLabel}>Target Price:</span>
+                      <span className={styles.dialogValue}>{post.target_price || 'N/A'}</span>
+                    </div>
+                  )}
+                  {post.stop_loss_triggered && (
+                    <div className={styles.dialogItem}>
+                      <span className={styles.dialogLabel}>Stop Loss:</span>
+                      <span className={styles.dialogValue}>{post.stop_loss_price || 'N/A'}</span>
+                    </div>
+                  )}
+                  <div className={styles.dialogItem}>
+                    <span className={styles.dialogLabel}>Date:</span>
+                    <span className={styles.dialogValue}>
+                      {post.target_reached 
+                        ? formatDate(post.target_reached_date)
+                        : formatDate(post.stop_loss_triggered_date)
+                      }
+                    </span>
+                  </div>
+                  {post.content && (
+                    <div className={styles.dialogNotes}>
+                      <h4>Notes</h4>
+                      <p>{post.content}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
       
       {/* Price check status for open posts */}

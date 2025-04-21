@@ -403,3 +403,191 @@
   background-color: hsl(var(--primary-foreground));
   color: hsl(var(--primary));
 }
+
+/* Progress bar styles */
+.progressContainer {
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.progressLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--gold-text, hsl(var(--foreground)));
+}
+
+.progressBarContainer {
+  height: 8px;
+  margin-top: 8px;
+  margin-bottom: 5px;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+:global(.dark) .progressBarContainer {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.progressBarFill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.positiveProgress {
+  background-color: var(--gold-accent, #f5d76e);
+  color: var(--gold-text, #f5d76e);
+}
+
+.negativeProgress {
+  background-color: hsl(var(--destructive));
+  color: hsl(var(--destructive));
+}
+
+.progressMetrics {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+  color: hsl(var(--muted-foreground));
+  margin-top: 4px;
+}
+
+.progressPercentage {
+  font-weight: bold;
+  font-size: 0.8rem;
+}
+
+/* Status Dialog Styles */
+.dialogOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.statusDialog {
+  background-color: hsl(var(--background));
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--gold-border, rgba(245, 215, 110, 0.3));
+  animation: dialogFadeIn 0.3s ease-out;
+}
+
+@keyframes dialogFadeIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.dialogHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--gold-border, rgba(245, 215, 110, 0.3));
+}
+
+.dialogHeader h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--gold-text, hsl(var(--foreground)));
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.closeButton:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--gold-text, hsl(var(--foreground)));
+}
+
+.dialogContent {
+  padding: 1.5rem;
+}
+
+.dialogItem {
+  display: flex;
+  margin-bottom: 1rem;
+  align-items: center;
+}
+
+.dialogLabel {
+  font-weight: 600;
+  width: 120px;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.9rem;
+}
+
+.dialogValue {
+  font-weight: 500;
+  color: var(--gold-text, hsl(var(--foreground)));
+  font-size: 1rem;
+}
+
+.dialogNotes {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--gold-border, rgba(245, 215, 110, 0.3));
+}
+
+.dialogNotes h4 {
+  font-size: 1rem;
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  color: var(--gold-text, hsl(var(--foreground)));
+}
+
+.dialogNotes p {
+  margin: 0;
+  color: hsl(var(--foreground));
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+
+/* Make status badges clickable */
+.statusBadge {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.statusBadge:hover {
+  transform: scale(1.2);
+}
+
+.postStatus {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.postStatus:hover {
+  transform: translateY(-2px);
+}

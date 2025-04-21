@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import styles from '@/styles/profile.module.css';
 import { useProfile } from '@/providers/ProfileProvider';
+import dialogStyles from '@/styles/ProfilePostCard.module.css';
 
 
 
@@ -13,6 +14,7 @@ export default function CheckPostPricesButton({ userId }) {
   const { refreshData } = useProfile();
   const [abortController, setAbortController] = useState(null);
   const [isCancelled, setIsCancelled] = useState(false);
+  const [showStatsDialog, setShowStatsDialog] = useState(false);
   
   const cancelCheck = () => {
     if (abortController) {
@@ -78,10 +80,9 @@ export default function CheckPostPricesButton({ userId }) {
         refreshData(userId);
       }
       
+      // Show the stats dialog
       if (!isCancelled) {
-        setTimeout(() => {
-          setCheckStats(null);
-        }, 5000);
+        setShowStatsDialog(true);
       } 
       
     } catch (err) {
@@ -132,17 +133,46 @@ export default function CheckPostPricesButton({ userId }) {
         </div>
       )}
       
-      {checkStats && (
-        <div className={styles.checkStatsContainer}>
-          <div className={styles.usageInfo}>
-            <p>
-              Checks today: <strong>{checkStats.usageCount}</strong> of <strong>100</strong>
-              <br />
-              Checked <strong>{checkStats.checkedPosts}</strong> posts
-              {checkStats.updatedPosts > 0 && (
-                <> | Updated <strong>{checkStats.updatedPosts}</strong> posts</>  
+      {/* Stats Dialog */}
+      {showStatsDialog && checkStats && (
+        <div className={dialogStyles.dialogOverlay} onClick={() => setShowStatsDialog(false)}>
+          <div className={dialogStyles.statusDialog} onClick={(e) => e.stopPropagation()}>
+            <div className={dialogStyles.dialogHeader}>
+              <h3>Price Check Results</h3>
+              <button className={dialogStyles.closeButton} onClick={() => setShowStatsDialog(false)}>×</button>
+            </div>
+            <div className={dialogStyles.dialogContent}>
+              <div className={dialogStyles.dialogItem}>
+                <span className={dialogStyles.dialogLabel}>Checks Today:</span>
+                <span className={dialogStyles.dialogValue}>{checkStats.usageCount} of 100</span>
+              </div>
+              
+              <div className={dialogStyles.dialogItem}>
+                <span className={dialogStyles.dialogLabel}>Checked Posts:</span>
+                <span className={dialogStyles.dialogValue}>{checkStats.checkedPosts}</span>
+              </div>
+              
+              <div className={dialogStyles.dialogItem}>
+                <span className={dialogStyles.dialogLabel}>Updated Posts:</span>
+                <span className={dialogStyles.dialogValue}>{checkStats.updatedPosts}</span>
+              </div>
+              
+              {checkStats.closedPostsSkipped > 0 && (
+                <div className={dialogStyles.dialogItem}>
+                  <span className={dialogStyles.dialogLabel}>Skipped Posts:</span>
+                  <span className={dialogStyles.dialogValue}>{checkStats.closedPostsSkipped} (closed)</span>
+                </div>
               )}
-            </p>
+              
+              <div className={styles.statsActions}>
+                <button 
+                  className={styles.closeStatsButton}
+                  onClick={() => setShowStatsDialog(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
