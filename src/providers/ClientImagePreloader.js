@@ -24,7 +24,9 @@ const ClientImagePreloader = () => {
         const defaultImages = [
           '/default-avatar.svg',
           '/profile-bg.jpg',
-          '/logo.png',
+          '/favicon_io/android-chrome-192x192.png',
+          '/favicon_io/favicon.ico',
+          '/favicon_io/apple-touch-icon.png',
         ];
         
         // Use the cache manager if available, otherwise fallback

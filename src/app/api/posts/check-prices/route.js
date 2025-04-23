@@ -26,9 +26,13 @@ export async function POST(request) {
     const body = await request.json().catch(() => ({}));
     const cookieHeader = request.headers.get('cookie');
 
-    
+    // Check if includeApiDetails flag is set
+    const includeApiDetails = body.includeApiDetails === true;
+
     let userId = body.userId;
     let experienceUpdated = false;
+    // Initialize array to track API request details
+    const apiDetails = [];
 
     
     if (!userId) {
@@ -190,13 +194,29 @@ export async function POST(request) {
         
         
         const historicalUrl = `${BASE_URL}/eod/${symbol}?from=${fromDate}&to=${toDate}&period=d&api_token=${API_KEY}&fmt=json`;
-        
+
+        // Record API request details
+        const apiRequestInfo = {
+          symbol: post.symbol,
+          exchange: post.exchange || '',
+          requestType: 'Historical prices',
+          requestUrl: historicalUrl,
+          timestamp: new Date().toISOString()
+        };
         
         
         const response = await fetch(historicalUrl);
         
         if (!response.ok) {
           console.error(`Error getting stock data for ${symbol}:`, response.statusText);
+          
+          // Record failed API response
+          if (includeApiDetails) {
+            apiRequestInfo.responseType = 'API Error';
+            apiRequestInfo.errorDetails = response.statusText;
+            apiDetails.push(apiRequestInfo);
+          }
+          
           continue;
         }
         
@@ -204,6 +224,9 @@ export async function POST(request) {
         
         if (!Array.isArray(historicalData) || historicalData.length === 0) {
           console.warn(`No historical data found for stock ${symbol}, trying to get last close price`);
+          
+          // Update API request info for fallback request
+          apiRequestInfo.responseType = 'No historical data';
           
           try {
             // Import the generateEodLastCloseUrl function and ExchangeData
@@ -220,36 +243,41 @@ export async function POST(request) {
             const lastCloseUrl = generateEodLastCloseUrl(symbolWithExchange, post.country);
             console.log(`Trying to get last close price from: ${lastCloseUrl}`);
             
+            // Update API tracking for fallback request
+            const fallbackRequestInfo = {
+              symbol: post.symbol,
+              exchange: exchange || '',
+              requestType: 'Last close price fallback',
+              requestUrl: lastCloseUrl,
+              timestamp: new Date().toISOString()
+            };
+            
             // Fetch the last close price
             const lastCloseResponse = await fetch(lastCloseUrl);
             
-            if (lastCloseResponse.ok) {
-              const lastCloseData = await lastCloseResponse.json();
-              
-              if (lastCloseData && (typeof lastCloseData === 'number' || 
-                  (Array.isArray(lastCloseData) && lastCloseData.length > 0 && lastCloseData[0].close))) {
-                
-                // Extract the close price from the response
-                const closePrice = typeof lastCloseData === 'number' ? 
-                  lastCloseData : 
-                  parseFloat(lastCloseData[0].close);
-                
-                console.log(`Successfully got last close price for ${symbol}: ${closePrice}`);
-                
-                // Create a minimal historical data object using the last close price
-                historicalData = [{
-                  date: new Date().toISOString().split('T')[0],
-                  close: closePrice,
-                  high: closePrice,
-                  low: closePrice,
-                  open: closePrice,
-                  volume: 0
-                }];
-              } else {
-                throw new Error('Invalid last close price data format');
+            if (!lastCloseResponse.ok) {
+              throw new Error(`API error: ${lastCloseResponse.statusText}`);
+            }
+            
+            const lastCloseData = await lastCloseResponse.json();
+            
+            if (lastCloseData && lastCloseData.close) {
+              // Update fallback request info with success
+              fallbackRequestInfo.responseType = 'Last price only';
+              if (includeApiDetails) {
+                apiDetails.push(fallbackRequestInfo);
               }
+              
+              historicalData = [{
+                date: new Date().toISOString().split('T')[0],
+                close: lastCloseData.close,
+                high: lastCloseData.high || lastCloseData.close,
+                low: lastCloseData.low || lastCloseData.close,
+                open: lastCloseData.open || lastCloseData.close,
+                volume: lastCloseData.volume || 0
+              }];
             } else {
-              throw new Error(`Failed to get last close price: ${lastCloseResponse.status}`);
+              throw new Error('Invalid data format in fallback API response');
             }
           } catch (lastCloseError) {
             console.error(`Error getting last close price for ${symbol}:`, lastCloseError);
@@ -272,6 +300,13 @@ export async function POST(request) {
               open: currentPriceValue,
               volume: 0
             }];
+          }
+        } else {
+          // Record successful API response with historical data
+          apiRequestInfo.responseType = 'Historical prices';
+          apiRequestInfo.dataPoints = historicalData.length;
+          if (includeApiDetails) {
+            apiDetails.push(apiRequestInfo);
           }
         }
         
@@ -393,7 +428,19 @@ export async function POST(request) {
             : 0
         });
       } catch (error) {
-        console.error(`Error processing post ${post.id}:`, error);
+        console.error(`Error processing stock ${post.symbol}:`, error);
+        
+        // Record error in API details
+        if (includeApiDetails) {
+          apiDetails.push({
+            symbol: post.symbol,
+            exchange: post.exchange || '',
+            requestType: 'Error',
+            responseType: 'Processing Error',
+            errorDetails: error.message,
+            timestamp: new Date().toISOString()
+          });
+        }
       }
     }
     
@@ -537,7 +584,8 @@ export async function POST(request) {
       closedPostsSkipped: closedPostsCount,
       updateSuccess,
       experienceUpdated,
-      results
+      results,
+      apiDetails: includeApiDetails ? apiDetails : []
     });
   } catch (error) {
     console.error('Error checking post prices:', error);

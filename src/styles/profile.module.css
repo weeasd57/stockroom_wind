@@ -605,24 +605,33 @@
 }
 
 .errorMessage {
-  background-color: hsla(var(--destructive)/0.15);
   color: hsl(var(--destructive));
-  padding: 1rem 1.25rem;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  margin-bottom: 1.5rem;
-  border: 1px solid hsla(var(--destructive)/0.5);
-  animation: fadeIn 0.3s ease-out, pulse 2s infinite ease-in-out;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-weight: 500;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  text-align: center;
 }
 
-.errorMessage::before {
-  content: "⚠️";
-  font-size: 1.2rem;
+/* Error message dialog styles */
+.errorMessageContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem;
+  background-color: hsla(var(--destructive)/0.05);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.errorIcon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.errorText {
+  font-size: 1rem;
+  color: hsl(var(--destructive));
+  text-align: center;
+  font-weight: 500;
 }
 
 @keyframes pulse {
@@ -978,12 +987,6 @@
   grid-column: 1 / -1; /* span all columns */
 }
 
-.errorMessage {
-  color: var(--error-color, #ff4d4f);
-  margin-bottom: 1rem;
-  text-align: center;
-}
-
 .retryButton {
   background-color: var(--primary-color);
   color: white;
@@ -1091,6 +1094,12 @@
   position: relative;
 }
 
+.priceCheckButtonGroup {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 1rem;
+}
+
 .checkPricesButton {
   background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
@@ -1118,6 +1127,31 @@
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+.cancelCheckButton {
+  background-color: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 8px hsla(var(--destructive)/0.2);
+}
+
+.cancelCheckButton:hover {
+  background-color: hsla(var(--destructive)/0.9);
+  transform: translateY(-2px);
+}
+
+.cancelCheckButton:active {
+  transform: translateY(0);
 }
 
 .errorMessage {
@@ -1293,64 +1327,6 @@
 .dangerResult {
   color: rgb(200, 30, 30);
   font-weight: 500;
-}
-
-.priceCheckButtonGroup {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 1rem;
-}
-
-.checkPricesButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
-}
-
-.checkPricesButton:hover {
-  background-color: hsla(var(--primary)/0.9);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px hsla(var(--primary)/0.3);
-}
-
-.checkPricesButton:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-.cancelCheckButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  background-color: #e53935; /* Red color */
-  color: white;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
-}
-
-.cancelCheckButton:hover {
-  background-color: #c62828; /* Darker red on hover */
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(198, 40, 40, 0.3);
-}
-
-.cancelCheckButton:active {
-  transform: translateY(0);
-  box-shadow: none;
 }
 
 /* Strategies Tab Styles */
@@ -1607,6 +1583,7 @@
   margin-top: 1.5rem;
   display: flex;
   justify-content: flex-end;
+  gap: 1rem;
 }
 
 .closeStatsButton {
@@ -1624,4 +1601,245 @@
 .closeStatsButton:hover {
   background-color: var(--gold-hover, #ffee58);
   transform: translateY(-2px);
+}
+
+/* Price Check Results Table Styles */
+.resultTableHeader {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1.5fr;
+  gap: 8px;
+  padding: 10px;
+  background: hsla(var(--muted)/0.15);
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: hsl(var(--foreground));
+  margin-bottom: 8px;
+}
+
+.resultTableRow {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1.5fr;
+  gap: 8px;
+  padding: 12px 10px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  border-bottom: 1px solid hsla(var(--border)/0.1);
+  align-items: center;
+}
+
+.resultTableRow:hover {
+  background-color: hsla(var(--muted)/0.07);
+}
+
+.resultSymbolCol {
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+}
+
+.exchangeTag {
+  font-size: 0.7rem;
+  color: hsl(var(--muted-foreground));
+  font-weight: normal;
+  margin-top: 2px;
+}
+
+.resultPriceCol {
+  position: relative;
+}
+
+.priceChangeIndicator {
+  display: block;
+  font-size: 0.75rem;
+  margin-top: 2px;
+  font-weight: 500;
+}
+
+.priceUp {
+  color: rgb(34, 197, 94);
+}
+
+.priceDown {
+  color: rgb(239, 68, 68);
+}
+
+.resultStatusCol {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.targetReachedTag {
+  display: inline-block;
+  background-color: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: rgb(16, 185, 129);
+  font-weight: 500;
+  font-size: 0.8rem;
+}
+
+.stopLossTag {
+  display: inline-block;
+  background-color: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: rgb(239, 68, 68);
+  font-weight: 500;
+  font-size: 0.8rem;
+}
+
+.monitoringTag {
+  display: inline-block;
+  background-color: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: rgb(59, 130, 246);
+  font-weight: 500;
+  font-size: 0.8rem;
+}
+
+.dateInfo {
+  font-size: 0.7rem;
+  font-weight: normal;
+  margin-top: 3px;
+  opacity: 0.8;
+}
+
+.statsActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.closeStatsButton {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.closeStatsButton:hover {
+  background-color: hsla(var(--primary)/0.9);
+}
+
+/* Responsive styles for the table */
+@media (max-width: 600px) {
+  .resultTableHeader,
+  .resultTableRow {
+    grid-template-columns: 1.2fr 0.8fr 1fr 1fr;
+    font-size: 0.8rem;
+    gap: 4px;
+  }
+  
+  .priceChangeIndicator,
+  .exchangeTag {
+    font-size: 0.65rem;
+  }
+  
+  .targetReachedTag,
+  .stopLossTag,
+  .monitoringTag {
+    font-size: 0.7rem;
+    padding: 3px 6px;
+  }
+  
+  .dateInfo {
+    font-size: 0.65rem;
+  }
+}
+
+.resultApiCol {
+  font-weight: 500;
+  font-size: 0.9rem;
+  position: relative;
+}
+
+.resultTimeCol {
+  font-size: 0.85rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.responseTypeTag {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.historyTag {
+  background-color: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: rgb(16, 185, 129);
+}
+
+.lastPriceTag {
+  background-color: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: rgb(59, 130, 246);
+}
+
+.noDataMessage {
+  text-align: center;
+  padding: 1rem;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+  background-color: hsla(var(--muted)/0.05);
+  border-radius: 6px;
+  margin: 0.5rem 0;
+}
+
+.simpleResultRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  border-bottom: 1px solid hsla(var(--border)/0.1);
+  margin-bottom: 6px;
+  background-color: hsla(var(--muted)/0.05);
+}
+
+.simpleResultRow:hover {
+  background-color: hsla(var(--muted)/0.1);
+}
+
+.symbolWithTag {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.symbolText {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.priceUpTag {
+  background-color: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94,.3);
+  color: rgb(34, 197, 94);
+}
+
+.priceDownTag {
+  background-color: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: rgb(239, 68, 68);
+}
+
+.errorTag {
+  background-color: rgba(100, 100, 100, 0.15);
+  border: 1px solid rgba(100, 100, 100, 0.3);
+  color: rgb(100, 100, 100);
 }

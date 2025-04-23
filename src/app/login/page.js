@@ -97,7 +97,7 @@ export default function Login() {
         <div className={styles.logoContainer}>
           <div className={styles.logo}>
             <Image 
-              src="/favicon.ico" 
+              src="/favicon_io/android-chrome-192x192.png" 
               alt="FireStocks Logo" 
               width={50} 
               height={50}

@@ -135,7 +135,7 @@ export default function Navbar() {
         <Link href={isAuthenticated ? '/home' : '/landing'} className={styles.logo} onClick={closeMenu} style={{ textDecoration: 'none' }}>
           <div className={styles.logoWrapper}>
             <img 
-              src="/favicon.ico" 
+              src="/favicon_io/android-chrome-192x192.png" 
               alt="FireStocks Logo" 
               width={40}
               height={40}
