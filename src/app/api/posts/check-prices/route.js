@@ -15,8 +15,41 @@ const adminSupabase = createClient(supabaseUrl || '', serviceRoleKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
+  },
+  global: {
+    headers: {
+      'x-supabase-role': 'service_role',
+      'Authorization': `Bearer ${serviceRoleKey}`
+    },
   }
 });
+
+// Helper function to log status updates and DB operations
+const logStatusUpdate = async (postId, symbol, status, result) => {
+  console.log(`[STATUS UPDATE] Post ${postId} (${symbol}): ${status}`);
+  
+  // Log to database if needed
+  try {
+    const { error } = await adminSupabase
+      .from('operation_logs')
+      .insert({
+        operation_type: 'post_status_update',
+        post_id: postId,
+        status: status,
+        success: !result.error,
+        error_message: result.error ? result.error.message : null,
+        created_at: new Date().toISOString()
+      })
+      .select();
+      
+    if (error) {
+      console.error(`Failed to log operation: ${error.message}`);
+    }
+  } catch (err) {
+    console.error(`Exception logging operation: ${err.message}`);
+    // Continue execution even if logging fails
+  }
+};
 
 const MAX_DAILY_CHECKS = 100;
 
@@ -450,18 +483,22 @@ export async function POST(request) {
           console.error(`No historical data available for ${symbol}`);
           
           // Update the post with the status flag
-          const { error: updateError } = await supabase
+          const updateResult = await adminSupabase
             .from('posts')
             .update({
               postDateAfterPriceDate: false,
               postAfterMarketClose: false,
               noDataAvailable: true,
+              status_message: "No price data available",
               last_price_check: new Date().toISOString()
             })
             .eq('id', post.id);
 
-          if (updateError) {
-            console.error(`Error updating post status for ${symbol}:`, updateError);
+          // Log the update operation
+          await logStatusUpdate(post.id, post.symbol, "No price data available", updateResult);
+
+          if (updateResult.error) {
+            console.error(`Error updating post status for ${symbol}:`, updateResult.error);
           }
           
           results.push({
@@ -492,12 +529,13 @@ export async function POST(request) {
             console.log(`Post created after latest price data for ${symbol}, can't check prices accurately`);
             
             // Update the post with the status flag
-            const { error: updateError } = await supabase
+            const { error: updateError } = await adminSupabase
               .from('posts')
               .update({
                 postDateAfterPriceDate: true,
                 postAfterMarketClose: false,
                 noDataAvailable: false,
+                status_message: "Post created after latest price data - can't check target/stop loss",
                 last_price_check: new Date().toISOString()
               })
               .eq('id', post.id);
@@ -534,12 +572,13 @@ export async function POST(request) {
               console.log(`Post created after market close on ${postDateOnly}, can't check prices accurately`);
               
               // Update the post with the status flag
-              const { error: updateError } = await supabase
+              const { error: updateError } = await adminSupabase
                 .from('posts')
                 .update({
                   postDateAfterPriceDate: false,
                   postAfterMarketClose: true,
                   noDataAvailable: false,
+                  status_message: "Post created after market close - recent price data not available",
                   last_price_check: new Date().toISOString()
                 })
                 .eq('id', post.id);
@@ -671,7 +710,8 @@ export async function POST(request) {
             closed: shouldClosePost ? true : null,
             postDateAfterPriceDate: false,
             postAfterMarketClose: false,
-            noDataAvailable: false
+            noDataAvailable: false,
+            status_message: shouldClosePost ? "Post closed" : "Post still active"
           });
         }
         
@@ -783,15 +823,17 @@ export async function POST(request) {
     }
     
     if (updatedPosts.length > 0) {
-      
-      
-      
-      
-      
-      
+      console.log(`Attempting to update ${updatedPosts.length} posts in Supabase...`);
       
       let retryCount = 0;
       const maxRetries = 2;
+      
+      // Log a sample post update for debugging
+      if (updatedPosts.length > 0) {
+        const samplePost = updatedPosts[0];
+        console.log(`Sample post update - ID: ${samplePost.id}`);
+        console.log(`Status flags: noDataAvailable=${samplePost.noDataAvailable}, postDateAfterPriceDate=${samplePost.postDateAfterPriceDate}, postAfterMarketClose=${samplePost.postAfterMarketClose}`);
+      }
       
       while (!updateSuccess && retryCount <= maxRetries) {
         try {
@@ -801,43 +843,90 @@ export async function POST(request) {
           
           if (updateError) {
             console.error('Error updating posts:', updateError);
+            console.error('Error details:', updateError.message);
+            
+            // Check for specific error types
+            if (updateError.message && updateError.message.includes('permission denied')) {
+              console.error('PERMISSION DENIED: The service role may not have proper access. Check RLS policies.');
+            }
+            
             retryCount++;
             
             if (retryCount <= maxRetries) {
-              
+              console.log(`Retrying update in ${1000 * retryCount}ms (attempt ${retryCount}/${maxRetries})...`);
               await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
-              
             }
           } else {
-            
+            console.log(`Successfully updated ${updatedPosts.length} posts in Supabase!`);
             updateSuccess = true;
             
-            
-            const updatedIds = updatedPosts.map(p => p.id);
+            // Verify the updates by checking a sample of posts
+            const sampleIds = updatedPosts.slice(0, 3).map(p => p.id); // Check up to 3 posts
             const { data: verifyData, error: verifyError } = await adminSupabase
               .from('posts')
-              .select('id, target_reached, stop_loss_triggered, last_price, closed')
-              .in('id', updatedIds);
+              .select('id, target_reached, stop_loss_triggered, last_price, closed, postDateAfterPriceDate, postAfterMarketClose, noDataAvailable')
+              .in('id', sampleIds);
               
             if (verifyError) {
               console.error('Error verifying update:', verifyError);
             } else {
-              
-              
+              console.log(`Verification successful. Sample of updated posts:`, verifyData);
             }
           }
         } catch (error) {
           console.error(`Error updating posts (attempt ${retryCount + 1}/${maxRetries + 1}):`, error);
+          console.error('Error type:', error.name, 'Message:', error.message);
           retryCount++;
           
           if (retryCount <= maxRetries) {
-            
+            console.log(`Retrying update in ${1000 * retryCount}ms...`);
             await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
-            
           }
         }
       }
       
+      // If all attempts failed, try one more time with a different approach
+      if (!updateSuccess) {
+        console.error(`Failed to update posts with upsert. Trying individual updates...`);
+        
+        let individualUpdateSuccess = 0;
+        
+        // Try updating posts one by one
+        for (const post of updatedPosts) {
+          try {
+            const { error: singleUpdateError } = await adminSupabase
+              .from('posts')
+              .update({
+                current_price: post.current_price,
+                target_reached: post.target_reached,
+                stop_loss_triggered: post.stop_loss_triggered,
+                target_reached_date: post.target_reached_date,
+                stop_loss_triggered_date: post.stop_loss_triggered_date,
+                last_price_check: post.last_price_check,
+                last_price: post.last_price,
+                closed: post.closed,
+                postDateAfterPriceDate: post.postDateAfterPriceDate,
+                postAfterMarketClose: post.postAfterMarketClose,
+                noDataAvailable: post.noDataAvailable,
+                status_message: post.status_message
+              })
+              .eq('id', post.id);
+            
+            if (singleUpdateError) {
+              console.error(`Error updating post ${post.id}:`, singleUpdateError);
+            } else {
+              individualUpdateSuccess++;
+            }
+          } catch (err) {
+            console.error(`Exception updating post ${post.id}:`, err);
+          }
+        }
+        
+        if (individualUpdateSuccess > 0) {
+          console.log(`Successfully updated ${individualUpdateSuccess}/${updatedPosts.length} posts individually`);
+          updateSuccess = individualUpdateSuccess === updatedPosts.length;
+        }
+      }
       
       results.updateSuccess = updateSuccess;
     }

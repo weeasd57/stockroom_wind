@@ -248,43 +248,51 @@ export const updateUserProfile = async (userId, updates) => {
   if (!userId) return { data: null, error: 'No user ID provided' };
 
   try {
-
+    console.log('updateUserProfile called with:', { userId, updates });
     
-    // Ensure avatar_url and background_url are properly handled
-    const sanitizedUpdates = { ...updates };
+    // Create a clean updates object for the database
+    const dbUpdates = {};
     
-    // Special handling for OAuth profile pictures
-    // If it's a Google profile picture, store it as is without cache-busting parameters
-    if (sanitizedUpdates.avatar_url) {
-      if (sanitizedUpdates.avatar_url.includes('googleusercontent.com')) {
-        // Keep the Google URL as is
-      } else if (sanitizedUpdates.avatar_url.includes('?')) {
-        // For non-OAuth URLs, remove cache-busting parameters
-        sanitizedUpdates.avatar_url = sanitizedUpdates.avatar_url.split('?')[0];
-
-      }
+    // Map form fields to database columns
+    if (updates.username) dbUpdates.username = updates.username;
+    if (updates.bio) dbUpdates.bio = updates.bio;
+    
+    // Handle avatarUrl (from form) or avatar_url (directly provided)
+    if (updates.avatarUrl) {
+      dbUpdates.avatar_url = updates.avatarUrl.split('?')[0]; // Remove cache params
+      console.log('Setting avatar_url in database to:', dbUpdates.avatar_url);
+    } else if (updates.avatar_url) {
+      dbUpdates.avatar_url = updates.avatar_url.split('?')[0]; // Remove cache params
+      console.log('Setting avatar_url in database to:', dbUpdates.avatar_url);
     }
     
-    if (sanitizedUpdates.background_url && sanitizedUpdates.background_url.includes('?')) {
-      sanitizedUpdates.background_url = sanitizedUpdates.background_url.split('?')[0];
-
+    // Handle backgroundUrl (from form) or background_url (directly provided)
+    if (updates.backgroundUrl) {
+      dbUpdates.background_url = updates.backgroundUrl.split('?')[0]; // Remove cache params
+      console.log('Setting background_url in database to:', dbUpdates.background_url);
+    } else if (updates.background_url) {
+      dbUpdates.background_url = updates.background_url.split('?')[0]; // Remove cache params
+      console.log('Setting background_url in database to:', dbUpdates.background_url);
     }
-
+    
+    console.log('Final database updates:', dbUpdates);
+    
     const { data, error } = await supabase
       .from('profiles')
-      .update(sanitizedUpdates)
+      .update(dbUpdates)
       .eq('id', userId)
-      .select()
+      .select('*')
       .single();
-
+    
     if (error) {
-
-      throw error;
+      console.error('Error updating profile in database:', error);
+      return { data: null, error };
     }
-
+    
+    console.log('Profile updated successfully in database:', data);
     return { data, error: null };
   } catch (error) {
-
+    console.error('Error in updateUserProfile:', error);
     return { data: null, error };
   }
 };

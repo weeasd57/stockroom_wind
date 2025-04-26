@@ -23,7 +23,11 @@ BEGIN
     stop_loss_price DECIMAL(10, 2),
     strategy TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    postDateAfterPriceDate BOOLEAN DEFAULT FALSE,
+    postAfterMarketClose BOOLEAN DEFAULT FALSE,
+    noDataAvailable BOOLEAN DEFAULT FALSE,
+    status_message TEXT
   );
 
   -- Create index on user_id for faster queries
