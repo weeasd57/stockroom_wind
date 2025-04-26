@@ -457,6 +457,17 @@ export function ProfileProvider({ children }) {
       setIsRefreshing(true);
       setError(null);
       
+      // Fetch the current profile data - added to ensure experience score is up-to-date
+      const { data: profileData, error: profileError } = await getUserProfile(userId);
+      
+      if (profileError) {
+        console.error('Error fetching profile data:', profileError);
+      } else if (profileData && profileData.length > 0) {
+        // Update profile with the latest data including experience score
+        console.log('Updated profile data from refreshData:', profileData[0]);
+        setProfile(profileData[0]);
+      }
+      
       // Similar fetch logic as initializeData
       const { data: postsData, error: postsError } = await supabase
         .from('posts')

@@ -122,11 +122,6 @@ export async function POST(request) {
     }
     
     
-    await ensurePostTableColumns();
-    
-    
-    
-    
     const { data: allPosts, error: allPostsError } = await supabase
       .from('posts')
       .select('id, closed')
@@ -185,13 +180,23 @@ export async function POST(request) {
         const symbol = post.exchange ? `${post.symbol}.${post.exchange}` : post.symbol;
         
         
-        const createdAt = new Date(post.created_at);
-        const todayDate = new Date();
+        // Get the date from the request or use today's date
+        const requestDate = body.requestDate ? new Date(body.requestDate) : new Date();
+        const todayDate = requestDate;
         
+        // Use the created_at date from post or one month before request date if not available
+        const createdAt = post.created_at ? new Date(post.created_at) : new Date(todayDate);
+        createdAt.setDate(createdAt.getDate() - 30); // Ensure we have at least some historical data
         
+        // Format dates for API request
         const fromDate = createdAt.toISOString().split('T')[0];
         const toDate = todayDate.toISOString().split('T')[0];
         
+        // Record post creation date and time for comparison with price data later
+        const postCreationDate = post.created_at ? new Date(post.created_at) : null;
+        const postDateOnly = postCreationDate ? postCreationDate.toISOString().split('T')[0] : null;
+        const postTimeHours = postCreationDate ? postCreationDate.getHours() : 0;
+        const postTimeMinutes = postCreationDate ? postCreationDate.getMinutes() : 0;
         
         const historicalUrl = `${BASE_URL}/eod/${symbol}?from=${fromDate}&to=${toDate}&period=d&api_token=${API_KEY}&fmt=json`;
 
@@ -204,124 +209,374 @@ export async function POST(request) {
           timestamp: new Date().toISOString()
         };
         
+        let historicalData;  // Declare historicalData variable here
         
-        const response = await fetch(historicalUrl);
-        
-        if (!response.ok) {
-          console.error(`Error getting stock data for ${symbol}:`, response.statusText);
+        try {
+          // Fetch historical data
+          console.log(`Fetching EOD data for ${symbol} from ${fromDate} to ${toDate}`);
+          const response = await fetch(historicalUrl);
           
-          // Record failed API response
-          if (includeApiDetails) {
-            apiRequestInfo.responseType = 'API Error';
-            apiRequestInfo.errorDetails = response.statusText;
-            apiDetails.push(apiRequestInfo);
+          if (!response.ok) {
+            console.error(`Error getting stock data for ${symbol}:`, response.statusText);
+            
+            // Record failed API response
+            if (includeApiDetails) {
+              apiRequestInfo.responseType = 'API Error';
+              apiRequestInfo.errorDetails = response.statusText;
+              apiDetails.push(apiRequestInfo);
+            }
+            
+            // Instead of continuing, try to get data from previous days
+            let fallbackDate = new Date(requestDate);
+            let fallbackData = null;
+            let attempts = 0;
+            const maxAttempts = 5; // Try up to 5 previous days
+            
+            while (!fallbackData && attempts < maxAttempts) {
+              // Move back one day
+              fallbackDate.setDate(fallbackDate.getDate() - 1);
+              const fallbackFromDate = fallbackDate.toISOString().split('T')[0];
+              
+              // Try to get historical data from the previous day
+              const fallbackUrl = `${BASE_URL}/eod/${symbol}?from=${fallbackFromDate}&to=${fallbackFromDate}&period=d&api_token=${API_KEY}&fmt=json`;
+              
+              try {
+                console.log(`Attempting fallback request for ${symbol} on date: ${fallbackFromDate}`);
+                const fallbackResponse = await fetch(fallbackUrl);
+                
+                if (fallbackResponse.ok) {
+                  const data = await fallbackResponse.json();
+                  if (Array.isArray(data) && data.length > 0) {
+                    fallbackData = data;
+                    console.log(`Successfully retrieved fallback data for ${symbol} from ${fallbackFromDate}`);
+                    
+                    // Record successful fallback API request
+                    if (includeApiDetails) {
+                      apiDetails.push({
+                        symbol: post.symbol,
+                        exchange: post.exchange || '',
+                        requestType: 'Fallback historical price',
+                        requestUrl: fallbackUrl,
+                        responseType: 'Success',
+                        dataPoints: data.length,
+                        timestamp: new Date().toISOString()
+                      });
+                    }
+                  }
+                }
+              } catch (fallbackError) {
+                console.error(`Error in fallback request for ${symbol}:`, fallbackError);
+              }
+              
+              attempts++;
+            }
+            
+            if (fallbackData) {
+              historicalData = fallbackData;
+            } else {
+              // If still no data, try using generateEodLastCloseUrl
+              console.warn(`No historical data found for stock ${symbol}, trying to get last close price`);
+              
+              // Update API request info for fallback request
+              apiRequestInfo.responseType = 'No historical data';
+              
+              try {
+                // Import the generateEodLastCloseUrl function and ExchangeData
+                const { generateEodLastCloseUrl } = require('@/utils/stockApi');
+                const { getExchangeForCountry } = require('@/models/ExchangeData');
+                
+                // Get the exchange from the post or determine it from the country
+                const exchange = post.exchange || (post.country ? getExchangeForCountry(post.country) : '');
+                
+                // Create the symbol with exchange if available
+                const symbolWithExchange = exchange ? `${post.symbol}.${exchange}` : post.symbol;
+                
+                // Generate URL for last close price
+                const lastCloseUrl = generateEodLastCloseUrl(symbolWithExchange, post.country);
+                console.log(`Trying to get last close price from: ${lastCloseUrl}`);
+                
+                // Update API tracking for fallback request
+                const fallbackRequestInfo = {
+                  symbol: post.symbol,
+                  exchange: exchange || '',
+                  requestType: 'Last close price fallback',
+                  requestUrl: lastCloseUrl,
+                  timestamp: new Date().toISOString()
+                };
+                
+                // Fetch the last close price
+                const lastCloseResponse = await fetch(lastCloseUrl);
+                
+                if (!lastCloseResponse.ok) {
+                  throw new Error(`API error: ${lastCloseResponse.statusText}`);
+                }
+                
+                const lastCloseData = await lastCloseResponse.json();
+                
+                if (lastCloseData && lastCloseData.close) {
+                  // Update fallback request info with success
+                  fallbackRequestInfo.responseType = 'Last price only';
+                  if (includeApiDetails) {
+                    apiDetails.push(fallbackRequestInfo);
+                  }
+                  
+                  historicalData = [{
+                    date: new Date().toISOString().split('T')[0],
+                    close: lastCloseData.close,
+                    high: lastCloseData.high || lastCloseData.close,
+                    low: lastCloseData.low || lastCloseData.close,
+                    open: lastCloseData.open || lastCloseData.close,
+                    volume: lastCloseData.volume || 0
+                  }];
+                } else {
+                  throw new Error('Invalid data format in fallback API response');
+                }
+              } catch (lastCloseError) {
+                console.error(`Error getting last close price for ${symbol}:`, lastCloseError);
+                
+                // Fallback to using the current_price from the post record
+                if (!post.current_price) {
+                  console.error(`No current price stored for stock ${symbol}`);
+                  continue;
+                }
+                
+                // Create a minimal historical data object using the stored current_price
+                const currentPriceValue = parseFloat(post.current_price);
+                console.log(`Falling back to stored current price for ${symbol}: ${currentPriceValue}`);
+                
+                historicalData = [{
+                  date: new Date().toISOString().split('T')[0],
+                  close: currentPriceValue,
+                  high: currentPriceValue,
+                  low: currentPriceValue,
+                  open: currentPriceValue,
+                  volume: 0
+                }];
+              }
+            }
+          } else {
+            // Parse the response
+            historicalData = await response.json();
+            
+            // Check if the response is valid
+            if (!Array.isArray(historicalData) || historicalData.length === 0) {
+              console.warn(`Empty historical data array returned for ${symbol}, trying to get last close price`);
+              
+              try {
+                // Import the generateEodLastCloseUrl function and ExchangeData
+                const { generateEodLastCloseUrl } = require('@/utils/stockApi');
+                const { getExchangeForCountry } = require('@/models/ExchangeData');
+                
+                // Get the exchange from the post or determine it from the country
+                const exchange = post.exchange || (post.country ? getExchangeForCountry(post.country) : '');
+                
+                // Create the symbol with exchange if available
+                const symbolWithExchange = exchange ? `${post.symbol}.${exchange}` : post.symbol;
+                
+                // Generate URL for last close price
+                const lastCloseUrl = generateEodLastCloseUrl(symbolWithExchange, post.country);
+                console.log(`Trying to get last close price from: ${lastCloseUrl}`);
+                
+                // Fetch the last close price
+                const lastCloseResponse = await fetch(lastCloseUrl);
+                
+                if (!lastCloseResponse.ok) {
+                  throw new Error(`API error: ${lastCloseResponse.statusText}`);
+                }
+                
+                const lastCloseData = await lastCloseResponse.json();
+                
+                if (lastCloseData && lastCloseData.close) {
+                  historicalData = [{
+                    date: new Date().toISOString().split('T')[0],
+                    close: lastCloseData.close,
+                    high: lastCloseData.high || lastCloseData.close,
+                    low: lastCloseData.low || lastCloseData.close,
+                    open: lastCloseData.open || lastCloseData.close,
+                    volume: lastCloseData.volume || 0
+                  }];
+                } else {
+                  throw new Error('Invalid data format in fallback API response');
+                }
+              } catch (lastCloseError) {
+                console.error(`Error getting last close price for ${symbol}:`, lastCloseError);
+                
+                // Fallback to using the current_price from the post record
+                if (!post.current_price) {
+                  console.error(`No current price stored for stock ${symbol}`);
+                  continue;
+                }
+                
+                // Create a minimal historical data object using the stored current_price
+                const currentPriceValue = parseFloat(post.current_price);
+                console.log(`Falling back to stored current price for ${symbol}: ${currentPriceValue}`);
+                
+                historicalData = [{
+                  date: new Date().toISOString().split('T')[0],
+                  close: currentPriceValue,
+                  high: currentPriceValue,
+                  low: currentPriceValue,
+                  open: currentPriceValue,
+                  volume: 0
+                }];
+              }
+            } else {
+              // Record successful API response with historical data
+              apiRequestInfo.responseType = 'Historical prices';
+              apiRequestInfo.dataPoints = historicalData.length;
+              if (includeApiDetails) {
+                apiDetails.push(apiRequestInfo);
+              }
+            }
           }
+        } catch (error) {
+          console.error(`Error processing stock ${post.symbol}:`, error);
+          
+          // Record error in API details
+          if (includeApiDetails) {
+            apiDetails.push({
+              symbol: post.symbol,
+              exchange: post.exchange || '',
+              requestType: 'Error',
+              responseType: 'Processing Error',
+              errorDetails: error.message,
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+        
+        // Check if we have valid historical data
+        if (!Array.isArray(historicalData) || historicalData.length === 0) {
+          console.error(`No historical data available for ${symbol}`);
+          
+          // Update the post with the status flag
+          const { error: updateError } = await supabase
+            .from('posts')
+            .update({
+              postDateAfterPriceDate: false,
+              postAfterMarketClose: false,
+              noDataAvailable: true,
+              last_price_check: new Date().toISOString()
+            })
+            .eq('id', post.id);
+
+          if (updateError) {
+            console.error(`Error updating post status for ${symbol}:`, updateError);
+          }
+          
+          results.push({
+            id: post.id,
+            symbol: post.symbol,
+            companyName: post.company_name,
+            currentPrice: post.current_price,
+            targetPrice: post.target_price,
+            stopLossPrice: post.stop_loss_price,
+            message: "No price data available",
+            noDataAvailable: true
+          });
           
           continue;
         }
+
+        // Get the last price date and check if it's valid for comparison with the post date
+        const lastDataPoint = historicalData[historicalData.length - 1];
+        const lastPriceDate = lastDataPoint ? new Date(lastDataPoint.date) : null;
+        const lastPriceDateStr = lastPriceDate ? lastPriceDate.toISOString().split('T')[0] : null;
         
-        let historicalData = await response.json();
-        
-        if (!Array.isArray(historicalData) || historicalData.length === 0) {
-          console.warn(`No historical data found for stock ${symbol}, trying to get last close price`);
+        // Check if the post date is valid for comparison with the last price date
+        if (postCreationDate && lastPriceDate) {
+          console.log(`Comparing post date (${postDateOnly}) with last price date (${lastPriceDateStr})`);
           
-          // Update API request info for fallback request
-          apiRequestInfo.responseType = 'No historical data';
-          
-          try {
-            // Import the generateEodLastCloseUrl function and ExchangeData
-            const { generateEodLastCloseUrl } = require('@/utils/stockApi');
-            const { getExchangeForCountry } = require('@/models/ExchangeData');
+          // If post date is after last price date, we can't check prices
+          if (postDateOnly > lastPriceDateStr) {
+            console.log(`Post created after latest price data for ${symbol}, can't check prices accurately`);
             
-            // Get the exchange from the post or determine it from the country
-            const exchange = post.exchange || (post.country ? getExchangeForCountry(post.country) : '');
-            
-            // Create the symbol with exchange if available
-            const symbolWithExchange = exchange ? `${post.symbol}.${exchange}` : post.symbol;
-            
-            // Generate URL for last close price
-            const lastCloseUrl = generateEodLastCloseUrl(symbolWithExchange, post.country);
-            console.log(`Trying to get last close price from: ${lastCloseUrl}`);
-            
-            // Update API tracking for fallback request
-            const fallbackRequestInfo = {
-              symbol: post.symbol,
-              exchange: exchange || '',
-              requestType: 'Last close price fallback',
-              requestUrl: lastCloseUrl,
-              timestamp: new Date().toISOString()
-            };
-            
-            // Fetch the last close price
-            const lastCloseResponse = await fetch(lastCloseUrl);
-            
-            if (!lastCloseResponse.ok) {
-              throw new Error(`API error: ${lastCloseResponse.statusText}`);
+            // Update the post with the status flag
+            const { error: updateError } = await supabase
+              .from('posts')
+              .update({
+                postDateAfterPriceDate: true,
+                postAfterMarketClose: false,
+                noDataAvailable: false,
+                last_price_check: new Date().toISOString()
+              })
+              .eq('id', post.id);
+
+            if (updateError) {
+              console.error(`Error updating post status for ${symbol}:`, updateError);
             }
             
-            const lastCloseData = await lastCloseResponse.json();
+            results.push({
+              id: post.id,
+              symbol: post.symbol,
+              companyName: post.company_name,
+              currentPrice: post.current_price,
+              targetPrice: post.target_price,
+              stopLossPrice: post.stop_loss_price,
+              message: "Post created after latest price data - can't check target/stop loss",
+              postDateAfterPriceDate: true
+            });
             
-            if (lastCloseData && lastCloseData.close) {
-              // Update fallback request info with success
-              fallbackRequestInfo.responseType = 'Last price only';
-              if (includeApiDetails) {
-                apiDetails.push(fallbackRequestInfo);
+            continue;
+          }
+          
+          // If post date is the same as last price date, check the time
+          // Market data is usually end-of-day, so if post was created before market close,
+          // we can compare, otherwise we can't check prices for the same day
+          if (postDateOnly === lastPriceDateStr) {
+            console.log(`Post created on the same day as last price data, checking time`);
+            
+            // Assume market close is at 4 PM (16:00) - this can be adjusted for different markets
+            const marketCloseHour = 16;
+            
+            // If post was created after market close, can't check prices accurately
+            if (postTimeHours >= marketCloseHour) {
+              console.log(`Post created after market close on ${postDateOnly}, can't check prices accurately`);
+              
+              // Update the post with the status flag
+              const { error: updateError } = await supabase
+                .from('posts')
+                .update({
+                  postDateAfterPriceDate: false,
+                  postAfterMarketClose: true,
+                  noDataAvailable: false,
+                  last_price_check: new Date().toISOString()
+                })
+                .eq('id', post.id);
+
+              if (updateError) {
+                console.error(`Error updating post status for ${symbol}:`, updateError);
               }
               
-              historicalData = [{
-                date: new Date().toISOString().split('T')[0],
-                close: lastCloseData.close,
-                high: lastCloseData.high || lastCloseData.close,
-                low: lastCloseData.low || lastCloseData.close,
-                open: lastCloseData.open || lastCloseData.close,
-                volume: lastCloseData.volume || 0
-              }];
-            } else {
-              throw new Error('Invalid data format in fallback API response');
-            }
-          } catch (lastCloseError) {
-            console.error(`Error getting last close price for ${symbol}:`, lastCloseError);
-            
-            // Fallback to using the current_price from the post record
-            if (!post.current_price) {
-              console.error(`No current price stored for stock ${symbol}`);
+              results.push({
+                id: post.id,
+                symbol: post.symbol,
+                companyName: post.company_name,
+                currentPrice: post.current_price,
+                targetPrice: post.target_price,
+                stopLossPrice: post.stop_loss_price,
+                message: "Post created after market close - recent price data not available",
+                postAfterMarketClose: true
+              });
+              
               continue;
+            } else {
+              console.log(`Post created before market close on ${postDateOnly}, can check prices`);
             }
-            
-            // Create a minimal historical data object using the stored current_price
-            const currentPriceValue = parseFloat(post.current_price);
-            console.log(`Falling back to stored current price for ${symbol}: ${currentPriceValue}`);
-            
-            historicalData = [{
-              date: new Date().toISOString().split('T')[0],
-              close: currentPriceValue,
-              high: currentPriceValue,
-              low: currentPriceValue,
-              open: currentPriceValue,
-              volume: 0
-            }];
-          }
-        } else {
-          // Record successful API response with historical data
-          apiRequestInfo.responseType = 'Historical prices';
-          apiRequestInfo.dataPoints = historicalData.length;
-          if (includeApiDetails) {
-            apiDetails.push(apiRequestInfo);
           }
         }
         
-        
-        historicalData.sort((a, b) => new Date(a.date) - new Date(b.date));
-        
-        
+        // Continue with normal price checking if we've passed the date validation checks
         const targetPrice = parseFloat(post.target_price);
         const stopLossPrice = parseFloat(post.stop_loss_price);
         
-        
+        // Track if target has been hit
         let targetReachedDate = null;
         let stopLossTriggeredDate = null;
         let targetReached = false;
         let stopLossTriggered = false;
+        let highPrice = null; // Store the high price when target is reached
+        let targetHitTime = null; // Store the time of day when target was hit (if available)
         
         for (const dayData of historicalData) {
           const date = dayData.date;
@@ -329,18 +584,30 @@ export async function POST(request) {
           const low = parseFloat(dayData.low);
           const close = parseFloat(dayData.close);
           
-          
+          // First check if target is reached - this has priority
           if (!targetReached && high >= targetPrice) {
             targetReached = true;
             targetReachedDate = date;
+            highPrice = high; // Store the high price that reached the target
             
+            // Try to extract time if it's included in the date string
+            if (date.includes('T')) {
+              try {
+                const dateObj = new Date(date);
+                targetHitTime = dateObj.toTimeString().split(' ')[0]; // Format as HH:MM:SS
+              } catch (e) {
+                // If date parsing fails, leave targetHitTime as null
+              }
+            }
+            
+            // Do not check for stop loss once target is reached
+            continue;
           }
           
-          
-          if (!stopLossTriggered && low <= stopLossPrice) {
+          // Only check for stop loss if target hasn't been reached
+          if (!targetReached && !stopLossTriggered && low <= stopLossPrice) {
             stopLossTriggered = true;
             stopLossTriggeredDate = date;
-            
           }
         }
         
@@ -354,6 +621,12 @@ export async function POST(request) {
           continue;
         }
         
+        // Find the highest price in the historical data
+        const highestPrice = historicalData.reduce((max, data) => {
+          const dataHigh = parseFloat(data.high);
+          return dataHigh > max ? dataHigh : max;
+        }, 0);
+        
         
         const shouldClosePost = targetReached || stopLossTriggered;
         
@@ -361,38 +634,44 @@ export async function POST(request) {
         const shouldUpdate = targetReached || stopLossTriggered || (post.last_price !== lastPrice) || shouldClosePost;
         
         if (shouldUpdate) {
-          
-          
-          
+          // Keep original target, stop loss and initial prices intact
+          // Only update the current price with the last available price
           updatedPosts.push({
             id: post.id,
             user_id: userId, 
             
-            
+            // Keep original content information
             content: post.content || '', 
             company_name: post.company_name || '',
             symbol: post.symbol || '',
             strategy: post.strategy || '',
             description: post.description || '',
             
-            
+            // Keep original metadata
             image_url: post.image_url,
             country: post.country,
             exchange: post.exchange,
             
-            
+            // Update current price but preserve target, stop loss, and initial price
             current_price: lastPrice,
-            target_price: post.target_price,
-            stop_loss_price: post.stop_loss_price,
+            target_price: post.target_price, // Keep original target price
+            stop_loss_price: post.stop_loss_price, // Keep original stop loss
+            initial_price: post.initial_price, // Never change the initial price once set
+            high_price: highestPrice, // Store the highest price in the period
+            target_high_price: highPrice, // Store the high price when target was reached
             
-            
+            // Update status information
             target_reached: targetReached,
             stop_loss_triggered: stopLossTriggered,
             target_reached_date: targetReachedDate,
+            target_hit_time: targetHitTime, // Add the time when target was hit
             stop_loss_triggered_date: stopLossTriggeredDate,
             last_price_check: new Date().toISOString(),
             last_price: lastPrice,
-            closed: shouldClosePost ? true : null
+            closed: shouldClosePost ? true : null,
+            postDateAfterPriceDate: false,
+            postAfterMarketClose: false,
+            noDataAvailable: false
           });
         }
         
@@ -597,52 +876,5 @@ export async function POST(request) {
       },
       { status: 500 }
     );
-  }
-}
-
-
-async function ensurePostTableColumns() {
-  try {
-    // Define the required columns we need to ensure exist
-    const requiredColumns = [
-      { name: 'target_reached', type: 'boolean', default: null },
-      { name: 'stop_loss_triggered', type: 'boolean', default: null },
-      { name: 'target_reached_date', type: 'timestamptz', default: null },
-      { name: 'stop_loss_triggered_date', type: 'timestamptz', default: null },
-      { name: 'last_price_check', type: 'timestamptz', default: null },
-      { name: 'last_price', type: 'decimal(15,4)', default: null },
-      { name: 'closed', type: 'boolean', default: null }
-    ];
-    
-    // Try to directly add each column without checking if it exists first
-    // The add_column_if_not_exists RPC function will handle the existence check
-    for (const column of requiredColumns) {
-      const { error: alterError } = await supabase
-        .rpc('add_column_if_not_exists', { 
-          p_table_name: 'posts',
-          p_column_name: column.name,
-          p_data_type: column.type,
-          p_default_value: column.default
-        });
-      
-      if (alterError) {
-        console.error(`Error adding column ${column.name}:`, alterError);
-      }
-    }
-    
-    // Ensure experience_Score column exists in profiles table
-    const { error: experienceError } = await supabase
-      .rpc('add_column_if_not_exists', { 
-        p_table_name: 'profiles',
-        p_column_name: 'experience_Score',
-        p_data_type: 'integer',
-        p_default_value: 0
-      });
-    
-    if (experienceError) {
-      console.error('Error adding experience_Score column to profiles table:', experienceError);
-    }
-  } catch (error) {
-    console.error('Error ensuring table columns:', error);
   }
 }

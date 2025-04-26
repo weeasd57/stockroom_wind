@@ -62,17 +62,15 @@ export default function Navbar() {
         const loadAvatar = async () => {
           setAvatarLoading(true);
           try {
-            console.log('Loading navbar avatar...');
+            
             const url = await getEffectiveAvatarUrl();
             
             // Only update if we got a valid URL that's different from current
             if (url && url !== avatarUrl) {
-              console.log('Navbar avatar URL updated:', url);
+              
               setAvatarUrl(url);
               lastAvatarRefresh.current = now;
-            } else {
-              console.log('Skipping navbar avatar update - same URL or invalid');
-            }
+            } 
           } catch (error) {
             console.error('Error loading avatar:', error);
             setAvatarUrl('/default-avatar.svg');
@@ -81,9 +79,7 @@ export default function Navbar() {
           }
         };
         loadAvatar();
-      } else {
-        console.log('Skipping navbar avatar refresh - recently updated');
-      }
+      } 
     }
   }, [profile, getEffectiveAvatarUrl]);
 
@@ -101,10 +97,10 @@ export default function Navbar() {
     closeMenu();
     
     if (isAuthenticated) {
-      console.log('User is authenticated, navigating to home');
+      
       router.push('/home');
     } else {
-      console.log('User is not authenticated, navigating to landing');
+      
       router.push('/landing');
     }
   };

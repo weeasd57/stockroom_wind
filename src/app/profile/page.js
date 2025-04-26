@@ -55,6 +55,13 @@ export default function Profile() {
     
     // Debug the profile data
     console.log("[PROFILE] Profile data:", profile);
+    if (profile) {
+      console.log("[PROFILE] Experience score from database:", {
+        experience_Score: profile.experience_Score,
+        success_posts: profile.success_posts,
+        loss_posts: profile.loss_posts
+      });
+    }
   }, [isAuthenticated, user, authLoading, profileLoading, profile]);
 
   
@@ -95,6 +102,14 @@ export default function Profile() {
       initializeData(user.id);
     }
     
+    // Force an immediate refresh to get latest experience data
+    const getLatestExperienceData = async () => {
+      console.log('Forcing refresh to get latest experience data');
+      await refreshData(user.id);
+    };
+    
+    getLatestExperienceData();
+    
     // Update form data with profile details when they become available
     if (profile && !profileLoading) {
       setFormData({
@@ -104,7 +119,7 @@ export default function Profile() {
       setAvatarUrl(contextAvatarUrl || '/default-avatar.svg');
       setBackgroundUrl(contextBackgroundUrl || '/profile-bg.jpg');
     }
-  }, [user, contextAvatarUrl, contextBackgroundUrl, profile, profileLoading, isAuthenticated, isInitialized, initializeData]);
+  }, [user, contextAvatarUrl, contextBackgroundUrl, profile, profileLoading, isAuthenticated, isInitialized, initializeData, refreshData]);
 
   // Set up background refresh interval with reduced frequency
   useEffect(() => {
@@ -897,7 +912,7 @@ export default function Profile() {
         <div className={styles.tradingInfoItem}>
           <span className={styles.tradingInfoLabel}>Experience Score:</span>
           <span className={`${styles.tradingInfoValue} ${(profile?.experience_Score || 0) > 0 ? styles.positiveScore : (profile?.experience_Score || 0) < 0 ? styles.negativeScore : ''}`}>
-            {profile?.experience_Score || 0}
+            {profile?.experience_Score !== undefined ? profile.experience_Score : 0}
           </span>
         </div>
         <div className={styles.tradingInfoItem}>

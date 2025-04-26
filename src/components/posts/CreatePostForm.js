@@ -1279,6 +1279,7 @@ export default function CreatePostForm() {
         country: selectedStock?.country || undefined,
         exchange: selectedStock?.exchange || undefined,
         current_price: currentPrice || undefined,
+        initial_price: currentPrice || undefined, // Set initial price once during creation
         target_price: targetPrice ? parseFloat(targetPrice) : undefined,
         stop_loss_price: stopLossPrice ? parseFloat(stopLossPrice) : undefined,
         strategy: selectedStrategy || undefined

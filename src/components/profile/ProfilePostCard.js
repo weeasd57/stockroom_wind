@@ -156,18 +156,16 @@ export const ProfilePostCard = ({ post = {} }) => {
           </div>
         )}
 
-        {/* Current price (latest update) */}
-        {post.last_price && (
-          <div className={`${styles.priceItem} ${styles.currentPriceItem}`}>
-            <span className={styles.priceLabel}>Current Price:</span>
-            <span className={styles.priceValue}>{post.last_price}</span>
-            {post.last_price_check && (
-              <div className={styles.lastCheckDate} title="Last price update">
-                {formatDate(post.last_price_check)}
+        {/* High price display - Show the highest price if available */}
+        {(post.high_price || post.target_high_price) && (
+          <div className={`${styles.priceItem} ${styles.highPriceItem}`}>
+            <span className={styles.priceLabel}>High Price:</span>
+            <span className={styles.priceValue}>{post.high_price || post.target_high_price}</span>
+            {post.target_reached && post.target_hit_time && (
+              <div className={styles.lastCheckDate} title="Time when target was hit">
+                Hit at {post.target_hit_time}
               </div>
             )}
-            
-            {/* Price change display removed as requested */}
           </div>
         )}
         
@@ -286,10 +284,18 @@ export const ProfilePostCard = ({ post = {} }) => {
                     <span className={styles.dialogValue}>{post.last_price || 'N/A'}</span>
                   </div>
                   {post.target_reached && (
+                    <>
                     <div className={styles.dialogItem}>
                       <span className={styles.dialogLabel}>Target Price:</span>
                       <span className={styles.dialogValue}>{post.target_price || 'N/A'}</span>
                     </div>
+                      {post.target_high_price && (
+                        <div className={styles.dialogItem}>
+                          <span className={styles.dialogLabel}>High Price:</span>
+                          <span className={styles.dialogValue}>{post.target_high_price || 'N/A'}</span>
+                        </div>
+                      )}
+                    </>
                   )}
                   {post.stop_loss_triggered && (
                     <div className={styles.dialogItem}>
@@ -301,7 +307,7 @@ export const ProfilePostCard = ({ post = {} }) => {
                     <span className={styles.dialogLabel}>Date:</span>
                     <span className={styles.dialogValue}>
                       {post.target_reached 
-                        ? formatDate(post.target_reached_date)
+                        ? `${formatDate(post.target_reached_date)}${post.target_hit_time ? ` at ${post.target_hit_time}` : ''}`
                         : formatDate(post.stop_loss_triggered_date)
                       }
                     </span>
@@ -324,6 +330,30 @@ export const ProfilePostCard = ({ post = {} }) => {
         <div className={styles.priceCheckStatus}>
           <span className={styles.priceCheckIcon}>📈</span>
           <span className={styles.priceCheckText}>Last price update: {formatDate(post.last_price_check)}</span>
+        </div>
+      )}
+      
+      {/* Display message when post was created after latest price data */}
+      {post.postDateAfterPriceDate && (
+        <div className={`${styles.priceCheckStatus} ${styles.warningStatus}`}>
+          <span className={styles.priceCheckIcon}>⚠️</span>
+          <span className={styles.priceCheckText}>Post created after latest price data - can't check target/stop loss</span>
+        </div>
+      )}
+      
+      {/* Display message when post was created after market close on the same day */}
+      {post.postAfterMarketClose && (
+        <div className={`${styles.priceCheckStatus} ${styles.warningStatus}`}>
+          <span className={styles.priceCheckIcon}>⚠️</span>
+          <span className={styles.priceCheckText}>Post created after market close - recent price data not available</span>
+        </div>
+      )}
+      
+      {/* Display message when no price data is available */}
+      {post.noDataAvailable && (
+        <div className={`${styles.priceCheckStatus} ${styles.errorStatus}`}>
+          <span className={styles.priceCheckIcon}>❌</span>
+          <span className={styles.priceCheckText}>No price data available for this stock</span>
         </div>
       )}
       
