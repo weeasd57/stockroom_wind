@@ -70,10 +70,18 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
+      // Detect if we're on localhost or production
+      const isLocalhost = window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1';
+
+      const redirectTo = isLocalhost 
+        ? 'http://localhost:3000/auth/callback' 
+        : 'https://firestocks.vercel.app/auth/callback';
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: redirectTo,
         },
       });
       
