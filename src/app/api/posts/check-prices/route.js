@@ -26,27 +26,47 @@ const adminSupabase = createClient(supabaseUrl || '', serviceRoleKey, {
 
 // Helper function to log status updates and DB operations
 const logStatusUpdate = async (postId, symbol, status, result) => {
-  console.log(`[STATUS UPDATE] Post ${postId} (${symbol}): ${status}`);
+  const timestamp = new Date().toISOString();
+  console.log(`[STATUS UPDATE][${timestamp}] Post ${postId} (${symbol}): ${status}`);
+  
+  // Log more detailed information if result contains data
+  if (result.data) {
+    console.log(`[STATUS DATA][${timestamp}] Post ${postId}: ${JSON.stringify(result.data).substring(0, 200)}${result.data.length > 200 ? '...' : ''}`);
+  }
+  
+  // Log errors more clearly
+  if (result.error) {
+    console.error(`[STATUS ERROR][${timestamp}] Post ${postId}: ${result.error.message}`);
+    if (result.error.details) {
+      console.error(`[STATUS ERROR DETAILS][${timestamp}] Post ${postId}: ${JSON.stringify(result.error.details)}`);
+    }
+  }
   
   // Log to database if needed
   try {
+    const logStartTime = Date.now();
     const { error } = await adminSupabase
       .from('operation_logs')
       .insert({
         operation_type: 'post_status_update',
         post_id: postId,
+        symbol: symbol,
         status: status,
         success: !result.error,
         error_message: result.error ? result.error.message : null,
-        created_at: new Date().toISOString()
+        data_summary: result.data ? JSON.stringify(result.data).substring(0, 1000) : null,
+        created_at: timestamp
       })
       .select();
+    const logDuration = Date.now() - logStartTime;
       
     if (error) {
-      console.error(`Failed to log operation: ${error.message}`);
+      console.error(`[ERROR] Failed to log operation for post ${postId}: ${error.message}`);
+    } else {
+      console.log(`[DEBUG] Successfully logged operation for post ${postId} in ${logDuration}ms`);
     }
   } catch (err) {
-    console.error(`Exception logging operation: ${err.message}`);
+    console.error(`[ERROR] Exception logging operation for post ${postId}: ${err.message}`);
     // Continue execution even if logging fails
   }
 };
@@ -54,13 +74,17 @@ const logStatusUpdate = async (postId, symbol, status, result) => {
 const MAX_DAILY_CHECKS = 100;
 
 export async function POST(request) {
+  console.log(`[DEBUG] Check-prices API route called at ${new Date().toISOString()}`);
   try {
     
     const body = await request.json().catch(() => ({}));
+    console.log(`[DEBUG] Request body:`, JSON.stringify(body));
     const cookieHeader = request.headers.get('cookie');
+    console.log(`[DEBUG] Cookie header present: ${!!cookieHeader}`);
 
     // Check if includeApiDetails flag is set
     const includeApiDetails = body.includeApiDetails === true;
+    console.log(`[DEBUG] Include API details: ${includeApiDetails}`);
 
     let userId = body.userId;
     let experienceUpdated = false;
@@ -69,13 +93,14 @@ export async function POST(request) {
 
     
     if (!userId) {
+      console.log(`[DEBUG] No userId in request body, attempting to get from session`);
       
       const { data: { session }, error: authError } = await supabase.auth.getSession({
         cookieHeader
       });
       
       if (authError) {
-        console.error('Error verifying authentication:', authError.message);
+        console.error('[ERROR] Error verifying authentication:', authError.message);
         return NextResponse.json(
           { success: false, message: 'Authentication error', details: authError.message },
           { status: 401 }
@@ -83,7 +108,7 @@ export async function POST(request) {
       }
       
       if (!session || !session.user) {
-        console.error('No active user session found');
+        console.error('[ERROR] No active user session found');
         return NextResponse.json(
           { success: false, message: 'Unauthorized', details: 'No active session' },
           { status: 401 }
@@ -91,12 +116,14 @@ export async function POST(request) {
       }
       
       userId = session.user.id;
+      console.log(`[DEBUG] Retrieved userId from session: ${userId}`);
     }
     
     
     
     
     if (!userId) {
+      console.error('[ERROR] User ID not available after both checks');
       return NextResponse.json(
         { success: false, message: 'User ID not available' },
         { status: 401 }
@@ -105,6 +132,7 @@ export async function POST(request) {
     
     
     const today = new Date().toISOString().split('T')[0]; 
+    console.log(`[DEBUG] Checking usage for user ${userId} on date ${today}`);
     
     const { data: usageData, error: usageError } = await supabase
       .from('price_check_usage')
@@ -115,8 +143,10 @@ export async function POST(request) {
     
     
     if (!usageError && usageData) {
+      console.log(`[DEBUG] Found existing usage record: ${JSON.stringify(usageData)}`);
       
       if (usageData.count >= MAX_DAILY_CHECKS) {
+        console.log(`[DEBUG] User has reached maximum daily checks (${usageData.count}/${MAX_DAILY_CHECKS})`);
         return NextResponse.json(
           { 
             success: false, 
@@ -128,7 +158,7 @@ export async function POST(request) {
         );
       }
       
-      
+      console.log(`[DEBUG] Updating usage count from ${usageData.count} to ${usageData.count + 1}`);
       const { error: updateError } = await supabase
         .from('price_check_usage')
         .update({ 
@@ -139,9 +169,10 @@ export async function POST(request) {
         .eq('check_date', today);
       
       if (updateError) {
-        console.error('Error updating usage count:', updateError);
+        console.error('[ERROR] Error updating usage count:', updateError);
       }
     } else {
+      console.log(`[DEBUG] No existing usage record found, creating new record`);
       
       const { error: insertError } = await supabase
         .from('price_check_usage')
@@ -150,21 +181,27 @@ export async function POST(request) {
         ]);
       
       if (insertError) {
-        console.error('Error creating new usage record:', insertError);
+        console.error('[ERROR] Error creating new usage record:', insertError);
+      } else {
+        console.log(`[DEBUG] Successfully created new usage record`);
       }
     }
     
-    
+    console.log(`[DEBUG] Fetching all posts to count closed posts`);
     const { data: allPosts, error: allPostsError } = await supabase
       .from('posts')
       .select('id, closed')
       .eq('user_id', userId);
       
+    if (allPostsError) {
+      console.error('[ERROR] Error fetching all posts:', allPostsError);
+    }
     
     const closedPostsCount = allPosts?.filter(post => post.closed === true).length || 0;
+    console.log(`[DEBUG] Found ${closedPostsCount} closed posts out of ${allPosts?.length || 0} total posts`);
     
     
-    
+    console.log(`[DEBUG] Fetching open posts for price check`);
     const { data: posts, error: postsError } = await supabase
       .from('posts')
       .select(`
@@ -188,8 +225,11 @@ export async function POST(request) {
     
     
     if (postsError) {
+      console.error('[ERROR] Error fetching open posts:', postsError);
       throw postsError;
     }
+    
+    console.log(`[DEBUG] Found ${posts.length} open posts to check prices for`);
     
     const results = [];
     const updatedPosts = [];
@@ -197,33 +237,36 @@ export async function POST(request) {
     
     for (const post of posts) {
       try {
+        console.log(`[DEBUG] Processing post ID ${post.id} for symbol ${post.symbol}`);
         
         if (!post.symbol || !post.target_price || !post.stop_loss_price) {
-          
+          console.warn(`[WARN] Skipping post ${post.id} - missing required fields (symbol: ${!!post.symbol}, target: ${!!post.target_price}, stop-loss: ${!!post.stop_loss_price})`);
           continue;
         }
         
         
         if (post.closed === true) {
-          
+          console.log(`[DEBUG] Skipping closed post ${post.id}`);
           continue;
         }
         
         
         const symbol = post.exchange ? `${post.symbol}.${post.exchange}` : post.symbol;
+        console.log(`[DEBUG] Using symbol with exchange: ${symbol}`);
         
         
         // Get the date from the request or use today's date
         const requestDate = body.requestDate ? new Date(body.requestDate) : new Date();
         const todayDate = requestDate;
         
-        // Use the created_at date from post or one month before request date if not available
+        // For the fromDate, use the post creation date without going back 30 days
+        // This ensures we don't incorrectly go back to the previous month
         const createdAt = post.created_at ? new Date(post.created_at) : new Date(todayDate);
-        createdAt.setDate(createdAt.getDate() - 30); // Ensure we have at least some historical data
         
         // Format dates for API request
         const fromDate = createdAt.toISOString().split('T')[0];
         const toDate = todayDate.toISOString().split('T')[0];
+        console.log(`[DEBUG] Date range for historical data: ${fromDate} to ${toDate}`);
         
         // Record post creation date and time for comparison with price data later
         const postCreationDate = post.created_at ? new Date(post.created_at) : null;
@@ -232,6 +275,7 @@ export async function POST(request) {
         const postTimeMinutes = postCreationDate ? postCreationDate.getMinutes() : 0;
         
         const historicalUrl = `${BASE_URL}/eod/${symbol}?from=${fromDate}&to=${toDate}&period=d&api_token=${API_KEY}&fmt=json`;
+        console.log(`[DEBUG] Fetching historical data for ${symbol} from API`);
 
         // Record API request details
         const apiRequestInfo = {
@@ -242,76 +286,49 @@ export async function POST(request) {
           timestamp: new Date().toISOString()
         };
         
-        let historicalData;  // Declare historicalData variable here
-        
+        let historicalData;
         try {
-          // Fetch historical data
-          console.log(`Fetching EOD data for ${symbol} from ${fromDate} to ${toDate}`);
+          console.log(`[DEBUG] Sending historical data API request for ${symbol}`);
+          
           const response = await fetch(historicalUrl);
+          console.log(`[DEBUG] API response received with status: ${response.status}`);
+          
+          // Update API tracking with response info
+          apiRequestInfo.responseStatus = response.status;
           
           if (!response.ok) {
-            console.error(`Error getting stock data for ${symbol}:`, response.statusText);
+            console.error(`[ERROR] API error for ${symbol}: ${response.status} ${response.statusText}`);
+            apiRequestInfo.responseType = 'Error';
+            apiRequestInfo.errorCode = response.status;
             
-            // Record failed API response
             if (includeApiDetails) {
-              apiRequestInfo.responseType = 'API Error';
-              apiRequestInfo.errorDetails = response.statusText;
               apiDetails.push(apiRequestInfo);
             }
             
-            // Instead of continuing, try to get data from previous days
-            let fallbackDate = new Date(requestDate);
-            let fallbackData = null;
-            let attempts = 0;
-            const maxAttempts = 5; // Try up to 5 previous days
+            // Try fallback to cached data
+            console.log(`[DEBUG] Attempting to use cached data for ${symbol}`);
+            const { data: cachedData, error: cacheError } = await supabase
+              .from('stock_prices_cache')
+              .select('data')
+              .eq('symbol', symbol)
+              .order('updated_at', { ascending: false })
+              .limit(1)
+              .single();
             
-            while (!fallbackData && attempts < maxAttempts) {
-              // Move back one day
-              fallbackDate.setDate(fallbackDate.getDate() - 1);
-              const fallbackFromDate = fallbackDate.toISOString().split('T')[0];
-              
-              // Try to get historical data from the previous day
-              const fallbackUrl = `${BASE_URL}/eod/${symbol}?from=${fallbackFromDate}&to=${fallbackFromDate}&period=d&api_token=${API_KEY}&fmt=json`;
-              
-              try {
-                console.log(`Attempting fallback request for ${symbol} on date: ${fallbackFromDate}`);
-                const fallbackResponse = await fetch(fallbackUrl);
-                
-                if (fallbackResponse.ok) {
-                  const data = await fallbackResponse.json();
-                  if (Array.isArray(data) && data.length > 0) {
-                    fallbackData = data;
-                    console.log(`Successfully retrieved fallback data for ${symbol} from ${fallbackFromDate}`);
-                    
-                    // Record successful fallback API request
-                    if (includeApiDetails) {
-                      apiDetails.push({
-                        symbol: post.symbol,
-                        exchange: post.exchange || '',
-                        requestType: 'Fallback historical price',
-                        requestUrl: fallbackUrl,
-                        responseType: 'Success',
-                        dataPoints: data.length,
-                        timestamp: new Date().toISOString()
-                      });
-                    }
-                  }
-                }
-              } catch (fallbackError) {
-                console.error(`Error in fallback request for ${symbol}:`, fallbackError);
-              }
-              
-              attempts++;
-            }
-            
-            if (fallbackData) {
-              historicalData = fallbackData;
+            if (cacheError) {
+              console.error(`[ERROR] No cached data available for ${symbol}:`, cacheError.message);
+              var fallbackData = null;
             } else {
-              // If still no data, try using generateEodLastCloseUrl
-              console.warn(`No historical data found for stock ${symbol}, trying to get last close price`);
-              
-              // Update API request info for fallback request
-              apiRequestInfo.responseType = 'No historical data';
+              console.log(`[DEBUG] Successfully retrieved cached data for ${symbol}`);
+              var fallbackData = cachedData?.data;
+            }
+          } else {
+            // Parse the response
+            historicalData = await response.json();
+            
+            // Check if the response is valid
+            if (!Array.isArray(historicalData) || historicalData.length === 0) {
+              console.warn(`Empty historical data array returned for ${symbol}, trying to get last close price`);
               
               try {
                 // Import the generateEodLastCloseUrl function and ExchangeData
@@ -338,15 +355,27 @@ export async function POST(request) {
                 };
                 
                 // Fetch the last close price
+                const fallbackStartTime = Date.now();
                 const lastCloseResponse = await fetch(lastCloseUrl);
+                const fallbackEndTime = Date.now();
+                const fallbackResponseTime = fallbackEndTime - fallbackStartTime;
+                
+                console.log(`[DEBUG] Fallback API response received in ${fallbackResponseTime}ms with status: ${lastCloseResponse.status}`);
+                
+                fallbackRequestInfo.responseStatus = lastCloseResponse.status;
+                fallbackRequestInfo.responseTime = fallbackResponseTime;
                 
                 if (!lastCloseResponse.ok) {
+                  console.error(`[ERROR] Fallback API error for ${symbol}: ${lastCloseResponse.status} ${lastCloseResponse.statusText}`);
+                  fallbackRequestInfo.responseType = 'Error';
+                  fallbackRequestInfo.errorCode = lastCloseResponse.status;
                   throw new Error(`API error: ${lastCloseResponse.statusText}`);
                 }
                 
                 const lastCloseData = await lastCloseResponse.json();
                 
                 if (lastCloseData && lastCloseData.close) {
+                  console.log(`[DEBUG] Successfully got last close price for ${symbol}: ${lastCloseData.close}`);
                   // Update fallback request info with success
                   fallbackRequestInfo.responseType = 'Last price only';
                   if (includeApiDetails) {
@@ -362,73 +391,7 @@ export async function POST(request) {
                     volume: lastCloseData.volume || 0
                   }];
                 } else {
-                  throw new Error('Invalid data format in fallback API response');
-                }
-              } catch (lastCloseError) {
-                console.error(`Error getting last close price for ${symbol}:`, lastCloseError);
-                
-                // Fallback to using the current_price from the post record
-                if (!post.current_price) {
-                  console.error(`No current price stored for stock ${symbol}`);
-                  continue;
-                }
-                
-                // Create a minimal historical data object using the stored current_price
-                const currentPriceValue = parseFloat(post.current_price);
-                console.log(`Falling back to stored current price for ${symbol}: ${currentPriceValue}`);
-                
-                historicalData = [{
-                  date: new Date().toISOString().split('T')[0],
-                  close: currentPriceValue,
-                  high: currentPriceValue,
-                  low: currentPriceValue,
-                  open: currentPriceValue,
-                  volume: 0
-                }];
-              }
-            }
-          } else {
-            // Parse the response
-            historicalData = await response.json();
-            
-            // Check if the response is valid
-            if (!Array.isArray(historicalData) || historicalData.length === 0) {
-              console.warn(`Empty historical data array returned for ${symbol}, trying to get last close price`);
-              
-              try {
-                // Import the generateEodLastCloseUrl function and ExchangeData
-                const { generateEodLastCloseUrl } = require('@/utils/stockApi');
-                const { getExchangeForCountry } = require('@/models/ExchangeData');
-                
-                // Get the exchange from the post or determine it from the country
-                const exchange = post.exchange || (post.country ? getExchangeForCountry(post.country) : '');
-                
-                // Create the symbol with exchange if available
-                const symbolWithExchange = exchange ? `${post.symbol}.${exchange}` : post.symbol;
-                
-                // Generate URL for last close price
-                const lastCloseUrl = generateEodLastCloseUrl(symbolWithExchange, post.country);
-                console.log(`Trying to get last close price from: ${lastCloseUrl}`);
-                
-                // Fetch the last close price
-                const lastCloseResponse = await fetch(lastCloseUrl);
-                
-                if (!lastCloseResponse.ok) {
-                  throw new Error(`API error: ${lastCloseResponse.statusText}`);
-                }
-                
-                const lastCloseData = await lastCloseResponse.json();
-                
-                if (lastCloseData && lastCloseData.close) {
-                  historicalData = [{
-                    date: new Date().toISOString().split('T')[0],
-                    close: lastCloseData.close,
-                    high: lastCloseData.high || lastCloseData.close,
-                    low: lastCloseData.low || lastCloseData.close,
-                    open: lastCloseData.open || lastCloseData.close,
-                    volume: lastCloseData.volume || 0
-                  }];
-                } else {
+                  console.error(`[ERROR] Invalid data format in fallback API response for ${symbol}`);
                   throw new Error('Invalid data format in fallback API response');
                 }
               } catch (lastCloseError) {
@@ -478,6 +441,10 @@ export async function POST(request) {
           }
         }
         
+        // Insert before the code that processes price data
+        console.log(`[DEBUG] Post ${post.id}: Processing price data for ${symbol}`);
+        console.log(`[DEBUG] - Target price: ${post.target_price}, Stop loss: ${post.stop_loss_price}`);
+        
         // Check if we have valid historical data
         if (!Array.isArray(historicalData) || historicalData.length === 0) {
           console.error(`No historical data available for ${symbol}`);
@@ -513,6 +480,15 @@ export async function POST(request) {
           });
           
           continue;
+        }
+
+        // Insert at the point where historical data is processed
+        if (historicalData && historicalData.length > 0) {
+          console.log(`[DEBUG] Historical data points: ${historicalData.length}`);
+          console.log(`[DEBUG] First data point: ${JSON.stringify(historicalData[0])}`);
+          console.log(`[DEBUG] Last data point: ${JSON.stringify(historicalData[historicalData.length - 1])}`);
+        } else {
+          console.warn(`[WARN] No historical data points available for ${symbol}`);
         }
 
         // Get the last price date and check if it's valid for comparison with the post date
@@ -746,6 +722,18 @@ export async function POST(request) {
             ? ((lastPrice - stopLossPrice) / lastPrice * 100).toFixed(2)
             : 0
         });
+
+        // Insert right before the post is updated
+        console.log(`[DEBUG] Post ${post.id} price check results:`);
+        console.log(`[DEBUG] - Symbol: ${symbol}, Last price: ${lastPrice}`);
+        console.log(`[DEBUG] - Target reached: ${targetReached}, Stop loss triggered: ${stopLossTriggered}`);
+        console.log(`[DEBUG] - Will close post: ${shouldClosePost}`);
+
+        // Add near line ~600 where price processing happens
+        console.log(`[DEBUG] Checking targets for post ${post.id}. Target: ${post.target_price}, Stop-loss: ${post.stop_loss_price}, Current: ${lastPrice}`);
+        
+        // Add near line ~700 where posts are being updated
+        console.log(`[DEBUG] Updating post ${post.id}. Setting current_price: ${lastPrice}, target_reached: ${targetReached}, stop_loss_triggered: ${stopLossTriggered}`);
       } catch (error) {
         console.error(`Error processing stock ${post.symbol}:`, error);
         
@@ -941,6 +929,8 @@ export async function POST(request) {
     
     const usageCount = currentUsage ? currentUsage.count : 1;
     const remainingChecks = MAX_DAILY_CHECKS - usageCount;
+    
+    console.log(`[DEBUG] Price check completed for ${posts.length} posts. Updated: ${updatedPosts.length}, Skipped: ${closedPostsCount}, Remaining checks today: ${remainingChecks}`);
     
     return NextResponse.json({
       success: true,

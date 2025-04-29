@@ -600,3 +600,56 @@
 .postStatus:hover {
   transform: translateY(-2px);
 }
+
+/* Progress bar container */
+.progressBarOuter {
+  height: 8px;
+  margin-top: 8px;
+  margin-bottom: 5px;
+  border-radius: 4px;
+  background-color: #e0e0e0;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Progress bar fill element */
+.progressBarInner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.progressBarInnerPositive {
+  background-color: #4caf50;
+}
+
+.progressBarInnerNegative {
+  background-color: #f44336;
+}
+
+/* Progress percentage display container */
+.progressTextContainer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+  color: #666;
+  margin-top: 4px;
+}
+
+/* Progress percentage text */
+.progressPercentText {
+  font-weight: bold;
+  font-size: 0.8rem;
+}
+
+.progressPercentTextPositive {
+  color: #4caf50;
+}
+
+.progressPercentTextNegative {
+  color: #f44336;
+}

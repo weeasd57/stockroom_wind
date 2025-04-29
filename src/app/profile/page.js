@@ -56,11 +56,16 @@ export default function Profile() {
     // Debug the profile data
     console.log("[PROFILE] Profile data:", profile);
     if (profile) {
+      console.log("[PROFILE] Username from profile:", profile.username);
+      console.log("[PROFILE] Profile data type:", typeof profile);
+      console.log("[PROFILE] Profile keys:", Object.keys(profile));
       console.log("[PROFILE] Experience score from database:", {
         experience_Score: profile.experience_Score,
         success_posts: profile.success_posts,
         loss_posts: profile.loss_posts
       });
+    } else {
+      console.log("[PROFILE] No profile data available");
     }
   }, [isAuthenticated, user, authLoading, profileLoading, profile]);
 
@@ -68,6 +73,7 @@ export default function Profile() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
+    full_name: '',
     bio: '',
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -99,13 +105,26 @@ export default function Profile() {
     
     // Initialize profile store if not already done
     if (!isInitialized) {
+      console.log('Initializing profile data');
       initializeData(user.id);
+    } else {
+      console.log('Profile data already initialized');
     }
     
-    // Force an immediate refresh to get latest experience data
+    // Force an immediate refresh to get latest experience data - only if not recently refreshed
     const getLatestExperienceData = async () => {
-      console.log('Forcing refresh to get latest experience data');
-      await refreshData(user.id);
+      // Check if we've already forced a refresh recently
+      const { lastFetched } = useProfile.getState();
+      const now = Date.now();
+      const oneMinuteAgo = now - 60 * 1000; // 1 minute ago
+      
+      // Only refresh if no data or data is older than 1 minute
+      if (!lastFetched || lastFetched < oneMinuteAgo) {
+        console.log('Forcing refresh to get latest experience data');
+        await refreshData(user.id);
+      } else {
+        console.log('Skipping initial refresh - data was recently fetched');
+      }
     };
     
     getLatestExperienceData();
@@ -114,22 +133,31 @@ export default function Profile() {
     if (profile && !profileLoading) {
       setFormData({
         username: profile.username || '',
+        full_name: profile.full_name || '',
         bio: profile.bio || '',
       });
       setAvatarUrl(contextAvatarUrl || '/default-avatar.svg');
       setBackgroundUrl(contextBackgroundUrl || '/profile-bg.jpg');
+      
+      // Debug profile data for username display
+      console.log('[DEBUG] Profile username:', profile.username);
+      console.log('[DEBUG] Profile data for display:', {
+        username: profile.username,
+        userId: profile.id,
+        dataAvailable: !!profile
+      });
     }
-  }, [user, contextAvatarUrl, contextBackgroundUrl, profile, profileLoading, isAuthenticated, isInitialized, initializeData, refreshData]);
+  }, [user?.id, isAuthenticated, isInitialized]);
 
   // Set up background refresh interval with reduced frequency
   useEffect(() => {
     if (user && isAuthenticated) {
-      // Don't refresh immediately if data is less than 2 minutes old
+      // Don't refresh immediately if data is less than 5 minutes old
       const { lastFetched } = useProfile.getState();
       const now = Date.now();
-      const twoMinutesAgo = now - 2 * 60 * 1000; // 2 minutes in milliseconds
+      const fiveMinutesAgo = now - 5 * 60 * 1000; // 5 minutes in milliseconds
       
-      if (!lastFetched || lastFetched < twoMinutesAgo) {
+      if (!lastFetched || lastFetched < fiveMinutesAgo) {
         // Only refresh if data is stale
         console.log('Initial background refresh - data is stale or not loaded yet');
         refreshData(user.id);
@@ -137,21 +165,21 @@ export default function Profile() {
         console.log('Skipping initial refresh - data is recent');
       }
 
-      // Set up interval for background refresh (every 2 minutes instead of 30 seconds)
+      // Set up interval for background refresh (every 5 minutes instead of 2 minutes)
       refreshInterval.current = setInterval(() => {
         // Get the latest lastFetched value
         const { lastFetched, isRefreshing } = useProfile.getState();
         const now = Date.now();
-        const twoMinutesAgo = now - 2 * 60 * 1000;
+        const fiveMinutesAgo = now - 5 * 60 * 1000;
         
-        // Only refresh if not already refreshing and data is older than 2 minutes
-        if (!isRefreshing && (!lastFetched || lastFetched < twoMinutesAgo)) {
+        // Only refresh if not already refreshing and data is older than 5 minutes
+        if (!isRefreshing && (!lastFetched || lastFetched < fiveMinutesAgo)) {
           console.log('Background refresh triggered');
           refreshData(user.id);
         } else {
           console.log('Skipping background refresh - data is recent or refresh in progress');
         }
-      }, 120000); // 2 minutes interval instead of 30 seconds
+      }, 300000); // 5 minutes interval instead of 2 minutes
     }
 
     return () => {
@@ -159,13 +187,14 @@ export default function Profile() {
         clearInterval(refreshInterval.current);
       }
     };
-  }, [user, isAuthenticated, refreshData]);
+  }, [user?.id, isAuthenticated]); // Only depend on user ID and auth status
 
   // Update form data when profile changes
   useEffect(() => {
     if (profile) {
       setFormData({
         username: profile.username || '',
+        full_name: profile.full_name || '',
         bio: profile.bio || '',
       });
     }
@@ -224,6 +253,7 @@ export default function Profile() {
     setBackgroundPreview(null);
     setFormData({
       username: profile?.username || '',
+      full_name: profile?.full_name || '',
       bio: profile?.bio || '',
     });
   }, [profile]);
@@ -244,9 +274,6 @@ export default function Profile() {
         console.log('Loading profile images on page load');
         
         try {
-          // Get the latest data from the database
-          await refreshData(user.id);
-          
           // Set avatar URL once without cache busting
           if (contextAvatarUrl) {
             console.log('Setting initial avatar URL:', contextAvatarUrl);
@@ -266,7 +293,7 @@ export default function Profile() {
       // Run the function
       loadImagesOnce();
     }
-  }, [user, isAuthenticated, profile]);
+  }, [user?.id, isAuthenticated, profile?.id, contextAvatarUrl, contextBackgroundUrl]); // Only critical dependencies
 
   // Clear upload errors when modal opens/closes
   useEffect(() => {
@@ -889,7 +916,9 @@ export default function Profile() {
             
             {/* User info section */}
             <div className={styles.nameSection}>
-              <h1 className={styles.profileName}>{profile?.username || 'Trader'}</h1>
+              <h1 className={styles.profileName}>
+                {profile?.username || (user?.id ? `user_${user.id.substring(0, 8)}` : 'Trader')}
+              </h1>
               <p className={styles.profileBio}>{profile?.bio || 'No bio yet'}</p>
               
               {!showEditModal && (
@@ -1347,6 +1376,19 @@ export default function Profile() {
                   required
                   disabled={isSaving}
                   placeholder="Enter your username"
+                />
+              </div>
+              
+              <div className={editStyles.formGroup}>
+                <label htmlFor="full_name">Full Name</label>
+                <input
+                  type="text"
+                  id="full_name"
+                  name="full_name"
+                  value={formData.full_name}
+                  onChange={handleInputChange}
+                  disabled={isSaving}
+                  placeholder="Enter your full name"
                 />
               </div>
               

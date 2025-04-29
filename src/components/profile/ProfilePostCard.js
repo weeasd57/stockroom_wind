@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import styles from '@/styles/ProfilePostCard.module.css';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 import { COUNTRY_ISO_CODES } from '@/models/CurrencyData';
@@ -10,16 +10,18 @@ import { useRouter } from 'next/navigation';
 function formatDate(dateString) {
   if (!dateString) return '';
   const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
+  return date.toLocaleString('en-US', {
     year: 'numeric',
     month: 'short',
-    day: 'numeric'
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
   });
 }
 
 export const ProfilePostCard = ({ post = {} }) => {
   const router = useRouter();
-  const [showStatusDialog, setShowStatusDialog] = useState(false);
   // Add default empty object to prevent errors if post is undefined
   
   // Check for stock_symbol in different possible locations based on API response structure
@@ -123,7 +125,6 @@ export const ProfilePostCard = ({ post = {} }) => {
               <div 
                 className={styles.statusBadge} 
                 title={`Target reached on ${formatDate(post.target_reached_date)}`}
-                onClick={() => setShowStatusDialog(true)}
               >
                 ✓
               </div>
@@ -200,129 +201,37 @@ export const ProfilePostCard = ({ post = {} }) => {
             <div className={styles.progressContainer}>
              
               {/* Simple progress bar with container and fill */}
-              <div style={{
-                height: '8px',
-                marginTop: '8px',
-                marginBottom: '5px',
-                borderRadius: '4px',
-                backgroundColor: '#e0e0e0',
-                overflow: 'hidden',
-                position: 'relative',
-                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  height: '100%',
-                  width: `${Math.min(Math.max(0, parseFloat(percentToTarget)), 100)}%`,
-                  backgroundColor: isMovingTowardTarget ? '#4caf50' : '#f44336'
-                }}></div>
+              <div className={styles.progressBarOuter}>
+                <div 
+                  className={`${styles.progressBarInner} ${isMovingTowardTarget ? styles.progressBarInnerPositive : styles.progressBarInnerNegative}`}
+                  style={{ width: `${Math.min(Math.max(0, parseFloat(percentToTarget)), 100)}%` }}
+                ></div>
               </div>
               
               {/* Progress display with percentage */}
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                fontSize: '0.7rem',
-                color: '#666',
-                marginTop: '4px',
-              }}>
+              <div className={styles.progressTextContainer}>
                 <span>0%</span>
-                <span style={{
-                  color: isMovingTowardTarget ? '#4caf50' : '#f44336',
-                  fontWeight: 'bold',
-                  fontSize: '0.8rem'
-                }}>
+                <span className={`${styles.progressPercentText} ${isMovingTowardTarget ? styles.progressPercentTextPositive : styles.progressPercentTextNegative}`}>
                   {Math.max(1, Math.round(parseFloat(percentToTarget)))}% to target
                 </span>
                 <span>100%</span>
               </div>
-              
-             
             </div>
           );
         })()}
       </div>
       
-      {/* Status indicator for closed posts - now as clickable badge that shows dialog */}
+      {/* Status indicator for closed posts */}
       {post.closed && (
-        <>
-          <div 
-            className={`${styles.postStatus} ${post.target_reached ? styles.successStatus : styles.dangerStatus}`}
-            onClick={() => setShowStatusDialog(true)}
-          >
-            {post.target_reached ? 'Target Reached' : 'Stop Loss Triggered'}
-            <span className={styles.statusDate}>
-              {post.target_reached 
-                ? `on ${formatDate(post.target_reached_date)}`
-                : `on ${formatDate(post.stop_loss_triggered_date)}`
-              }
-            </span>
-          </div>
-          
-          {/* Status dialog */}
-          {showStatusDialog && (
-            <div className={styles.dialogOverlay} onClick={() => setShowStatusDialog(false)}>
-              <div className={styles.statusDialog} onClick={(e) => e.stopPropagation()}>
-                <div className={styles.dialogHeader}>
-                  <h3>{post.target_reached ? 'Target Reached' : 'Stop Loss Triggered'}</h3>
-                  <button className={styles.closeButton} onClick={() => setShowStatusDialog(false)}>×</button>
-                </div>
-                <div className={styles.dialogContent}>
-                  <div className={styles.dialogItem}>
-                    <span className={styles.dialogLabel}>Stock:</span>
-                    <span className={styles.dialogValue}>{post.symbol || post.title?.split(' ')[0] || 'N/A'}</span>
-                  </div>
-                  <div className={styles.dialogItem}>
-                    <span className={styles.dialogLabel}>Initial Price:</span>
-                    <span className={styles.dialogValue}>{post.current_price || 'N/A'}</span>
-                  </div>
-                  <div className={styles.dialogItem}>
-                    <span className={styles.dialogLabel}>Final Price:</span>
-                    <span className={styles.dialogValue}>{post.last_price || 'N/A'}</span>
-                  </div>
-                  {post.target_reached && (
-                    <>
-                    <div className={styles.dialogItem}>
-                      <span className={styles.dialogLabel}>Target Price:</span>
-                      <span className={styles.dialogValue}>{post.target_price || 'N/A'}</span>
-                    </div>
-                      {post.target_high_price && (
-                        <div className={styles.dialogItem}>
-                          <span className={styles.dialogLabel}>High Price:</span>
-                          <span className={styles.dialogValue}>{post.target_high_price || 'N/A'}</span>
-                        </div>
-                      )}
-                    </>
-                  )}
-                  {post.stop_loss_triggered && (
-                    <div className={styles.dialogItem}>
-                      <span className={styles.dialogLabel}>Stop Loss:</span>
-                      <span className={styles.dialogValue}>{post.stop_loss_price || 'N/A'}</span>
-                    </div>
-                  )}
-                  <div className={styles.dialogItem}>
-                    <span className={styles.dialogLabel}>Date:</span>
-                    <span className={styles.dialogValue}>
-                      {post.target_reached 
-                        ? `${formatDate(post.target_reached_date)}${post.target_hit_time ? ` at ${post.target_hit_time}` : ''}`
-                        : formatDate(post.stop_loss_triggered_date)
-                      }
-                    </span>
-                  </div>
-                  {post.content && (
-                    <div className={styles.dialogNotes}>
-                      <h4>Notes</h4>
-                      <p>{post.content}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </>
+        <div className={`${styles.postStatus} ${post.target_reached ? styles.successStatus : styles.dangerStatus}`}>
+          {post.target_reached ? 'Target Reached' : 'Stop Loss Triggered'}
+          <span className={styles.statusDate}>
+            {post.target_reached 
+              ? `on ${formatDate(post.target_reached_date)}`
+              : `on ${formatDate(post.stop_loss_triggered_date)}`
+            }
+          </span>
+        </div>
       )}
       
       {/* Price check status for open posts */}
@@ -363,10 +272,13 @@ export const ProfilePostCard = ({ post = {} }) => {
         <div className={styles.metaRow}>
           {post.created_at && (
             <span className={styles.postDate}>
-              {new Date(post.created_at).toLocaleDateString(undefined, { 
+              {new Date(post.created_at).toLocaleString('en-US', { 
                 year: 'numeric', 
                 month: 'short', 
-                day: 'numeric' 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
               })}
             </span>
           )}

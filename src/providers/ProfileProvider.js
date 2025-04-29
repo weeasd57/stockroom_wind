@@ -26,22 +26,8 @@ const globalProfileState = {
 // Provider component
 export function ProfileProvider({ children }) {
   // Handle the case where SupabaseProvider might not be available during SSR
-  let user = null;
-  let supabaseContextAvailable = true;
-  
-  try {
-    // Try to use the SupabaseProvider
-    const supabaseContext = useSupabase();
-    user = supabaseContext?.user;
-    
-    // If we got here without errors, SupabaseProvider is available
-  } catch (error) {
-    // If this fails, it means we're not within a SupabaseProvider
-    // This can happen during server-side rendering on Vercel
-    console.warn('SupabaseProvider not available - rendering with null user');
-    supabaseContextAvailable = false;
-    user = null;
-  }
+  const { user, isAuthenticated } = useSupabase();
+  const supabaseContextAvailable = !!user || (typeof window !== 'undefined');
   
   const [profile, setProfile] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -62,6 +48,10 @@ export function ProfileProvider({ children }) {
   const [lastFetched, setLastFetched] = useState(null);
   const [selectedStrategy, setSelectedStrategy] = useState(null);
 
+  // Add a ref to track the last refresh time
+  const lastRefreshTime = useRef(0);
+  const REFRESH_THROTTLE_MS = 5000; // 5 seconds minimum between refreshes
+  
   // Update global state when local state changes
   useEffect(() => {
     globalProfileState.lastFetched = lastFetched;
@@ -111,24 +101,32 @@ export function ProfileProvider({ children }) {
       return;
     }
     
-      console.log('Fetching user profile data for user ID:', user.id);
-      getUserProfile(user.id)
-        .then((response) => {
-          console.log('Profile response received:', response);
-          if (response.data) {
-            setProfile(response.data);
-            console.log('Profile data set:', response.data);
-          } else if (response.error) {
-          setError(handleError(response.error));
-            console.error('Error in profile response:', response.error);
+    
+    getUserProfile(user.id)
+      .then((response) => {
+        
+        if (response.data) {
+          // Fix: Ensure we're extracting the profile data correctly from the array
+          const profileData = Array.isArray(response.data) ? response.data[0] : response.data;
+          setProfile(profileData);
+          
+          
+          // Check if username exists, if not, ensure it's created
+          if (!profileData.username) {
+            
+            ensureUsername(user.id);
           }
-          setLoading(false);
-        })
-        .catch((error) => {
-          console.error('Error fetching profile data:', error);
+        } else if (response.error) {
+          setError(handleError(response.error));
+          console.error('Error in profile response:', response.error);
+        }
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error('Error fetching profile data:', error);
         setError(handleError(error));
-          setLoading(false);
-        });
+        setLoading(false);
+      });
   }, [user, supabaseContextAvailable]);
 
   useEffect(() => {
@@ -143,7 +141,7 @@ export function ProfileProvider({ children }) {
         if (typeof window !== 'undefined' && window.imageCacheManager) {
           const cachedAvatar = window.imageCacheManager.getAvatarUrl(user.id);
           if (cachedAvatar) {
-            console.log('Using cached avatar from global cache manager');
+            
             setAvatarUrl(cachedAvatar);
           }
         }
@@ -151,13 +149,13 @@ export function ProfileProvider({ children }) {
         // Local cache as fallback
         if (!avatarUrl && imageCache.current.has(`avatar_${user.id}`)) {
           const cached = imageCache.current.get(`avatar_${user.id}`);
-          console.log('Using cached avatar from local cache');
+          
           setAvatarUrl(cached);
         }
         
         if (!backgroundUrl && imageCache.current.has(`background_${user.id}`)) {
           const cached = imageCache.current.get(`background_${user.id}`);
-          console.log('Using cached background from local cache');
+          
           setBackgroundUrl(cached);
         }
       }
@@ -168,7 +166,7 @@ export function ProfileProvider({ children }) {
       const shouldRefresh = !avatarUrl || !backgroundUrl || now - lastImageRefresh.current > 300000; // 5 minutes
       
       if (shouldRefresh) {
-        console.log('Refreshing profile images - time elapsed or first load');
+        
         const fetchImages = async () => {
           try {
             if (user && profile) {
@@ -192,7 +190,7 @@ export function ProfileProvider({ children }) {
               setAvatarUrl(avatar);
               setBackgroundUrl(background);
               lastImageRefresh.current = now;
-              console.log('Profile images refreshed from server');
+              
             }
           } catch (error) {
             console.error('Error loading profile images:', error);
@@ -203,8 +201,6 @@ export function ProfileProvider({ children }) {
         };
         
         fetchImages();
-      } else {
-        console.log('Skipping image refresh - recently refreshed');
       }
   }, [profile, user, avatarUrl, backgroundUrl, supabaseContextAvailable]);
 
@@ -219,7 +215,7 @@ export function ProfileProvider({ children }) {
     
     setLoading(true);
     try {
-      console.log('Updating profile with data:', updates);
+      
       const { data, error } = await updateUserProfile(user.id, updates);
       
       if (error) {
@@ -228,7 +224,7 @@ export function ProfileProvider({ children }) {
         return { success: false, error: handleError(error) };
       }
       
-      console.log('Profile updated successfully:', data);
+      
       setProfile(data);
       
       // If avatar was updated, refresh it but maintain cached URLs
@@ -327,7 +323,7 @@ export function ProfileProvider({ children }) {
     }
   };
 
-  // Added functions from ProfileStore
+  // Initialize data for a user - fetch posts, followers, and following
   const initializeData = async (userId) => {
     // Check if we're properly authenticated
     if (!supabaseContextAvailable) {
@@ -353,24 +349,6 @@ export function ProfileProvider({ children }) {
         
       if (postsError) throw postsError;
       
-      // First, let's inspect the followers table structure to get the correct column names
-      try {
-        // Attempt to get a single row to see the column structure
-        const { data: tableInfo, error: tableInfoError } = await supabase
-          .from('followers')
-          .select('*')
-          .limit(1);
-          
-        console.log('Followers table structure:', tableInfo);
-        
-        if (tableInfoError) {
-          console.error('Error getting followers table structure:', tableInfoError);
-        }
-      } catch (inspectError) {
-        console.error('Error inspecting followers table:', inspectError);
-      }
-      
-      // Modified queries using more commonly used column names - we'll adjust based on your actual schema
       // Using follower_id/following_id structure for followers
       let followersData, followingData;
       
@@ -426,13 +404,12 @@ export function ProfileProvider({ children }) {
         followingData = followingResult.data || [];
       }
       
-      // Set the data
+      // Update the data
       setPosts(postsData || []);
       setFollowers(followersData);
       setFollowing(followingData);
-      setIsInitialized(true);
       setLastFetched(Date.now());
-      
+      setIsInitialized(true);
     } catch (error) {
       console.error('Error initializing profile data:', error);
       setError(handleError(error));
@@ -440,7 +417,7 @@ export function ProfileProvider({ children }) {
       setIsLoading(false);
     }
   };
-  
+
   const refreshData = async (userId) => {
     // Check if we're properly authenticated
     if (!supabaseContextAvailable) {
@@ -453,19 +430,34 @@ export function ProfileProvider({ children }) {
     // Don't refresh if already refreshing
     if (isRefreshing) return;
     
+    // Apply throttling to prevent excessive refreshes
+    const now = Date.now();
+    if (now - lastRefreshTime.current < REFRESH_THROTTLE_MS) {
+      
+      return;
+    }
+    
     try {
       setIsRefreshing(true);
       setError(null);
+      // Update the last refresh time
+      lastRefreshTime.current = now;
       
       // Fetch the current profile data - added to ensure experience score is up-to-date
       const { data: profileData, error: profileError } = await getUserProfile(userId);
       
       if (profileError) {
         console.error('Error fetching profile data:', profileError);
-      } else if (profileData && profileData.length > 0) {
+      } else if (profileData) {
         // Update profile with the latest data including experience score
-        console.log('Updated profile data from refreshData:', profileData[0]);
-        setProfile(profileData[0]);
+        // Fix: Ensure we're extracting the profile data correctly from the array
+        const updatedProfileData = Array.isArray(profileData) ? profileData[0] : profileData;
+        if (updatedProfileData) {
+          
+          setProfile(updatedProfileData);
+        } else {
+          console.error('No profile data found in refreshData');
+        }
       }
       
       // Similar fetch logic as initializeData
@@ -564,6 +556,36 @@ export function ProfileProvider({ children }) {
       // Add other state as needed
       setError: (newError) => globalProfileState.setError(newError)
     };
+  };
+
+  // Function to ensure a username exists for the user
+  const ensureUsername = async (userId) => {
+    if (!userId) return;
+
+    try {
+      
+      
+      // Create a default username based on user ID
+      const defaultUsername = `user_${userId.substring(0, 8)}`;
+      
+      // Update the profile with the default username
+      const { data, error } = await updateUserProfile(userId, {
+        username: defaultUsername
+      });
+      
+      if (error) {
+        console.error('Error creating default username:', error);
+        return;
+      }
+      
+      if (data) {
+        
+        // Update the profile state with the new data
+        setProfile(data);
+      }
+    } catch (err) {
+      console.error('Error in ensureUsername:', err);
+    }
   };
 
   return (

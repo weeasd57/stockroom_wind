@@ -59,7 +59,11 @@ export default function CheckPostPricesButton({ userId }) {
     const controller = new AbortController();
     setAbortController(controller);
     
+    console.log('Checking post prices for user:', userId);
+    console.log('Including API details in request:', true);
+    
     try {
+      console.log('Making API request to: /api/posts/check-prices');
       const response = await fetch('/api/posts/check-prices', {
         method: 'POST',
         headers: {
@@ -88,6 +92,9 @@ export default function CheckPostPricesButton({ userId }) {
         throw new Error(data.message || 'An error occurred while checking prices');
       }
       
+      console.log('Received API response:', data);
+      console.log('API details:', data.apiDetails || 'No API details available');
+      
       setCheckStats({
         usageCount: data.usageCount,
         remainingChecks: data.remainingChecks,
@@ -102,9 +109,16 @@ export default function CheckPostPricesButton({ userId }) {
         
         // Extract API response details if available
         if (data.apiDetails && Array.isArray(data.apiDetails)) {
+          console.log(`Processing ${data.apiDetails.length} API response details`);
           setApiResponses(data.apiDetails);
+          
+          // Log each URL for debugging
+          data.apiDetails.forEach((detail, index) => {
+            console.log(`API URL ${index + 1} (${detail.symbol}): ${detail.requestUrl || 'No URL available'}`);
+          });
         } else {
           // Create mock API response details if none provided by the server
+          console.log('No API details provided by server, creating mock data');
           const mockApiData = data.results.map(post => {
             // Determine the type of response based on available data
             let responseType = 'No price data';
@@ -128,12 +142,20 @@ export default function CheckPostPricesButton({ userId }) {
               }
             }
             
+            // Construct a mock API URL for display purposes
+            const mockRequestUrl = post.symbol ? 
+              `https://eodhd.com/api/eod/${post.symbol}${post.exchange ? `.${post.exchange}` : ''}?from=YYYY-MM-DD&to=YYYY-MM-DD&period=d&api_token=***&fmt=json` : 
+              'N/A';
+            
+            console.log(`Creating mock URL for ${post.symbol}: ${mockRequestUrl}`);
+            
             return {
               symbol: post.symbol,
               exchange: post.exchange || 'N/A',
               requestType: 'Price data request',
               responseType: responseType,
-              timestamp: post.last_price_check || new Date().toISOString()
+              timestamp: post.last_price_check || new Date().toISOString(),
+              requestUrl: mockRequestUrl // Add mock URL for display
             };
           });
           setApiResponses(mockApiData);
@@ -259,6 +281,47 @@ export default function CheckPostPricesButton({ userId }) {
                       >
                         {response.responseType || 'N/A'}
                       </span>
+
+                      {/* Display API URL if available */}
+                      {response.requestUrl && (
+                        <div className={styles.apiUrlContainer}>
+                          <input 
+                            type="text" 
+                            readOnly
+                            value={response.requestUrl} 
+                            className={styles.apiUrlInput}
+                            onClick={(e) => e.target.select()}
+                          />
+                          <button 
+                            className={styles.copyUrlButton}
+                            onClick={() => {
+                              console.log(`Copying URL to clipboard: ${response.requestUrl}`);
+                              navigator.clipboard.writeText(response.requestUrl)
+                                .then(() => {
+                                  console.log('URL successfully copied to clipboard');
+                                  // Show copied notification
+                                  const button = document.getElementById(`copy-btn-${index}`);
+                                  if (button) {
+                                    const originalText = button.innerText;
+                                    button.innerText = 'Copied!';
+                                    setTimeout(() => {
+                                      button.innerText = originalText;
+                                      console.log('Reset button text after copy');
+                                    }, 2000);
+                                  } else {
+                                    console.warn(`Copy button element not found: copy-btn-${index}`);
+                                  }
+                                })
+                                .catch(err => {
+                                  console.error('Error copying URL to clipboard:', err);
+                                });
+                            }}
+                            id={`copy-btn-${index}`}
+                          >
+                            Copy URL
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))
                 ) : (

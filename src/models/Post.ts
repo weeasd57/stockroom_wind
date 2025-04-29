@@ -1,26 +1,98 @@
 export interface Post {
-  id?: string;
+  id: string;
   user_id: string;
-  company_name: string;
-  symbol: string;
-  description: string;
   content: string;
-  strategy: string;
-  country?: string;
-  current_price?: number;
-  target_price?: number;
-  stop_loss_price?: number;
-  exchange?: string;
   image_url?: string;
-  created_at: string;
-  updated_at: string;
-  
-  // Fields for price checking and post status
-  target_reached?: boolean;
-  stop_loss_triggered?: boolean;
-  target_reached_date?: string;
-  stop_loss_triggered_date?: string;
-  last_price_check?: string;
+  symbol: string;
+  company_name: string;
+  country: string;
+  exchange: string;
+  current_price: number;
+  target_price: number;
+  stop_loss_price: number;
+  strategy: string;
+  created_at: Date;
+  updated_at: Date;
+  description?: string;
+  target_reached: boolean;
+  stop_loss_triggered: boolean;
+  target_reached_date?: Date;
+  stop_loss_triggered_date?: Date;
+  last_price_check?: Date;
   last_price?: number;
-  closed?: boolean;
+  closed: boolean;
+  initial_price: number;
+  high_price: number;
+  target_high_price: number;
+  target_hit_time?: Date;
+  postDateAfterPriceDate: boolean;
+  postAfterMarketClose: boolean;
+  noDataAvailable: boolean;
+  status_message?: string;
+}
+
+export class PostModel implements Post {
+  id: string;
+  user_id: string;
+  content: string;
+  image_url?: string;
+  symbol: string;
+  company_name: string;
+  country: string;
+  exchange: string;
+  current_price: number;
+  target_price: number;
+  stop_loss_price: number;
+  strategy: string;
+  created_at: Date;
+  updated_at: Date;
+  description?: string;
+  target_reached: boolean;
+  stop_loss_triggered: boolean;
+  target_reached_date?: Date;
+  stop_loss_triggered_date?: Date;
+  last_price_check?: Date;
+  last_price?: number;
+  closed: boolean;
+  initial_price: number;
+  high_price: number;
+  target_high_price: number;
+  target_hit_time?: Date;
+  postDateAfterPriceDate: boolean;
+  postAfterMarketClose: boolean;
+  noDataAvailable: boolean;
+  status_message?: string;
+
+  constructor(data: Partial<Post>) {
+    this.id = data.id || '';
+    this.user_id = data.user_id || '';
+    this.content = data.content || '';
+    this.image_url = data.image_url;
+    this.symbol = data.symbol || '';
+    this.company_name = data.company_name || '';
+    this.country = data.country || '';
+    this.exchange = data.exchange || '';
+    this.current_price = data.current_price || 0;
+    this.target_price = data.target_price || 0;
+    this.stop_loss_price = data.stop_loss_price || 0;
+    this.strategy = data.strategy || '';
+    this.created_at = data.created_at || new Date();
+    this.updated_at = data.updated_at || new Date();
+    this.description = data.description;
+    this.target_reached = data.target_reached || false;
+    this.stop_loss_triggered = data.stop_loss_triggered || false;
+    this.target_reached_date = data.target_reached_date;
+    this.stop_loss_triggered_date = data.stop_loss_triggered_date;
+    this.last_price_check = data.last_price_check;
+    this.last_price = data.last_price;
+    this.closed = data.closed || false;
+    this.initial_price = data.initial_price || 0;
+    this.high_price = data.high_price || 0;
+    this.target_high_price = data.target_high_price || 0;
+    this.target_hit_time = data.target_hit_time;
+    this.postDateAfterPriceDate = data.postDateAfterPriceDate || false;
+    this.postAfterMarketClose = data.postAfterMarketClose || false;
+    this.noDataAvailable = data.noDataAvailable || false;
+    this.status_message = data.status_message;
+  }
 }

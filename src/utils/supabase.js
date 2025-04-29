@@ -255,6 +255,7 @@ export const updateUserProfile = async (userId, updates) => {
     
     // Map form fields to database columns
     if (updates.username) dbUpdates.username = updates.username;
+    if (updates.full_name) dbUpdates.full_name = updates.full_name;
     if (updates.bio) dbUpdates.bio = updates.bio;
     
     // Handle avatarUrl (from form) or avatar_url (directly provided)
