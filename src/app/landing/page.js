@@ -16,6 +16,7 @@ export default function LandingPage() {
   const handleScroll = () => {
     setScrollPosition(window.scrollY);
   };
+  
   useEffect(() => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
@@ -27,6 +28,39 @@ export default function LandingPage() {
     }, 100);
     return () => clearTimeout(timer);
   }, []);
+  
+  const features = [
+    {
+      id: 1,
+      title: "Market Analytics",
+      description: "Real-time data insights",
+      icon: "📈",
+    },
+    {
+      id: 2,
+      title: "Stock Analysis",
+      description: "Precise trade targets",
+      icon: "📊",
+    },
+    {
+      id: 3,
+      title: "Portfolio Tracking",
+      description: "Performance metrics",
+      icon: "💼",
+    },
+    {
+      id: 4,
+      title: "Price Alerts",
+      description: "Instant notifications",
+      icon: "📱",
+    },
+    {
+      id: 5,
+      title: "Documentation",
+      description: "Extensive resources",
+      icon: "📝",
+    }
+  ];
 
   const login = () => {
     setVisible(false);
@@ -39,40 +73,8 @@ export default function LandingPage() {
     setHoverButton(id);
     setTimeout(() => setHoverButton(null), 500);
   };
-
-  const features = [
-    {
-      id: 1,
-      title: "Market Analytics",
-      description: "Real-time data insights",
-      icon: "📈"
-    },
-    {
-      id: 2,
-      title: "Stock Analysis",
-      description: "Precise trade targets",
-      icon: "📊"
-    },
-    {
-      id: 3,
-      title: "Portfolio Tracking",
-      description: "Performance metrics",
-      icon: "💼"
-    },
-    {
-      id: 4,
-      title: "Price Alerts",
-      description: "Instant notifications",
-      icon: "📱"
-    },
-    {
-      id: 5,
-      title: "Documentation",
-      description: "Extensive resources",
-      icon: "📝"
-    }
-  ];
-
+  
+ 
 
   return (
     <div className={`${styles.landingPage} ${visible ? 'auth-fade-in' : 'auth-fade-out'} ${theme}`}>
@@ -81,7 +83,7 @@ export default function LandingPage() {
           className={styles.heroSection} 
           style={{
             transform: `translateY(${Math.max(-800, scrollPosition * -3)}px)`,
-            opacity: Math.max(0, 1 - scrollPosition / 1000) 
+            opacity: Math.max(0, 1 - scrollPosition / 1000),
           }}
         >
           <div className={styles.heroContent}>
@@ -94,7 +96,10 @@ export default function LandingPage() {
             
             <div className={styles.featureCards}>
               {features.map((feature) => (
-                <div key={feature.id} className={styles.featureCard}>
+                <div 
+                  key={feature.id} 
+                  className={styles.featureCard}
+                >
                   <div className={styles.featureIcon}>{feature.icon}</div>
                   <h3 className={styles.featureTitle}>{feature.title}</h3>
                   <p className={styles.featureDescription}>{feature.description}</p>

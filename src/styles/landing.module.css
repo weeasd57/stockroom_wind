@@ -8,6 +8,85 @@
   padding-bottom: 200px;
 }
 
+/* Navbar styles */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 300;
+}
+
+.navbarLogo {
+  display: flex;
+  align-items: center;
+}
+
+.logoIcon {
+  width: 32px;
+  height: 32px;
+  margin-right: 10px;
+  border-radius: 50%;
+  background: #333;
+}
+
+.logoText {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.navLinks {
+  display: flex;
+  gap: 2rem;
+}
+
+.navLink {
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.navLink:hover {
+  opacity: 0.7;
+}
+
+.navbarRight {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.loginButton {
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0.5rem 0.7rem;
+}
+
+.getStartedButton {
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #333;
+  color: white;
+  border: none;
+  transition: all 0.2s;
+}
+
+.getStartedButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
 :global(.dark) .landingPage {
   background: linear-gradient(to bottom, #1f1f1f, #121212);
 }
@@ -35,8 +114,8 @@
   top: 0;
   left: 0;
   width: 96%;
-  height: 90vh;
-  padding: 2rem 2rem 200px 2rem;
+  height: 61vh;
+  padding: 100px 2rem 130px 2rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -45,7 +124,34 @@
   overflow: hidden;
   border-bottom-left-radius: 40px;
   border-bottom-right-radius: 40px;
+  transition: background-image 0.3s ease, background-color 0.3s ease;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
 
+/* Background overlay for when an image is shown */
+.heroBackgroundOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 201;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+:global(.dark) .heroBackgroundOverlay {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+:global(.light) .heroBackgroundOverlay {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.heroBackgroundOverlay.visible {
+  opacity: 1;
 }
 
 :global(.dark) .heroSection {
@@ -61,11 +167,12 @@
 }
 
 .heroContent {
-  z-index: 201;
+  z-index: 202;
   text-align: center;
   padding: 1rem;
   width: 100%;
   max-width: 1200px;
+  position: relative;
 }
 
 .heroTitle {
@@ -127,6 +234,8 @@
   margin-right: 0;
   padding-left: 1rem;
   padding-right: 1rem;
+  position: relative;
+  z-index: 203;
 }
 
 .featureCards::-webkit-scrollbar {
@@ -199,6 +308,23 @@
   background: rgba(245, 245, 245, 0.9);
 }
 
+/* Active feature card styling */
+.activeFeatureCard {
+  transform: translateY(-5px);
+}
+
+:global(.dark) .activeFeatureCard {
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 215, 0, 0.8);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+:global(.light) .activeFeatureCard {
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(226, 185, 0, 0.7);
+  background: rgba(245, 245, 245, 1);
+}
+
 .featureIcon {
   font-size: 2rem;
   margin-bottom: 0.75rem;
@@ -244,6 +370,8 @@
   gap: 1rem;
   justify-content: center;
   margin-top: 1.5rem;
+  position: relative;
+  z-index: 203;
 }
 
 .primaryButton {
@@ -337,6 +465,10 @@
 
 /* Responsive adjustments */
 @media (max-width: 1024px) {
+  .navLinks {
+    gap: 1.5rem;
+  }
+  
   .featureCards {
     padding: 1rem;
   }
@@ -348,6 +480,14 @@
 }
 
 @media (max-width: 768px) {
+  .navbar {
+    padding: 1rem;
+  }
+  
+  .navLinks {
+    display: none;
+  }
+  
   .heroSection {
     padding: 2rem 1rem 200px 1rem;
   }
@@ -375,6 +515,23 @@
 }
 
 @media (max-width: 480px) {
+  .navbar {
+    padding: 0.75rem;
+  }
+  
+  .logoText {
+    font-size: 1rem;
+  }
+  
+  .navbarRight {
+    gap: 0.5rem;
+  }
+  
+  .getStartedButton, .loginButton {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
+  }
+  
   .primaryButton {
     padding: 0.8rem 1.8rem;
     font-size: 1rem;

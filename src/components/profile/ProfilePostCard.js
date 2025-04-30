@@ -10,13 +10,17 @@ import { useRouter } from 'next/navigation';
 function formatDate(dateString) {
   if (!dateString) return '';
   const date = new Date(dateString);
-  return date.toLocaleString('en-US', {
+  
+  // For display purposes, use a standardized format that matches API requests
+  // This ensures date display is consistent with the date used in API calls
+  return date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    hour12: true
+    hour12: true,
+    timeZone: 'UTC' // Use UTC timezone to match API date format
   });
 }
 
@@ -124,7 +128,7 @@ export const ProfilePostCard = ({ post = {} }) => {
             {post.target_reached && (
               <div 
                 className={styles.statusBadge} 
-                title={`Target reached on ${formatDate(post.target_reached_date)}`}
+                title={`Target reached on ${formatDate(post.target_reached_date)} (UTC)`}
               >
                 ✓
               </div>
@@ -137,7 +141,7 @@ export const ProfilePostCard = ({ post = {} }) => {
             <span className={styles.priceLabel}>Stop Loss:</span>
             <span className={styles.priceValue}>{post.stop_loss_price}</span>
             {post.stop_loss_triggered && (
-              <div className={`${styles.statusBadge} ${styles.stopLossBadge}`} title={`Stop loss triggered on ${formatDate(post.stop_loss_triggered_date)}`}>
+              <div className={`${styles.statusBadge} ${styles.stopLossBadge}`} title={`Stop loss triggered on ${formatDate(post.stop_loss_triggered_date)} (UTC)`}>
                 ⚠
               </div>
             )}
@@ -149,11 +153,6 @@ export const ProfilePostCard = ({ post = {} }) => {
           <div className={`${styles.priceItem} ${styles.initialPriceItem}`}>
             <span className={styles.priceLabel}>Initial Price:</span>
             <span className={styles.priceValue}>{post.current_price}</span>
-            {post.created_at && (
-              <div className={styles.lastCheckDate} title="Post creation date">
-                {formatDate(post.created_at)}
-              </div>
-            )}
           </div>
         )}
 
@@ -227,8 +226,8 @@ export const ProfilePostCard = ({ post = {} }) => {
           {post.target_reached ? 'Target Reached' : 'Stop Loss Triggered'}
           <span className={styles.statusDate}>
             {post.target_reached 
-              ? `on ${formatDate(post.target_reached_date)}`
-              : `on ${formatDate(post.stop_loss_triggered_date)}`
+              ? `on ${formatDate(post.target_reached_date)} (UTC)`
+              : `on ${formatDate(post.stop_loss_triggered_date)} (UTC)`
             }
           </span>
         </div>
@@ -238,7 +237,7 @@ export const ProfilePostCard = ({ post = {} }) => {
       {!post.closed && post.last_price_check && (
         <div className={styles.priceCheckStatus}>
           <span className={styles.priceCheckIcon}>📈</span>
-          <span className={styles.priceCheckText}>Last price update: {formatDate(post.last_price_check)}</span>
+          <span className={styles.priceCheckText}>Last price update: {formatDate(post.last_price_check)} (UTC)</span>
         </div>
       )}
       
@@ -278,8 +277,9 @@ export const ProfilePostCard = ({ post = {} }) => {
                 day: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit',
-                hour12: true
-              })}
+                hour12: true,
+                timeZone: 'UTC' // Use UTC timezone to match API date format
+              })} (UTC)
             </span>
           )}
           

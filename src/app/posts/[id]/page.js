@@ -16,12 +16,16 @@ import { useProfile } from '@/providers/ProfileProvider';
 function formatDate(dateString) {
   if (!dateString) return '';
   const date = new Date(dateString);
+  
+  // For display purposes, use a standardized format that matches API requests
+  // This ensures date display is consistent with the date used in API calls
   return date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    timeZone: 'UTC' // Use UTC timezone to match API date format
   });
 }
 
@@ -254,11 +258,6 @@ export default function PostDetailsPage() {
             <div className={styles.priceItem}>
               <span className={styles.priceLabel}>Initial Price:</span>
               <span className={styles.priceValue}>{post.current_price || 'N/A'}</span>
-              {post.created_at && (
-                <span className={styles.priceDate}>
-                  {formatDate(post.created_at)}
-                </span>
-              )}
             </div>
             
             <div className={styles.priceItem}>
@@ -266,7 +265,7 @@ export default function PostDetailsPage() {
               <span className={styles.priceValue}>{post.last_price || 'N/A'}</span>
               {post.last_price_check && (
                 <span className={styles.priceDate}>
-                  {formatDate(post.last_price_check)}
+                  {formatDate(post.last_price_check)} (UTC)
                 </span>
               )}
             </div>
@@ -353,14 +352,14 @@ export default function PostDetailsPage() {
             {post.created_at && (
               <div className={styles.detailItem}>
                 <span className={styles.detailLabel}>Posted:</span>
-                <span className={styles.detailValue}>{formatDate(post.created_at)}</span>
+                <span className={styles.detailValue}>{formatDate(post.created_at)} (UTC)</span>
               </div>
             )}
             
             {post.updated_at && post.updated_at !== post.created_at && (
               <div className={styles.detailItem}>
                 <span className={styles.detailLabel}>Last Updated:</span>
-                <span className={styles.detailValue}>{formatDate(post.updated_at)}</span>
+                <span className={styles.detailValue}>{formatDate(post.updated_at)} (UTC)</span>
               </div>
             )}
           </div>

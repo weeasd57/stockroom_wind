@@ -258,21 +258,30 @@ export async function POST(request) {
         // Get the date from the request or use today's date
         const requestDate = body.requestDate ? new Date(body.requestDate) : new Date();
         const todayDate = requestDate;
-        
+
         // For the fromDate, use the post creation date without going back 30 days
         // This ensures we don't incorrectly go back to the previous month
         const createdAt = post.created_at ? new Date(post.created_at) : new Date(todayDate);
-        
-        // Format dates for API request
+
+        // Adjust for timezone differences to ensure proper date comparison
+        // When post is created at late night hours, the date conversion might result in a different day
+        // Format dates for API request, using UTC to avoid timezone issues
         const fromDate = createdAt.toISOString().split('T')[0];
         const toDate = todayDate.toISOString().split('T')[0];
         console.log(`[DEBUG] Date range for historical data: ${fromDate} to ${toDate}`);
-        
+
         // Record post creation date and time for comparison with price data later
         const postCreationDate = post.created_at ? new Date(post.created_at) : null;
+        // Use UTC date for consistency with API data which is typically in UTC
         const postDateOnly = postCreationDate ? postCreationDate.toISOString().split('T')[0] : null;
+        // Get hours in local time for market hours comparison
         const postTimeHours = postCreationDate ? postCreationDate.getHours() : 0;
         const postTimeMinutes = postCreationDate ? postCreationDate.getMinutes() : 0;
+
+        // Additional logging to track timezone-related issues
+        console.log(`[DEBUG] Post creation date/time: ${postCreationDate ? postCreationDate.toISOString() : 'none'}`);
+        console.log(`[DEBUG] Post date only (UTC): ${postDateOnly}`);
+        console.log(`[DEBUG] Post time (local): ${postTimeHours}:${postTimeMinutes}`);
         
         const historicalUrl = `${BASE_URL}/eod/${symbol}?from=${fromDate}&to=${toDate}&period=d&api_token=${API_KEY}&fmt=json`;
         console.log(`[DEBUG] Fetching historical data for ${symbol} from API`);
@@ -494,15 +503,21 @@ export async function POST(request) {
         // Get the last price date and check if it's valid for comparison with the post date
         const lastDataPoint = historicalData[historicalData.length - 1];
         const lastPriceDate = lastDataPoint ? new Date(lastDataPoint.date) : null;
+        // Important: Get UTC date string for lastPriceDate to match postDateOnly format
         const lastPriceDateStr = lastPriceDate ? lastPriceDate.toISOString().split('T')[0] : null;
-        
+
+        // Log additional timezone information for debugging
+        console.log(`[DEBUG] Last price date details: ${lastPriceDate} (${lastPriceDateStr})`);
+
         // Check if the post date is valid for comparison with the last price date
         if (postCreationDate && lastPriceDate) {
-          console.log(`Comparing post date (${postDateOnly}) with last price date (${lastPriceDateStr})`);
+          // Log comparison details
+          console.log(`[DEBUG] Comparing post date (${postDateOnly}) with last price date (${lastPriceDateStr})`);
           
           // If post date is after last price date, we can't check prices
           if (postDateOnly > lastPriceDateStr) {
-            console.log(`Post created after latest price data for ${symbol}, can't check prices accurately`);
+            console.log(`[DEBUG] Post created after latest price data for ${symbol}, can't check prices accurately`);
+            console.log(`[DEBUG] Post date: ${postDateOnly}, Last price date: ${lastPriceDateStr}`);
             
             // Update the post with the status flag
             const { error: updateError } = await adminSupabase
@@ -538,14 +553,19 @@ export async function POST(request) {
           // Market data is usually end-of-day, so if post was created before market close,
           // we can compare, otherwise we can't check prices for the same day
           if (postDateOnly === lastPriceDateStr) {
-            console.log(`Post created on the same day as last price data, checking time`);
+            console.log(`[DEBUG] Post created on the same day as last price data, checking time`);
             
-            // Assume market close is at 4 PM (16:00) - this can be adjusted for different markets
+            // Convert post creation time to the exchange's timezone
+            // For simplicity, we're assuming market close is at 4 PM (16:00) local time
+            // This can be adjusted for different markets in the future
             const marketCloseHour = 16;
+            
+            // Log detailed time information for debugging
+            console.log(`[DEBUG] Post time: ${postTimeHours}:${postTimeMinutes}, Market close hour: ${marketCloseHour}:00`);
             
             // If post was created after market close, can't check prices accurately
             if (postTimeHours >= marketCloseHour) {
-              console.log(`Post created after market close on ${postDateOnly}, can't check prices accurately`);
+              console.log(`[DEBUG] Post created after market close on ${postDateOnly}, can't check prices accurately`);
               
               // Update the post with the status flag
               const { error: updateError } = await adminSupabase
@@ -575,9 +595,9 @@ export async function POST(request) {
               });
               
               continue;
-            } else {
-              console.log(`Post created before market close on ${postDateOnly}, can check prices`);
             }
+            
+            console.log(`[DEBUG] Post created before market close on ${postDateOnly}, can check prices`);
           }
         }
         
