@@ -76,7 +76,6 @@ const MAX_DAILY_CHECKS = 100;
 export async function POST(request) {
   console.log(`[DEBUG] Check-prices API route called at ${new Date().toISOString()}`);
   try {
-    
     const body = await request.json().catch(() => ({}));
     console.log(`[DEBUG] Request body:`, JSON.stringify(body));
     const cookieHeader = request.headers.get('cookie');
@@ -233,6 +232,9 @@ export async function POST(request) {
     
     const results = [];
     const updatedPosts = [];
+    
+    // Map to store historical data for each post
+    const postHistoricalData = {};
     
     
     for (const post of posts) {
@@ -754,6 +756,9 @@ export async function POST(request) {
         
         // Add near line ~700 where posts are being updated
         console.log(`[DEBUG] Updating post ${post.id}. Setting current_price: ${lastPrice}, target_reached: ${targetReached}, stop_loss_triggered: ${stopLossTriggered}`);
+
+        // Store historical data in the map
+        postHistoricalData[post.id] = historicalData;
       } catch (error) {
         console.error(`Error processing stock ${post.symbol}:`, error);
         
@@ -832,6 +837,60 @@ export async function POST(request) {
     
     if (updatedPosts.length > 0) {
       console.log(`Attempting to update ${updatedPosts.length} posts in Supabase...`);
+      
+      // Update each post with its price check results
+      for (let i = 0; i < updatedPosts.length; i++) {
+        try {
+          const post = updatedPosts[i];
+          const postResult = results.find(r => r.id === post.id);
+          
+          if (postResult) {
+            // Get the current price_checks array or initialize if not present
+            let priceChecks = post.price_checks || [];
+            
+            // Handle string format if the JSONB was returned as a string
+            if (typeof priceChecks === 'string') {
+              try {
+                priceChecks = JSON.parse(priceChecks);
+              } catch (e) {
+                console.error(`Error parsing price_checks for post ${post.id}:`, e);
+                priceChecks = [];
+              }
+            }
+            
+            // If it's not an array, initialize it
+            if (!Array.isArray(priceChecks)) {
+              priceChecks = [];
+            }
+            
+            // Add the new price check entry
+            priceChecks.push({
+              price: post.last_price,
+              date: new Date().toISOString(),
+              target_reached: post.target_reached,
+              stop_loss_triggered: post.stop_loss_triggered,
+              percent_to_target: postResult.percentToTarget,
+              percent_to_stop_loss: postResult.percentToStopLoss
+            });
+            
+            // Update the post with the updated price_checks array
+            post.price_checks = priceChecks;
+            
+            // Get the historical data we already fetched
+            const historicalData = postHistoricalData[post.id];
+            
+            if (historicalData && Array.isArray(historicalData) && historicalData.length > 0) {
+              // Store the historical data directly in the price_checks field instead of creating a summary
+              post.price_checks = historicalData;
+              console.log(`[DEBUG] Stored ${historicalData.length} historical data points in price_checks for post ${post.id}`);
+            } else {
+              console.warn(`[WARN] No historical data available for post ${post.id}, keeping existing price_checks`);
+            }
+          }
+        } catch (error) {
+          console.error(`Error updating price_checks for post ${updatedPosts[i]?.id}:`, error);
+        }
+      }
       
       let retryCount = 0;
       const maxRetries = 2;

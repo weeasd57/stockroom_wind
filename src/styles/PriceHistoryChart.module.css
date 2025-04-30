@@ -1,0 +1,74 @@
+.chartContainer {
+  width: 100%;
+  margin: 2rem 0;
+  background-color: hsl(var(--card));
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.chartTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: hsl(var(--foreground));
+  align-self: flex-start;
+}
+
+.chart {
+  width: 100%;
+  max-width: 700px;
+  height: auto;
+  background-color: white;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.noDataContainer {
+  width: 100%;
+  margin: 2rem 0;
+  background-color: hsl(var(--card));
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.noDataMessage {
+  font-size: 1rem;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+  margin-bottom: 0.5rem;
+}
+
+.noDataHint {
+  font-size: 0.9rem;
+  color: hsl(var(--muted-foreground));
+}
+
+@media (max-width: 768px) {
+  .chartContainer {
+    padding: 1rem;
+  }
+  
+  .chartTitle {
+    font-size: 1rem;
+  }
+  
+  .chart {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .chartContainer {
+    padding: 0.75rem;
+  }
+} 

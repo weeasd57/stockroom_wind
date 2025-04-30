@@ -11,6 +11,7 @@ import 'flag-icons/css/flag-icons.min.css';
 import Link from 'next/link';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
+import PriceHistoryChart from '@/components/PriceHistoryChart';
 
 // Function to format date
 function formatDate(dateString) {
@@ -34,6 +35,8 @@ export default function PostDetailsPage() {
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [checkingPrice, setCheckingPrice] = useState(false);
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const { user } = useSupabase();
   const { profile } = useProfile();
   
@@ -151,6 +154,50 @@ export default function PostDetailsPage() {
     };
   };
   
+ 
+  
+  // Function to format price check history
+  const formatPriceHistory = (priceChecks) => {
+    console.log('Formatting price history:', priceChecks);
+    
+    if (!priceChecks) return [];
+    
+    // Handle string format if the JSONB was returned as a string
+    let parsedChecks = priceChecks;
+    if (typeof priceChecks === 'string') {
+      try {
+        parsedChecks = JSON.parse(priceChecks);
+      } catch (e) {
+        console.error('Error parsing price_checks:', e);
+        return [];
+      }
+    }
+    
+    if (!Array.isArray(parsedChecks) || parsedChecks.length === 0) {
+      return [];
+    }
+    
+    // Check if we have the new format (with OHLC data)
+    const isNewFormat = parsedChecks[0] && ('close' in parsedChecks[0]);
+    
+    // If we have the new format, convert to a more readable display format
+    if (isNewFormat) {
+      return parsedChecks.map(check => ({
+        price: check.close,
+        date: check.date,
+        open: check.open,
+        high: check.high,
+        low: check.low,
+        volume: check.volume
+      }));
+    }
+    
+    // Sort by date descending (newest first)
+    return [...parsedChecks].sort((a, b) => {
+      return new Date(b.date) - new Date(a.date);
+    });
+  };
+  
   useEffect(() => {
     async function fetchPost() {
       try {
@@ -162,6 +209,21 @@ export default function PostDetailsPage() {
         }
         
         if (data) {
+          // Process the price_checks field to ensure it's properly parsed
+          if (data.price_checks) {
+            if (typeof data.price_checks === 'string') {
+              try {
+                data.price_checks = JSON.parse(data.price_checks);
+              } catch (e) {
+                console.error('Error parsing price_checks in fetchPost:', e);
+                data.price_checks = [];
+              }
+            }
+          } else {
+            data.price_checks = [];
+          }
+          
+          console.log('Fetched post data:', data);
           setPost(data);
         } else {
           setError('Post not found');
@@ -214,9 +276,22 @@ export default function PostDetailsPage() {
     );
   }
   
+  // Process price_checks before using it
+  if (post.price_checks && typeof post.price_checks === 'string') {
+    try {
+      post.price_checks = JSON.parse(post.price_checks);
+    } catch (e) {
+      console.error('Error parsing price_checks in render:', e);
+      post.price_checks = [];
+    }
+  }
+  
   const countryCode = getCountryCode(post);
   const priceChange = calculatePriceChange(post.current_price, post.last_price);
   const progress = calculateProgress(post);
+  const priceHistory = formatPriceHistory(post.price_checks);
+  
+  console.log('Price history:', priceHistory);
   
   return (
     <div className={styles.container}>
@@ -295,6 +370,25 @@ export default function PostDetailsPage() {
             </div>
           </div>
           
+       
+          
+          {/* Display price status */}
+          {post.closed && (
+            <div className={`${styles.statusContainer} ${post.target_reached ? styles.success : post.stop_loss_triggered ? styles.failure : styles.neutral}`}>
+              <span className={styles.statusIcon}>
+                {post.target_reached ? '✓' : post.stop_loss_triggered ? '⚠' : '•'}
+              </span>
+              <span className={styles.statusText}>
+                {post.target_reached 
+                  ? `Target price reached on ${formatDate(post.target_reached_date)}`
+                  : post.stop_loss_triggered
+                    ? `Stop loss triggered on ${formatDate(post.stop_loss_triggered_date)}`
+                    : `Closed on ${formatDate(post.closed_date)}`
+                }
+              </span>
+            </div>
+          )}
+          
           {post.last_price && post.current_price && (
             <div className={styles.priceChangeContainer}>
               <span className={styles.priceChangeLabel}>Price Change:</span>
@@ -317,6 +411,66 @@ export default function PostDetailsPage() {
                   className={`${styles.progressFill} ${progress.isMovingTowardTarget ? styles.positive : styles.negative}`}
                   style={{ width: `${Math.min(100, Math.max(0, parseFloat(progress.percentage)))}%` }}
                 ></div>
+              </div>
+            </div>
+          )}
+          
+          {/* Price history chart */}
+          {priceHistory.length >= 2 && (
+            <PriceHistoryChart 
+              priceChecks={post.price_checks}
+              targetPrice={post.target_price}
+              stopLossPrice={post.stop_loss_price}
+              initialPrice={post.current_price}
+            />
+          )}
+          
+          {/* Price history list */}
+          {priceHistory.length > 0 && (
+            <div className={styles.priceHistoryContainer}>
+              <div className={styles.priceHistoryHeader}>
+                <h4 className={styles.priceHistoryTitle}>Price History Data</h4>
+                
+                <div className={styles.priceHistoryActions}>
+                  <button 
+                    className={styles.toggleHistoryButton}
+                    onClick={() => setShowAllHistory(!showAllHistory)}
+                  >
+                    {showAllHistory ? 'Show Recent (5)' : `Show All (${priceHistory.length})`}
+                  </button>
+                </div>
+              </div>
+              
+              <div className={styles.priceHistoryList}>
+                {(showAllHistory ? priceHistory : priceHistory.slice(0, 5)).map((check, index) => (
+                  <div key={index} className={styles.priceHistoryItem}>
+                    {check.open ? (
+                      <>
+                        <div className={styles.priceHistoryDate}>
+                          <strong>{formatDate(check.date)}</strong>
+                        </div>
+                        <div className={styles.priceHistoryOHLC}>
+                          <span className={styles.priceHistoryValue}>Close: {check.price}</span>
+                          <span className={styles.priceHistoryValue}>Open: {check.open}</span>
+                          <span className={styles.priceHistoryValue}>High: {check.high}</span>
+                          <span className={styles.priceHistoryValue}>Low: {check.low}</span>
+                          <span className={styles.priceHistoryValue}>Vol: {check.volume ? check.volume.toLocaleString() : 'N/A'}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className={styles.priceHistoryValue}>{check.price}</span>
+                        <span className={styles.priceHistoryDate}>{formatDate(check.date)}</span>
+                      </>
+                    )}
+                  </div>
+                ))}
+                
+                {!showAllHistory && priceHistory.length > 5 && (
+                  <div className={styles.priceHistoryMore}>
+                    + {priceHistory.length - 5} more entries available
+                  </div>
+                )}
               </div>
             </div>
           )}

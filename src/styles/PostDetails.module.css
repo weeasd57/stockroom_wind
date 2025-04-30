@@ -491,3 +491,240 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Web Check Button */
+.webCheckContainer {
+  margin: 1.5rem 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.webCheckButton {
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.webCheckButton:hover {
+  background-color: #357abd;
+}
+
+.webCheckButton:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.webCheckButton.loading {
+  position: relative;
+  padding-left: 2.5rem;
+}
+
+.webCheckButton.loading::before {
+  content: '';
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  width: 1rem;
+  height: 1rem;
+  margin-top: -0.5rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spinner 0.8s linear infinite;
+}
+
+.webCheckHint {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #888;
+}
+
+/* Price Status */
+.statusContainer {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.statusContainer.success {
+  background-color: rgba(46, 204, 113, 0.1);
+  border-left: 4px solid #2ecc71;
+}
+
+.statusContainer.failure {
+  background-color: rgba(231, 76, 60, 0.1);
+  border-left: 4px solid #e74c3c;
+}
+
+.statusContainer.neutral {
+  background-color: rgba(149, 165, 166, 0.1);
+  border-left: 4px solid #95a5a6;
+}
+
+.statusIcon {
+  font-size: 1.25rem;
+  margin-right: 0.75rem;
+}
+
+.success .statusIcon {
+  color: #2ecc71;
+}
+
+.failure .statusIcon {
+  color: #e74c3c;
+}
+
+.neutral .statusIcon {
+  color: #95a5a6;
+}
+
+.statusText {
+  font-size: 0.95rem;
+  color: #333;
+}
+
+/* Price History */
+.priceHistoryContainer {
+  margin-top: 1.5rem;
+  max-height: 600px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.priceHistoryTitle {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+  margin-bottom: 0;
+}
+
+.priceHistoryHeader {
+  position: sticky;
+  top: 0;
+  background-color: white;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.priceHistoryList {
+  display: flex;
+  flex-direction: column;
+  padding: 0 15px 15px;
+}
+
+.priceHistoryItem {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+  padding: 15px;
+  border-radius: 8px;
+  background-color: rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease;
+  border-left: 3px solid #4a90e2;
+}
+
+.priceHistoryItem:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+}
+
+.priceHistoryDate {
+  margin-bottom: 8px;
+  font-size: 1rem;
+  color: #333;
+  font-weight: 500;
+}
+
+.priceHistoryDate strong {
+  color: #4a90e2;
+}
+
+.priceHistoryValue {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+  margin-right: 10px;
+}
+
+.priceHistoryOHLC {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.priceHistoryOHLC .priceHistoryValue {
+  font-size: 0.9rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.05);
+  margin: 0;
+  flex-grow: 1;
+  text-align: center;
+}
+
+.priceHistoryVolume {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.priceHistoryMore {
+  text-align: center;
+  color: #888;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed #eee;
+}
+
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.priceHistoryActions {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 5px;
+}
+
+.toggleHistoryButton {
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 140px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.toggleHistoryButton:hover {
+  background-color: #357abd;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+}
