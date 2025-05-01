@@ -1,5 +1,5 @@
 import { COUNTRY_ISO_CODES } from '@/models/CurrencyData.js';
-import { BASE_URL, API_KEY } from '@/models/StockApiConfig';
+import { BASE_URL, API_KEY } from '@/models/StockApiConfig.ts';
 import { getExchangeForCountry } from '@/models/ExchangeData';
 
 /**

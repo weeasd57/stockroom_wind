@@ -205,29 +205,24 @@ export default function HomePage() {
   };
 
   return (
-    <div className={`${styles.homePage} ${visible ? 'auth-fade-in' : ''}`}>
-      <div className={styles.emptyHomeContainer}>
-        <div className={`${styles.createPostContainer} ${isDarkMode ? styles.goldPulse : ''}`}>
-          <h1 className={styles.emptyHomeTitle}>Create a New Post</h1>
-          <p className={styles.emptyHomeText}>
-            Share your stock analysis with the community
-            {isDarkMode && (
-              <span className="inline-block ml-1" style={{ color: 'var(--gold-accent)' }}>✨</span>
-            )}
-          </p>
-          <CreatePostButton 
-            inDialog={true} 
-            size={getButtonSize()} 
-            className={styles.responsiveButton}
-          />
+    <div className={`${styles.homePage} ${visible ? styles.visible : ''}`}>
+      <div className={styles.homeContent}>
+        {/* Create Post Section */}
+        <div className={styles.createPostSection}>
+          <div className={styles.createPostContainer}>
+            <h2 className={styles.emptyHomeTitle}>Share your insights</h2>
+            <p className={styles.emptyHomeText}>Create a post to share your stock analysis, trading ideas, or market updates with the community</p>
+            <CreatePostButton size={getButtonSize()} />
+          </div>
+        </div>
+        
+        <div className={styles.feedsSection}>
+          {/* Feed content */}
         </div>
       </div>
       
-      {/* Render dialog using portal to document body */}
-      {portalContainer && createPortal(
-        renderDialog(),
-        portalContainer
-      )}
+      {/* Portal for dialog */}
+      {portalContainer && isOpen && createPortal(renderDialog(), portalContainer)}
     </div>
   );
 }

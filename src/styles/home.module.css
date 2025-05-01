@@ -284,3 +284,28 @@
     animation: goldPulse 2s infinite;
   }
 }
+
+/* Visibility animation */
+.visible {
+  animation: fadeIn 0.5s ease-out;
+}
+
+/* Home content */
+.homeContent {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+/* Create Post Section */
+.createPostSection {
+  margin-bottom: 2rem;
+  display: flex;
+  justify-content: center;
+}
+
+/* Feeds Section */
+.feedsSection {
+  width: 100%;
+}

@@ -100,8 +100,6 @@ body {
   flex-direction: column;
 }
 
-
-
 /* ========== SCROLLBAR STYLING ========== */
 /* Webkit browsers scrollbar - applied only to html */
 html::-webkit-scrollbar {
@@ -204,4 +202,26 @@ a:hover {
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* Spinner Animation */
+.spinner {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top-color: var(--color-primary, #3b82f6);
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.dark .spinner {
+  border-color: rgba(255, 255, 255, 0.1);
+  border-top-color: var(--color-primary, #3b82f6);
 } 

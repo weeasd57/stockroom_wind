@@ -1,13 +1,10 @@
 .chartContainer {
   width: 100%;
-  margin: 2rem 0;
-  background-color: hsl(var(--card));
+  margin: 1.5rem 0;
+  background-color: #FFFFFF;
   border-radius: 8px;
-  padding: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
 }
 
 .chartTitle {
@@ -20,20 +17,16 @@
 
 .chart {
   width: 100%;
-  max-width: 700px;
-  height: auto;
-  background-color: white;
-  border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  height: 300px;
 }
 
 .noDataContainer {
   width: 100%;
-  margin: 2rem 0;
-  background-color: hsl(var(--card));
+  margin: 1.5rem 0;
+  background-color: #FFFFFF;
   border-radius: 8px;
   padding: 2rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -44,31 +37,46 @@
 .noDataMessage {
   font-size: 1rem;
   font-weight: 500;
-  color: hsl(var(--foreground));
+  color: #333333;
   margin-bottom: 0.5rem;
 }
 
 .noDataHint {
   font-size: 0.9rem;
-  color: hsl(var(--muted-foreground));
+  color: #666666;
+}
+
+/* Dark mode support */
+:global(.dark) .chartContainer,
+:global(.dark) .noDataContainer {
+  background-color: #1A1A1A;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
+}
+
+:global(.dark) .noDataMessage {
+  color: #E0E0E0;
+}
+
+:global(.dark) .noDataHint {
+  color: #AAAAAA;
 }
 
 @media (max-width: 768px) {
   .chartContainer {
-    padding: 1rem;
-  }
-  
-  .chartTitle {
-    font-size: 1rem;
+    margin: 1rem 0;
   }
   
   .chart {
-    width: 100%;
+    height: 250px;
   }
 }
 
 @media (max-width: 480px) {
   .chartContainer {
-    padding: 0.75rem;
+    margin: 0.75rem 0;
+  }
+  
+  .chart {
+    height: 200px;
   }
 } 

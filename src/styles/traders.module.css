@@ -1,0 +1,320 @@
+/* Traders Page Styles */
+
+.tradersPage {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  color: hsl(var(--foreground));
+}
+
+.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Page Header */
+.pageHeader {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.pageHeader h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: hsl(var(--primary));
+}
+
+.pageHeader p {
+  font-size: 1.2rem;
+  color: hsl(var(--muted-foreground));
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Filters Section */
+.filtersContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.searchBar {
+  position: relative;
+  max-width: 600px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.searchBar input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  border-radius: 8px;
+  border: 1px solid hsl(var(--border));
+  background-color: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.searchBar input:focus {
+  outline: none;
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2);
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.25rem;
+  height: 1.25rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.filterButtons {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.filterButton {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  border: 1px solid hsl(var(--border));
+  background-color: transparent;
+  color: hsl(var(--foreground));
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filterButton:hover {
+  background-color: hsl(var(--primary) / 0.1);
+  border-color: hsl(var(--primary));
+}
+
+.filterButton.active {
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+/* Traders Grid */
+.tradersGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Trader Card */
+.traderCard {
+  background-color: hsl(var(--card));
+  border-radius: 12px;
+  border: 1px solid hsl(var(--border));
+  padding: 1.5rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.traderCard:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-md);
+}
+
+.traderHeader {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.traderAvatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid hsl(var(--primary));
+}
+
+.traderAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarPlaceholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.traderInfo {
+  flex: 1;
+}
+
+.traderInfo h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+  color: hsl(var(--foreground));
+}
+
+.username {
+  font-size: 0.9rem;
+  color: hsl(var(--muted-foreground));
+  margin: 0;
+}
+
+.traderStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background-color: hsl(var(--muted));
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  text-align: center;
+}
+
+.statLabel {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.statValue {
+  font-size: 1rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.traderBio {
+  font-size: 0.9rem;
+  color: hsl(var(--muted-foreground));
+  margin: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.followButton {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-top: auto;
+}
+
+.followButton:hover {
+  opacity: 0.9;
+}
+
+/* Loading State */
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  gap: 1rem;
+}
+
+.loadingSpinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid hsl(var(--primary) / 0.2);
+  border-radius: 50%;
+  border-top-color: hsl(var(--primary));
+  animation: spinner 1s linear infinite;
+}
+
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loadingContainer p {
+  color: hsl(var(--muted-foreground));
+}
+
+/* No Results */
+.noResults {
+  text-align: center;
+  padding: 3rem;
+  grid-column: 1 / -1;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+  .pageHeader h1 {
+    font-size: 2rem;
+  }
+  
+  .pageHeader p {
+    font-size: 1rem;
+  }
+  
+  .filtersContainer {
+    gap: 0.75rem;
+  }
+  
+  .tradersGrid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .tradersPage {
+    padding: 1.5rem 1rem;
+  }
+  
+  .pageHeader {
+    margin-bottom: 1.5rem;
+  }
+  
+  .pageHeader h1 {
+    font-size: 1.75rem;
+  }
+  
+  .traderAvatar {
+    width: 48px;
+    height: 48px;
+  }
+  
+  .traderStats {
+    padding: 0.5rem;
+  }
+  
+  .tradersGrid {
+    grid-template-columns: 1fr;
+  }
+} 
