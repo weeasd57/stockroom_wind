@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@/providers/theme-provider';
+import Image from 'next/image';
 import styles from '@/styles/landing.module.css';
 import Footer from "@/components/Footer";
 
@@ -11,7 +12,7 @@ export default function LandingPage() {
   const [scrollPosition, setScrollPosition] = useState(0);
   const [hoverButton, setHoverButton] = useState(null);
   const router = useRouter();
-  const { theme } = useTheme();
+  const { theme, setTheme } = useTheme();
 
   const handleScroll = () => {
     setScrollPosition(window.scrollY);
@@ -33,32 +34,26 @@ export default function LandingPage() {
     {
       id: 1,
       title: "Market Analytics",
-      description: "Real-time data insights",
+      description: "Real-time data insights for informed trading decisions with comprehensive market coverage",
       icon: "📈",
     },
     {
       id: 2,
       title: "Stock Analysis",
-      description: "Precise trade targets",
+      description: "Precise trade targets based on advanced algorithms and technical indicators",
       icon: "📊",
     },
     {
       id: 3,
       title: "Portfolio Tracking",
-      description: "Performance metrics",
+      description: "Track performance metrics across your investments with detailed reporting",
       icon: "💼",
     },
     {
       id: 4,
       title: "Price Alerts",
-      description: "Instant notifications",
+      description: "Instant notifications for critical price movements and market events",
       icon: "📱",
-    },
-    {
-      id: 5,
-      title: "Documentation",
-      description: "Extensive resources",
-      icon: "📝",
     }
   ];
 
@@ -74,53 +69,67 @@ export default function LandingPage() {
     setTimeout(() => setHoverButton(null), 500);
   };
   
- 
-
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light');
+  };
+  
   return (
-    <div className={`${styles.landingPage} ${visible ? 'auth-fade-in' : 'auth-fade-out'} ${theme}`}>
-      <div className={styles.stackContainer}>
-        <section 
-          className={styles.heroSection} 
-          style={{
-            transform: `translateY(${Math.max(-800, scrollPosition * -3)}px)`,
-            opacity: Math.max(0, 1 - scrollPosition / 1000),
-          }}
-        >
+    <div className={`${styles.variables} ${visible ? 'auth-fade-in' : 'auth-fade-out'}`}>
+      <div className={styles.pageWrapper}>
+        {/* Bubbles */}
+        <div className={`${styles.bubble} ${styles.bubble1}`}></div>
+        <div className={`${styles.bubble} ${styles.bubble2}`}></div>
+        <div className={`${styles.bubble} ${styles.bubble3}`}></div>
+        
+        {/* Main Card */}
+        <div className={styles.cardContainer}>
+          
+          
+          {/* Hero Section */}
           <div className={styles.heroContent}>
-            <h1 className={styles.heroTitle}>
-              FireStocks Trading Platform
+            <h1 className={styles.title}>
+              <span>FireStocks</span> Trading Platform
             </h1>
-            <p className={styles.heroSubtitle}>
-              Powerful tools for investors to track, analyze, and optimize portfolios
+            <p className={styles.subtitle}>
+              Powerful tools for investors to track, analyze, and optimize portfolios with real-time market data and social insights
             </p>
             
-            <div className={styles.featureCards}>
-              {features.map((feature) => (
-                <div 
-                  key={feature.id} 
-                  className={styles.featureCard}
-                >
-                  <div className={styles.featureIcon}>{feature.icon}</div>
-                  <h3 className={styles.featureTitle}>{feature.title}</h3>
-                  <p className={styles.featureDescription}>{feature.description}</p>
-                </div>
-              ))}
-            </div>
-            
-            <div className={styles.heroCta}>
+            <div className={styles.heroButtons}>
               <button 
-                className={`${styles.primaryButton} ${hoverButton === 'signup' ? styles.pulse : ''}`}
+                className={styles.primaryButton}
                 onMouseEnter={() => handleButtonHover('signup')}
                 onClick={login}
               >
-                Sign Up
+                Get Started
+              </button>
+              <button 
+                className={styles.secondaryButton}
+                onClick={() => router.push('/login')}
+              >
+                Learn More
               </button>
             </div>
+            
+            {/* Features Section */}
+            <div className={styles.features}>
+              {features.map((feature) => (
+                <div 
+                  key={feature.id} 
+                  className={styles.card}
+                >
+                  <div className={styles.cardIcon}>{feature.icon}</div>
+                  <h3 className={styles.cardTitle}>{feature.title}</h3>
+                  <p>{feature.description}</p>
+                </div>
+              ))}
+            </div>
           </div>
-        </section>
-      </div>
-      <div className={styles.footerContainer}>
-        <Footer />
+          
+          {/* Footer */}
+          <div className={styles.footer}>
+            <Footer />
+          </div>
+        </div>
       </div>
     </div>
   );

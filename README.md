@@ -303,3 +303,28 @@ src/
 - Zustand for state management
 - CSS Modules for component styling
 - CSS Variables for theming
+
+## Adding the Logo
+
+To add the FireStocks logo to the landing page:
+
+1. Save the logo image you provided (@lo.png) to the following location:
+   ```
+   public/images/logo.png
+   ```
+
+2. Make sure the image is properly formatted (PNG with transparent background for best results)
+
+3. The logo will automatically appear on the landing page
+
+## Development
+
+Run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) to view the application.

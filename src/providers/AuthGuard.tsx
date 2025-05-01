@@ -8,10 +8,29 @@ import '@/styles/auth.css';
 // Define paths that don't require authentication
 const PUBLIC_PATHS = ['/landing', '/login', '/register', '/auth/callback'];
 
+// Define error paths that should bypass authentication completely
+const ERROR_PATHS = ['/404', '/500', '/not-found', '/error', '/_error'];
+
 export function AuthGuard({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname() || '/';
+  
+  // Bypass auth check completely for error pages
+  // This prevents the useSupabase hook from being called during static generation
+  for (const errorPath of ERROR_PATHS) {
+    if (pathname.includes(errorPath)) {
+      console.log('Error page detected, bypassing auth check:', pathname);
+      return <>{children}</>;
+    }
+  }
+  
+  // For all other pages, continue with normal auth flow
+  return <ProtectedContent pathname={pathname}>{children}</ProtectedContent>;
+}
+
+// Separate component for protected content that uses Supabase
+function ProtectedContent({ children, pathname }: { children: React.ReactNode, pathname: string }) {
   const { user, loading, isAuthenticated } = useSupabase();
   const router = useRouter();
-  const pathname = usePathname() || '/';
   const [authChecked, setAuthChecked] = useState(false);
   const [fadeOut, setFadeOut] = useState(false);
 
