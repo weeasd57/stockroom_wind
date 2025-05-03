@@ -6,7 +6,7 @@ import { useSupabase } from './SupabaseProvider';
 import '@/styles/auth.css';
 
 // Define paths that don't require authentication
-const PUBLIC_PATHS = ['/landing', '/login', '/register', '/auth/callback', '/traders'];
+const PUBLIC_PATHS = ['/landing', '/login', '/register', '/auth/callback', '/traders', '/view-profile'];
 
 // Define error paths that should bypass authentication completely
 const ERROR_PATHS = ['/404', '/500', '/not-found', '/error', '/_error'];

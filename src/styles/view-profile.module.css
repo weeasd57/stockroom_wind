@@ -1,0 +1,325 @@
+/* View Profile Page Styles */
+
+/* Loading and Error States */
+.loadingContainer,
+.errorContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 2rem;
+  text-align: center;
+}
+
+.loadingSpinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid hsl(var(--muted));
+  border-radius: 50%;
+  border-top-color: hsl(var(--primary));
+  animation: spinner 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.errorContainer h2 {
+  color: hsl(var(--foreground));
+  margin-bottom: 1rem;
+}
+
+.errorContainer p {
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 2rem;
+}
+
+/* Profile Container */
+.profileContainer {
+  position: relative;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+/* Background Image */
+.profileBackground {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 250px;
+  background-size: cover;
+  background-position: center;
+  border-radius: 0 0 15px 15px;
+  z-index: 0;
+}
+
+/* Back Button */
+.backButton {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  background-color: hsla(var(--background), 0.8);
+  color: hsl(var(--foreground));
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  z-index: 10;
+  backdrop-filter: blur(4px);
+  transition: background-color 0.2s;
+}
+
+.backButton:hover {
+  background-color: hsla(var(--background), 0.9);
+}
+
+.backButton svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Profile Header */
+.profileHeader {
+  position: relative;
+  margin-top: 180px;
+  padding: 2rem;
+  padding-top: 5rem;
+  background-color: hsl(var(--card));
+  border-radius: 15px;
+  border: 1px solid hsl(var(--border));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  z-index: 1;
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+
+.profileAvatar {
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid hsl(var(--card));
+  top: -70px;
+  left: 50%;
+  transform: translateX(-50%);
+  flex-shrink: 0;
+  box-shadow: var(--shadow-md);
+  z-index: 2;
+}
+
+.profileAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profileInfo {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.profileInfo h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem 0;
+  color: hsl(var(--foreground));
+}
+
+.username {
+  font-size: 1.1rem;
+  color: hsl(var(--muted-foreground));
+  margin: 0 0 1.5rem 0;
+}
+
+.bio {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: hsl(var(--foreground));
+  margin-bottom: 1.5rem;
+  max-width: 600px;
+}
+
+/* Stats */
+.profileStats {
+  display: flex;
+  justify-content: center;
+  gap: 3rem;
+  margin: 1.5rem 0;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.statValue {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.statLabel {
+  font-size: 0.9rem;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Follow Button */
+.followButton {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  margin-top: 1rem;
+  min-width: 150px;
+}
+
+.followButton:hover {
+  opacity: 0.9;
+}
+
+/* Posts Section */
+.postsSection {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background-color: hsl(var(--card));
+  border-radius: 15px;
+  border: 1px solid hsl(var(--border));
+}
+
+.postsSection h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: hsl(var(--foreground));
+}
+
+.postsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.postCard {
+  padding: 1rem;
+  border-radius: 10px;
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  transition: transform 0.2s;
+}
+
+.postCard:hover {
+  transform: translateY(-3px);
+}
+
+.postCard h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: hsl(var(--foreground));
+}
+
+.postCard p {
+  font-size: 0.9rem;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.viewPostLink {
+  display: inline-block;
+  color: hsl(var(--primary));
+  font-weight: 500;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.viewPostLink:hover {
+  text-decoration: underline;
+  opacity: 0.8;
+}
+
+.emptyPosts {
+  text-align: center;
+  padding: 2rem;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+  .profileHeader {
+    padding: 1.5rem;
+    padding-top: 4rem;
+  }
+  
+  .profileAvatar {
+    width: 120px;
+    height: 120px;
+    top: -60px;
+  }
+  
+  .profileInfo h1 {
+    font-size: 1.75rem;
+  }
+  
+  .profileStats {
+    gap: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .profileBackground {
+    height: 150px;
+  }
+  
+  .profileHeader {
+    margin-top: 100px;
+    padding: 1rem;
+  }
+  
+  .profileAvatar {
+    width: 100px;
+    height: 100px;
+    margin-top: -50px;
+  }
+  
+  .profileInfo h1 {
+    font-size: 1.5rem;
+  }
+  
+  .profileStats {
+    gap: 1rem;
+  }
+}
+
+/* Add the disabled button style */
+.disabledButton {
+  background-color: hsl(var(--muted));
+  opacity: 0.8;
+}
+
+.disabledButton:hover {
+  background-color: hsl(var(--muted));
+  opacity: 0.9;
+  cursor: pointer;
+} 

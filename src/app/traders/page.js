@@ -1,16 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import styles from '@/styles/traders.module.css';
 
 export default function TradersPage() {
-  const { supabase } = useSupabase();
+  const { supabase, isAuthenticated, user } = useSupabase();
   const [traders, setTraders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [visible, setVisible] = useState(false);
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const router = useRouter();
 
   useEffect(() => {
     const fetchTraders = async () => {
@@ -79,7 +81,13 @@ export default function TradersPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Filter out the current user's profile and process other filters
   const filteredTraders = traders.filter(trader => {
+    // Skip current user's profile
+    if (isAuthenticated && user && trader.id === user.id) {
+      return false;
+    }
+    
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
@@ -103,6 +111,32 @@ export default function TradersPage() {
     
     return true; // 'all' filter
   });
+
+  const navigateToProfile = (userId) => {
+    // If it's the current user's profile and they're authenticated, go to the profile page
+    if (isAuthenticated && user && userId === user.id) {
+      router.push('/profile');
+      return;
+    }
+    
+    // For all other cases, go to the view-profile page
+    if (userId) {
+      router.push(`/view-profile?id=${userId}`);
+    }
+  };
+
+  const handleFollowClick = (e, userId) => {
+    e.stopPropagation(); // Prevent triggering the card click
+    
+    // Check if user is authenticated before following
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+    
+    // Follow logic would go here
+    console.log('Follow user:', userId);
+  };
 
   return (
     <div className={`${styles.tradersPage} ${visible ? styles.visible : ''}`}>
@@ -156,7 +190,10 @@ export default function TradersPage() {
           {filteredTraders.length > 0 ? (
             filteredTraders.map(trader => (
               <div key={trader.id} className={styles.traderCard}>
-                <div className={styles.traderHeader}>
+                <div 
+                  className={styles.traderHeader}
+                  onClick={() => navigateToProfile(trader.id)}
+                >
                   <div className={styles.traderAvatar}>
                     {trader.avatar_url ? (
                       <img src={trader.avatar_url} alt={trader.username} />
@@ -189,9 +226,20 @@ export default function TradersPage() {
                 
                 <p className={styles.traderBio}>{trader.bio || 'No bio available'}</p>
                 
-                <button className={styles.followButton}>
-                  Follow
-                </button>
+                <div className={styles.cardActions}>
+                  <button 
+                    className={styles.viewProfileButton}
+                    onClick={() => navigateToProfile(trader.id)}
+                  >
+                    View Profile
+                  </button>
+                  <button 
+                    className={styles.followButton}
+                    onClick={(e) => handleFollowClick(e, trader.id)}
+                  >
+                    Follow
+                  </button>
+                </div>
               </div>
             ))
           ) : (

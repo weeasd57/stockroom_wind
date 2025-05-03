@@ -51,7 +51,7 @@
 }
 
 .searchBar input {
-  width: 100%;
+  width: 80%;
   padding: 0.75rem 1rem 0.75rem 2.5rem;
   border-radius: 8px;
   border: 1px solid hsl(var(--border));
@@ -135,6 +135,12 @@
   display: flex;
   align-items: center;
   gap: 1rem;
+  cursor: pointer;
+}
+
+.traderHeader:hover h3 {
+  color: hsl(var(--primary));
+  text-decoration: underline;
 }
 
 .traderAvatar {
@@ -219,7 +225,31 @@
   flex: 1;
 }
 
+.cardActions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: auto;
+  width: 100%;
+}
+
+.viewProfileButton {
+  flex: 1;
+  background-color: transparent;
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.viewProfileButton:hover {
+  background-color: hsl(var(--muted));
+}
+
 .followButton {
+  flex: 1;
   background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
   border: none;
@@ -228,7 +258,6 @@
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s;
-  margin-top: auto;
 }
 
 .followButton:hover {
@@ -316,5 +345,16 @@
   
   .tradersGrid {
     grid-template-columns: 1fr;
+  }
+  
+  .cardActions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .viewProfileButton,
+  .followButton {
+    width: 100%;
+    padding: 0.5rem;
   }
 } 
