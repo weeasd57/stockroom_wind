@@ -1,5 +1,5 @@
 import { COUNTRY_ISO_CODES } from '@/models/CurrencyData.js';
-import { BASE_URL, API_KEY } from '@/models/StockApiConfig.ts';
+import { BASE_URL, API_KEY, hasValidApiKey } from '@/models/StockApiConfig.ts';
 import { getExchangeForCountry } from '@/models/ExchangeData';
 
 /**
@@ -9,6 +9,12 @@ import { getExchangeForCountry } from '@/models/ExchangeData';
  */
 export function generateEodLastCloseUrl(symbol, country) {
   if (!symbol) return '';
+  
+  // Validate API key first
+  if (!hasValidApiKey()) {
+    console.error('Cannot generate EOD URL: API key is not configured');
+    return null;
+  }
   
   // Check if symbol already includes an exchange code (e.g., AFMC.EGX)
   const parts = symbol.split('.');

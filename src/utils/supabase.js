@@ -1295,7 +1295,7 @@ export async function createUserStrategy(userId, strategyName) {
  */
 export const followUser = async (followerId, followingId) => {
   const { data, error } = await supabase
-    .from('followers')
+    .from('user_followings')
     .insert([{ follower_id: followerId, following_id: followingId }]);
   return { data, error };
 };
@@ -1308,7 +1308,7 @@ export const followUser = async (followerId, followingId) => {
  */
 export const unfollowUser = async (followerId, followingId) => {
   const { data, error } = await supabase
-    .from('followers')
+    .from('user_followings')
     .delete()
     .match({ follower_id: followerId, following_id: followingId });
   return { data, error };
@@ -1321,13 +1321,12 @@ export const unfollowUser = async (followerId, followingId) => {
  */
 export const getFollowers = async (userId) => {
   if (!userId) {
-
     return { data: [], error: { message: 'User ID is required' } };
   }
 
   try {
     const { data, error } = await supabase
-      .from('followers')
+      .from('user_followings')
       .select(`
         follower_id,
         profiles:follower_id (
@@ -1341,7 +1340,6 @@ export const getFollowers = async (userId) => {
     if (error) throw error;
     return { data, error: null };
   } catch (error) {
-
     return { data: [], error };
   }
 };
@@ -1353,13 +1351,12 @@ export const getFollowers = async (userId) => {
  */
 export const getFollowing = async (userId) => {
   if (!userId) {
-
     return { data: [], error: { message: 'User ID is required' } };
   }
 
   try {
     const { data, error } = await supabase
-      .from('followers')
+      .from('user_followings')
       .select(`
         following_id,
         profiles:following_id (
@@ -1373,7 +1370,6 @@ export const getFollowing = async (userId) => {
     if (error) throw error;
     return { data, error: null };
   } catch (error) {
-
     return { data: [], error };
   }
 };

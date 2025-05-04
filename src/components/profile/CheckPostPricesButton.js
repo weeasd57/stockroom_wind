@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import styles from '@/styles/profile.module.css';
 import { useProfile } from '@/providers/ProfileProvider';
 import dialogStyles from '@/styles/ProfilePostCard.module.css';
@@ -15,6 +15,7 @@ export default function CheckPostPricesButton({ userId }) {
   const [showStatsDialog, setShowStatsDialog] = useState(false);
   const [detailedResults, setDetailedResults] = useState([]);
   const [apiResponses, setApiResponses] = useState([]);
+  const [showInfoDialog, setShowInfoDialog] = useState(false);
   
   const cancelCheck = () => {
     if (abortController) {
@@ -89,7 +90,12 @@ export default function CheckPostPricesButton({ userId }) {
       }
       
       if (!response.ok) {
-        throw new Error(data.message || 'An error occurred while checking prices');
+        // Special handling for API key errors
+        if (data.error === 'missing_api_key') {
+          throw new Error('API key not configured. Please contact the administrator to set up the stock data API.');
+        } else {
+          throw new Error(data.message || 'An error occurred while checking prices');
+        }
       }
       
       console.log('Received API response:', data);
@@ -208,6 +214,8 @@ export default function CheckPostPricesButton({ userId }) {
   return (
     <div className={styles.priceCheckContainer}>
       <div className={styles.priceCheckButtonGroup}>
+        <div style={{ flex: 1 }}></div>
+        
         <button 
           onClick={checkPostPrices}
           disabled={isChecking}
@@ -217,20 +225,76 @@ export default function CheckPostPricesButton({ userId }) {
           {isChecking ? 'Checking...' : '📈 Check Post Prices'}
         </button>
         
-        {isChecking && (
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
           <button 
-            onClick={cancelCheck}
-            className={styles.cancelCheckButton}
-            aria-label="Cancel price check"
+            onClick={() => setShowInfoDialog(true)}
+            className={styles.infoButton}
+            aria-label="Check prices information"
           >
-            Cancel
+            ℹ️ Info
           </button>
-        )}
+          
+          {isChecking && (
+            <button 
+              onClick={cancelCheck}
+              className={styles.cancelCheckButton}
+              aria-label="Cancel price check"
+              style={{ marginLeft: '10px' }}
+            >
+              Cancel
+            </button>
+          )}
+        </div>
       </div>
       
       {error && (
         <div className={styles.errorMessage}>
           {error}
+        </div>
+      )}
+      
+      {/* Info Dialog */}
+      {showInfoDialog && (
+        <div className={dialogStyles.dialogOverlay} onClick={() => setShowInfoDialog(false)} style={{ zIndex: 9999 }}>
+          <div className={dialogStyles.statusDialog} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className={dialogStyles.dialogHeader}>
+              <h3>Check Post Prices Information</h3>
+              <button className={dialogStyles.closeButton} onClick={() => setShowInfoDialog(false)}>Close</button>
+            </div>
+            <div className={dialogStyles.dialogContent}>
+              <div className={styles.infoContent}>
+                <h4>What does "Check Post Prices" do?</h4>
+                <p>This feature checks the current prices of stocks in your posts and updates their status based on your target and stop-loss prices.</p>
+                
+                <h4>How it works:</h4>
+                <ul>
+                  <li>Fetches the latest price data for each stock from the EOD Historical Data API</li>
+                  <li>Compares the latest prices against your target and stop-loss prices</li>
+                  <li>Automatically marks posts as "Target Reached" or "Stop Loss Triggered" based on price movement</li>
+                  <li>Updates your experience score when targets are reached or stop losses are triggered</li>
+                </ul>
+                
+                <h4>Usage Limits:</h4>
+                <p>You can perform up to 100 price checks per day. This limit resets daily.</p>
+                
+                <h4>Tips:</h4>
+                <ul>
+                  <li>Check prices regularly to keep your portfolio status up to date</li>
+                  <li>Posts created after market close may not show updated prices until the next trading day</li>
+                  <li>If the API is temporarily unavailable, the system will use the last known price</li>
+                </ul>
+              </div>
+              
+              <div className={styles.statsActions}>
+                <button 
+                  className={styles.closeStatsButton}
+                  onClick={() => setShowInfoDialog(false)}
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
       

@@ -12,6 +12,7 @@ export default function TradersPage() {
   const [visible, setVisible] = useState(false);
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [followings, setFollowings] = useState({});
   const router = useRouter();
 
   useEffect(() => {
@@ -22,7 +23,7 @@ export default function TradersPage() {
         // First fetch user profiles
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
-          .select('id, full_name, username, avatar_url, bio, created_at')
+          .select('*')
           .order('created_at', { ascending: false });
           
         if (profilesError) {
@@ -51,16 +52,35 @@ export default function TradersPage() {
           }
         });
 
-        // Map post counts to profiles
-        const tradersWithPostCounts = profilesData.map(profile => {
+        // Get avatar URLs for each profile
+        const tradersWithImages = await Promise.all(profilesData.map(async (profile) => {
+          let avatarUrl = profile.avatar_url;
+          
+          // If no avatar_url exists, try to get it from Supabase storage
+          if (!avatarUrl) {
+            try {
+              const { data: avatarData } = await supabase
+                .storage
+                .from('avatars')
+                .getPublicUrl(`${profile.id}/avatar.png`);
+                
+              if (avatarData?.publicUrl) {
+                avatarUrl = `${avatarData.publicUrl}?t=${Date.now()}`;
+              }
+            } catch (e) {
+              console.log('No custom avatar found for user:', profile.id);
+            }
+          }
+          
           return {
             ...profile,
+            avatar_url: avatarUrl,
             post_count: postCounts[profile.id] || 0
           };
-        });
+        }));
         
-        console.log('Fetched profiles with post counts:', tradersWithPostCounts);
-        setTraders(tradersWithPostCounts || []);
+        console.log('Fetched profiles with avatars:', tradersWithImages);
+        setTraders(tradersWithImages || []);
       } catch (error) {
         console.error('Error fetching traders:', error.message);
         setTraders([]);
@@ -80,6 +100,38 @@ export default function TradersPage() {
     
     return () => clearTimeout(timer);
   }, []);
+
+  // Add this effect to fetch user followings when authenticated
+  useEffect(() => {
+    const fetchFollowings = async () => {
+      if (!isAuthenticated || !user) return;
+      
+      try {
+        // Check if we're using the correct table name
+        const { data, error } = await supabase
+          .from('user_followings')  // Changed from 'followings' to 'user_followings'
+          .select('following_id')
+          .eq('follower_id', user.id);
+          
+        if (error) {
+          console.error('Error fetching followings:', error);
+          return;
+        }
+        
+        // Create a map of user_id -> following status
+        const followingsMap = {};
+        data.forEach(item => {
+          followingsMap[item.following_id] = true;
+        });
+        
+        setFollowings(followingsMap);
+      } catch (error) {
+        console.error('Error in fetchFollowings:', error);
+      }
+    };
+    
+    fetchFollowings();
+  }, [supabase, isAuthenticated, user]);
 
   // Filter out the current user's profile and process other filters
   const filteredTraders = traders.filter(trader => {
@@ -119,13 +171,13 @@ export default function TradersPage() {
       return;
     }
     
-    // For all other cases, go to the view-profile page
+    // For all other cases, go to the view-profile page with dynamic route
     if (userId) {
-      router.push(`/view-profile?id=${userId}`);
+      router.push(`/view-profile/${userId}`);
     }
   };
 
-  const handleFollowClick = (e, userId) => {
+  const handleFollowClick = async (e, userId) => {
     e.stopPropagation(); // Prevent triggering the card click
     
     // Check if user is authenticated before following
@@ -134,8 +186,48 @@ export default function TradersPage() {
       return;
     }
     
-    // Follow logic would go here
-    console.log('Follow user:', userId);
+    try {
+      const isFollowing = followings[userId];
+      
+      if (isFollowing) {
+        // Unfollow: Delete the relationship
+        const { error: deleteError } = await supabase
+          .from('user_followings')
+          .delete()
+          .eq('follower_id', user.id)
+          .eq('following_id', userId);
+          
+        if (deleteError) {
+          throw deleteError;
+        }
+        
+        // Update the local state to reflect the change
+        const updatedFollowings = { ...followings };
+        delete updatedFollowings[userId];
+        setFollowings(updatedFollowings);
+        
+        console.log('Unfollowed user:', userId);
+      } else {
+        // Follow: Create the relationship
+        const { error: insertError } = await supabase
+          .from('user_followings')
+          .insert([
+            { follower_id: user.id, following_id: userId }
+          ]);
+          
+        if (insertError) {
+          throw insertError;
+        }
+        
+        // Update the local state to reflect the change
+        setFollowings({ ...followings, [userId]: true });
+        
+        console.log('Followed user:', userId);
+      }
+    } catch (error) {
+      console.error('Error following/unfollowing user:', error);
+      alert('There was an error updating your following status');
+    }
   };
 
   return (
@@ -199,12 +291,12 @@ export default function TradersPage() {
                       <img src={trader.avatar_url} alt={trader.username} />
                     ) : (
                       <div className={styles.avatarPlaceholder}>
-                        {trader.full_name?.charAt(0) || trader.username?.charAt(0) || '?'}
+                        {trader.name?.charAt(0) || trader.full_name?.charAt(0) || trader.username?.charAt(0) || '?'}
                       </div>
                     )}
                   </div>
                   <div className={styles.traderInfo}>
-                    <h3>{trader.full_name || 'Trader'}</h3>
+                    <h3>{trader.name || trader.full_name || trader.username || 'Trader'}</h3>
                     <p className={styles.username}>@{trader.username || 'username'}</p>
                   </div>
                 </div>
@@ -219,8 +311,8 @@ export default function TradersPage() {
                     <span className={styles.statValue}>{trader.post_count || 0}</span>
                   </div>
                   <div className={styles.statItem}>
-                    <span className={styles.statLabel}>Status</span>
-                    <span className={styles.statValue}>Active</span>
+                    <span className={styles.statLabel}>Followers</span>
+                    <span className={styles.statValue}>{trader.followers || 0}</span>
                   </div>
                 </div>
                 
@@ -237,7 +329,7 @@ export default function TradersPage() {
                     className={styles.followButton}
                     onClick={(e) => handleFollowClick(e, trader.id)}
                   >
-                    Follow
+                    {followings[trader.id] ? 'Unfollow' : 'Follow'}
                   </button>
                 </div>
               </div>

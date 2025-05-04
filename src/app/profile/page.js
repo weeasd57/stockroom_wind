@@ -956,15 +956,15 @@ export default function Profile() {
 
       {/* Profile Stats */}
       <div className={styles.profileStats}>
-        <div className={styles.statItem}>
+        <div className={styles.statItem} onClick={() => handleTabChange('posts')}>
           <span className={styles.statValue}>{posts.length}</span>
           <span className={styles.statLabel}>Posts</span>
         </div>
-        <div className={styles.statItem}>
+        <div className={styles.statItem} onClick={() => handleTabChange('followers')}>
           <span className={styles.statValue}>{followers.length}</span>
           <span className={styles.statLabel}>Followers</span>
         </div>
-        <div className={styles.statItem}>
+        <div className={styles.statItem} onClick={() => handleTabChange('following')}>
           <span className={styles.statValue}>{following.length}</span>
           <span className={styles.statLabel}>Following</span>
         </div>
@@ -1219,20 +1219,35 @@ export default function Profile() {
         {activeTab === 'followers' && (
           <div className={styles.usersGrid}>
             {followers.length > 0 ? (
-              followers.map(follower => (
-                <div key={follower.id} className={styles.userCard}>
-                  <img 
-                    src={follower.profiles?.avatar_url || '/default-avatar.svg'} 
-                    alt={follower.profiles?.username || 'User'} 
-                    width={50} 
-                    height={50}
-                    className={styles.userAvatar}
-                  />
-                  <span className={styles.userName}>{follower.profiles?.username || 'User'}</span>
+              followers.map((follower) => (
+                <div key={follower.follower_id} className={styles.userCard}>
+                  <Link href={`/view-profile/${follower.profiles?.id || follower.follower_id}`} className={styles.userLink}>
+                    <div className={styles.userCardInner}>
+                      <div className={styles.userAvatarContainer}>
+                        <img 
+                          src={follower.profiles?.avatar_url || '/default-avatar.svg'} 
+                          alt={follower.profiles?.username || 'User'} 
+                          className={styles.userAvatar}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = '/default-avatar.svg';
+                          }}
+                        />
+                      </div>
+                      <div className={styles.userInfo}>
+                        <h3 className={styles.userName}>{follower.profiles?.username || 'User'}</h3>
+                      </div>
+                    </div>
+                  </Link>
                 </div>
               ))
             ) : (
-              <p className={styles.emptyMessage}>No followers yet</p>
+              <div className={styles.emptyStateContainer}>
+                <div className={styles.emptyState}>
+                  <h3>No followers yet</h3>
+                  <p>When people follow you, they'll appear here</p>
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -1240,20 +1255,35 @@ export default function Profile() {
         {activeTab === 'following' && (
           <div className={styles.usersGrid}>
             {following.length > 0 ? (
-              following.map(follow => (
-                <div key={follow.id} className={styles.userCard}>
-                  <img 
-                    src={follow.profiles?.avatar_url || '/default-avatar.svg'} 
-                    alt={follow.profiles?.username || 'User'} 
-                    width={50} 
-                    height={50}
-                    className={styles.userAvatar}
-                  />
-                  <span className={styles.userName}>{follow.profiles?.username || 'User'}</span>
+              following.map((follow) => (
+                <div key={follow.following_id} className={styles.userCard}>
+                  <Link href={`/view-profile/${follow.profiles?.id || follow.following_id}`} className={styles.userLink}>
+                    <div className={styles.userCardInner}>
+                      <div className={styles.userAvatarContainer}>
+                        <img 
+                          src={follow.profiles?.avatar_url || '/default-avatar.svg'} 
+                          alt={follow.profiles?.username || 'User'} 
+                          className={styles.userAvatar}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = '/default-avatar.svg';
+                          }}
+                        />
+                      </div>
+                      <div className={styles.userInfo}>
+                        <h3 className={styles.userName}>{follow.profiles?.username || 'User'}</h3>
+                      </div>
+                    </div>
+                  </Link>
                 </div>
               ))
             ) : (
-              <p className={styles.emptyMessage}>Not following anyone yet</p>
+              <div className={styles.emptyStateContainer}>
+                <div className={styles.emptyState}>
+                  <h3>You're not following anyone yet</h3>
+                  <p>When you follow people, they'll appear here</p>
+                </div>
+              </div>
             )}
           </div>
         )}

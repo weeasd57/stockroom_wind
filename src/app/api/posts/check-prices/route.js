@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { BASE_URL, API_KEY } from '@/models/StockApiConfig';
+import { BASE_URL, API_KEY, hasValidApiKey } from '@/models/StockApiConfig';
 import { NextResponse } from 'next/server';
 
 
@@ -76,6 +76,19 @@ const MAX_DAILY_CHECKS = 100;
 export async function POST(request) {
   console.log(`[DEBUG] Check-prices API route called at ${new Date().toISOString()}`);
   try {
+    // Check if API key is configured
+    if (!hasValidApiKey()) {
+      console.error('[ERROR] EOD Historical Data API key is not configured');
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: 'API key not configured. Please add NEXT_PUBLIC_EOD_API_KEY to your environment variables.',
+          error: 'missing_api_key' 
+        },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json().catch(() => ({}));
     console.log(`[DEBUG] Request body:`, JSON.stringify(body));
     const cookieHeader = request.headers.get('cookie');
@@ -316,117 +329,50 @@ export async function POST(request) {
               apiDetails.push(apiRequestInfo);
             }
             
-            // Try fallback to cached data
-            console.log(`[DEBUG] Attempting to use cached data for ${symbol}`);
-            const { data: cachedData, error: cacheError } = await supabase
-              .from('stock_prices_cache')
-              .select('data')
-              .eq('symbol', symbol)
-              .order('updated_at', { ascending: false })
-              .limit(1)
-              .single();
-            
-            if (cacheError) {
-              console.error(`[ERROR] No cached data available for ${symbol}:`, cacheError.message);
-              var fallbackData = null;
-            } else {
-              console.log(`[DEBUG] Successfully retrieved cached data for ${symbol}`);
-              var fallbackData = cachedData?.data;
+            // Fallback directly to using the current_price from the post record
+            if (!post.current_price) {
+              console.error(`No current price stored for stock ${symbol}`);
+              continue;
             }
+            
+            // Create a minimal historical data object using the stored current_price
+            const currentPriceValue = parseFloat(post.current_price);
+            console.log(`Falling back to stored current price for ${symbol}: ${currentPriceValue}`);
+            
+            historicalData = [{
+              date: new Date().toISOString().split('T')[0],
+              close: currentPriceValue,
+              high: currentPriceValue,
+              low: currentPriceValue,
+              open: currentPriceValue,
+              volume: 0
+            }];
           } else {
             // Parse the response
             historicalData = await response.json();
             
             // Check if the response is valid
             if (!Array.isArray(historicalData) || historicalData.length === 0) {
-              console.warn(`Empty historical data array returned for ${symbol}, trying to get last close price`);
+              console.warn(`Empty historical data array returned for ${symbol}, falling back to stored current price`);
               
-              try {
-                // Import the generateEodLastCloseUrl function and ExchangeData
-                const { generateEodLastCloseUrl } = require('@/utils/stockApi');
-                const { getExchangeForCountry } = require('@/models/ExchangeData');
-                
-                // Get the exchange from the post or determine it from the country
-                const exchange = post.exchange || (post.country ? getExchangeForCountry(post.country) : '');
-                
-                // Create the symbol with exchange if available
-                const symbolWithExchange = exchange ? `${post.symbol}.${exchange}` : post.symbol;
-                
-                // Generate URL for last close price
-                const lastCloseUrl = generateEodLastCloseUrl(symbolWithExchange, post.country);
-                console.log(`Trying to get last close price from: ${lastCloseUrl}`);
-                
-                // Update API tracking for fallback request
-                const fallbackRequestInfo = {
-                  symbol: post.symbol,
-                  exchange: exchange || '',
-                  requestType: 'Last close price fallback',
-                  requestUrl: lastCloseUrl,
-                  timestamp: new Date().toISOString()
-                };
-                
-                // Fetch the last close price
-                const fallbackStartTime = Date.now();
-                const lastCloseResponse = await fetch(lastCloseUrl);
-                const fallbackEndTime = Date.now();
-                const fallbackResponseTime = fallbackEndTime - fallbackStartTime;
-                
-                console.log(`[DEBUG] Fallback API response received in ${fallbackResponseTime}ms with status: ${lastCloseResponse.status}`);
-                
-                fallbackRequestInfo.responseStatus = lastCloseResponse.status;
-                fallbackRequestInfo.responseTime = fallbackResponseTime;
-                
-                if (!lastCloseResponse.ok) {
-                  console.error(`[ERROR] Fallback API error for ${symbol}: ${lastCloseResponse.status} ${lastCloseResponse.statusText}`);
-                  fallbackRequestInfo.responseType = 'Error';
-                  fallbackRequestInfo.errorCode = lastCloseResponse.status;
-                  throw new Error(`API error: ${lastCloseResponse.statusText}`);
-                }
-                
-                const lastCloseData = await lastCloseResponse.json();
-                
-                if (lastCloseData && lastCloseData.close) {
-                  console.log(`[DEBUG] Successfully got last close price for ${symbol}: ${lastCloseData.close}`);
-                  // Update fallback request info with success
-                  fallbackRequestInfo.responseType = 'Last price only';
-                  if (includeApiDetails) {
-                    apiDetails.push(fallbackRequestInfo);
-                  }
-                  
-                  historicalData = [{
-                    date: new Date().toISOString().split('T')[0],
-                    close: lastCloseData.close,
-                    high: lastCloseData.high || lastCloseData.close,
-                    low: lastCloseData.low || lastCloseData.close,
-                    open: lastCloseData.open || lastCloseData.close,
-                    volume: lastCloseData.volume || 0
-                  }];
-                } else {
-                  console.error(`[ERROR] Invalid data format in fallback API response for ${symbol}`);
-                  throw new Error('Invalid data format in fallback API response');
-                }
-              } catch (lastCloseError) {
-                console.error(`Error getting last close price for ${symbol}:`, lastCloseError);
-                
-                // Fallback to using the current_price from the post record
-                if (!post.current_price) {
-                  console.error(`No current price stored for stock ${symbol}`);
-                  continue;
-                }
-                
-                // Create a minimal historical data object using the stored current_price
-                const currentPriceValue = parseFloat(post.current_price);
-                console.log(`Falling back to stored current price for ${symbol}: ${currentPriceValue}`);
-                
-                historicalData = [{
-                  date: new Date().toISOString().split('T')[0],
-                  close: currentPriceValue,
-                  high: currentPriceValue,
-                  low: currentPriceValue,
-                  open: currentPriceValue,
-                  volume: 0
-                }];
+              // Fallback directly to using the current_price from the post record
+              if (!post.current_price) {
+                console.error(`No current price stored for stock ${symbol}`);
+                continue;
               }
+              
+              // Create a minimal historical data object using the stored current_price
+              const currentPriceValue = parseFloat(post.current_price);
+              console.log(`Falling back to stored current price for ${symbol}: ${currentPriceValue}`);
+              
+              historicalData = [{
+                date: new Date().toISOString().split('T')[0],
+                close: currentPriceValue,
+                high: currentPriceValue,
+                low: currentPriceValue,
+                open: currentPriceValue,
+                volume: 0
+              }];
             } else {
               // Record successful API response with historical data
               apiRequestInfo.responseType = 'Historical prices';

@@ -349,59 +349,35 @@ export function ProfileProvider({ children }) {
         
       if (postsError) throw postsError;
       
-      // Using follower_id/following_id structure for followers
+      // Using user_followings table for followers/following
       let followersData, followingData;
       
       // First approach for followers - using follower_id/following_id structure
       const followersResult = await supabase
-        .from('followers')
-        .select('follower_id, profiles!followers_follower_id_fkey(id, username, avatar_url)')
+        .from('user_followings')
+        .select('follower_id, profiles!user_followings_follower_id_fkey(id, username, avatar_url)')
         .eq('following_id', userId);
         
       if (followersResult.error) {
-        console.error('First followers query failed:', followersResult.error);
-        
-        // If the first query fails, try with another common column name pattern
-        const altFollowersResult = await supabase
-          .from('followers')
-          .select('follower_id, profiles!followers_follower_id_fkey(id, username, avatar_url)')
-          .eq('following_id', userId);
-          
-        if (altFollowersResult.error) {
-          console.error('Alternative followers query failed:', altFollowersResult.error);
-          followersData = []; // Set empty array as fallback
-        } else {
-          // Use alternative data if the second query succeeded
-          followersData = altFollowersResult.data || [];
-        }
+        console.error('Followers query failed:', followersResult.error);
+        followersData = []; // Set empty array as fallback
       } else {
         followersData = followersResult.data || [];
+        console.log('Followers data fetched successfully:', followersData);
       }
       
-      // Try with following_id instead of followed_id for following
+      // For following - users that the current user follows
       const followingResult = await supabase
-        .from('followers')
-        .select('following_id, profiles!followers_following_id_fkey(id, username, avatar_url)')
+        .from('user_followings')
+        .select('following_id, profiles!user_followings_following_id_fkey(id, username, avatar_url)')
         .eq('follower_id', userId);
         
       if (followingResult.error) {
-        console.error('First following query failed:', followingResult.error);
-        
-        // If the first query fails, try with another common column name pattern
-        const altFollowingResult = await supabase
-          .from('followers')
-          .select('following_id, profiles!followers_following_id_fkey(id, username, avatar_url)')
-          .eq('follower_id', userId);
-          
-        if (altFollowingResult.error) {
-          console.error('Alternative following query failed:', altFollowingResult.error);
-          followingData = []; // Set empty array as fallback
-        } else {
-          // Use alternative data if the second query succeeded
-          followingData = altFollowingResult.data || [];
-        }
+        console.error('Following query failed:', followingResult.error);
+        followingData = []; // Set empty array as fallback
       } else {
         followingData = followingResult.data || [];
+        console.log('Following data fetched successfully:', followingData);
       }
       
       // Update the data
@@ -475,54 +451,30 @@ export function ProfileProvider({ children }) {
       
       // First approach for followers - using follower_id/following_id structure
       const followersResult = await supabase
-        .from('followers')
-        .select('follower_id, profiles!followers_follower_id_fkey(id, username, avatar_url)')
+        .from('user_followings')
+        .select('follower_id, profiles!user_followings_follower_id_fkey(id, username, avatar_url)')
         .eq('following_id', userId);
         
       if (followersResult.error) {
-        console.error('First followers query failed:', followersResult.error);
-        
-        // If the first query fails, try with another common column name pattern
-        const altFollowersResult = await supabase
-          .from('followers')
-          .select('follower_id, profiles!followers_follower_id_fkey(id, username, avatar_url)')
-          .eq('following_id', userId);
-          
-        if (altFollowersResult.error) {
-          console.error('Alternative followers query failed:', altFollowersResult.error);
-          followersData = []; // Set empty array as fallback
-        } else {
-          // Use alternative data if the second query succeeded
-          followersData = altFollowersResult.data || [];
-        }
+        console.error('Followers query failed:', followersResult.error);
+        followersData = []; // Set empty array as fallback
       } else {
         followersData = followersResult.data || [];
+        console.log('Followers data fetched successfully:', followersData);
       }
       
-      // Try with following_id instead of followed_id for following
+      // For following - users that the current user follows
       const followingResult = await supabase
-        .from('followers')
-        .select('following_id, profiles!followers_following_id_fkey(id, username, avatar_url)')
+        .from('user_followings')
+        .select('following_id, profiles!user_followings_following_id_fkey(id, username, avatar_url)')
         .eq('follower_id', userId);
         
       if (followingResult.error) {
-        console.error('First following query failed:', followingResult.error);
-        
-        // If the first query fails, try with another common column name pattern
-        const altFollowingResult = await supabase
-          .from('followers')
-          .select('following_id, profiles!followers_following_id_fkey(id, username, avatar_url)')
-          .eq('follower_id', userId);
-          
-        if (altFollowingResult.error) {
-          console.error('Alternative following query failed:', altFollowingResult.error);
-          followingData = []; // Set empty array as fallback
-        } else {
-          // Use alternative data if the second query succeeded
-          followingData = altFollowingResult.data || [];
-        }
+        console.error('Following query failed:', followingResult.error);
+        followingData = []; // Set empty array as fallback
       } else {
         followingData = followingResult.data || [];
+        console.log('Following data fetched successfully:', followingData);
       }
       
       // Update the data
