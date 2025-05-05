@@ -1,0 +1,100 @@
+import { NextResponse } from 'next/server';
+import { supabase } from '@/utils/supabase';
+
+export async function POST(request) {
+  try {
+    const { userId, email, username } = await request.json();
+
+    if (!userId || !email) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    console.log('API create-profile: Received request for user:', userId);
+
+    // Check if profile already exists
+    const { data: existingProfile, error: checkError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single();
+
+    if (checkError && !checkError.message.includes('No rows found')) {
+      console.error('API create-profile: Error checking profile:', checkError);
+      return NextResponse.json(
+        { error: checkError.message },
+        { status: 500 }
+      );
+    }
+
+    if (existingProfile) {
+      console.log('API create-profile: Profile already exists');
+      return NextResponse.json(
+        { message: 'Profile already exists' },
+        { status: 200 }
+      );
+    }
+
+    // Create new profile
+    console.log('API create-profile: Creating profile for user:', userId);
+    const now = new Date().toISOString();
+    const defaultProfile = {
+      id: userId,
+      username: username || email.split('@')[0],
+      email: email,
+      created_at: now,
+      updated_at: now,
+      last_sign_in: now,
+      success_posts: 0,
+      loss_posts: 0,
+      experience_Score: 0,
+      followers: 0,
+      following: 0,
+      avatar_url: null,
+      background_url: null,
+      bio: null,
+      website: null,
+      favorite_markets: null,
+      full_name: null
+    };
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .insert([defaultProfile])
+      .select();
+
+    if (error) {
+      console.error('API create-profile: Error creating profile:', error);
+      
+      if (error.message.includes('violates row-level security')) {
+        return NextResponse.json(
+          { 
+            error: "Profile creation failed due to permissions. Please contact support or try again later.",
+            details: error.message
+          },
+          { status: 403 }
+        );
+      }
+      
+      return NextResponse.json(
+        { error: error.message },
+        { status: 500 }
+      );
+    }
+
+    console.log('API create-profile: Profile created successfully');
+    return NextResponse.json(
+      { message: 'Profile created successfully', profile: data[0] },
+      { status: 201 }
+    );
+
+  } catch (error) {
+    console.error('API create-profile: Unexpected error:', error);
+    return NextResponse.json(
+      { error: 'An unexpected error occurred' },
+      { status: 500 }
+    );
+  }
+} 

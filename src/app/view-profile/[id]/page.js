@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabase } from '@/providers/SupabaseProvider';
+import Image from 'next/image';
 import styles from '@/styles/view-profile.module.css';
 import Link from 'next/link';
 
@@ -19,12 +20,13 @@ export default function ViewProfile({ params }) {
   const [profileData, setProfileData] = useState(null);
   const [profilePosts, setProfilePosts] = useState([]);
   const [avatarUrl, setAvatarUrl] = useState('/default-avatar.svg');
-  const [backgroundUrl, setBackgroundUrl] = useState('/profile-bg.jpg');
+  const [backgroundUrl, setBackgroundUrl] = useState('https://images.unsplash.com/photo-1579546929662-711aa81148cf?q=80&w=1200&auto=format&fit=crop');
   const [postCount, setPostCount] = useState(0);
   const [error, setError] = useState(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followers, setFollowers] = useState([]);
   const [following, setFollowing] = useState([]);
+  const [avatarError, setAvatarError] = useState(false);
 
   // Fetch profile data
   useEffect(() => {
@@ -102,30 +104,39 @@ export default function ViewProfile({ params }) {
         }
         
         // Try to get avatar and background images
-        try {
-          const { data: avatarData } = await supabase
-            .storage
-            .from('avatars')
-            .getPublicUrl(`${userId}/avatar.png`);
-            
-          if (avatarData?.publicUrl) {
-            setAvatarUrl(`${avatarData.publicUrl}?t=${Date.now()}`);
+        if (profile.avatar_url) {
+          setAvatarUrl(profile.avatar_url);
+        } else {
+          try {
+            const { data: avatarData } = await supabase
+              .storage
+              .from('avatars')
+              .getPublicUrl(`${userId}/avatar.png`);
+              
+            if (avatarData?.publicUrl) {
+              setAvatarUrl(`${avatarData.publicUrl}?t=${Date.now()}`);
+            }
+          } catch (e) {
+            console.log('No custom avatar found');
+            setAvatarUrl('/default-avatar.svg');
           }
-        } catch (e) {
-          console.log('No custom avatar found');
         }
         
-        try {
-          const { data: bgData } = await supabase
-            .storage
-            .from('backgrounds')
-            .getPublicUrl(`${userId}/background.png`);
-            
-          if (bgData?.publicUrl) {
-            setBackgroundUrl(`${bgData.publicUrl}?t=${Date.now()}`);
+        if (profile.background_url) {
+          setBackgroundUrl(profile.background_url);
+        } else {
+          try {
+            const { data: bgData } = await supabase
+              .storage
+              .from('backgrounds')
+              .getPublicUrl(`${userId}/background.png`);
+              
+            if (bgData?.publicUrl) {
+              setBackgroundUrl(`${bgData.publicUrl}?t=${Date.now()}`);
+            }
+          } catch (e) {
+            console.log('No custom background found');
           }
-        } catch (e) {
-          console.log('No custom background found');
         }
         
       } catch (error) {
@@ -142,6 +153,7 @@ export default function ViewProfile({ params }) {
   // Add effect to check if user is following this profile
   useEffect(() => {
     const checkFollowStatus = async () => {
+      // Skip follow status check for unauthenticated users
       if (!isAuthenticated || !user || !userId) return;
       
       try {
@@ -217,6 +229,11 @@ export default function ViewProfile({ params }) {
     router.back();
   };
 
+  const handleAvatarError = () => {
+    setAvatarError(true);
+    setAvatarUrl('/default-avatar.svg');
+  };
+
   if (loading) {
     return (
       <div className={styles.loadingContainer}>
@@ -240,49 +257,57 @@ export default function ViewProfile({ params }) {
 
   return (
     <div className={styles.profileContainer}>
+      <button onClick={handleBackClick} className={styles.backButton}>
+        Back
+      </button>
+      
       <div 
-        className={styles.profileHeader} 
+        className={styles.profileBackground} 
         style={{ backgroundImage: `url(${backgroundUrl})` }}
-      >
-        <div className={styles.profileHeaderOverlay}>
-          <div className={styles.profileActions}>
-            <button onClick={handleBackClick} className={styles.backButton}>
-              Back
-            </button>
-          </div>
+      ></div>
+      
+      <div className={styles.profileHeader}>
+        <div className={styles.profileAvatar}>
+          {avatarError ? (
+            <img 
+              src="/default-avatar.svg" 
+              alt={profileData?.username || 'User'}
+              width={140}
+              height={140}
+            />
+          ) : (
+            <img 
+              src={avatarUrl}
+              alt={profileData?.username || 'User'}
+              width={140}
+              height={140}
+              onError={handleAvatarError}
+            />
+          )}
+        </div>
+        
+        <div className={styles.profileInfo}>
+          <h1>{profileData?.username || 'User'}</h1>
+          <p className={styles.username}>@{profileData?.username?.toLowerCase() || 'user'}</p>
+          <p className={styles.bio}>{profileData?.bio || 'No bio available'}</p>
           
-          <div className={styles.profileInfo}>
-            <div className={styles.profileAvatar}>
-              <img 
-                src={avatarUrl} 
-                alt={profileData?.username || 'User'}
-                className={styles.avatarImage}
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = '/default-avatar.svg';
-                }}
-              />
-            </div>
-            
-            <div className={styles.profileDetails}>
-              <h1 className={styles.profileName}>
-                {profileData?.username || 'User'}
-              </h1>
-              
-              <p className={styles.profileBio}>
-                {profileData?.bio || 'No bio available.'}
-              </p>
-              
-              {isAuthenticated && user?.id !== userId && (
-                <button 
-                  onClick={handleFollowClick} 
-                  className={isFollowing ? styles.unfollowButton : styles.followButton}
-                >
-                  {isFollowing ? 'Unfollow' : 'Follow'}
-                </button>
-              )}
-            </div>
-          </div>
+          {isAuthenticated ? (
+            user?.id !== userId && (
+              <button 
+                onClick={handleFollowClick} 
+                className={isFollowing ? styles.unfollowButton : styles.followButton}
+              >
+                {isFollowing ? 'Unfollow' : 'Follow'}
+              </button>
+            )
+          ) : (
+            <button 
+              onClick={() => router.push('/login')} 
+              className={styles.loginToFollowButton}
+            >
+              Login to follow
+            </button>
+          )}
         </div>
       </div>
       
@@ -301,26 +326,28 @@ export default function ViewProfile({ params }) {
         </div>
       </div>
       
-      <div className={styles.contentTabs}>
-        <button className={`${styles.tabButton} ${styles.activeTab}`}>
-          Posts
-        </button>
-      </div>
-      
-      <div className={styles.postsContainer}>
+      <div className={styles.postsSection}>
+        <h2>Recent Posts</h2>
+        
         {profilePosts.length > 0 ? (
           <div className={styles.postsGrid}>
             {profilePosts.map(post => (
               <div key={post.id} className={styles.postCard}>
-                <h3 className={styles.postTitle}>{post.title}</h3>
-                <p className={styles.postContent}>
+                <div 
+                  className={styles.postImage} 
+                  style={{ 
+                    backgroundImage: `url(${post.image_url || '/default-post-bg.svg'})`
+                  }}
+                ></div>
+                <h3>{post.title || 'Untitled Post'}</h3>
+                <p>
                   {post.content?.length > 100
                     ? `${post.content.substring(0, 100)}...`
-                    : post.content}
+                    : post.content || 'No content'}
                 </p>
-                <div className={styles.postMeta}>
-                  <span>{new Date(post.created_at).toLocaleDateString()}</span>
-                </div>
+                <Link href={`/posts/${post.id}`} className={styles.viewPostLink}>
+                  View Post
+                </Link>
               </div>
             ))}
           </div>

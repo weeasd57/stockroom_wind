@@ -524,6 +524,22 @@ export default function Profile() {
       setAvatarUrl(publicUrl);
       console.log('Setting avatar URL to:', publicUrl);
       
+      // Update global avatar cache for immediate display throughout the app
+      const baseUrl = publicUrl.split('?')[0]; // Remove cache params
+      
+      // Update the image in global cache manager for immediate display in navigation bar
+      if (typeof window !== 'undefined' && window.imageCacheManager) {
+        window.imageCacheManager.setAvatarUrl(user.id, publicUrl);
+        window.imageCacheManager.preload(publicUrl);
+        console.log('Updated global image cache with new avatar');
+      }
+      
+      // Update ProfileProvider context with new avatar URL
+      if (updateProfile) {
+        updateProfile({ avatarUrl: publicUrl });
+        console.log('Updated ProfileProvider context with new avatar URL');
+      }
+      
       // Clean up the preview
       if (avatarPreview) {
         URL.revokeObjectURL(avatarPreview);
@@ -636,6 +652,19 @@ export default function Profile() {
       // Set the background URL directly with our cache buster
       setBackgroundUrl(refreshedUrl);
       console.log('Setting background URL to:', refreshedUrl);
+      
+      // Update global background cache for immediate display throughout the app
+      if (typeof window !== 'undefined' && window.imageCacheManager) {
+        // Use the new setBackgroundUrl method instead of just preloading
+        window.imageCacheManager.setBackgroundUrl(user.id, refreshedUrl);
+        console.log('Updated global image cache with new background');
+      }
+      
+      // Update ProfileProvider context with new background URL
+      if (updateProfile) {
+        updateProfile({ backgroundUrl: refreshedUrl });
+        console.log('Updated ProfileProvider context with new background URL');
+      }
       
       // Clean up the preview
       if (backgroundPreview) {

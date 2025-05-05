@@ -70,6 +70,29 @@ export default function RootLayout({ children }) {
           {`
             window.imageCacheManager = {
               cache: {},
+              listeners: [],
+              
+              // Register a component to be notified of image changes
+              subscribe: function(callback) {
+                if (typeof callback === 'function') {
+                  this.listeners.push(callback);
+                  return () => {
+                    this.listeners = this.listeners.filter(cb => cb !== callback);
+                  };
+                }
+              },
+              
+              // Notify all components about an image change
+              notifyChange: function(userId, imageType, url) {
+                this.listeners.forEach(callback => {
+                  try {
+                    callback(userId, imageType, url);
+                  } catch (e) {
+                    console.error('Error in imageCacheManager listener:', e);
+                  }
+                });
+              },
+              
               preload: function(urls) {
                 if (!Array.isArray(urls)) urls = [urls];
                 urls.forEach(url => {
@@ -83,15 +106,36 @@ export default function RootLayout({ children }) {
                   img.src = url;
                 });
               },
+              
               getAvatarUrl: function(userId) {
                 const key = 'avatar_' + userId;
                 return localStorage.getItem(key);
               },
+              
               setAvatarUrl: function(userId, url) {
                 if (!userId || !url) return;
                 const key = 'avatar_' + userId;
                 localStorage.setItem(key, url);
                 this.preload(url);
+                
+                // Notify all subscribers about the avatar change
+                this.notifyChange(userId, 'avatar', url);
+              },
+              
+              // Add method for background images
+              getBackgroundUrl: function(userId) {
+                const key = 'background_' + userId;
+                return localStorage.getItem(key);
+              },
+              
+              setBackgroundUrl: function(userId, url) {
+                if (!userId || !url) return;
+                const key = 'background_' + userId;
+                localStorage.setItem(key, url);
+                this.preload(url);
+                
+                // Notify all subscribers about the background change
+                this.notifyChange(userId, 'background', url);
               }
             };
           `}

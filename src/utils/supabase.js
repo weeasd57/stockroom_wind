@@ -1,39 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
 // import logger from '@/utils/logger';
 
-// Create a single supabase client for interacting with your database
+// Create a client with the public anon key
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 // Check if environment variables are set
-export const isSupabaseConfigured = () => {
-  return Boolean(supabaseUrl && supabaseAnonKey);
-};
-
-// Ensure we have valid credentials before creating the client
-if (!isSupabaseConfigured()) {
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Missing Supabase Environment Variables');
 }
 
-// Create the Supabase client with options
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-  global: {
-    fetch: (...args) => fetch(...args),
-  },
-  // Add more detailed error handling
-  debug: process.env.NODE_ENV === 'development',
-  // Set reasonable timeouts
-  realtime: {
-    timeout: 30000, // 30 seconds
-  },
-});
+// Create a single client for use throughout the app
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Test the connection on initialization
 (async function testConnection() {
-  if (typeof window !== 'undefined' && isSupabaseConfigured()) {
+  if (typeof window !== 'undefined' && supabaseUrl && supabaseAnonKey) {
     try {
       const { error } = await supabase.from('_connection_test').select('*').limit(1).single();
       // If we get a "relation does not exist" error, that's actually good
@@ -48,18 +30,98 @@ export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
  * Sign up a new user
  * @param {string} email - User email
  * @param {string} password - User password
+ * @param {object} userData - Additional user data such as username
  * @returns {Promise<object>} - Signed up user data and error
  */
-export const signUp = async (email, password) => {
+export const signUp = async (email, password, userData = {}) => {
   try {
+    console.log('signUp utility: Attempting to create new user with email:', email);
+    
+    // Check if password meets minimum requirements
+    if (password.length < 6) {
+      console.error('Password too short');
+      return { 
+        data: null, 
+        error: new Error('Password must be at least 6 characters long') 
+      };
+    }
+    
+    // Extract username from userData or fallback to email
+    const username = userData?.username || email.split('@')[0];
+    
+    // 1. Sign up the user with Supabase Auth
+    console.log('signUp utility: Sending auth.signUp request with username:', username);
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          username: username
+        },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        // Auto-confirm email so users can sign in immediately
+        emailConfirm: true
+      }
     });
     
-    if (error) throw error;
+    console.log('signUp utility: Supabase response:', { 
+      user: data?.user ? 'User object present' : 'No user object',
+      identities: data?.user?.identities?.length,
+      error: error ? error.message : 'No error'
+    });
+    
+    if (error) {
+      console.error('signUp utility: Auth error:', error.message);
+      throw error;
+    }
+    
+    // Check if the user already exists
+    if (data?.user?.identities?.length === 0) {
+      console.error('User already exists');
+      return { 
+        data: null, 
+        error: new Error('This email is already registered. Please sign in instead.') 
+      };
+    }
+    
+    // 2. If user was created successfully, we let the database trigger handle profile creation
+    // The trigger should automatically create a profile for new users
+    if (data?.user?.id) {
+      try {
+        // Wait a moment for the trigger to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Try to create a profile directly (this may fail with RLS, which is fine)
+        const now = new Date().toISOString();
+        const profileData = {
+          id: data.user.id,
+          username: username,
+          email: email,
+          created_at: now,
+          updated_at: now,
+          last_sign_in: now,
+          success_posts: 0,
+          loss_posts: 0,
+          experience_Score: 0,
+          followers: 0,
+          following: 0
+        };
+        
+        // This might fail due to RLS, but we try anyway
+        // The database trigger should have created the profile already
+        await supabase.from('profiles').insert([profileData]);
+        
+        // No need to check for errors, as we expect this might fail due to RLS
+        // or because the profile already exists from the trigger
+      } catch (profileError) {
+        console.error('signUp utility: Profile creation attempt error:', profileError);
+        // Continue even if profile creation fails - the trigger might have worked
+      }
+    }
+    
     return { data, error: null };
   } catch (e) {
+    console.error('signUp utility: Error during sign up:', e);
     return { data: null, error: e };
   }
 };
@@ -194,17 +256,25 @@ export const getUserProfile = async (userId) => {
     if (!data || data.length === 0) {
       
       // Create a default profile for the user
+      const now = new Date().toISOString();
       const defaultProfile = {
         id: userId,
         username: `user_${userId.substring(0, 8)}`,
         full_name: null,
-        email: null,
         avatar_url: null,
-        background_url: null,
         bio: null,
-        experience_Score: 0,
+        website: null,
+        favorite_markets: null,
+        created_at: now,
+        updated_at: now,
+        email: null,
+        last_sign_in: now,
         success_posts: 0,
         loss_posts: 0,
+        background_url: null,
+        experience_Score: 0,
+        followers: 0,
+        following: 0
       };
       
       // Count successful and lost posts for this user (in case they exist before profile creation)
@@ -903,7 +973,7 @@ export async function checkTableExists(tableName) {
 export async function checkSupabaseConnection() {
   try {
     // First check if Supabase is configured
-    if (!isSupabaseConfigured()) {
+    if (!supabaseUrl || !supabaseAnonKey) {
 
       return false;
     }

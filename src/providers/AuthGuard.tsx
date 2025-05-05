@@ -6,7 +6,10 @@ import { useSupabase } from './SupabaseProvider';
 import '@/styles/auth.css';
 
 // Define paths that don't require authentication
-const PUBLIC_PATHS = ['/landing', '/login', '/register', '/auth/callback', '/traders', '/view-profile'];
+const PUBLIC_PATHS = ['/landing', '/login', '/register', '/auth/callback', '/traders'];
+
+// Define path prefixes that should be public (for dynamic routes)
+const PUBLIC_PATH_PREFIXES = ['/view-profile/'];
 
 // Define error paths that should bypass authentication completely
 const ERROR_PATHS = ['/404', '/500', '/not-found', '/error', '/_error'];
@@ -25,6 +28,23 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   
   // For all other pages, continue with normal auth flow
   return <ProtectedContent pathname={pathname}>{children}</ProtectedContent>;
+}
+
+// Helper function to check if a path is public
+function isPublicPath(pathname: string): boolean {
+  // Check exact matches first
+  if (PUBLIC_PATHS.includes(pathname)) {
+    return true;
+  }
+  
+  // Check path prefixes for dynamic routes
+  for (const prefix of PUBLIC_PATH_PREFIXES) {
+    if (pathname.startsWith(prefix)) {
+      return true;
+    }
+  }
+  
+  return false;
 }
 
 // Separate component for protected content that uses Supabase
@@ -52,7 +72,7 @@ function ProtectedContent({ children, pathname }: { children: React.ReactNode, p
     setAuthChecked(true);
 
     // Current path is a public path, no need to redirect
-    if (PUBLIC_PATHS.includes(pathname)) {
+    if (isPublicPath(pathname)) {
       return;
     }
     
@@ -63,7 +83,7 @@ function ProtectedContent({ children, pathname }: { children: React.ReactNode, p
     }
 
     // For protected routes, redirect to landing if not authenticated
-    if (!isAuthenticated && !PUBLIC_PATHS.includes(pathname)) {
+    if (!isAuthenticated && !isPublicPath(pathname)) {
       console.log('User not authenticated, redirecting to landing page');
       
       // Start the fade out animation
@@ -79,7 +99,7 @@ function ProtectedContent({ children, pathname }: { children: React.ReactNode, p
 
   // Only show loading state for non-public paths when authentication is required
   // This allows public pages to render immediately
-  if ((loading || !authChecked) && !PUBLIC_PATHS.includes(pathname)) {
+  if ((loading || !authChecked) && !isPublicPath(pathname)) {
     return (
       <div className={`auth-guard-container ${fadeOut ? 'auth-fade-out' : 'auth-fade-in'}`}>
         <div className="auth-guard-content">

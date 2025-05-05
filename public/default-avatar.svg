@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="200px" height="200px" viewBox="0 0 200 200" version="1.1" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="100" cy="100" r="100" fill="#e0e0e0"/>
-    <circle cx="100" cy="80" r="40" fill="#a0a0a0"/>
-    <path d="M160,180 C160,140 140,120 100,120 C60,120 40,140 40,180" fill="#a0a0a0"/>
+    <!-- Background circle -->
+    <circle cx="100" cy="100" r="100" fill="#FFD700"/>
+    <!-- User silhouette -->
+    <g transform="translate(50, 40)">
+        <!-- Head -->
+        <circle cx="50" cy="40" r="35" fill="#333333"/>
+        <!-- Body -->
+        <path d="M20 80 Q50 110 80 80 L80 140 Q50 160 20 140 Z" fill="#333333"/>
+    </g>
 </svg>

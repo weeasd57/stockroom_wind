@@ -74,7 +74,7 @@ export default function TradersPage() {
           
           return {
             ...profile,
-            avatar_url: avatarUrl,
+            avatar_url: avatarUrl || '/default-avatar.svg',
             post_count: postCounts[profile.id] || 0
           };
         }));
@@ -288,10 +288,18 @@ export default function TradersPage() {
                 >
                   <div className={styles.traderAvatar}>
                     {trader.avatar_url ? (
-                      <img src={trader.avatar_url} alt={trader.username} />
+                      <img 
+                        src={trader.avatar_url}
+                        alt={trader.username}
+                        onError={(e) => {
+                          console.log(`Failed to load avatar for ${trader.username}, using fallback`);
+                          e.target.onerror = null;
+                          e.target.src = '/default-avatar.svg';
+                        }}
+                      />
                     ) : (
                       <div className={styles.avatarPlaceholder}>
-                        {trader.name?.charAt(0) || trader.full_name?.charAt(0) || trader.username?.charAt(0) || '?'}
+                        {trader.username?.charAt(0).toUpperCase() || '?'}
                       </div>
                     )}
                   </div>

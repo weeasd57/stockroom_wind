@@ -198,10 +198,24 @@
   animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
 }
 
+.success {
+  background-color: hsla(var(--success, 142 76% 36%), 0.1);
+  color: hsl(var(--success, 142 76% 36%));
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  animation: fadeIn 0.5s ease-out;
+}
+
 .switchMode {
   margin-top: 2rem;
   text-align: center;
   color: hsl(var(--muted-foreground));
+}
+
+.resetLink {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
 }
 
 .switchButton {
@@ -218,6 +232,12 @@
 .switchButton:hover {
   color: hsl(var(--primary) / 0.8);
   text-decoration: underline;
+}
+
+.passwordHint {
+  font-size: 0.8rem;
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.25rem;
 }
 
 /* Animations */

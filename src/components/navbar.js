@@ -41,14 +41,48 @@ export default function Navbar() {
 
   // Create a ref to track the last avatar refresh time
   const lastAvatarRefresh = useRef(Date.now());
+  
+  // Add unsubscribe ref to clean up listener on unmount
+  const unsubscribeRef = useRef(null);
 
   useEffect(() => {
     setMounted(true);
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
     handleScroll();
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+    
+    // Subscribe to avatar changes from imageCacheManager
+    if (typeof window !== 'undefined' && window.imageCacheManager && user) {
+      // Handle image change notifications
+      const handleImageChange = (userId, imageType, newUrl) => {
+        // Only update if it's an avatar change for the current user
+        if (imageType === 'avatar' && userId === user.id) {
+          console.log('Navbar: Received avatar update notification:', newUrl);
+          setAvatarUrl(newUrl);
+          lastAvatarRefresh.current = Date.now();
+          setAvatarLoading(false);
+        }
+      };
+      
+      // Subscribe and store unsubscribe function
+      unsubscribeRef.current = window.imageCacheManager.subscribe(handleImageChange);
+      
+      // Get initial avatar from cache
+      const cachedAvatar = window.imageCacheManager.getAvatarUrl(user.id);
+      if (cachedAvatar) {
+        setAvatarUrl(cachedAvatar);
+        setAvatarLoading(false);
+      }
+    }
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      // Clean up the subscription
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+    };
+  }, [user]);
 
   useEffect(() => {
     if (profile && getEffectiveAvatarUrl) {
@@ -56,7 +90,7 @@ export default function Navbar() {
       // or if we don't have an avatar URL yet
       const now = Date.now();
       const shouldRefresh = !avatarUrl || avatarUrl === '/default-avatar.svg' || 
-                            now - lastAvatarRefresh.current > 30000;
+                          now - lastAvatarRefresh.current > 30000;
       
       if (shouldRefresh) {
         const loadAvatar = async () => {

@@ -165,8 +165,10 @@
   justify-content: center;
   background: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: bold;
+  border-radius: 50%;
+  text-transform: uppercase;
 }
 
 .traderInfo {

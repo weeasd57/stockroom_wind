@@ -130,15 +130,89 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, userData: any) => {
+  const signUp = async (email: string, password: string, userData: any = {}) => {
     try {
-      const { error } = await supabase.auth.signUp({
+      console.log('SupabaseProvider: Starting signUp with email:', email);
+      
+      // Step 1: Sign up the user with Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: { data: userData }
       });
-      if (error) throw error;
+      
+      if (error) {
+        console.error('SupabaseProvider: Signup error:', error.message);
+        throw error;
+      }
+      
+      console.log('SupabaseProvider: Auth signup successful, user ID:', data?.user?.id);
+      
+      // Step 2: Wait briefly to allow database triggers to run
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Step 3: Create a profile for the user
+      if (data?.user?.id) {
+        try {
+          const userId = data.user.id;
+          const username = userData?.username || email.split('@')[0];
+          const now = new Date().toISOString();
+          
+          // Check if profile already exists (to avoid duplicate profile errors)
+          console.log('SupabaseProvider: Checking if profile exists for user:', userId);
+          const { data: existingProfile, error: profileCheckError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', userId)
+            .single();
+            
+          if (profileCheckError) {
+            console.log('SupabaseProvider: Error checking for profile:', profileCheckError.message);
+          }
+            
+          // Only create profile if it doesn't exist
+          if (!existingProfile) {
+            console.log('SupabaseProvider: Creating new profile with username:', username);
+            const defaultProfile = {
+              id: userId,
+              username: username,
+              full_name: userData?.full_name || null,
+              avatar_url: null,
+              bio: null,
+              website: null,
+              favorite_markets: null,
+              created_at: now,
+              updated_at: null,
+              email: email,
+              last_sign_in: now,
+              success_posts: 0,
+              loss_posts: 0,
+              background_url: null,
+              experience_Score: 0,
+              followers: 0,
+              following: 0
+            };
+            
+            const { error: profileError } = await supabase
+              .from('profiles')
+              .insert([defaultProfile]);
+              
+            if (profileError) {
+              console.error('SupabaseProvider: Profile creation error:', profileError.message, profileError);
+              // We continue without throwing since the auth signup was successful
+            } else {
+              console.log('SupabaseProvider: Profile created successfully');
+            }
+          } else {
+            console.log('SupabaseProvider: Profile already exists, no need to create');
+          }
+        } catch (profileError) {
+          console.error('SupabaseProvider: Error during profile creation:', profileError);
+          // We don't throw since auth was successful
+        }
+      }
     } catch (err) {
+      console.error('SupabaseProvider: Sign up process failed:', err);
       setError(err instanceof Error ? err : new Error('Failed to sign up'));
       throw err;
     }
@@ -368,7 +442,22 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       setIsLoggingOut(true);
       await signOut();
       console.log('User logged out successfully');
-      router.push('/landing');
+      
+      // Get the current path
+      const currentPath = window.location.pathname;
+      
+      // Check if we're on a view-profile page or other public page
+      if (currentPath.startsWith('/view-profile/') || 
+          currentPath === '/traders' || 
+          currentPath === '/landing') {
+        // Don't redirect - stay on the current page
+        // Just refresh the component by setting isAuthenticated to false
+        setIsAuthenticated(false);
+        setUser(null);
+      } else {
+        // Redirect to landing page for non-public pages
+        router.push('/landing');
+      }
     } catch (error) {
       console.error('Error logging out:', error);
     } finally {
