@@ -1,0 +1,26 @@
+{
+  "name": "stockroom-post-generator",
+  "version": "1.0.0",
+  "description": "A tool for generating realistic trading posts with country-specific exchange data",
+  "main": "generate.js",
+  "bin": {
+    "stockroom-generate": "./generate.js"
+  },
+  "scripts": {
+    "start": "node generate.js",
+    "test": "node generate.js --user test123 --count 5"
+  },
+  "keywords": [
+    "trading",
+    "posts",
+    "generator",
+    "stocks",
+    "sample-data"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {},
+  "engines": {
+    "node": ">=12.0.0"
+  }
+} 
