@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useRouter } from 'next/navigation';
-import PostGenerator from '@/components/admin/PostGenerator';
 import styles from '@/styles/admin.module.css';
 
 export default function AdminPage() {
@@ -46,9 +45,11 @@ export default function AdminPage() {
     <div className={styles.adminContainer}>
       <h1 className={styles.adminTitle}>Admin Dashboard</h1>
       
-      <section>
-        <h2>Data Tools</h2>
-        <PostGenerator />
+      <section className={styles.adminSection}>
+        <h2 className={styles.sectionTitle}>Data Tools</h2>
+        <p className={styles.sectionDescription}>
+          Data generation and management tools will be added in future updates.
+        </p>
       </section>
       
       <section className={styles.adminSection}>

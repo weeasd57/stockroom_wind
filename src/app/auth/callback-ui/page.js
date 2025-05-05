@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabase } from '@/providers/SupabaseProvider';
-import styles from './callback.module.css';
+import styles from './styles.module.css';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -51,7 +51,7 @@ export default function AuthCallbackPage() {
   return (
     <div className={styles.container}>
       <div className={styles.loadingWrapper}>
-            <div className={styles.loadingIndicator}></div>
+        <div className={styles.loadingIndicator}></div>
         <p>Authenticating...</p>
       </div>
     </div>
