@@ -223,7 +223,9 @@ export async function POST(request) {
         target_price, 
         stop_loss_price, 
         current_price,
+        initial_price,
         exchange,
+        country,
         target_reached,
         stop_loss_triggered,
         created_at,
@@ -415,6 +417,9 @@ export async function POST(request) {
               noDataAvailable: true,
               status_message: "No price data available",
               last_price_check: new Date().toISOString()
+              // Do not update these fields to preserve their original values
+              // country: post.country,
+              // initial_price: post.initial_price
             })
             .eq('id', post.id);
 
@@ -476,6 +481,9 @@ export async function POST(request) {
                 noDataAvailable: false,
                 status_message: "Post created after latest price data - can't check target/stop loss",
                 last_price_check: new Date().toISOString()
+                // Do not update these fields to preserve their original values
+                // country: post.country,
+                // initial_price: post.initial_price
               })
               .eq('id', post.id);
 
@@ -524,6 +532,9 @@ export async function POST(request) {
                   noDataAvailable: false,
                   status_message: "Post created after market close - recent price data not available",
                   last_price_check: new Date().toISOString()
+                  // Do not update these fields to preserve their original values
+                  // country: post.country,
+                  // initial_price: post.initial_price
                 })
                 .eq('id', post.id);
 
@@ -630,7 +641,7 @@ export async function POST(request) {
             strategy: post.strategy || '',
             description: post.description || '',
             
-            // Keep original metadata
+            // Keep original metadata - preserve country even if null
             image_url: post.image_url,
             country: post.country,
             exchange: post.exchange,
@@ -921,7 +932,10 @@ export async function POST(request) {
                 postDateAfterPriceDate: post.postDateAfterPriceDate,
                 postAfterMarketClose: post.postAfterMarketClose,
                 noDataAvailable: post.noDataAvailable,
-                status_message: post.status_message
+                status_message: post.status_message,
+                // Do not update these fields to prevent them from being set to null
+                // country: post.country,
+                // initial_price: post.initial_price,
               })
               .eq('id', post.id);
             

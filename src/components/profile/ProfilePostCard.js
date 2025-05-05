@@ -149,10 +149,10 @@ export const ProfilePostCard = ({ post = {} }) => {
         )}
 
         {/* Initial price (when post was created) */}
-        {post.current_price && (
+        {(post.initial_price || post.current_price) && (
           <div className={`${styles.priceItem} ${styles.initialPriceItem}`}>
             <span className={styles.priceLabel}>Initial Price:</span>
-            <span className={styles.priceValue}>{post.current_price}</span>
+            <span className={styles.priceValue}>{post.initial_price || post.current_price}</span>
           </div>
         )}
 
@@ -172,7 +172,7 @@ export const ProfilePostCard = ({ post = {} }) => {
         {/* Text-based progress indicator with percentage difference */}
         {!post.closed && post.last_price && post.target_price && !post.target_reached && (() => {
           // Parse values as numbers to ensure correct calculation
-          const initialPrice = parseFloat(post.current_price);
+          const initialPrice = parseFloat(post.initial_price || post.current_price);
           const currentPrice = parseFloat(post.last_price);
           const targetPrice = parseFloat(post.target_price);
           const isUpwardTarget = targetPrice > initialPrice;

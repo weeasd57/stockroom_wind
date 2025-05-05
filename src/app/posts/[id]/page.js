@@ -117,11 +117,11 @@ export default function PostDetailsPage() {
   
   // Calculate progress to target
   const calculateProgress = (post) => {
-    if (!post || !post.current_price || !post.last_price || !post.target_price) {
+    if (!post || !post.target_price) {
       return { percentage: 0, isMovingTowardTarget: false };
     }
     
-    const initialPrice = parseFloat(post.current_price);
+    const initialPrice = parseFloat(post.initial_price || post.current_price);
     const currentPrice = parseFloat(post.last_price);
     const targetPrice = parseFloat(post.target_price);
     
@@ -287,7 +287,7 @@ export default function PostDetailsPage() {
   }
   
   const countryCode = getCountryCode(post);
-  const priceChange = calculatePriceChange(post.current_price, post.last_price);
+  const priceChange = calculatePriceChange(post.initial_price || post.current_price, post.last_price);
   const progress = calculateProgress(post);
   const priceHistory = formatPriceHistory(post.price_checks);
   
@@ -332,7 +332,7 @@ export default function PostDetailsPage() {
           <div className={styles.priceGrid}>
             <div className={styles.priceItem}>
               <span className={styles.priceLabel}>Initial Price:</span>
-              <span className={styles.priceValue}>{post.current_price || 'N/A'}</span>
+              <span className={styles.priceValue}>{post.initial_price || post.current_price || 'N/A'}</span>
             </div>
             
             <div className={styles.priceItem}>
@@ -389,7 +389,7 @@ export default function PostDetailsPage() {
             </div>
           )}
           
-          {post.last_price && post.current_price && (
+          {post.last_price && (post.initial_price || post.current_price) && (
             <div className={styles.priceChangeContainer}>
               <span className={styles.priceChangeLabel}>Price Change:</span>
               <span className={`${styles.priceChangeValue} ${priceChange.isPositive ? styles.positive : styles.negative}`}>
@@ -421,7 +421,7 @@ export default function PostDetailsPage() {
               priceChecks={post.price_checks}
               targetPrice={post.target_price}
               stopLossPrice={post.stop_loss_price}
-              initialPrice={post.current_price}
+              initialPrice={post.initial_price || post.current_price}
             />
           )}
           

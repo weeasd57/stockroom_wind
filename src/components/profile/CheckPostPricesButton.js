@@ -198,9 +198,9 @@ export default function CheckPostPricesButton({ userId }) {
   
   // Calculate price change percentage and direction between initial and last price
   const getPriceChangeStatus = (post) => {
-    if (!post.current_price || !post.last_price) return null;
+    if (!post.last_price || (!post.initial_price && !post.current_price)) return null;
     
-    const initial = parseFloat(post.current_price);
+    const initial = parseFloat(post.initial_price || post.current_price);
     const last = parseFloat(post.last_price);
     
     if (last < initial) {

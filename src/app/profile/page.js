@@ -238,8 +238,20 @@ export default function Profile() {
 
   // Memoized handlers
   const handleTabChange = useCallback((tab) => {
+    // If we're coming from strategies tab to posts tab,
+    // and there's a selectedStrategyForDetails, use that as the strategy filter
+    if (tab === 'posts' && activeTab === 'strategies' && selectedStrategyForDetails) {
+      console.log(`Setting strategy filter to ${selectedStrategyForDetails} from strategy details`);
+      handleStrategyChange({ target: { value: selectedStrategyForDetails } });
+      setSelectedStrategyForDetails(null); // Clear after using
+    }
+    
+    // Always update the active tab
     setActiveTab(tab);
-  }, [setActiveTab]);
+    
+    // If switching to a tab other than posts, we don't need to do anything with filters
+    // as they'll only apply when we come back to the posts tab
+  }, [activeTab, selectedStrategyForDetails]);
 
   const handleEditProfile = useCallback(() => {
     setShowEditModal(true);
@@ -336,6 +348,15 @@ export default function Profile() {
   useEffect(() => {
     // Update local state when store state changes
     setLocalSelectedStrategy(selectedStrategy);
+  }, [selectedStrategy]);
+
+  // Add a useEffect to sync local state with global state
+  useEffect(() => {
+    // Sync local strategy state with global strategy state
+    if (selectedStrategy !== localSelectedStrategy) {
+      console.log(`Syncing strategy state: global=${selectedStrategy}, local=${localSelectedStrategy}`);
+      setLocalSelectedStrategy(selectedStrategy);
+    }
   }, [selectedStrategy]);
 
   // Only show loading state during initial load
@@ -861,10 +882,12 @@ export default function Profile() {
       console.log('[UI DEBUG] 🧹 Clearing strategy filter');
       console.time('[UI DEBUG] ⏱️ Clear strategy filter operation');
       clearSelectedStrategy();
+      setLocalSelectedStrategy(null); // Also update local state
     } else {
       console.log(`[UI DEBUG] 🔎 Setting strategy filter to: ${value}`);
       console.time('[UI DEBUG] ⏱️ Set strategy filter operation');
       setSelectedStrategy(value);
+      setLocalSelectedStrategy(value); // Also update local state
     }
     
     // Monitor when loading state changes back to false (completed)
@@ -890,6 +913,59 @@ export default function Profile() {
 
   // Get dialog state at the component level to avoid hooks in render functions
   const { isOpen, closeDialog } = useCreatePostForm();
+
+  // Add a helper function to determine if a post matches a given status
+  const matchesStatus = (post, statusFilter) => {
+    if (!statusFilter) {
+      return true; // No filter applied, so it matches
+    }
+    
+    if (statusFilter === 'success') {
+      return post.status === 'success' || post.target_reached === true;
+    } 
+    
+    if (statusFilter === 'loss') {
+      return post.status === 'loss' || post.stop_loss_triggered === true;
+    }
+    
+    if (statusFilter === 'open') {
+      // A post is "open" if:
+      // 1. It has an explicit "open" status, OR
+      // 2. It has no status AND hasn't reached target or triggered stop loss
+      return post.status === 'open' || 
+            (!post.status && !post.target_reached && !post.stop_loss_triggered);
+    }
+    
+    return false; // Unknown status filter
+  };
+
+  // Add a helper function to get country from a post
+  const getPostCountry = (post) => {
+    // Try to get country directly from post
+    if (post.country) {
+      return post.country;
+    }
+    
+    // Try to extract from symbol if available
+    if (post.symbol) {
+      const parts = post.symbol.split('.');
+      if (parts.length > 1) {
+        return parts[1];
+      }
+    }
+    
+    return null;
+  };
+
+  // Add a function to check if a post matches a country filter
+  const matchesCountry = (post, countryFilter) => {
+    if (!countryFilter) {
+      return true; // No filter applied, so it matches
+    }
+    
+    const postCountry = getPostCountry(post);
+    return postCountry === countryFilter;
+  };
 
   return (
     <div className={styles.profileContainer}>
@@ -1050,11 +1126,7 @@ export default function Profile() {
                     id="strategyFilter"
                     className={`${styles.filterSelect} ${localSelectedStrategy ? styles.activeFilter : ''}`}
                     value={localSelectedStrategy || ''}
-                    onChange={(e) => {
-                      setLocalSelectedStrategy(e.target.value || null);
-                      setFilterLoading(true);
-                      setTimeout(() => setFilterLoading(false), 300);
-                    }}
+                    onChange={handleStrategyChange}
                     disabled={filterLoading}
                   >
                     <option value="">All Strategies</option>
@@ -1067,9 +1139,7 @@ export default function Profile() {
                     <button 
                       className={styles.clearFilterButton}
                       onClick={() => {
-                        setLocalSelectedStrategy(null);
-                        setFilterLoading(true);
-                        setTimeout(() => setFilterLoading(false), 300);
+                        handleStrategyChange({ target: { value: '' } });
                       }}
                       aria-label="Clear strategy filter"
                     >
@@ -1089,6 +1159,11 @@ export default function Profile() {
                     onChange={(e) => {
                       setSelectedStatus(e.target.value);
                       setFilterLoading(true);
+                      
+                      // Debug the selected value
+                      console.log(`Status filter changed to: ${e.target.value}`);
+                      
+                      // Set a short timeout to simulate loading and give UI time to update
                       setTimeout(() => setFilterLoading(false), 300);
                     }}
                     disabled={filterLoading}
@@ -1131,20 +1206,7 @@ export default function Profile() {
                   >
                     <option value="">All Countries</option>
                     {Array.from(new Set(posts
-                      .map(post => {
-                        // Try to get country from post
-                        let countryCode = post.country;
-                        
-                        // If no country code directly, try to extract from symbol
-                        if (!countryCode && post.symbol) {
-                          const parts = post.symbol.split('.');
-                          if (parts.length > 1) {
-                            countryCode = parts[1];
-                          }
-                        }
-                        
-                        return countryCode;
-                      })
+                      .map(post => getPostCountry(post))
                       .filter(Boolean)))
                       .map(country => {
                         // Get country name if available
@@ -1177,10 +1239,17 @@ export default function Profile() {
                 <button 
                   className={styles.clearAllFiltersButton}
                   onClick={() => {
-                    setLocalSelectedStrategy(null);
+                    // Clear all filters
+                    handleStrategyChange({ target: { value: '' } });
                     setSelectedStatus('');
                     setSelectedCountry('');
                     setFilterLoading(true);
+                    
+                    // If we're not on the posts tab, switch to it to show all posts
+                    if (activeTab !== 'posts') {
+                      setActiveTab('posts');
+                    }
+                    
                     setTimeout(() => setFilterLoading(false), 300);
                   }}
                   aria-label="Clear all filters"
@@ -1226,12 +1295,11 @@ export default function Profile() {
                       // Strategy filter
                       const strategyMatch = !localSelectedStrategy || post.strategy === localSelectedStrategy;
                       
-                      // Status filter
-                      const statusMatch = !selectedStatus || post.status === selectedStatus;
+                      // Status filter - use the helper function
+                      const statusMatch = matchesStatus(post, selectedStatus);
                       
-                      // Country filter
-                      const countryMatch = !selectedCountry || post.country === selectedCountry || 
-                                        (post.symbol && post.symbol.split('.')[1] === selectedCountry);
+                      // Country filter - use the helper function
+                      const countryMatch = matchesCountry(post, selectedCountry);
                       
                       // All filters must match
                       return strategyMatch && statusMatch && countryMatch;
@@ -1363,8 +1431,17 @@ export default function Profile() {
                             <button 
                               className={styles.viewPostsButton}
                               onClick={() => {
-                                setSelectedStrategy(strategy);
-                                handleTabChange('posts');
+                                // Set the strategy filter
+                                handleStrategyChange({ target: { value: strategy } });
+                                
+                                // Switch to posts tab if not already there
+                                if (activeTab !== 'posts') {
+                                  setActiveTab('posts');
+                                }
+                                
+                                // Reset other filters for a cleaner view
+                                setSelectedStatus('');
+                                setSelectedCountry('');
                               }}
                             >
                               View Posts
