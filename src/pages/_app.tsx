@@ -1,5 +1,5 @@
 import type { AppProps } from 'next/app';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { PostProvider } from '@/providers';
 import { UserProvider } from '@/providers/UserProvider';
