@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { Comment } from '../models/Comment';
-import { fetchWithTimeout } from '../utils/api';
+import { fetchWithTimeout } from '../services/api';
 
 interface CommentContextType {
   comments: Comment[];

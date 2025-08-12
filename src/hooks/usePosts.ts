@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { PostWithUser, UsePostsOptions, PaginatedResponse } from '@/types';
-import { fetchWithTimeout } from '@/utils/api';
+import { fetchWithTimeout } from '@/services/api';
 
 interface UsePostsReturn {
   posts: PostWithUser[];

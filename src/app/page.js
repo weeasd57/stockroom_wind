@@ -7,7 +7,15 @@ import { createClient } from '@supabase/supabase-js';
 // Create a Supabase client for checking auth status
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+
+// Check if environment variables are set
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Missing Supabase environment variables. Redirecting to landing page.');
+}
+
+const supabase = supabaseUrl && supabaseAnonKey ? 
+  createClient(supabaseUrl, supabaseAnonKey) : 
+  null;
 
 export default function RootPage() {
   const [isVisible, setIsVisible] = useState(false);
@@ -18,6 +26,12 @@ export default function RootPage() {
   useEffect(() => {
     async function checkAuthAndRedirect() {
       try {
+        // If no Supabase client, redirect to landing
+        if (!supabase) {
+          router.push('/landing');
+          return;
+        }
+
         // Get the current session
         const { data: { session }, error } = await supabase.auth.getSession();
         

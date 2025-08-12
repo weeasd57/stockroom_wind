@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { User } from '../models/User';
-import { fetchWithTimeout } from '../utils/api';
+import { fetchWithTimeout } from '../services/api';
 
 interface UserContextType {
   user: User | null;
