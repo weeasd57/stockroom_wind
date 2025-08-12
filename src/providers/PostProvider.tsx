@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Post } from '../models/Post';
-import { fetchWithTimeout } from '../utils/api';
+import { fetchWithTimeout } from '../services/api';
 
 interface PostContextType {
   posts: Post[];
