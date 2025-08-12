@@ -1,10 +1,16 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import Navbar from '@/components/navbar';
 
 export function ClientSideLayout({ children }) {
   const [mounted, setMounted] = useState(false);
+  const pathname = usePathname();
+
+  // تحديد الصفحات التي لا تحتاج إلى Navbar
+  const pagesWithoutNavbar = ['/landing'];
+  const shouldShowNavbar = !pagesWithoutNavbar.includes(pathname);
 
   useEffect(() => {
     // Set mounted state once the component is on the client
@@ -83,8 +89,8 @@ export function ClientSideLayout({ children }) {
       className="flex flex-col min-h-screen"
       suppressHydrationWarning
     >
-      <Navbar />
-      <main className="flex-grow pt-16 w-full">
+      {shouldShowNavbar && <Navbar />}
+      <main className={`flex-grow w-full ${shouldShowNavbar ? 'pt-16' : ''}`}>
         {children}
       </main>
     </div>
