@@ -1,10 +1,12 @@
 .header {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   width: 100%;
   z-index: 1150;
-  background-color: hsla(var(--background), 0.8);
-  backdrop-filter: blur(8px);
+  background-color: hsla(var(--background), 0.95);
+  backdrop-filter: blur(12px);
   border-bottom: 1px solid transparent;
   transition: all 0.3s ease;
 }
@@ -23,6 +25,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .logo {
