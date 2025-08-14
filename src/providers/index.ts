@@ -5,3 +5,4 @@ export * from './SupabaseProvider';
 export * from './CreatePostFormProvider';
 export * from './AuthGuard';
 export * from './ProfileProvider';
+export * from './TradersProvider';

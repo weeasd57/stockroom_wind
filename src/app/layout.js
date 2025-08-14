@@ -3,6 +3,7 @@ import '@/styles/globals.css';
 import { ThemeProvider } from "@/providers/theme-provider";
 import { SupabaseProvider, UserProvider, CreatePostFormProvider } from '@/providers';
 import { ProfileProvider } from '@/providers/ProfileProvider';
+import { TradersProvider } from '@/providers/TradersProvider';
 import { AuthGuard } from '@/providers/AuthGuard';
 import { ClientSideLayout } from '@/providers/ClientSideLayout';
 import ClientImagePreloader from '@/providers/ClientImagePreloader';
@@ -25,6 +26,7 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
+  const isProd = process.env.NODE_ENV === 'production';
   return (
     <html lang="en" className={`scroll-smooth ${inter.variable} ${robotoMono.variable}`} suppressHydrationWarning>
       <head>
@@ -50,7 +52,7 @@ export default function RootLayout({ children }) {
         
         <Script id="console-suppressor" strategy="beforeInteractive">
           {`
-            if (process.env.NODE_ENV === 'production') {
+            if (${isProd}) {
               const originalLog = console.log;
               const originalInfo = console.info;
               const originalDebug = console.debug;
@@ -144,18 +146,20 @@ export default function RootLayout({ children }) {
         <SupabaseProvider>
           <UserProvider>
             <ProfileProvider>
-              <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={true}>
-                <CreatePostFormProvider>
-                  <ClientSideLayout>
-                    <AuthGuard>
-                      <ClientImagePreloader />
-                      <FollowProvider> {/* Wrap children with FollowProvider */}
-                        {children}
-                      </FollowProvider>
-                    </AuthGuard>
-                  </ClientSideLayout>
-                </CreatePostFormProvider>
-              </ThemeProvider>
+              <TradersProvider>
+                <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={true}>
+                  <CreatePostFormProvider>
+                    <ClientSideLayout>
+                      <AuthGuard>
+                        <ClientImagePreloader />
+                        <FollowProvider> {/* Wrap children with FollowProvider */}
+                          {children}
+                        </FollowProvider>
+                      </AuthGuard>
+                    </ClientSideLayout>
+                  </CreatePostFormProvider>
+                </ThemeProvider>
+              </TradersProvider>
             </ProfileProvider>
           </UserProvider>
         </SupabaseProvider>

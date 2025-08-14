@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabase } from '@/providers/SupabaseProvider';
+import { useProfile } from '@/providers/ProfileProvider';
 import Image from 'next/image';
 import styles from '@/styles/view-profile.module.css';
 import Link from 'next/link';
@@ -13,10 +14,19 @@ export default function ViewProfile({ params }) {
   const router = useRouter();
   const { isFollowing, toggleFollow, checkIsFollowing, loading: followLoading, error: followError } = useFollow(); // Use useFollow hook
   
+  // Try to get ProfileProvider for updating follow counts
+  let profileContext;
+  try {
+    profileContext = useProfile();
+  } catch (e) {
+    // ProfileProvider not available in this context, that's okay
+    console.log('[VIEW-PROFILE] ProfileProvider not available');
+  }
+  
   // Make sure to extract the ID correctly from params
   const userId = params?.id;
-  // console.log("Received params:", params);
-  // console.log("User ID from URL:", userId);
+  console.log("[VIEW-PROFILE] Component loaded with params:", params);
+  console.log("[VIEW-PROFILE] Extracted userId:", userId);
   
   const [loading, setLoading] = useState(true);
   const [profileData, setProfileData] = useState(null);
@@ -27,30 +37,49 @@ export default function ViewProfile({ params }) {
   const [error, setError] = useState(null);
   const [avatarError, setAvatarError] = useState(false);
 
+  // Safety timeout for loading state - in case something goes wrong
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (loading) {
+        console.warn('[VIEW-PROFILE] Loading timeout reached, forcing loading to false');
+        setLoading(false);
+      }
+    }, 10000); // 10 seconds timeout
+
+    return () => clearTimeout(timeoutId);
+  }, [loading]);
+
   // Fetch profile data
   useEffect(() => {
     // Only redirect if there's definitely no user ID
     if (userId === undefined || userId === null) {
-      // console.error("No user ID found in params, redirecting to home");
       router.push('/home');
       return;
     }
 
-    // console.log("Fetching profile data for user ID:", userId);
-    
+    let isCancelled = false;
+
+    const safeSetState = (setter) => {
+      if (!isCancelled) setter();
+    };
+
     const fetchProfileData = async () => {
       try {
+        console.log('[VIEW-PROFILE] Starting to fetch profile data for userId:', userId);
         setLoading(true);
+        setError(null);
         
         // Fetch user profile
+        console.log('[VIEW-PROFILE] Fetching profile from database...');
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', userId)
           .single();
           
+        console.log('[VIEW-PROFILE] Profile query result:', { profile: !!profile, error: profileError });
+          
         if (profileError) {
-          // console.error('Profile error:', profileError);
           throw profileError;
         }
         
@@ -58,8 +87,7 @@ export default function ViewProfile({ params }) {
           throw new Error('Profile not found');
         }
         
-        // console.log("Profile data fetched successfully:", profile);
-        setProfileData(profile);
+        safeSetState(() => setProfileData(profile));
         
         // Fetch user posts
         const { data: posts, error: postsError } = await supabase
@@ -68,43 +96,26 @@ export default function ViewProfile({ params }) {
           .eq('user_id', userId)
           .order('created_at', { ascending: false });
           
-        if (postsError) {
-          // console.error('Error fetching posts:', postsError);
-        } else {
-          // console.log("Posts fetched:", posts?.length || 0);
-          setProfilePosts(posts || []);
-          setPostCount(posts?.length || 0);
+        if (!postsError) {
+          safeSetState(() => setProfilePosts(posts || []));
+          safeSetState(() => setPostCount(posts?.length || 0));
         }
         
-        // Fetch followers
-        const { data: followersData, error: followersError } = await supabase
+        // Fetch followers (optional UI-managed)
+        await supabase
           .from('user_followings')
           .select('follower_id, profiles!user_followings_follower_id_fkey(id, username, avatar_url)')
           .eq('following_id', userId);
-          
-        if (followersError) {
-          // console.error('Error fetching followers:', followersError);
-        } else {
-          // console.log("Followers fetched:", followersData?.length || 0);
-          // setFollowers(followersData || []); // This state is now managed by FollowProvider
-        }
         
-        // Fetch following
-        const { data: followingData, error: followingError } = await supabase
+        // Fetch following (optional UI-managed)
+        await supabase
           .from('user_followings')
           .select('following_id, profiles!user_followings_following_id_fkey(id, username, avatar_url)')
           .eq('follower_id', userId);
-          
-        if (followingError) {
-          // console.error('Error fetching following:', followingError);
-        } else {
-          // console.log("Following fetched:", followingData?.length || 0);
-          // setFollowing(followingData || []); // This state is now managed by FollowProvider
-        }
         
         // Try to get avatar and background images
         if (profile.avatar_url) {
-          setAvatarUrl(profile.avatar_url);
+          safeSetState(() => setAvatarUrl(profile.avatar_url));
         } else {
           try {
             const { data: avatarData } = await supabase
@@ -113,16 +124,15 @@ export default function ViewProfile({ params }) {
               .getPublicUrl(`${userId}/avatar.png`);
               
             if (avatarData?.publicUrl) {
-              setAvatarUrl(`${avatarData.publicUrl}?t=${Date.now()}`);
+              safeSetState(() => setAvatarUrl(`${avatarData.publicUrl}?t=${Date.now()}`));
             }
           } catch (e) {
-            // console.log('No custom avatar found');
-            setAvatarUrl('/default-avatar.svg');
+            safeSetState(() => setAvatarUrl('/default-avatar.svg'));
           }
         }
         
         if (profile.background_url) {
-          setBackgroundUrl(profile.background_url);
+          safeSetState(() => setBackgroundUrl(profile.background_url));
         } else {
           try {
             const { data: bgData } = await supabase
@@ -131,30 +141,45 @@ export default function ViewProfile({ params }) {
               .getPublicUrl(`${userId}/background.png`);
               
             if (bgData?.publicUrl) {
-              setBackgroundUrl(`${bgData.publicUrl}?t=${Date.now()}`);
+              safeSetState(() => setBackgroundUrl(`${bgData.publicUrl}?t=${Date.now()}`));
             }
           } catch (e) {
-            // console.log('No custom background found');
+            // no-op
           }
         }
         
       } catch (error) {
-        // console.error('Error fetching profile:', error);
-        setError(error.message);
+        console.error('[VIEW-PROFILE] Error fetching profile:', error);
+        safeSetState(() => setError(error.message));
       } finally {
-        setLoading(false);
+        console.log('[VIEW-PROFILE] Setting loading to false');
+        safeSetState(() => setLoading(false));
       }
     };
 
     fetchProfileData();
-  }, [userId, supabase, router]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [userId]);
 
   // Use effect to check follow status using the FollowProvider
   useEffect(() => {
-    if (isAuthenticated && user && userId) {
-      checkIsFollowing(userId);
+    if (isAuthenticated && user?.id && userId) {
+      console.log('[VIEW-PROFILE] Checking follow status for user:', userId);
+      checkIsFollowing(userId)
+        .then(result => {
+          console.log('[VIEW-PROFILE] Follow status check completed:', result);
+        })
+        .catch(error => {
+          console.error('[VIEW-PROFILE] Error checking follow status:', error);
+        });
+    } else {
+      console.log('[VIEW-PROFILE] Skipping follow check - not authenticated or no userId');
     }
-  }, [isAuthenticated, user, userId, checkIsFollowing]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user?.id, userId]);
 
   const handleFollowClick = async () => {
     // Check if user is authenticated before following
@@ -163,34 +188,43 @@ export default function ViewProfile({ params }) {
       return;
     }
     
-    await toggleFollow(userId);
-    // Re-fetch profile data to get updated followers/following counts
-    // This might be redundant if the ProfileProvider or useFollow updates it
-    // but it ensures immediate UI consistency if not.
-    // Consider if this is truly needed or if a more granular update is better.
-    // For now, re-fetching profile data after a follow/unfollow is a simple solution.
-    // (Could be optimized by updating local state for followers/following counts)
-    const fetchUpdatedCounts = async () => {
-      const { data: updatedProfile, error: updateError } = await supabase
-        .from('profiles')
-        .select('followers, following')
-        .eq('id', userId)
-        .single();
-
-      if (updatedProfile) {
-        setProfileData(prev => ({
+    console.log('[VIEW-PROFILE] Follow button clicked, isFollowing before:', isFollowing);
+    
+    const wasFollowing = isFollowing;
+    
+    try {
+      await toggleFollow(userId);
+      console.log('[VIEW-PROFILE] Toggle follow completed, isFollowing after:', isFollowing);
+      
+      // Update local counts immediately for better UX
+      setProfileData(prev => {
+        if (!prev) return prev;
+        
+        const newFollowerCount = wasFollowing 
+          ? Math.max((prev.followers || 0) - 1, 0)
+          : (prev.followers || 0) + 1;
+          
+        return {
           ...prev,
-          followers: updatedProfile.followers,
-          following: updatedProfile.following,
-        }));
-        // Also update the local followers/following state which is used for the lists
-        // This part would need actual user data from the followings table to update lists correctly.
-        // For a quick fix, if `followers` and `following` are just numbers, update them directly.
-        // If they are lists of profile objects, a more complex re-fetch or state manipulation is needed.
-        // Given the current structure, let's assume direct number update is sufficient for now.
+          followers: newFollowerCount
+        };
+      });
+      
+      // Update ProfileProvider if available (for current user's following count)
+      if (profileContext && profileContext.updateFollowCounts && profileData) {
+        const action = wasFollowing ? 'unfollow' : 'follow';
+        const targetUserData = {
+          username: profileData.username || 'User',
+          avatar_url: profileData.avatar_url || '/default-avatar.svg'
+        };
+        profileContext.updateFollowCounts(action, userId, targetUserData);
+        console.log('[VIEW-PROFILE] Updated ProfileProvider follow counts');
       }
-    };
-    fetchUpdatedCounts();
+      
+    } catch (error) {
+      console.error('[VIEW-PROFILE] Error in handleFollowClick:', error);
+      // You might want to show an error message to the user here
+    }
   };
   
   const handleBackClick = () => {
@@ -202,7 +236,9 @@ export default function ViewProfile({ params }) {
     setAvatarUrl('/default-avatar.svg');
   };
 
-  if (loading || followLoading) { // Include followLoading in overall loading state
+  // Only show loading if profile data is still loading
+  // Don't block on follow loading since that's a secondary operation
+  if (loading) {
     return (
       <div className={styles.loadingContainer}>
         <div className={styles.loadingSpinner}></div>
@@ -211,11 +247,24 @@ export default function ViewProfile({ params }) {
     );
   }
 
-  if (error || followError) { // Include followError in overall error state
+  if (error) {
     return (
       <div className={styles.errorContainer}>
         <h2>Error Loading Profile</h2>
-        <p>{error || followError}</p>
+        <p>{error}</p>
+        <button onClick={handleBackClick} className={styles.backButton}>
+          Go Back
+        </button>
+      </div>
+    );
+  }
+
+  // Guard against rendering placeholders if data failed to load silently
+  if (!loading && !error && !profileData) {
+    return (
+      <div className={styles.errorContainer}>
+        <h2>Profile not found</h2>
+        <p>This profile may be private or unavailable. Please try again later.</p>
         <button onClick={handleBackClick} className={styles.backButton}>
           Go Back
         </button>
@@ -276,6 +325,9 @@ export default function ViewProfile({ params }) {
             >
               Login to follow
             </button>
+          )}
+          {followError && (
+            <p className={styles.followErrorText}>{followError}</p>
           )}
         </div>
       </div>

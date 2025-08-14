@@ -3,94 +3,28 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabase } from '@/providers/SupabaseProvider';
+import { useTraders } from '@/providers/TradersProvider';
 import styles from '@/styles/traders.module.css';
 
 export default function TradersPage() {
   const { supabase, isAuthenticated, user } = useSupabase();
-  const [traders, setTraders] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    traders,
+    loading,
+    error,
+    searchQuery,
+    filter,
+    hasMore,
+    setSearchQuery,
+    setFilter,
+    loadMore,
+    refreshTraders
+  } = useTraders();
+  
   const [visible, setVisible] = useState(false);
-  const [filter, setFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
   const [followings, setFollowings] = useState({});
+  const [loadingMore, setLoadingMore] = useState(false);
   const router = useRouter();
-
-  useEffect(() => {
-    const fetchTraders = async () => {
-      try {
-        setLoading(true);
-        
-        // First fetch user profiles
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('created_at', { ascending: false });
-          
-        if (profilesError) {
-          throw profilesError;
-        }
-
-        if (!profilesData || profilesData.length === 0) {
-          setTraders([]);
-          return;
-        }
-
-        // Fetch posts to count them for each user
-        const { data: postsData, error: postsError } = await supabase
-          .from('posts')
-          .select('user_id');
-
-        if (postsError) {
-          console.error('Error fetching posts:', postsError.message);
-        }
-
-        // Count posts for each user
-        const postCounts = {};
-        postsData?.forEach(post => {
-          if (post.user_id) {
-            postCounts[post.user_id] = (postCounts[post.user_id] || 0) + 1;
-          }
-        });
-
-        // Get avatar URLs for each profile
-        const tradersWithImages = await Promise.all(profilesData.map(async (profile) => {
-          let avatarUrl = profile.avatar_url;
-          
-          // If no avatar_url exists, try to get it from Supabase storage
-          if (!avatarUrl) {
-            try {
-              const { data: avatarData } = await supabase
-                .storage
-                .from('avatars')
-                .getPublicUrl(`${profile.id}/avatar.png`);
-                
-              if (avatarData?.publicUrl) {
-                avatarUrl = `${avatarData.publicUrl}?t=${Date.now()}`;
-              }
-            } catch (e) {
-              console.log('No custom avatar found for user:', profile.id);
-            }
-          }
-          
-          return {
-            ...profile,
-            avatar_url: avatarUrl || '/default-avatar.svg',
-            post_count: postCounts[profile.id] || 0
-          };
-        }));
-        
-        console.log('Fetched profiles with avatars:', tradersWithImages);
-        setTraders(tradersWithImages || []);
-      } catch (error) {
-        console.error('Error fetching traders:', error.message);
-        setTraders([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTraders();
-  }, [supabase]);
 
   // Animation effect
   useEffect(() => {
@@ -101,15 +35,14 @@ export default function TradersPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Add this effect to fetch user followings when authenticated
+  // Fetch user followings when authenticated
   useEffect(() => {
     const fetchFollowings = async () => {
       if (!isAuthenticated || !user) return;
       
       try {
-        // Check if we're using the correct table name
         const { data, error } = await supabase
-          .from('user_followings')  // Changed from 'followings' to 'user_followings'
+          .from('user_followings')
           .select('following_id')
           .eq('follower_id', user.id);
           
@@ -118,7 +51,6 @@ export default function TradersPage() {
           return;
         }
         
-        // Create a map of user_id -> following status
         const followingsMap = {};
         data.forEach(item => {
           followingsMap[item.following_id] = true;
@@ -133,54 +65,22 @@ export default function TradersPage() {
     fetchFollowings();
   }, [supabase, isAuthenticated, user]);
 
-  // Filter out the current user's profile and process other filters
-  const filteredTraders = traders.filter(trader => {
-    // Skip current user's profile
-    if (isAuthenticated && user && trader.id === user.id) {
-      return false;
-    }
-    
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        trader.full_name?.toLowerCase().includes(query) || 
-        trader.username?.toLowerCase().includes(query) ||
-        trader.bio?.toLowerCase().includes(query)
-      );
-    }
-    
-    if (filter === 'top') {
-      // Show users with the most posts
-      return trader.post_count > 0;
-    }
-    
-    if (filter === 'trending') {
-      // Show users created in the last month as trending
-      const oneMonthAgo = new Date();
-      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-      return new Date(trader.created_at) > oneMonthAgo;
-    }
-    
-    return true; // 'all' filter
-  });
-
+  // Navigation functions
   const navigateToProfile = (userId) => {
-    // If it's the current user's profile and they're authenticated, go to the profile page
     if (isAuthenticated && user && userId === user.id) {
       router.push('/profile');
       return;
     }
     
-    // For all other cases, go to the view-profile page with dynamic route
     if (userId) {
       router.push(`/view-profile/${userId}`);
     }
   };
 
+  // Handle follow click
   const handleFollowClick = async (e, userId) => {
-    e.stopPropagation(); // Prevent triggering the card click
+    e.stopPropagation();
     
-    // Check if user is authenticated before following
     if (!isAuthenticated) {
       router.push('/login');
       return;
@@ -190,7 +90,7 @@ export default function TradersPage() {
       const isFollowing = followings[userId];
       
       if (isFollowing) {
-        // Unfollow: Delete the relationship
+        // Unfollow
         const { error: deleteError } = await supabase
           .from('user_followings')
           .delete()
@@ -201,14 +101,13 @@ export default function TradersPage() {
           throw deleteError;
         }
         
-        // Update the local state to reflect the change
         const updatedFollowings = { ...followings };
         delete updatedFollowings[userId];
         setFollowings(updatedFollowings);
         
         console.log('Unfollowed user:', userId);
       } else {
-        // Follow: Create the relationship
+        // Follow
         const { error: insertError } = await supabase
           .from('user_followings')
           .insert([
@@ -219,7 +118,6 @@ export default function TradersPage() {
           throw insertError;
         }
         
-        // Update the local state to reflect the change
         setFollowings({ ...followings, [userId]: true });
         
         console.log('Followed user:', userId);
@@ -229,6 +127,46 @@ export default function TradersPage() {
       alert('There was an error updating your following status');
     }
   };
+
+  // Handle load more
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      setLoadingMore(true);
+      loadMore();
+      // Reset loading state after a delay
+      setTimeout(() => setLoadingMore(false), 1000);
+    }
+  };
+
+  // Lazy Image Component
+  const LazyImage = ({ src, alt, profileId, onError }) => {
+    return (
+      <img 
+        src={src || '/default-avatar.svg'}
+        alt={alt}
+        onError={onError}
+      />
+    );
+  };
+
+  // Show error state
+  if (error) {
+    return (
+      <div className={`${styles.tradersPage} ${visible ? styles.visible : ''}`}>
+        <div className={styles.pageHeader}>
+          <h1>Top Traders</h1>
+          <p>Follow and learn from successful traders in the community</p>
+        </div>
+        
+        <div className={styles.errorContainer}>
+          <p>Error loading traders: {error}</p>
+          <button onClick={refreshTraders} className={styles.retryButton}>
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`${styles.tradersPage} ${visible ? styles.visible : ''}`}>
@@ -279,26 +217,26 @@ export default function TradersPage() {
         </div>
       ) : (
         <div className={styles.tradersGrid}>
-          {filteredTraders.length > 0 ? (
-            filteredTraders.map(trader => (
+          {traders.length > 0 ? (
+            traders.map(trader => (
               <div key={trader.id} className={styles.traderCard}>
                 <div 
                   className={styles.traderHeader}
                   onClick={() => navigateToProfile(trader.id)}
                 >
                   <div className={styles.traderAvatar}>
-                    <img 
+                    <LazyImage
                       src={trader.avatar_url || '/default-avatar.svg'}
                       alt={trader.username}
+                      profileId={trader.id}
                       onError={(e) => {
-                        // Silent fallback to default avatar
                         e.target.onerror = null;
                         e.target.src = '/default-avatar.svg';
                       }}
                     />
                   </div>
                   <div className={styles.traderInfo}>
-                    <h3>{trader.name || trader.full_name || trader.username || 'Trader'}</h3>
+                    <h3>{trader.full_name || trader.username || 'Trader'}</h3>
                     <p className={styles.username}>@{trader.username || 'username'}</p>
                   </div>
                 </div>
@@ -321,18 +259,14 @@ export default function TradersPage() {
                 <p className={styles.traderBio}>{trader.bio || 'No bio available'}</p>
                 
                 <div className={styles.cardActions}>
-                  <button 
-                    className={styles.viewProfileButton}
-                    onClick={() => navigateToProfile(trader.id)}
-                  >
-                    View Profile
-                  </button>
-                  <button 
-                    className={styles.followButton}
-                    onClick={(e) => handleFollowClick(e, trader.id)}
-                  >
-                    {followings[trader.id] ? 'Unfollow' : 'Follow'}
-                  </button>
+                  {isAuthenticated && (
+                    <button 
+                      className={followings[trader.id] ? styles.unfollowButton : styles.followButton}
+                      onClick={(e) => handleFollowClick(e, trader.id)}
+                    >
+                      {followings[trader.id] ? 'Unfollow' : 'Follow'}
+                    </button>
+                  )}
                 </div>
               </div>
             ))
@@ -341,6 +275,26 @@ export default function TradersPage() {
               <p>No traders found matching your criteria</p>
             </div>
           )}
+        </div>
+      )}
+      
+      {/* Load More Button */}
+      {!loading && hasMore && traders.length > 0 && (
+        <div className={styles.loadMoreContainer}>
+          <button 
+            className={styles.loadMoreButton}
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+          >
+            {loadingMore ? (
+              <>
+                <div className={styles.buttonSpinner}></div>
+                Loading more...
+              </>
+            ) : (
+              'Load More Traders'
+            )}
+          </button>
         </div>
       )}
     </div>

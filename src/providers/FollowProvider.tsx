@@ -19,6 +19,8 @@ export const FollowProvider = ({ children }: { children: ReactNode }) => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // We'll handle ProfileProvider integration at component level instead
 
   // Function to check if the current user is following a specific profile
   const checkIsFollowing = useCallback(async (profileIdToFollow: string): Promise<boolean> => {
@@ -60,8 +62,23 @@ export const FollowProvider = ({ children }: { children: ReactNode }) => {
 
   // Function to toggle follow status
   const toggleFollow = useCallback(async (profileIdToToggle: string) => {
+    console.log('[FOLLOW] Toggle follow called with:', { 
+      isAuthenticated, 
+      userId: user?.id, 
+      profileIdToToggle 
+    });
+    
     if (!isAuthenticated || !user || !profileIdToToggle) {
+      console.error('[FOLLOW] Missing authentication or profile ID:', { 
+        isAuthenticated, 
+        hasUser: !!user, 
+        profileIdToToggle 
+      });
       setError('Authentication required or profile ID missing.');
+      return;
+    }
+    if (user.id === profileIdToToggle) {
+      setError("You can't follow yourself.");
       return;
     }
 
@@ -69,36 +86,86 @@ export const FollowProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     try {
       const currentFollowStatus = await checkIsFollowing(profileIdToToggle);
+      // Optimistic toggle
+      setIsFollowing(!currentFollowStatus);
 
       if (currentFollowStatus) {
-        // Unfollow
+        // Unfollow - Use Supabase client directly instead of API route
         console.log(`Unfollowing user ${profileIdToToggle} from ${user.id}`);
-        const response = await fetch('/api/unfollow', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include', // Include cookies for authentication
-          body: JSON.stringify({ follower_id: user.id, following_id: profileIdToToggle }),
-        });
+        
+        // Delete the follow relationship
+        const { error } = await supabase
+          .from('user_followings')
+          .delete()
+          .eq('follower_id', user.id)
+          .eq('following_id', profileIdToToggle);
 
-        if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.error || 'Failed to unfollow user.');
+        if (error) {
+          console.error('[UNFOLLOW] Database error:', error);
+          // Fallback to API route (server-side auth context)
+          const res = await fetch('/api/unfollow', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ follower_id: user.id, following_id: profileIdToToggle })
+          });
+          if (!res.ok) {
+            // Revert optimistic update
+            setIsFollowing(true);
+            const { error: apiError } = await res.json().catch(() => ({ error: 'Unfollow failed' }));
+            throw new Error(apiError || 'Failed to unfollow user');
+          }
         }
         setIsFollowing(false);
         console.log('Successfully unfollowed.');
       } else {
-        // Follow
+        // Follow - Use Supabase client directly instead of API route
         console.log(`Following user ${profileIdToToggle} by ${user.id}`);
-        const response = await fetch('/api/follow', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include', // Include cookies for authentication
-          body: JSON.stringify({ follower_id: user.id, following_id: profileIdToToggle }),
-        });
+        
+        // First check if already following to avoid duplicate entries
+        const { data: existingFollow } = await supabase
+          .from('user_followings')
+          .select('id')
+          .eq('follower_id', user.id)
+          .eq('following_id', profileIdToToggle)
+          .maybeSingle();
 
-        if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.error || 'Failed to follow user.');
+        if (existingFollow) {
+          console.log('[FOLLOW] Already following this user');
+          setIsFollowing(true);
+          return;
+        }
+
+        // Insert new follow relationship
+        const { data, error } = await supabase
+          .from('user_followings')
+          .insert([{ follower_id: user.id, following_id: profileIdToToggle }])
+          .select();
+
+        if (error) {
+          console.error('[FOLLOW] Database error:', error);
+          // Handle common database errors gracefully
+          const code = (error as any).code || (error as any).details;
+          if (code === '23505') { // unique_violation
+            // Already following – mark as following silently
+            setIsFollowing(true);
+            return;
+          }
+          if (code === '23503' || (error.message && error.message.toLowerCase().includes('foreign key'))) {
+            setError('Your profile is not initialized properly. Please sign out and sign in again, then try following.');
+            throw new Error('Profile not initialized (FK)');
+          }
+          // Fallback to API route
+          const res = await fetch('/api/follow', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ follower_id: user.id, following_id: profileIdToToggle })
+          });
+          if (!res.ok) {
+            // Revert optimistic update
+            setIsFollowing(false);
+            const { error: apiError } = await res.json().catch(() => ({ error: 'Follow failed' }));
+            throw new Error(apiError || 'Failed to follow user');
+          }
         }
         setIsFollowing(true);
         console.log('Successfully followed.');

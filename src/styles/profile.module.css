@@ -1,7 +1,7 @@
 .profileContainer {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 1rem;
+  padding: 3rem 1rem 1rem 1rem; /* Add more padding to the top */
   animation: fadeIn 0.5s ease-out;
   position: relative;
   overflow-x: hidden;

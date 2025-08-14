@@ -6,6 +6,7 @@ import { useProfile } from '@/providers/ProfileProvider';
 import { CreatePostButton } from '@/components/posts/CreatePostButton';
 import { CreatePostForm } from '@/components/posts/CreatePostForm';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
+import { DashboardSection } from '@/components/home/DashboardSection';
 import { createPortal } from 'react-dom';
 import styles from '@/styles/home.module.css';
 import '@/styles/create-post-page.css'; 
@@ -207,6 +208,9 @@ export default function HomePage() {
   return (
     <div className={`${styles.homePage} ${visible ? styles.visible : ''}`}>
       <div className={styles.homeContent}>
+        {/* Dashboard Section */}
+        <DashboardSection />
+
         {/* Create Post Section */}
         <div className={styles.createPostSection}>
           <div className={styles.createPostContainer}>
@@ -215,12 +219,8 @@ export default function HomePage() {
             <CreatePostButton size={getButtonSize()} />
           </div>
         </div>
-        
-        <div className={styles.feedsSection}>
-          {/* Feed content */}
-        </div>
       </div>
-      
+
       {/* Portal for dialog */}
       {portalContainer && isOpen && createPortal(renderDialog(), portalContainer)}
     </div>

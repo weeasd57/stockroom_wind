@@ -495,6 +495,78 @@ export function ProfileProvider({ children }) {
     setSelectedStrategy(null);
   };
 
+  // Functions to update follow counts and data
+  const updateFollowCounts = (action, targetUserId, targetUserData = {}) => {
+    console.log(`[PROFILE] Updating follow counts - action: ${action}, targetUserId: ${targetUserId}`);
+    
+    if (action === 'follow') {
+      // User followed someone - increment following count
+      setFollowing(prev => {
+        const newFollowing = [...prev];
+        const targetUser = {
+          following_id: targetUserId,
+          profiles: {
+            id: targetUserId,
+            username: targetUserData.username || 'User',
+            avatar_url: targetUserData.avatar_url || '/default-avatar.svg'
+          }
+        };
+        newFollowing.push(targetUser);
+        return newFollowing;
+      });
+    } else if (action === 'unfollow') {
+      // User unfollowed someone - decrement following count
+      setFollowing(prev => prev.filter(f => f.following_id !== targetUserId));
+    }
+    
+    // Update profile counts for current user
+    if (profile && user?.id === profile.id) {
+      setProfile(prev => ({
+        ...prev,
+        following: action === 'follow' 
+          ? (prev.following || 0) + 1 
+          : Math.max((prev.following || 0) - 1, 0)
+      }));
+    }
+  };
+  
+  const updateTargetUserFollowers = (action, targetUserId, currentUserData = {}) => {
+    console.log(`[PROFILE] Updating target user followers - action: ${action}, targetUserId: ${targetUserId}`);
+    
+    // If we're viewing the target user's profile, update their followers
+    if (profile && profile.id === targetUserId) {
+      if (action === 'follow') {
+        // Someone followed this user - add to followers
+        setFollowers(prev => {
+          const newFollower = {
+            follower_id: user?.id,
+            profiles: {
+              id: user?.id,
+              username: currentUserData.username || user?.email?.split('@')[0] || 'User',
+              avatar_url: currentUserData.avatar_url || '/default-avatar.svg'
+            }
+          };
+          return [...prev, newFollower];
+        });
+        
+        // Update followers count in profile
+        setProfile(prev => ({
+          ...prev,
+          followers: (prev.followers || 0) + 1
+        }));
+      } else if (action === 'unfollow') {
+        // Someone unfollowed this user - remove from followers
+        setFollowers(prev => prev.filter(f => f.follower_id !== user?.id));
+        
+        // Update followers count in profile
+        setProfile(prev => ({
+          ...prev,
+          followers: Math.max((prev.followers || 0) - 1, 0)
+        }));
+      }
+    }
+  };
+
   // Add a new post to the posts array
   const addPost = (post) => {
     setPosts(prevPosts => [post, ...prevPosts]);
@@ -570,6 +642,10 @@ export function ProfileProvider({ children }) {
       setSelectedStrategy,
       clearSelectedStrategy,
       addPost,
+      
+      // Follow-related functions
+      updateFollowCounts,
+      updateTargetUserFollowers,
       
       // Static methods
       getState

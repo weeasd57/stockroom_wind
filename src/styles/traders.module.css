@@ -3,7 +3,7 @@
 .tradersPage {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 3rem 1rem 2rem 1rem; /* Add more padding to the top */
   opacity: 0;
   transform: translateY(10px);
   transition: opacity 0.3s ease, transform 0.3s ease;
@@ -266,6 +266,23 @@
   opacity: 0.9;
 }
 
+/* Unfollow variant: red border, transparent background */
+.unfollowButton {
+  flex: 1;
+  background-color: transparent;
+  color: hsl(var(--destructive));
+  border: 1px solid hsl(var(--destructive));
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.unfollowButton:hover {
+  background-color: hsl(var(--destructive) / 0.08);
+}
+
 /* Loading State */
 .loadingContainer {
   display: flex;
@@ -301,6 +318,51 @@
   padding: 3rem;
   grid-column: 1 / -1;
   color: hsl(var(--muted-foreground));
+}
+
+/* Load More Button */
+.loadMoreContainer {
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
+  padding: 1rem;
+}
+
+.loadMoreButton {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  border-radius: 8px;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: 180px;
+}
+
+.loadMoreButton:hover:not(:disabled) {
+  background-color: hsl(var(--primary) / 0.9);
+  transform: translateY(-2px);
+}
+
+.loadMoreButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.buttonSpinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid hsl(var(--primary-foreground) / 0.3);
+  border-radius: 50%;
+  border-top-color: hsl(var(--primary-foreground));
+  animation: spinner 0.8s linear infinite;
 }
 
 /* Responsive Styles */
@@ -355,7 +417,8 @@
   }
   
   .viewProfileButton,
-  .followButton {
+  .followButton,
+  .unfollowButton {
     width: 100%;
     padding: 0.5rem;
   }

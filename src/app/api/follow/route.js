@@ -6,11 +6,19 @@ export async function POST(req) {
   try {
     const { follower_id, following_id } = await req.json();
     
+    console.log('[FOLLOW API] Request received for:', { follower_id, following_id });
+    
     // Create supabase client with the request context
     const supabase = createRouteHandlerClient({ cookies });
     
     // Get the current user session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    console.log('[FOLLOW API] Session check result:', { 
+      hasSession: !!session, 
+      userId: session?.user?.id,
+      error: sessionError?.message 
+    });
     
     if (sessionError || !session?.user) {
       console.error('Authentication error:', sessionError?.message || 'No session found');

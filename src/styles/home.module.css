@@ -305,7 +305,39 @@
   justify-content: center;
 }
 
-/* Feeds Section */
-.feedsSection {
+/* Main Content Grid */
+.mainContentGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
   width: 100%;
+  margin-top: 2rem;
+}
+
+.postsColumn {
+  width: 100%;
+}
+
+.sidebarColumn {
+  width: 100%;
+}
+
+/* Desktop layout */
+@media (min-width: 1024px) {
+  .mainContentGrid {
+    grid-template-columns: 2fr 1fr;
+    gap: 32px;
+  }
+  
+  .homeContent {
+    max-width: 1400px;
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .homeContent {
+    max-width: 1600px;
+    padding: 2rem;
+  }
 }
