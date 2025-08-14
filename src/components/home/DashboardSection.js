@@ -56,7 +56,7 @@ export function DashboardSection() {
           successRate,
           followers: followersCount,
           following: followingCount,
-          experienceScore: profileData?.experience_Score || 0
+          experienceScore: profileData?.experience_score || 0
         });
 
       } catch (error) {
@@ -67,7 +67,7 @@ export function DashboardSection() {
     }
 
     fetchUserStats();
-  }, [user?.id, profileData?.id, profileData?.experience_Score, followersList?.length, followingList?.length]);
+  }, [user?.id, profileData?.id, profileData?.experience_score, followersList?.length, followingList?.length]);
 
   if (loading) {
     return (

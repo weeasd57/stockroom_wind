@@ -1,0 +1,92 @@
+.actionsContainer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 16px 0;
+}
+
+.actionButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 20px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.actionButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.actionButton.active {
+  border-color: #3b82f6;
+  background: #3b82f6;
+  color: white;
+}
+
+.actionButton.active:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.actionButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Buy button specific styles */
+.actionButton:first-child:hover:not(.active) {
+  border-color: #10b981;
+  color: #10b981;
+}
+
+.actionButton:first-child.active {
+  border-color: #10b981;
+  background: #10b981;
+}
+
+.actionButton:first-child.active:hover {
+  background: #059669;
+  border-color: #059669;
+}
+
+/* Sell button specific styles */
+.actionButton:last-child:hover:not(.active) {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.actionButton:last-child.active {
+  border-color: #ef4444;
+  background: #ef4444;
+}
+
+.actionButton:last-child.active:hover {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .actionButton {
+    border-color: #374151;
+    color: #d1d5db;
+  }
+  
+  .actionButton:hover:not(.active) {
+    border-color: #6b7280;
+    color: #f3f4f6;
+  }
+}

@@ -2,20 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
-
-// Create a Supabase client for checking auth status
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-// Check if environment variables are set
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Missing Supabase environment variables. Redirecting to landing page.');
-}
-
-const supabase = supabaseUrl && supabaseAnonKey ? 
-  createClient(supabaseUrl, supabaseAnonKey) : 
-  null;
+import { supabase } from '@/utils/supabase';
 
 export default function RootPage() {
   const [isVisible, setIsVisible] = useState(false);

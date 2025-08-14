@@ -49,15 +49,15 @@ export async function POST(request) {
       last_sign_in: now,
       success_posts: 0,
       loss_posts: 0,
-      experience_Score: 0,
+      experience_score: 0,
       followers: 0,
       following: 0,
-      avatar_url: null,
-      background_url: null,
-      bio: null,
-      website: null,
-      favorite_markets: null,
-      full_name: null
+      avatar_url: '/default-avatar.svg',
+      background_url: '/profile-bg.jpg',
+      bio: '',
+      website: '',
+      favorite_markets: [],
+      full_name: username || email.split('@')[0]
     };
 
     const { data, error } = await supabase

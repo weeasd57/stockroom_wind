@@ -189,7 +189,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
               success_posts: 0,
               loss_posts: 0,
               background_url: null,
-              experience_Score: 0,
+              experience_score: 0,
               followers: 0,
               following: 0
             };
@@ -437,15 +437,21 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   };
 
   const handleLogout = async () => {
-    if (isLoggingOut) return;
+    console.log('[SupabaseProvider] handleLogout: Started');
+    if (isLoggingOut) {
+      console.log('[SupabaseProvider] handleLogout: Already logging out, returning.');
+      return;
+    }
     
     try {
       setIsLoggingOut(true);
+      console.log('[SupabaseProvider] handleLogout: Calling signOut function...');
       await signOut();
-      // console.log('User logged out successfully');
+      console.log('[SupabaseProvider] handleLogout: signOut completed. User logged out successfully.');
       
       // Get the current path
       const currentPath = window.location.pathname;
+      console.log('[SupabaseProvider] handleLogout: Current path:', currentPath);
       
       // Check if we're on a view-profile page or other public page
       if (currentPath.startsWith('/view-profile/') || 
@@ -453,15 +459,18 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
           currentPath === '/landing') {
         // Don't redirect - stay on the current page
         // Just refresh the component by setting isAuthenticated to false
+        console.log('[SupabaseProvider] handleLogout: Staying on public page, updating auth state.');
         setIsAuthenticated(false);
         setUser(null);
       } else {
         // Redirect to landing page for non-public pages
+        console.log('[SupabaseProvider] handleLogout: Redirecting to /landing.');
         router.push('/landing');
       }
     } catch (error) {
-      // console.error('Error logging out:', error);
+      console.error('[SupabaseProvider] handleLogout: Error during logout:', error);
     } finally {
+      console.log('[SupabaseProvider] handleLogout: Finished. Setting isLoggingOut to false.');
       setIsLoggingOut(false);
     }
   };

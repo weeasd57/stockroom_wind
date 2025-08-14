@@ -18,7 +18,7 @@ export interface User {
   success_posts: number;
   loss_posts: number;
   background_url: string | null;
-  experience_Score: number;
+  experience_score: number;
   followers: number | null;
   following: number | null;
   is_active?: boolean;

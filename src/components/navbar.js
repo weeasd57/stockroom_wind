@@ -291,99 +291,101 @@ export default function Navbar() {
         className={`${styles.mobileMenu} ${isMenuOpen ? styles.open : ''}`}
         aria-hidden={!isMenuOpen}
       >
-        <nav className={styles.mobileNav} aria-label="Mobile navigation">
-          <ul className={styles.mobileNavList}>
-            {navLinks.map((link, index) => (
-              <li key={link.href} className={styles.mobileNavItem} style={{ animationDelay: `${index * 100}ms` }}>
-                <button 
-                  onClick={() => handleNavigation(link.href)}
-                  className={`${styles.mobileNavLink} ${pathname === link.href ? styles.active : ''}`}
-                >
-                  <span className={styles.navIcon} aria-hidden="true">
-                    {link.icon}
-                  </span>
-                  {link.label}
-                </button>
-              </li>
-            ))}
-          </ul>
+        <div className={styles.mobileMenuContent}>
+          <nav className={styles.mobileNav} aria-label="Mobile navigation">
+            <ul className={styles.mobileNavList}>
+              {navLinks.map((link, index) => (
+                <li key={link.href} className={styles.mobileNavItem} style={{ animationDelay: `${index * 100}ms` }}>
+                  <button 
+                    onClick={() => handleNavigation(link.href)}
+                    className={`${styles.mobileNavLink} ${pathname === link.href ? styles.active : ''}`}
+                  >
+                    <span className={styles.navIcon} aria-hidden="true">
+                      {link.icon}
+                    </span>
+                    {link.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
 
-          <div className={styles.mobileActions}>
-            <div className={styles.mobileThemeToggle}>
-              <ModeToggle />
-            </div>
-
-            {isAuthenticated ? (
-              <div className={styles.mobileUserSection}>
-                <button 
-                  onClick={() => handleNavigation('/profile')}
-                  className={styles.mobileProfileButton}
-                >
-                  <div className={styles.avatarWrapper}>
-                    {avatarLoading ? (
-                      <div className={styles.avatarSkeleton}>
-                        <span className={styles.avatarFallback}>
-                          {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
-                        </span>
-                      </div>
-                    ) : (
-                      <Avatar className={styles.avatar}>
-                        <AvatarImage 
-                          src={avatarUrl} 
-                          alt={`${profile?.username || 'User'}'s Avatar`}
-                          onError={(e) => {
-                            console.error('Error loading mobile navbar avatar image');
-                            e.target.src = '/default-avatar.svg';
-                          }}
-                        />
-                        <AvatarFallback>
-                          {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                    )}
-                  </div>
-                  <span>View Profile</span>
-                </button>
-                
-                <button 
-                  className={styles.mobileLogoutButton} 
-                  onClick={handleLogoutClick}
-                  disabled={isLoggingOut}
-                >
-                  {isLoggingOut ? (
-                    <>
-                      <span className={styles.spinner} aria-hidden="true"></span>
-                      Logging out...
-                    </>
-                  ) : (
-                    <>
-                      <span aria-hidden="true">👋</span>
-                      Logout
-                    </>
-                  )}
-                </button>
+            <div className={styles.mobileActions}>
+              <div className={styles.mobileThemeToggle}>
+                <ModeToggle />
               </div>
-            ) : (
-              <button 
-                onClick={() => handleNavigation('/login')}
-                className={styles.mobileSignInButton}
-              >
-                <span aria-hidden="true">🚀</span>
-                Sign In
-              </button>
-            )}
-          </div>
-        </nav>
+
+              {isAuthenticated ? (
+                <div className={styles.mobileUserSection}>
+                  <button 
+                    onClick={() => handleNavigation('/profile')}
+                    className={styles.mobileProfileButton}
+                  >
+                    <div className={styles.avatarWrapper}>
+                      {avatarLoading ? (
+                        <div className={styles.avatarSkeleton}>
+                          <span className={styles.avatarFallback}>
+                            {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                          </span>
+                        </div>
+                      ) : (
+                        <Avatar className={styles.avatar}>
+                          <AvatarImage 
+                            src={avatarUrl} 
+                            alt={`${profile?.username || 'User'}'s Avatar`} 
+                            onError={(e) => {
+                              console.error('Error loading mobile navbar avatar image');
+                              e.target.src = '/default-avatar.svg';
+                            }}
+                          />
+                          <AvatarFallback>
+                            {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+                    </div>
+                    <span>View Profile</span>
+                  </button>
+                  
+                  <button 
+                    className={styles.mobileLogoutButton} 
+                    onClick={handleLogoutClick}
+                    disabled={isLoggingOut}
+                  >
+                    {isLoggingOut ? (
+                      <>
+                        <span className={styles.spinner} aria-hidden="true"></span>
+                        Logging out...
+                      </>
+                    ) : (
+                      <>
+                        <span aria-hidden="true">👋</span>
+                        Logout
+                      </>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => handleNavigation('/login')}
+                  className={styles.mobileSignInButton}
+                >
+                  <span aria-hidden="true">🚀</span>
+                  Sign In
+                </button>
+              )}
+            </div>
+          </nav>
+        </div>
       </div>
 
       {/* Mobile Menu Overlay */}
-      {isMenuOpen && (
+      {/* {isMenuOpen && (
         <div 
           className={styles.mobileOverlay}
           onClick={closeMenu}
           aria-hidden="true"
         />
-      )}
+      )} */}
     </header>
   );
 }

@@ -60,7 +60,7 @@ export default function Profile() {
       console.log("[PROFILE] Profile data type:", typeof profile);
       console.log("[PROFILE] Profile keys:", Object.keys(profile));
       console.log("[PROFILE] Experience score from database:", {
-        experience_Score: profile.experience_Score,
+        experience_score: profile.experience_score,
         success_posts: profile.success_posts,
         loss_posts: profile.loss_posts
       });
@@ -82,8 +82,8 @@ export default function Profile() {
   const [backgroundFile, setBackgroundFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [backgroundPreview, setBackgroundPreview] = useState(null);
-  const [avatarUrl, setAvatarUrl] = useState(contextAvatarUrl || '/default-avatar.svg');
-  const [backgroundUrl, setBackgroundUrl] = useState(contextBackgroundUrl || '/profile-bg.jpg');
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  const [backgroundUrl, setBackgroundUrl] = useState(null);
   const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
   const [backgroundUploadProgress, setBackgroundUploadProgress] = useState(0);
   const [avatarUploadError, setAvatarUploadError] = useState(null);
@@ -200,42 +200,6 @@ export default function Profile() {
     }
   }, [profile]);
 
-  // Add this effect to load images when profile or context data updates
-  useEffect(() => {
-    if (user && isAuthenticated) {
-      const loadImages = async () => {
-        try {
-          // Only update if context URLs exist and are different from current URLs
-          const shouldUpdateAvatar = contextAvatarUrl && 
-            (!avatarUrl || !avatarUrl.includes(contextAvatarUrl.split('?')[0]));
-            
-          const shouldUpdateBackground = contextBackgroundUrl && 
-            (!backgroundUrl || !backgroundUrl.includes(contextBackgroundUrl.split('?')[0]));
-          
-          if (shouldUpdateAvatar || shouldUpdateBackground) {
-            console.log('Loading profile images from context - detected changes');
-            
-            if (shouldUpdateAvatar) {
-              console.log('Setting avatar URL:', contextAvatarUrl);
-              setAvatarUrl(contextAvatarUrl);
-            }
-            
-            if (shouldUpdateBackground) {
-              console.log('Setting background URL:', contextBackgroundUrl);
-              setBackgroundUrl(contextBackgroundUrl);
-            }
-          } else {
-            console.log('Skipping profile image update - no changes detected');
-          }
-        } catch (error) {
-          console.error('Error setting profile images:', error);
-        }
-      };
-      
-      loadImages();
-    }
-  }, [user, isAuthenticated, contextAvatarUrl, contextBackgroundUrl]);
-
   // Memoized handlers
   const handleTabChange = useCallback((tab) => {
     // If we're coming from strategies tab to posts tab,
@@ -271,41 +235,28 @@ export default function Profile() {
   }, [profile]);
 
   // Add this function at the top level of the component
-  const addCacheBuster = (url) => {
+  const addCacheBuster = useCallback((url) => {
     if (!url || url.startsWith('/')) return url;
     const cacheBuster = `?t=${Date.now()}`;
     return url.includes('?') ? url : `${url}${cacheBuster}`;
-  };
+  }, []);
 
- 
-  // Add this effect to load images only once when the page loads
+  // Synchronize avatar and background URLs from context
   useEffect(() => {
-    if (user && isAuthenticated && profile) {
-      // Create a function that sets image URLs only once
-      const loadImagesOnce = async () => {
-        console.log('Loading profile images on page load');
-        
-        try {
-          // Set avatar URL once without cache busting
-          if (contextAvatarUrl) {
-            console.log('Setting initial avatar URL:', contextAvatarUrl);
-            setAvatarUrl(contextAvatarUrl);
-          }
-          
-          // Set background image once
-          if (contextBackgroundUrl) {
-            console.log('Setting initial background URL:', contextBackgroundUrl);
-            setBackgroundUrl(contextBackgroundUrl);
-          }
-        } catch (error) {
-          console.error('Error loading initial images:', error);
-        }
-      };
-      
-      // Run the function
-      loadImagesOnce();
+    // Set avatar URL if available from context or default
+    if (contextAvatarUrl) {
+      setAvatarUrl(contextAvatarUrl);
+    } else {
+      setAvatarUrl('/default-avatar.svg'); // Fallback default
     }
-  }, [user?.id, isAuthenticated, profile?.id, contextAvatarUrl, contextBackgroundUrl]); // Only critical dependencies
+
+    // Set background URL if available from context or default
+    if (contextBackgroundUrl) {
+      setBackgroundUrl(contextBackgroundUrl);
+    } else {
+      setBackgroundUrl('/profile-bg.jpg'); // Fallback default
+    }
+  }, [contextAvatarUrl, contextBackgroundUrl]); // Dependencies: only re-run when context URLs change
 
   // Clear upload errors when modal opens/closes
   useEffect(() => {
@@ -315,48 +266,10 @@ export default function Profile() {
     }
   }, [showEditModal]);
 
-  // Force refresh the background image when needed
-  const forceRefreshBackground = useCallback(() => {
-    if (backgroundUrl) {
-      console.log('Forcing background refresh');
-      // Add a temporary cache buster to the URL to force a refresh
-      const cacheBuster = `?t=${Date.now()}`;
-      const baseUrl = backgroundUrl.split('?')[0];
-      const tempUrl = `${baseUrl}${cacheBuster}`;
-      
-      // Set a temporary URL to force refresh, then revert back
-      setBackgroundUrl(tempUrl);
-      
-      // After a short delay, revert to the clean URL
-      setTimeout(() => {
-        setBackgroundUrl(baseUrl);
-      }, 100);
-    }
-  }, [backgroundUrl]);
-  
-  // Call force refresh after the background upload is complete
-  useEffect(() => {
-    if (backgroundUploadProgress === 100) {
-      const timer = setTimeout(() => {
-        forceRefreshBackground();
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [backgroundUploadProgress, forceRefreshBackground]);
-
   // Add a useEffect to update the local state when the store's selectedStrategy changes
   useEffect(() => {
     // Update local state when store state changes
     setLocalSelectedStrategy(selectedStrategy);
-  }, [selectedStrategy]);
-
-  // Add a useEffect to sync local state with global state
-  useEffect(() => {
-    // Sync local strategy state with global strategy state
-    if (selectedStrategy !== localSelectedStrategy) {
-      console.log(`Syncing strategy state: global=${selectedStrategy}, local=${localSelectedStrategy}`);
-      setLocalSelectedStrategy(selectedStrategy);
-    }
   }, [selectedStrategy]);
 
   // Only show loading state during initial load
@@ -1045,8 +958,8 @@ export default function Profile() {
       <div className={styles.tradingInfo}>
         <div className={styles.tradingInfoItem}>
           <span className={styles.tradingInfoLabel}>Experience Score:</span>
-          <span className={`${styles.tradingInfoValue} ${(profile?.experience_Score || 0) > 0 ? styles.positiveScore : (profile?.experience_Score || 0) < 0 ? styles.negativeScore : ''}`}>
-            {profile?.experience_Score !== undefined ? profile.experience_Score : 0}
+          <span className={`${styles.tradingInfoValue} ${(profile?.experience_score || 0) > 0 ? styles.positiveScore : (profile?.experience_score || 0) < 0 ? styles.negativeScore : ''}`}>
+            {profile?.experience_score !== undefined ? profile.experience_score : 0}
           </span>
         </div>
         <div className={styles.tradingInfoItem}>

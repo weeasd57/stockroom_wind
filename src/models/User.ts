@@ -13,7 +13,7 @@ export interface User {
   success_posts: number;
   loss_posts: number;
   background_url: string | null;
-  experience_Score: number;
+  experience_score: number;
   followers: number | null;
   following: number | null;
 }
@@ -37,7 +37,7 @@ export const createDefaultUser = (userId: string, email: string): User => {
     success_posts: 0,
     loss_posts: 0,
     background_url: null,
-    experience_Score: 0,
+    experience_score: 0,
     followers: 0,
     following: 0
   };

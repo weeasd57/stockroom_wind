@@ -31,7 +31,7 @@
   
   /* Modern Navbar Variables */
   --navbar-height: 4rem;
-  --navbar-bg: rgba(255, 255, 255, 0.8);
+  --navbar-bg: rgba(255, 255, 255, 1);
   --navbar-border: rgba(0, 0, 0, 0.08);
   --navbar-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   --navbar-blur: 20px;
@@ -84,7 +84,7 @@
   --ring: 46 64% 52%;             /* gold focus ring */
   
   /* Navbar */
-  --navbar-bg: rgba(0, 0, 0, 0.9);
+  --navbar-bg: rgba(0, 0, 0, 1);
   --navbar-border: rgba(212, 175, 55, 0.15); /* soft gold */
   --navbar-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
@@ -300,7 +300,6 @@
     left: 0;
     right: 0;
     bottom: 0;
-    @apply glass;
     transform: translateY(-100%);
     opacity: 0;
     visibility: hidden;

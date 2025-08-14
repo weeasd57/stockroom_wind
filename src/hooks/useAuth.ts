@@ -31,7 +31,7 @@ export const useAuth = (): UseAuthReturn => {
       if (data.user) {
         // Fetch user profile from our database
         const { data: profileData, error: profileError } = await supabase
-          .from('users')
+          .from('profiles')
           .select('*')
           .eq('id', data.user.id)
           .single();
@@ -123,7 +123,7 @@ export const useAuth = (): UseAuthReturn => {
 
       setIsLoading(true);
       const { data, error } = await supabase
-        .from('users')
+        .from('profiles')
         .update(updates)
         .eq('id', user.id)
         .select()
@@ -168,7 +168,7 @@ export const useAuth = (): UseAuthReturn => {
           if (session?.user) {
             // Fetch user profile
             const { data: profileData, error: profileError } = await supabase
-              .from('users')
+              .from('profiles')
               .select('*')
               .eq('id', session.user.id)
               .single();
@@ -199,7 +199,7 @@ export const useAuth = (): UseAuthReturn => {
         if (session?.user) {
           // Fetch user profile
           const { data: profileData, error: profileError } = await supabase
-            .from('users')
+            .from('profiles')
             .select('*')
             .eq('id', session.user.id)
             .single();

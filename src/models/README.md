@@ -24,7 +24,7 @@ export interface User {
   success_posts: number;    // Count of successful trade posts
   loss_posts: number;       // Count of unsuccessful trade posts
   background_url: string | null; // URL to user's profile background image
-  experience_Score: number; // User's experience score (calculated from posts)
+  experience_score: number; // User's experience score (calculated from posts)
   followers: number | null; // Count of followers
   following: number | null; // Count of users being followed
 }

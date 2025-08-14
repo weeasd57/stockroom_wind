@@ -774,7 +774,7 @@ export async function POST(request) {
               success_posts: newSuccessPosts,
               loss_posts: newLossPosts,
               // Experience is calculated as successful posts minus lost posts
-              experience_Score: newSuccessPosts - newLossPosts
+              experience_score: newSuccessPosts - newLossPosts
             })
             .eq('id', userId);
           

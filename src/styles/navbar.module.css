@@ -289,24 +289,55 @@
   transform: scale(0.95);
 }
 
+.menuToggle {
+  width: 1.5rem; /* Or appropriate size */
+  height: 1.25rem; /* Or appropriate size */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.menuToggle span {
+  display: block;
+  width: 100%;
+  height: 2px; /* Thickness of the lines */
+  background: hsl(var(--foreground)); /* Use a foreground color that contrasts with navbar-bg */
+  border-radius: 1px;
+  transition: all 0.3s ease-in-out;
+}
+
+.menuToggle.open span:nth-child(1) {
+  transform: translateY(10px) rotate(45deg);
+}
+
+.menuToggle.open span:nth-child(2) {
+  opacity: 0;
+}
+
+.menuToggle.open span:nth-child(3) {
+  transform: translateY(-10px) rotate(-45deg);
+}
+
 /* ==========================================================================
    Mobile Menu
    ========================================================================== */
 
   .mobileMenu {
     position: fixed;
-    top: var(--navbar-height);
+    top: var(--navbar-height); /* Changed back to start below navbar */
     left: 0;
     right: 0;
-    bottom: 0;
-    background: var(--navbar-bg);
-    backdrop-filter: blur(var(--navbar-blur));
-    border: 1px solid var(--navbar-border);
+    height: calc(100vh - var(--navbar-height)); /* Calculate height dynamically */
+    background-color: var(--navbar-bg); /* Changed to solid red background */
+    /* backdrop-filter: blur(var(--navbar-blur)); */ /* Removed backdrop-filter for full opacity */
+    /* border: 1px solid var(--navbar-border); */ /* Removed border */
     transform: translateY(-100%);
     opacity: 0;
     visibility: hidden;
     transition: all var(--animation-normal) var(--animation-ease);
-    z-index: 40;
+    z-index: 9999; /* Adjusted z-index to ensure it covers all content */
   }
 
 .mobileMenu.open {
@@ -315,11 +346,21 @@
   visibility: visible;
 }
 
-.mobileNav {
+.mobileMenuContent {
   height: 100%;
+  width: 100%;
+  box-sizing: border-box; /* Include padding in height calculation */
   display: flex;
   flex-direction: column;
   padding: 2rem 1rem;
+}
+
+.mobileNav {
+  /* height: 100%; */ /* Removed fixed height, let flexbox handle it */
+  flex-grow: 1; /* Added to make it fill available space */
+  display: flex;
+  flex-direction: column;
+  padding: 0; /* Remove padding here as it's now on mobileMenuContent */
 }
 
 .mobileNavList {
@@ -352,8 +393,8 @@
   font-size: 1.125rem;
   font-weight: 500;
   color: hsl(var(--foreground));
-  background: transparent;
-  border: none;
+  background: transparent; /* Changed back to transparent */
+  border: 1px solid hsl(var(--border)); /* Added theme-matching border */
   border-radius: 0.75rem;
   cursor: pointer;
   transition: all var(--animation-normal) var(--animation-ease);

@@ -7,18 +7,13 @@ import { generateEodLastCloseUrl, countries, BASE_URL, API_KEY } from '@/utils/s
 import { getCountrySymbolCounts, searchStocks } from '@/utils/symbolSearch';
 import { uploadPostImage } from '@/utils/supabase';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider'; // Updated from contexts/CreatePostFormContext
-import { createClient } from '@supabase/supabase-js';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData'; // Import from models
 import { CURRENCY_SYMBOLS, getCurrencySymbol, COUNTRY_ISO_CODES } from '@/models/CurrencyData'; // Import from models
 import 'flag-icons/css/flag-icons.min.css';
-import '@/styles/create-post-page.css';
+import '@/styles/create-post-page.css'; // Updated from styles/create-post-page.css 
 import '@/styles/animation.css';
 import countrySummaryData from '@/symbols_data/country_summary_20250304_171206.json';
-
-// Create reusable Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+import { supabase } from '@/utils/supabase'; // Moved here and removed local client creation
 
 // Add a function to load country symbol counts from the JSON file
 const loadCountrySymbolCounts = () => {
@@ -67,7 +62,7 @@ const formatSymbolForApi = (symbol, country) => {
   return formattedSymbol;
 };
 
-export default function CreatePostForm() {
+export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSubmit, isSubmitting: propIsSubmitting, setSubmitState, setGlobalStatus }) {
   const { user } = useSupabase();
   const { profile, getEffectiveAvatarUrl, addPost } = useProfile();
   
@@ -93,10 +88,7 @@ export default function CreatePostForm() {
     selectedStrategy = '',
     targetPercentage = '',
     stopLossPercentage = '',
-    isSubmitting: contextIsSubmitting = false,
-    submissionProgress = '',
-    setGlobalStatus,
-    setSubmitState
+    submissionProgress = ''
   } = useCreatePostForm() || {};
 
   // addPost function is imported from ProfileProvider
@@ -128,7 +120,7 @@ export default function CreatePostForm() {
   const [currentAvatar, setCurrentAvatar] = useState(null);
   const [previewAvatar, setPreviewAvatar] = useState(null);
   const [isAddingStrategy, setIsAddingStrategy] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(contextIsSubmitting);
+  const [isSubmitting, setIsSubmitting] = useState(propIsSubmitting);
   
   const fileInputRef = useRef(null);
   const searchTimeoutRef = useRef(null);
@@ -201,8 +193,8 @@ export default function CreatePostForm() {
 
   // Keep local isSubmitting state in sync with context
   useEffect(() => {
-    setIsSubmitting(contextIsSubmitting);
-  }, [contextIsSubmitting]);
+    setIsSubmitting(propIsSubmitting);
+  }, [propIsSubmitting]);
 
   // Fetch user's strategies
   const fetchStrategies = async () => {
@@ -1287,6 +1279,7 @@ export default function CreatePostForm() {
 
       // Process image uploads
       if (imageFile) {
+        console.time('Image Upload Time');
         try {
           updateGlobalStatus('Uploading image...', 'processing');
           const uploadedUrl = await uploadPostImage(imageFile, user?.id);
@@ -1302,97 +1295,68 @@ export default function CreatePostForm() {
           }
           throw error;
         }
+        console.timeEnd('Image Upload Time');
       } else if (imageUrl) {
         postData.image_url = imageUrl;
       }
 
-      // Save post directly to Supabase
-      updateGlobalStatus('Creating your post...', 'processing');
-      console.log('Creating post with data:', postData);
+      // Optimistic UI update: Create a temporary post object
+      const tempPost = {
+        ...postData,
+        id: `temp-${Date.now()}`, // Temporary ID for optimistic update
+        syncing: true, // Flag to indicate it\'s an optimistic entry
+      };
       
-      // Check if we have Supabase client initialized
-      if (!supabase) {
-        setIsSubmitting(false); // Reset submitting state on error
-        if (setSubmitState) {
-          setSubmitState('error');
-        }
-        throw new Error('Supabase client not initialized. Check your environment variables.');
+      if (onPostCreated) {
+        onPostCreated(tempPost); // Notify parent component immediately
       }
-      
-      // Insert post into 'posts' table
-      const { data: post, error } = await supabase
-        .from('posts')
-        .insert(postData)
-        .select()
-        .single();
-      
-      if (error) {
-        setIsSubmitting(false); // Reset submitting state on error
-        if (setSubmitState) {
-          setSubmitState('error');
-        }
-        throw new Error(`Failed to save post to database: ${error.message}`);
-      }
-      
-      console.log('Post saved successfully:', post);
-      
-      // Add post to profile store for immediate UI update
-      if (post && addPost) {
-        console.log('Adding post to profile store for immediate display');
-        
-        // Ensure the post has all the required fields for display
-        const enrichedPost = {
-          ...post,
-          user: {
-            id: user?.id,
-            email: user?.email,
-            avatar_url: avatarUrl
-          },
-          created_at_formatted: new Date().toLocaleString()
-        };
-        
-        // Add the post to the store to immediately display it in the profile
-        addPost(enrichedPost);
-      }
-      
-      // Reset form after successful submission
-      updateField('description', '');
-      
-      // Reset all form fields
-      updateField('imageFile', null);
-      updateField('imagePreview', '');
-      updateField('imageUrl', '');
-      updateField('selectedStock', null);
-      updateField('selectedStrategy', '');
-      updateField('targetPrice', '');
-      updateField('stopLossPrice', '');
-      
-      setStatus('idle');
-      setIsSubmitting(false); // Reset submitting state after success
-      if (setSubmitState) {
-        setSubmitState('success');
-      }
-      updateGlobalStatus('Post created successfully! It is now visible on your profile.', 'success');
 
-      // Auto-close status after 3 seconds
-      setTimeout(() => {
-        updateGlobalStatus(null);
-      }, 3000);
-      
-      // Close form if in dialog
-      setTimeout(() => {
-        if (closeDialog) {
-          closeDialog();
+      updateGlobalStatus('Publishing post...', 'processing');
+      // No longer need a timeout for the actual Supabase insert since we are focusing on performance
+      // and optimistic UI is handled by immediate onPostCreated call.
+      console.time('Supabase Insert Time');
+      const { data: createdPost, error: postError } = await supabase
+        .from('posts')
+        .insert([postData]) // Use postData (without temp ID or syncing flag)
+        .select();
+      console.timeEnd('Supabase Insert Time');
+
+      if (postError) {
+        console.error('Error creating post:', postError);
+        updateGlobalStatus('Failed to publish post. Please try again.', 'error');
+        setErrors({ submit: postError.message || 'Failed to create post' });
+        // If optimistic update was done, notify parent to remove or mark as failed
+        if (onPostCreated) {
+          onPostCreated({ ...tempPost, error: true, syncing: false }); // Mark as failed
         }
-      }, 1500);
-    } catch (error) {
-      console.error('Error creating post:', error);
-      setStatus('error');
-      setIsSubmitting(false); // Reset submitting state on error
-      if (setSubmitState) {
-        setSubmitState('error');
+        throw postError;
       }
-      updateGlobalStatus(`Error creating post: ${error.message}`, 'error');
+
+      updateGlobalStatus('Post published successfully!', 'success');
+      resetForm(); // Clear form fields
+
+      // Notify parent about the successfully created post (with real ID)
+      if (onPostCreated && createdPost && createdPost.length > 0) {
+        onPostCreated({ ...createdPost[0], syncing: false }); // Replace optimistic with real data
+      }
+
+      // Call onSuccessfulSubmit to perform any additional actions in the parent
+      if (onSuccessfulSubmit) {
+        onSuccessfulSubmit(createdPost[0]);
+      }
+
+      closeDialog(); // Close the post creation dialog
+    } catch (error) {
+      console.error('Submission error:', error);
+      updateGlobalStatus('An unexpected error occurred.', 'error');
+      setErrors({ submit: 'An unexpected error occurred during submission.' });
+    } finally {
+      setIsSubmitting(false); // Reset submitting state
+      if (setSubmitState) {
+        setSubmitState('idle');
+      }
+      // Optionally clear global status after a short delay for success/error messages
+      setTimeout(() => updateGlobalStatus('', 'processing'), 3000);
     }
   };
 

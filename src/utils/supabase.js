@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 // import logger from '@/utils/logger';
+import imageCompression from 'browser-image-compression';
 
 // Create a client with the public anon key
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -90,7 +91,7 @@ export const signUp = async (email, password, userData = {}) => {
           last_sign_in: now,
           success_posts: 0,
           loss_posts: 0,
-          experience_Score: 0,
+          experience_score: 0,
           followers: 0,
           following: 0
         };
@@ -145,12 +146,16 @@ export const signIn = async (email, password) => {
  */
 export const signOut = async (router = null) => {
   try {
+    console.time('Supabase Logout');
     const { error } = await supabase.auth.signOut();
+    console.timeEnd('Supabase Logout');
     if (error) throw error;
     
     // If router is provided, redirect to landing page
     if (router) {
+      console.time('Logout Redirection');
       router.push('/landing');
+      console.timeEnd('Logout Redirection');
     }
     
     return { error: null };
@@ -199,7 +204,7 @@ export const getUserProfile = async (userId) => {
     // First, get the user profile data
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, username, full_name, email, avatar_url, background_url, bio, success_posts, loss_posts, experience_Score')
+      .select('id, username, full_name, email, avatar_url, background_url, bio, success_posts, loss_posts, experience_score')
       .eq('id', userId);
 
     if (error) throw error;
@@ -227,7 +232,7 @@ export const getUserProfile = async (userId) => {
           .update({
             success_posts: successPosts,
             loss_posts: lossPosts,
-            experience_Score: experienceScore
+            experience_score: experienceScore
           })
           .eq('id', userId);
           
@@ -235,7 +240,7 @@ export const getUserProfile = async (userId) => {
           // Update the data object with the new counts
           data[0].success_posts = successPosts;
           data[0].loss_posts = lossPosts;
-          data[0].experience_Score = experienceScore;
+          data[0].experience_score = experienceScore;
         }
       }
     }
@@ -245,22 +250,23 @@ export const getUserProfile = async (userId) => {
       
       // Create a default profile for the user
       const now = new Date().toISOString();
+      const user = await getCurrentUser(); // Get the current user to get their email
       const defaultProfile = {
         id: userId,
         username: `user_${userId.substring(0, 8)}`,
-        full_name: null,
-        avatar_url: null,
-        bio: null,
-        website: null,
-        favorite_markets: null,
+        full_name: `User ${userId.substring(0, 8)}`,
+        avatar_url: '/default-avatar.svg',
+        bio: '',
+        website: '',
+        favorite_markets: [],
         created_at: now,
         updated_at: now,
-        email: null,
+        email: user?.email || '',
         last_sign_in: now,
         success_posts: 0,
         loss_posts: 0,
-        background_url: null,
-        experience_Score: 0,
+        background_url: '/profile-bg.jpg',
+        experience_score: 0,
         followers: 0,
         following: 0
       };
@@ -276,7 +282,7 @@ export const getUserProfile = async (userId) => {
         // Count successful and lost posts
         defaultProfile.success_posts = postsData.filter(post => post.target_reached).length;
         defaultProfile.loss_posts = postsData.filter(post => post.stop_loss_triggered).length;
-        defaultProfile.experience_Score = defaultProfile.success_posts - defaultProfile.loss_posts;
+        defaultProfile.experience_score = defaultProfile.success_posts - defaultProfile.loss_posts;
       }
       
       const { error: insertError } = await supabase
@@ -342,6 +348,8 @@ export const updateUserProfile = async (userId, updates) => {
       .eq('id', userId)
       .select('*')
       .single();
+    
+    console.log('[updateUserProfile] Supabase raw response - data:', data, 'error:', error);
     
     if (error) {
       // console.error('Error updating profile in database:', error);
@@ -750,14 +758,15 @@ async function createPost(post, userId) {
   };
   
   try {
-    // Step 1: Create the post with an explicit timeout (extended from default 5s)
-
+    // Start timing the post creation
+    console.time('Post Creation');
     const { data, error } = await supabase
       .from('posts')
       .insert([sanitizedPost]) // Use sanitized post without images
       .select();
     
     const insertDuration = performance.now() - startTime;
+    console.timeEnd('Post Creation'); // End timing here
 
     
     if (error) {
@@ -852,78 +861,84 @@ async function createPost(post, userId) {
 }
 
 /**
- * Upload post image with performance tracking
+ * Upload post image with performance tracking and client-side compression
  * @param {File} file - Image file to upload
  * @param {string} userId - User ID
  * @returns {Promise<string>} - Public URL of the uploaded image
  */
 export async function uploadPostImage(file, userId) {
   const uploadStart = performance.now();
-  const fileSize = Math.round(file.size / 1024);
+  const originalFileSize = Math.round(file.size / 1024); // in KB
   const fileType = file.type;
 
-  
+  let compressedFile = file;
+
+  // Compress image before uploading if it's an image
+  if (fileType.startsWith('image/')) {
+    try {
+      console.log('Original image file size:', originalFileSize, 'KB');
+      const options = {
+        maxSizeMB: 1,           // Max size in MB
+        maxWidthOrHeight: 1920, // Max width or height in pixels
+        useWebWorker: true,    // Use web worker for better performance
+        initialQuality: 0.8, // Initial quality, 0 to 1
+        maxIteration: 10, // Max number of iterations to compress the image
+      };
+      compressedFile = await imageCompression(file, options);
+      const compressedFileSize = Math.round(compressedFile.size / 1024); // in KB
+      console.log('Compressed image file size:', compressedFileSize, 'KB');
+    } catch (error) {
+      console.error('Image compression error:', error);
+      // Fallback to original file if compression fails
+      compressedFile = file;
+    }
+  }
+
   try {
     // Generate a unique filename with timestamp
     const timestamp = Date.now();
-    const fileExt = file.name.split('.').pop().toLowerCase();
+    const fileExt = compressedFile.name.split('.').pop().toLowerCase();
     const fileName = `${userId}-post-${timestamp}.${fileExt}`;
-    
-    // First try to use the 'posts' bucket
+
     let bucketName = 'post_images';
     let filePath = `${fileName}`;
-    
-    // Check if the 'posts' bucket exists by trying to list its contents
-    const { data: bucketCheck, error: bucketError } = await supabase.storage
-      .from(bucketName)
-      .list();
-    
-    // If there's an error with the 'posts' bucket, fall back to 'avatars' bucket
-    if (bucketError) {
 
-      bucketName = 'avatars';
-      filePath = `posts/${fileName}`; // Store in a 'posts' subfolder
-    }
-
-    
-    // Track storage upload operation
-    const storageUploadStart = performance.now();
-    
+    // Try to upload directly to 'post_images' bucket first
     const { data, error } = await supabase.storage
       .from(bucketName)
-      .upload(filePath, file, {
+      .upload(filePath, compressedFile, { // Use compressedFile here
         cacheControl: '3600',
-        upsert: true // Changed to true to overwrite if needed
+        upsert: true
       });
-    
-    const storageUploadEnd = performance.now();
 
-    
+    // If upload to 'post_images' fails and it's a bucket-related error, fall back to 'avatars'
+    if (error && (error.message.includes('Bucket not found') || error.message.includes('permission denied'))) {
+      console.warn(`[uploadPostImage] Failed to upload to '${bucketName}' bucket, falling back to 'avatars'. Error:`, error.message);
+      bucketName = 'avatars';
+      filePath = `posts/${fileName}`; // Store in a 'posts' subfolder
+
+      // Retry upload with the fallback bucket
+      const { data: fallbackData, error: fallbackError } = await supabase.storage
+        .from(bucketName)
+        .upload(filePath, compressedFile, { // Use compressedFile here
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (fallbackError) {
+        throw fallbackError;
+      }
+      return supabase.storage.from(bucketName).getPublicUrl(filePath).data.publicUrl;
+    }
+
     if (error) {
-
       throw error;
     }
-    
-    // Track URL generation time
-    const urlGenStart = performance.now();
 
-    
-    const { data: publicUrlData } = supabase.storage
-      .from(bucketName)
-      .getPublicUrl(filePath);
-    
-    const publicUrl = publicUrlData.publicUrl;
-    
-    const urlGenEnd = performance.now();
+    // Get the public URL for the successfully uploaded file
+    return supabase.storage.from(bucketName).getPublicUrl(filePath).data.publicUrl;
 
-    
-    const uploadEnd = performance.now();
-
-    
-    return publicUrl;
   } catch (error) {
-    const uploadEnd = performance.now();
-
     throw error;
   }
 }

@@ -24,7 +24,7 @@ export function TopPerformers() {
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('*')
-          .order('experience_Score', { ascending: false })
+          .order('experience_score', { ascending: false })
           .limit(10);
 
         if (profilesError) {
@@ -57,7 +57,7 @@ export function TopPerformers() {
                   successRate,
                   recentActivity: recentPosts,
                   // Add rank based on a combination of factors
-                  rank: (profile.experience_Score * 0.4) + (successRate * 0.4) + (totalPosts * 0.2)
+                  rank: (profile.experience_score * 0.4) + (successRate * 0.4) + (totalPosts * 0.2)
                 };
               }
 
@@ -66,7 +66,7 @@ export function TopPerformers() {
                 totalPosts: 0,
                 successRate: 0,
                 recentActivity: 0,
-                rank: profile.experience_Score || 0
+                rank: profile.experience_score || 0
               };
 
             } catch (error) {
@@ -76,7 +76,7 @@ export function TopPerformers() {
                 totalPosts: 0,
                 successRate: 0,
                 recentActivity: 0,
-                rank: profile.experience_Score || 0
+                rank: profile.experience_score || 0
               };
             }
           })
@@ -261,7 +261,7 @@ export function TopPerformers() {
                   <span className={styles.statLabel}>Total Posts</span>
                 </div>
                 <div className={styles.statItem}>
-                  <span className={styles.statValue}>{performer.experience_Score || 0}</span>
+                  <span className={styles.statValue}>{performer.experience_score || 0}</span>
                   <span className={styles.statLabel}>Experience</span>
                 </div>
               </div>

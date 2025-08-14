@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/utils/supabase';
 
 export async function GET(request) {
   const url = new URL(request.url);
@@ -7,10 +7,6 @@ export async function GET(request) {
   const next = url.searchParams.get('next') || '/';
 
   if (code) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
     try {
       // Exchange the code for a session
       await supabase.auth.exchangeCodeForSession(code);
