@@ -86,11 +86,11 @@ export function ClientSideLayout({ children }) {
   // Only render the full layout on the client side
   return (
     <div 
-      className="flex flex-col min-h-screen"
+      className="min-h-screen"
       suppressHydrationWarning
     >
       {shouldShowNavbar && <Navbar />}
-      <main className={`flex-grow w-full ${shouldShowNavbar ? 'pt-16' : ''}`}>
+      <main className={`w-full ${shouldShowNavbar ? 'pt-20' : ''}`} style={{ marginTop: shouldShowNavbar ? '0' : '0' }}>
         {children}
       </main>
     </div>
