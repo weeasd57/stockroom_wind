@@ -6,6 +6,10 @@ import { useProfile } from '@/providers/ProfileProvider';
 import { CreatePostButton } from '@/components/posts/CreatePostButton';
 import { CreatePostForm } from '@/components/posts/CreatePostForm';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
+import { DashboardSection } from '@/components/home/DashboardSection';
+import { MarketOverview } from '@/components/home/MarketOverview';
+import { PostsFeed } from '@/components/home/PostsFeed';
+import { TopPerformers } from '@/components/home/TopPerformers';
 import { createPortal } from 'react-dom';
 import styles from '@/styles/home.module.css';
 import '@/styles/create-post-page.css'; 
@@ -207,6 +211,12 @@ export default function HomePage() {
   return (
     <div className={`${styles.homePage} ${visible ? styles.visible : ''}`}>
       <div className={styles.homeContent}>
+        {/* Dashboard Section */}
+        <DashboardSection />
+        
+        {/* Market Overview */}
+        <MarketOverview />
+        
         {/* Create Post Section */}
         <div className={styles.createPostSection}>
           <div className={styles.createPostContainer}>
@@ -216,8 +226,17 @@ export default function HomePage() {
           </div>
         </div>
         
-        <div className={styles.feedsSection}>
-          {/* Feed content */}
+        {/* Main Content Grid */}
+        <div className={styles.mainContentGrid}>
+          {/* Posts Feed */}
+          <div className={styles.postsColumn}>
+            <PostsFeed />
+          </div>
+          
+          {/* Top Performers Sidebar */}
+          <div className={styles.sidebarColumn}>
+            <TopPerformers />
+          </div>
         </div>
       </div>
       

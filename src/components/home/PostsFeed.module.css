@@ -1,0 +1,462 @@
+.postsFeed {
+  background: var(--card-background, #ffffff);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-color, #e5e7eb);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary, #1f2937);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+}
+
+.filterButton {
+  padding: 6px 12px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--card-background, #ffffff);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filterButton:hover {
+  background: var(--card-secondary, #f9fafb);
+}
+
+.filterButton.active {
+  background: var(--primary-color, #3b82f6);
+  color: white;
+  border-color: var(--primary-color, #3b82f6);
+}
+
+/* Posts Container */
+.postsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.postCard {
+  background: var(--card-secondary, #f9fafb);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid var(--border-light, #f3f4f6);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.postCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* Post Header */
+.postHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarPlaceholder {
+  width: 100%;
+  height: 100%;
+  background: var(--primary-light, #dbeafe);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: var(--primary-color, #3b82f6);
+  font-size: 1rem;
+}
+
+.userDetails h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+  margin: 0 0 2px 0;
+}
+
+.timestamp {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+  margin: 0;
+}
+
+.status {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.status.active {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status.success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status.loss {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Stock Info */
+.stockInfo {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-light, #f3f4f6);
+}
+
+.stockHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.stockSymbol {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary, #1f2937);
+  margin: 0;
+}
+
+.exchange {
+  background: var(--border-light, #f3f4f6);
+  color: var(--text-secondary, #6b7280);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.companyName {
+  font-size: 1rem;
+  color: var(--text-primary, #1f2937);
+  margin: 0 0 4px 0;
+  font-weight: 500;
+}
+
+.country {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+  margin: 0;
+}
+
+/* Price Analysis */
+.priceAnalysis {
+  margin-bottom: 16px;
+}
+
+.priceGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.priceItem {
+  text-align: center;
+}
+
+.priceLabel {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary, #6b7280);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.priceValue {
+  display: block;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+}
+
+.priceValue.potential {
+  color: #059669;
+}
+
+/* Post Content */
+.postContent {
+  margin-bottom: 16px;
+}
+
+.postContent p {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-primary, #1f2937);
+  margin: 0;
+}
+
+/* Strategy */
+.strategy {
+  margin-bottom: 16px;
+}
+
+.strategyTag {
+  display: inline-block;
+  background: var(--primary-light, #dbeafe);
+  color: var(--primary-color, #3b82f6);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* Post Footer */
+.postFooter {
+  display: flex;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light, #f3f4f6);
+}
+
+.actionButton {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.actionButton:hover {
+  background: var(--card-background, #ffffff);
+  color: var(--text-primary, #1f2937);
+}
+
+/* Loading States */
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.postSkeleton {
+  background: var(--card-secondary, #f9fafb);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid var(--border-light, #f3f4f6);
+}
+
+.skeletonHeader,
+.skeletonContent,
+.skeletonFooter {
+  height: 20px;
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.skeletonContent {
+  height: 60px;
+}
+
+.skeletonFooter {
+  height: 16px;
+  width: 60%;
+  margin-bottom: 0;
+}
+
+/* Error and Empty States */
+.errorMessage,
+.emptyState {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.errorMessage p,
+.emptyState p {
+  margin-bottom: 16px;
+  font-size: 1rem;
+}
+
+.retryButton {
+  background: var(--primary-color, #3b82f6);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.retryButton:hover {
+  background: var(--primary-hover, #2563eb);
+}
+
+/* Load More */
+.loadMore {
+  text-align: center;
+  margin-top: 24px;
+}
+
+.loadMoreButton {
+  background: var(--card-background, #ffffff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 500;
+  color: var(--text-primary, #1f2937);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.loadMoreButton:hover {
+  background: var(--card-secondary, #f9fafb);
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .postsFeed {
+    --card-background: #1f2937;
+    --card-secondary: #374151;
+    --border-color: #4b5563;
+    --border-light: #374151;
+    --text-primary: #f9fafb;
+    --text-secondary: #d1d5db;
+    --primary-color: #3b82f6;
+    --primary-hover: #2563eb;
+    --primary-light: #1e40af;
+  }
+  
+  .skeletonHeader,
+  .skeletonContent,
+  .skeletonFooter {
+    background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+    background-size: 200% 100%;
+  }
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .postsFeed {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .title {
+    font-size: 1.25rem;
+  }
+  
+  .postCard {
+    padding: 16px;
+  }
+  
+  .priceGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .postFooter {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .actionButton {
+    padding: 4px 8px;
+    font-size: 0.8125rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .userInfo {
+    gap: 8px;
+  }
+  
+  .avatar {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .userDetails h4 {
+    font-size: 0.875rem;
+  }
+  
+  .timestamp {
+    font-size: 0.8125rem;
+  }
+  
+  .stockSymbol {
+    font-size: 1.125rem;
+  }
+  
+  .priceGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+}
