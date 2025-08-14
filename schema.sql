@@ -149,23 +149,9 @@ CREATE INDEX idx_comments_user_id ON comments(user_id);
 CREATE INDEX idx_comments_parent_comment_id ON comments(parent_comment_id);
 CREATE INDEX idx_comments_created_at ON comments(created_at DESC);
 
--- ===================================================================
--- Table: COMMENT_LIKES (Likes on comments)
--- ===================================================================
--- This table stores user likes on comments, similar to Facebook's like system
--- Users can like any comment except their own (enforced by constraint)
--- The unique constraint prevents multiple likes from the same user on the same comment
-CREATE TABLE comment_likes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    comment_id UUID REFERENCES comments(id) ON DELETE CASCADE NOT NULL,
-    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
-    UNIQUE(comment_id, user_id)
-);
 
-CREATE INDEX idx_comment_likes_comment_id ON comment_likes(comment_id);
-CREATE INDEX idx_comment_likes_user_id ON comment_likes(user_id);
+
+
 
 -- ===================================================================
 -- ROW LEVEL SECURITY POLICIES
@@ -178,7 +164,7 @@ ALTER TABLE user_strategies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_followings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE post_actions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE comment_likes ENABLE ROW LEVEL SECURITY;
+
 
 -- Profiles policies
 CREATE POLICY "Public profiles are viewable by everyone" ON profiles
@@ -240,15 +226,7 @@ CREATE POLICY "Users can update their own comments" ON comments
 CREATE POLICY "Users can delete their own comments" ON comments
   FOR DELETE USING (auth.uid() = user_id);
 
--- Comment likes policies
-CREATE POLICY "Comment likes are viewable by everyone" ON comment_likes
-  FOR SELECT USING (true);
 
-CREATE POLICY "Users can insert their own comment likes" ON comment_likes
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete their own comment likes" ON comment_likes
-  FOR DELETE USING (auth.uid() = user_id);
 
 -- ===================================================================
 -- FUNCTIONS AND TRIGGERS
@@ -317,17 +295,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Function to get comment like count
-CREATE OR REPLACE FUNCTION get_comment_like_count(comment_uuid UUID)
-RETURNS BIGINT AS $$
-BEGIN
-  RETURN (
-    SELECT COUNT(*) 
-    FROM comment_likes 
-    WHERE comment_id = comment_uuid
-  );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 
 -- ===================================================================
 -- USEFUL VIEWS FOR NEW TABLES
@@ -363,24 +331,15 @@ LEFT JOIN (
     GROUP BY post_id
 ) comment_counts ON p.id = comment_counts.post_id;
 
--- View for comments with user info and like counts
+-- View for comments with user info
 CREATE OR REPLACE VIEW comments_with_user_info AS
 SELECT 
     c.*,
     p.username,
     p.avatar_url,
-    p.full_name,
-    COALESCE(like_counts.like_count, 0) as like_count,
-    EXISTS(SELECT 1 FROM comment_likes cl WHERE cl.comment_id = c.id AND cl.user_id = auth.uid()) as is_liked_by_current_user
+    p.full_name
 FROM comments c
-JOIN profiles p ON c.user_id = p.id
-LEFT JOIN (
-    SELECT 
-        comment_id,
-        COUNT(*) as like_count
-    FROM comment_likes 
-    GROUP BY comment_id
-) like_counts ON c.id = like_counts.comment_id;
+JOIN profiles p ON c.user_id = p.id;
 
 -- ===================================================================
 -- ADDITIONAL INDEXES FOR PERFORMANCE
@@ -389,7 +348,7 @@ LEFT JOIN (
 -- Composite indexes for better query performance
 CREATE INDEX idx_post_actions_post_user_type ON post_actions(post_id, user_id, action_type);
 CREATE INDEX idx_comments_post_parent_created ON comments(post_id, parent_comment_id, created_at);
-CREATE INDEX idx_comment_likes_comment_user ON comment_likes(comment_id, user_id);
+
 
 -- Partial indexes for active posts and comments
 CREATE INDEX idx_posts_active ON posts(created_at) WHERE NOT closed;
@@ -407,9 +366,7 @@ CHECK (LENGTH(TRIM(content)) > 0);
 ALTER TABLE post_actions ADD CONSTRAINT check_action_type_valid 
 CHECK (action_type IN ('buy', 'sell'));
 
--- Check that users cannot like their own comments
-ALTER TABLE comment_likes ADD CONSTRAINT check_not_self_like 
-CHECK (user_id != (SELECT user_id FROM comments WHERE id = comment_id));
+
 
 -- Check that users cannot have both buy and sell actions on the same post
 ALTER TABLE post_actions ADD CONSTRAINT check_no_duplicate_actions 
@@ -486,56 +443,45 @@ RETURNS TABLE(
     content TEXT,
     created_at TIMESTAMP WITH TIME ZONE,
     parent_comment_id UUID,
-    like_count BIGINT,
     level INTEGER
 ) AS $$
 BEGIN
-    RETURN QUERY
-    WITH RECURSIVE comment_tree AS (
-        -- Base case: top-level comments
-        SELECT 
-            c.id,
-            c.user_id,
-            p.username,
-            p.full_name,
-            p.avatar_url,
-            c.content,
-            c.created_at,
-            c.parent_comment_id,
-            COALESCE(cl.like_count, 0) as like_count,
-            0 as level
-        FROM comments c
-        JOIN profiles p ON c.user_id = p.id
-        LEFT JOIN (
-            SELECT comment_id, COUNT(*) as like_count
-            FROM comment_likes GROUP BY comment_id
-        ) cl ON c.id = cl.comment_id
-        WHERE c.post_id = p_post_id AND c.parent_comment_id IS NULL
-        
-        UNION ALL
-        
-        -- Recursive case: child comments
-        SELECT 
-            c.id,
-            c.user_id,
-            p.username,
-            p.full_name,
-            p.avatar_url,
-            c.content,
-            c.created_at,
-            c.parent_comment_id,
-            COALESCE(cl.like_count, 0) as like_count,
-            ct.level + 1
-        FROM comments c
-        JOIN profiles p ON c.user_id = p.id
-        LEFT JOIN (
-            SELECT comment_id, COUNT(*) as like_count
-            FROM comment_likes GROUP BY comment_id
-        ) cl ON c.id = cl.comment_id
-        JOIN comment_tree ct ON c.parent_comment_id = ct.comment_id
-    )
-    SELECT * FROM comment_tree
-    ORDER BY level, created_at;
+  RETURN QUERY
+  WITH RECURSIVE comment_tree AS (
+    -- Base case: top-level comments
+    SELECT 
+      c.id,
+      c.user_id,
+      p.username,
+      p.full_name,
+      p.avatar_url,
+      c.content,
+      c.created_at,
+      c.parent_comment_id,
+      0 as level
+    FROM comments c
+    JOIN profiles p ON c.user_id = p.id
+    WHERE c.post_id = p_post_id AND c.parent_comment_id IS NULL
+    
+    UNION ALL
+    
+    -- Recursive case: child comments
+    SELECT 
+      c.id,
+      c.user_id,
+      p.username,
+      p.full_name,
+      p.avatar_url,
+      c.content,
+      c.created_at,
+      c.parent_comment_id,
+      ct.level + 1
+    FROM comments c
+    JOIN profiles p ON c.user_id = p.id
+    JOIN comment_tree ct ON c.parent_comment_id = ct.comment_id
+  )
+  SELECT * FROM comment_tree
+  ORDER BY level, created_at;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -637,7 +583,6 @@ CREATE TRIGGER prevent_circular_comments_trigger
 -- NEW TABLES ADDED:
 -- 1. post_actions - Stores buy/sell actions on posts
 -- 2. comments - Hierarchical comment system like Facebook
--- 3. comment_likes - Like system for comments
 
 -- NEW FUNCTIONS ADDED:
 -- 1. toggle_post_action() - Toggle buy/sell actions
@@ -645,19 +590,17 @@ CREATE TRIGGER prevent_circular_comments_trigger
 -- 3. get_nested_comments() - Get hierarchical comments
 -- 4. get_post_action_counts() - Get buy/sell counts
 -- 5. get_post_comment_count() - Get comment count
--- 6. get_comment_like_count() - Get like count
 
 -- NEW VIEWS ADDED:
 -- 1. posts_with_stats - Posts with action and comment counts
--- 2. comments_with_user_info - Comments with user info and likes
+-- 2. comments_with_user_info - Comments with user info
 
 -- NEW FEATURES:
 -- 1. Buy/Sell voting system on posts
 -- 2. Facebook-style comment system with nested replies
--- 3. Like system for comments
--- 4. Automatic tracking of comment edits
--- 5. Prevention of circular references in comments
--- 6. Performance-optimized queries with proper indexing
+-- 3. Automatic tracking of comment edits
+-- 4. Prevention of circular references in comments
+-- 5. Performance-optimized queries with proper indexing
 
 -- ===================================================================
 -- NEXT STEPS FOR IMPLEMENTATION
@@ -666,9 +609,8 @@ CREATE TRIGGER prevent_circular_comments_trigger
 -- 1. Run this schema in your Supabase database
 -- 2. Create React components for buy/sell buttons
 -- 3. Create comment components with nested display
--- 4. Implement like functionality for comments
--- 5. Add real-time updates using Supabase subscriptions
--- 6. Style components to match your app's design
+-- 4. Add real-time updates using Supabase subscriptions
+-- 5. Style components to match your app's design
 
 -- ===================================================================
 -- END OF SCHEMA
