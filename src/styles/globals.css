@@ -3,564 +3,413 @@
 @tailwind utilities;
 
 :root {
-  --background: 220 20% 97%;
-  --foreground: 222.2 84% 4.9%;
-  --card: 220 25% 98%;
-  --card-foreground: 222.2 84% 4.9%;
-  --popover: 220 20% 97%;
-  --popover-foreground: 222.2 84% 4.9%;
-  --primary: 221.2 83.2% 53.3%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
+  /* Modern Color System */
+  --background: 0 0% 100%;
+  --foreground: 224 71.4% 4.1%;
+  --card: 0 0% 100%;
+  --card-foreground: 224 71.4% 4.1%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 224 71.4% 4.1%;
+  --primary: 262.1 83.3% 57.8%;
+  --primary-foreground: 210 20% 98%;
+  --secondary: 220 14.3% 95.9%;
+  --secondary-foreground: 220.9 39.3% 11%;
+  --muted: 220 14.3% 95.9%;
+  --muted-foreground: 220 8.9% 46.1%;
+  --accent: 220 14.3% 95.9%;
+  --accent-foreground: 220.9 39.3% 11%;
   --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 221.2 83.2% 53.3%;
-  --radius: 0.5rem;
+  --destructive-foreground: 210 20% 98%;
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 262.1 83.3% 57.8%;
+  --radius: 0.75rem;
+  
+  /* Typography */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   
-  /* Add scrollbar styling to the body and all elements */
+  /* Modern Navbar Variables */
+  --navbar-height: 4rem;
+  --navbar-bg: rgba(255, 255, 255, 0.8);
+  --navbar-border: rgba(0, 0, 0, 0.08);
+  --navbar-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --navbar-blur: 20px;
+  
+  /* Animation Variables */
+  --animation-fast: 150ms;
+  --animation-normal: 250ms;
+  --animation-slow: 350ms;
+  --animation-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --animation-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  
+  /* Scrollbar */
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--primary) / 0.3) transparent;
 }
 
 .dark {
-  --background: 0 0% 0%;
-  --foreground: 0 0% 100%;
-  --card: 0 0% 0%;
-  --card-foreground: 0 0% 100%;
-  --popover: 0 0% 0%;
-  --popover-foreground: 0 0% 100%;
-  --primary: 0 0% 100%;
-  --primary-foreground: 0 0% 0%;
-  --secondary: 0 0% 5%;
-  --secondary-foreground: 0 0% 100%;
-  --muted: 0 0% 10%;
-  --muted-foreground: 0 0% 70%;
-  --accent: 0 0% 5%;
-  --accent-foreground: 0 0% 100%;
+  /* Dark Mode Colors */
+  --background: 224 71.4% 4.1%;
+  --foreground: 210 20% 98%;
+  --card: 224 71.4% 4.1%;
+  --card-foreground: 210 20% 98%;
+  --popover: 224 71.4% 4.1%;
+  --popover-foreground: 210 20% 98%;
+  --primary: 263.4 70% 50.4%;
+  --primary-foreground: 210 20% 98%;
+  --secondary: 215 27.9% 16.9%;
+  --secondary-foreground: 210 20% 98%;
+  --muted: 215 27.9% 16.9%;
+  --muted-foreground: 217.9 10.6% 64.9%;
+  --accent: 215 27.9% 16.9%;
+  --accent-foreground: 210 20% 98%;
   --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 0 0% 20%;
-  --input: 0 0% 5%;
-  --ring: 0 0% 100%;
+  --destructive-foreground: 210 20% 98%;
+  --border: 215 27.9% 16.9%;
+  --input: 215 27.9% 16.9%;
+  --ring: 263.4 70% 50.4%;
   
-  /* Enhanced Gold theme variables */
-  --gold-primary: #f5d76e;
-  --gold-secondary: #f9ca24;
-  --gold-accent: #ffd700;
-  --gold-highlight: #ffee58;
-  --gold-muted: rgba(245, 215, 110, 0.7);
-  --gold-border: rgba(245, 215, 110, 0.3);
-  --gold-shadow: rgba(245, 215, 110, 0.15);
-  --gold-gradient-start: #f9ca24;
-  --gold-gradient-end: #f1c40f;
-  --gold-text: #f5d76e;
-  --gold-link: #ffd700;
-  --gold-button: #f9ca24;
-  --gold-hover: #ffee58;
-  
-  /* Override text colors with gold in dark mode */
-  --foreground: 45 100% 70%;
-  --card-foreground: 45 100% 70%;
-  --popover-foreground: 45 100% 70%;
-  --border: 45 70% 30%;
-}
-
-.disable-transitions * {
-  transition: none !important;
+  /* Dark Mode Navbar Variables */
+  --navbar-bg: rgba(15, 23, 42, 0.8);
+  --navbar-border: rgba(255, 255, 255, 0.1);
+  --navbar-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
   }
 
   html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+    height: 100%;
   }
   
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
     min-height: 100vh;
     overflow-x: hidden;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
+  /* Better Selection */
   ::selection {
-    background: hsla(var(--foreground), 0.1);
-    color: hsl(var(--foreground));
+    background: hsl(var(--primary) / 0.2);
+    color: hsl(var(--primary-foreground));
   }
-  
-  /* Remove gradient and set pure black background in dark mode */
-  .dark body {
-    background: hsl(0, 0%, 0%);
+
+  /* Better Focus Styles */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
   }
-  
-  /* Gold text selection in dark mode */
-  .dark ::selection {
-    background: var(--gold-shadow);
-    color: var(--gold-primary);
+
+  /* Scrollbar Styling */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
   }
-  
-  /* Gold text styling in dark mode */
-  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
-    color: var(--gold-primary);
-    text-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
   }
-  
-  .dark p {
-    color: var(--gold-muted);
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 4px;
   }
-  
-  .dark strong, .dark b {
-    color: var(--gold-primary);
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* Modern Button Reset */
+  button {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+  }
+
+  /* Modern Input Reset */
+  input, textarea, select {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: none;
+    outline: none;
+  }
+
+  /* Modern Link Reset */
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Lists */
+  ul, ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  /* Modern Typography */
+  h1, h2, h3, h4, h5, h6 {
     font-weight: 600;
+    line-height: 1.2;
+    margin: 0;
   }
-  
-  .dark hr {
-    border-color: var(--gold-border);
+
+  h1 { font-size: 2.25rem; }
+  h2 { font-size: 1.875rem; }
+  h3 { font-size: 1.5rem; }
+  h4 { font-size: 1.25rem; }
+  h5 { font-size: 1.125rem; }
+  h6 { font-size: 1rem; }
+
+  p {
+    margin: 0;
+    line-height: 1.6;
   }
-  
-  .dark blockquote {
-    border-left-color: var(--gold-secondary);
-    color: var(--gold-muted);
+
+  /* Utility Classes */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
-  
-  .dark code, .dark pre {
-    color: var(--gold-primary);
-    background-color: rgba(0, 0, 0, 0.3);
-    border: 1px solid var(--gold-border);
+
+  .container {
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 1rem;
   }
-  
-  .dark a:not([class]) {
-    color: var(--gold-link);
-    text-decoration-color: var(--gold-border);
+
+  /* Animation Utilities */
+  .animate-fade-in {
+    animation: fadeIn var(--animation-normal) var(--animation-ease);
   }
-  
-  .dark a:not([class]):hover {
-    color: var(--gold-highlight);
-    text-decoration-color: var(--gold-primary);
+
+  .animate-slide-up {
+    animation: slideUp var(--animation-normal) var(--animation-ease);
+  }
+
+  .animate-scale {
+    animation: scale var(--animation-normal) var(--animation-bounce);
+  }
+
+  /* Gradient Text */
+  .gradient-text {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Glass Effect */
+  .glass {
+    background: var(--navbar-bg);
+    backdrop-filter: blur(var(--navbar-blur));
+    border: 1px solid var(--navbar-border);
+  }
+
+  /* Modern Card */
+  .card {
+    @apply glass rounded-xl p-6 shadow-lg;
+  }
+
+  /* Button Variants */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+    @apply disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary text-primary-foreground hover:bg-primary/90;
+  }
+
+  .btn-secondary {
+    @apply btn bg-secondary text-secondary-foreground hover:bg-secondary/80;
+  }
+
+  .btn-ghost {
+    @apply btn hover:bg-accent hover:text-accent-foreground;
+  }
+
+  .btn-destructive {
+    @apply btn bg-destructive text-destructive-foreground hover:bg-destructive/90;
   }
 }
 
 @layer components {
-  .btn {
-    @apply inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+  /* Modern Navbar Specific Styles */
+  .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--navbar-height);
+    z-index: 50;
+    @apply glass;
+    box-shadow: var(--navbar-shadow);
+    transition: all var(--animation-normal) var(--animation-ease);
   }
-  .btn-primary {
-    @apply bg-primary text-primary-foreground hover:bg-primary/90;
+
+  .navbar.scrolled {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   }
-  .btn-secondary {
-    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80;
+
+  .dark .navbar.scrolled {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   }
-  .btn-outline {
-    @apply border border-input bg-background hover:bg-accent hover:text-accent-foreground;
+
+  /* Modern Mobile Menu */
+  .mobile-menu {
+    position: fixed;
+    top: var(--navbar-height);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    @apply glass;
+    transform: translateY(-100%);
+    opacity: 0;
+    visibility: hidden;
+    transition: all var(--animation-normal) var(--animation-ease);
   }
-  .btn-ghost {
-    @apply hover:bg-accent hover:text-accent-foreground;
+
+  .mobile-menu.open {
+    transform: translateY(0);
+    opacity: 1;
+    visibility: visible;
   }
-  .btn-link {
-    @apply text-primary underline-offset-4 hover:underline;
+
+  /* Logo Animation */
+  .logo {
+    transition: transform var(--animation-normal) var(--animation-ease);
   }
-  
-  /* Update dark mode button styles to use gold theme */
-  .dark .btn-primary {
-    background: linear-gradient(to bottom, var(--gold-gradient-start), var(--gold-gradient-end));
-    color: #2d3748;
-    border: none;
-    font-weight: 600;
-    box-shadow: 0 2px 10px var(--gold-shadow);
+
+  .logo:hover {
+    transform: scale(1.05);
   }
-  
-  .dark .btn-primary:hover {
-    background: linear-gradient(to bottom, var(--gold-highlight), var(--gold-secondary));
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px var(--gold-shadow);
+
+  /* Menu Toggle Animation */
+  .menu-toggle {
+    width: 24px;
+    height: 24px;
+    position: relative;
+    cursor: pointer;
   }
-  
-  .dark .btn-outline {
-    border-color: var(--gold-border);
-    color: var(--gold-primary);
+
+  .menu-toggle span {
+    display: block;
+    position: absolute;
+    height: 2px;
+    width: 100%;
+    background: hsl(var(--foreground));
+    border-radius: 1px;
+    opacity: 1;
+    left: 0;
+    transform: rotate(0deg);
+    transition: all var(--animation-fast) var(--animation-ease);
   }
-  
-  .dark .btn-outline:hover {
-    background-color: rgba(245, 215, 110, 0.1);
-    color: var(--gold-highlight);
-    border-color: var(--gold-primary);
+
+  .menu-toggle span:nth-child(1) {
+    top: 0px;
   }
-  
-  .dark .btn-ghost {
-    color: var(--gold-muted);
+
+  .menu-toggle span:nth-child(2) {
+    top: 8px;
   }
-  
-  .dark .btn-ghost:hover {
-    background-color: rgba(245, 215, 110, 0.1);
-    color: var(--gold-primary);
+
+  .menu-toggle span:nth-child(3) {
+    top: 16px;
   }
-  
-  .dark .btn-link {
-    color: var(--gold-link);
+
+  .menu-toggle.open span:nth-child(1) {
+    top: 8px;
+    transform: rotate(135deg);
   }
-  
-  .dark .btn-link:hover {
-    color: var(--gold-highlight);
+
+  .menu-toggle.open span:nth-child(2) {
+    opacity: 0;
+    left: -60px;
   }
-  
-  /* Gold-themed form elements */
-  .dark input, 
-  .dark textarea, 
-  .dark select {
-    background-color: hsl(0, 0%, 5%);
-    border-color: var(--gold-border);
-    color: var(--gold-primary);
-  }
-  
-  .dark input:focus, 
-  .dark textarea:focus, 
-  .dark select:focus {
-    border-color: var(--gold-primary);
-    box-shadow: 0 0 0 2px var(--gold-shadow);
-  }
-  
-  .dark input::placeholder,
-  .dark textarea::placeholder {
-    color: var(--gold-muted);
-    opacity: 0.7;
-  }
-  
-  /* Gold-themed links */
-  .dark a {
-    color: var(--gold-link);
-    transition: all 0.2s ease;
-  }
-  
-  .dark a:hover {
-    color: var(--gold-highlight);
-    text-shadow: 0 0 5px var(--gold-shadow);
-  }
-  
-  /* Update active elements to use gold */
-  .dark .active {
-    color: var(--gold-primary) !important;
-    text-shadow: 0 0 5px var(--gold-shadow);
-  }
-  
-  /* Gold-themed navigation */
-  .dark nav a,
-  .dark .nav-link {
-    color: var(--gold-muted);
-  }
-  
-  .dark nav a:hover,
-  .dark .nav-link:hover {
-    color: var(--gold-primary);
-  }
-  
-  .dark nav a.active,
-  .dark .nav-link.active {
-    color: var(--gold-primary) !important;
-    text-shadow: 0 0 5px var(--gold-shadow);
-  }
-  
-  /* Gold-themed cards and panels */
-  .dark .card,
-  .dark .panel,
-  .dark [class*="card-"],
-  .dark [class*="panel-"] {
-    border-color: var(--gold-border);
-    box-shadow: 0 4px 20px var(--gold-shadow);
-  }
-  
-  .dark .card:hover,
-  .dark .panel:hover {
-    border-color: var(--gold-muted);
-    box-shadow: 0 6px 25px var(--gold-shadow);
-  }
-  
-  /* Gold-themed headings */
-  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6,
-  .dark [class*="heading-"],
-  .dark [class*="title-"] {
-    color: var(--gold-primary);
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  }
-  
-  /* Gold-themed text elements */
-  .dark .text-primary {
-    color: var(--gold-primary) !important;
-  }
-  
-  .dark .text-secondary {
-    color: var(--gold-secondary) !important;
-  }
-  
-  .dark .text-muted {
-    color: var(--gold-muted) !important;
-  }
-  
-  .dark .text-accent {
-    color: var(--gold-accent) !important;
-  }
-  
-  /* Gold-themed borders */
-  .dark .border {
-    border-color: var(--gold-border) !important;
-  }
-  
-  .dark .border-primary {
-    border-color: var(--gold-primary) !important;
-  }
-  
-  .dark .border-t, .dark .border-b, .dark .border-l, .dark .border-r {
-    border-color: var(--gold-border) !important;
-  }
-  
-  /* Gold-themed dividers */
-  .dark .divider, 
-  .dark hr,
-  .dark .separator {
-    border-color: var(--gold-border) !important;
-  }
-  
-  /* Gold glow for important elements */
-  .dark .gold-glow {
-    box-shadow: 0 0 10px var(--gold-shadow);
-    border-color: var(--gold-border);
-    transition: all 0.3s ease;
-  }
-  
-  .dark .gold-glow:hover {
-    box-shadow: 0 0 15px var(--gold-shadow);
-    border-color: var(--gold-primary);
-  }
-  
-  /* Gold-themed tables */
-  .dark table {
-    border-color: var(--gold-border);
-  }
-  
-  .dark th {
-    color: var(--gold-primary);
-    border-bottom-color: var(--gold-border);
-    background-color: rgba(0, 0, 0, 0.3);
-  }
-  
-  .dark td {
-    color: var(--gold-muted);
-    border-color: var(--gold-border);
-  }
-  
-  .dark tr:hover td {
-    background-color: rgba(245, 215, 110, 0.05);
-  }
-  
-  /* Gold-themed lists */
-  .dark ul li::before,
-  .dark ol li::marker {
-    color: var(--gold-secondary);
+
+  .menu-toggle.open span:nth-child(3) {
+    top: 8px;
+    transform: rotate(-135deg);
   }
 }
 
-/* Ensure proper viewport handling for all screen sizes */
-@media screen and (max-width: 768px) {
-  html {
-    -webkit-text-size-adjust: 100%;
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale {
+  from { 
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to { 
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Disable transitions during theme changes */
+.disable-transitions * {
+  transition: none !important;
+}
+
+/* Modern responsive breakpoints */
+@media (max-width: 640px) {
+  .container {
+    padding: 0 0.75rem;
   }
   
-  :root {
-    --container-padding: 1rem;
+  h1 { font-size: 1.875rem; }
+  h2 { font-size: 1.5rem; }
+  h3 { font-size: 1.25rem; }
+}
+
+@media (min-width: 1280px) {
+  .container {
+    padding: 0 2rem;
   }
-}
-
-@media screen and (max-width: 480px) {
-  :root {
-    --container-padding: 0.75rem;
-  }
-  
-  body {
-    overflow-x: hidden;
-  }
-}
-
-/* Fix for mobile touch targets */
-@media (hover: none) and (pointer: coarse) {
-  button, 
-  a,
-  [role="button"] {
-    min-height: 44px;
-    min-width: 44px;
-  }
-}
-
-/* Fix for mobile bottom navigation icons */
-.mobile-nav-icon,
-.bottom-navigation svg,
-.bottom-navigation path,
-.bottom-navigation polygon,
-nav[role="navigation"] svg,
-nav[role="navigation"] path,
-button svg,
-button path {
-  fill: currentColor !important;
-  stroke: currentColor !important;
-  color: inherit !important;
-}
-
-.dark nav svg,
-.dark button svg {
-  fill: hsl(45, 100%, 60%) !important;
-  color: hsl(45, 100%, 60%) !important;
-}
-
-/* Fix for white triangle that appears when scrolling */
-.scroll-indicator,
-.scroll-arrow,
-.scroll-to-top {
-  background-color: transparent !important;
-  color: hsl(var(--foreground)) !important;
-}
-
-.dark .scroll-indicator,
-.dark .scroll-arrow,
-.dark .scroll-to-top {
-  color: hsl(45, 100%, 60%) !important;
-}
-
-/* Fix any triangular navigation elements */
-nav polygon,
-nav path[d*="triangle"],
-button polygon,
-button path[d*="triangle"] {
-  fill: hsl(var(--foreground)) !important;
-}
-
-.dark nav polygon,
-.dark nav path[d*="triangle"],
-.dark button polygon,
-.dark button path[d*="triangle"] {
-  fill: hsl(45, 100%, 60%) !important;
-}
-
-/* Fix white triangle in bottom navigation */
-.dark div > svg > polygon,
-.dark button > svg > polygon,
-.dark [role="button"] > svg > polygon,
-.dark a > svg > polygon,
-.dark div[role="navigation"] svg polygon {
-  fill: hsl(45, 100%, 60%) !important;
-  stroke: hsl(45, 100%, 60%) !important;
-}
-
-/* Target system back/forward triangles specifically */
-.dark div[role="navigation"] button svg,
-.dark div[role="navigation"] a svg,
-.dark [role="navigation"] svg {
-  color: hsl(45, 100%, 60%) !important;
-  fill: hsl(45, 100%, 60%) !important;
-  stroke: hsl(45, 100%, 60%) !important;
-}
-
-/* Fix for bottom bar */
-@media (max-width: 767px) {
-  /* Target fixed position elements at bottom of screen */
-  body > div:last-child > div[style*="fixed"][style*="bottom"],
-  body > div > div[style*="fixed"][style*="bottom"],
-  div[role="navigation"][style*="bottom"],
-  nav[style*="bottom"] {
-    background-color: hsl(var(--background)) !important;
-    border-top: 1px solid hsl(var(--border)) !important;
-  }
-  
-  .dark body > div:last-child > div[style*="fixed"][style*="bottom"],
-  .dark body > div > div[style*="fixed"][style*="bottom"],
-  .dark div[role="navigation"][style*="bottom"],
-  .dark nav[style*="bottom"] {
-    background-color: hsl(0, 0%, 10%) !important;
-    border-top: 1px solid hsl(45, 30%, 30%) !important;
-  }
-}
-
-/* Target system navigation triangle elements - this is the most direct approach */
-[style*="color: white"],
-[style*="color:white"],
-[style*="color: #fff"],
-[style*="color:#fff"],
-[style*="color: rgb(255, 255, 255)"],
-[style*="color:rgb(255,255,255)"],
-[style*="border-color: white"],
-[style*="border-color: #fff"],
-[style*="border-color:white"],
-[style*="border-color:#fff"] {
-  color: hsl(var(--foreground)) !important;
-  border-color: hsl(var(--foreground)) !important;
-  fill: hsl(var(--foreground)) !important;
-  stroke: hsl(var(--foreground)) !important;
-  background-color: transparent !important;
-}
-
-.dark [style*="color: white"],
-.dark [style*="color:white"],
-.dark [style*="color: #fff"],
-.dark [style*="color:#fff"],
-.dark [style*="color: rgb(255, 255, 255)"],
-.dark [style*="color:rgb(255,255,255)"],
-.dark [style*="border-color: white"],
-.dark [style*="border-color: #fff"],
-.dark [style*="border-color:white"],
-.dark [style*="border-color:#fff"] {
-  color: hsl(45, 100%, 60%) !important;
-  border-color: hsl(45, 100%, 60%) !important;
-  fill: hsl(45, 100%, 60%) !important;
-  stroke: hsl(45, 100%, 60%) !important;
-  background-color: transparent !important;
-}
-
-/* Target system-injected navigation elements */
-@media (max-width: 767px) {
-  /* For iOS-style bottom navigation */
-  :root {
-    --system-nav-color: hsl(var(--foreground));
-  }
-  
-  .dark {
-    --system-nav-color: hsl(45, 100%, 60%);
-  }
-  
-  /* Directly override any fixed or absolute elements at the bottom of page */
-  *[style*="position: fixed"][style*="bottom"] *,
-  *[style*="position:fixed"][style*="bottom"] *,
-  *[style*="position: absolute"][style*="bottom"] *,
-  *[style*="position:absolute"][style*="bottom"] * {
-    color: var(--system-nav-color) !important;
-    fill: var(--system-nav-color) !important;
-    stroke: var(--system-nav-color) !important;
-  }
-}
-
-/* Webkit scrollbar styles (Chrome, Safari, Edge) */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--primary) / 0.3);
-  border-radius: 20px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background-color: hsl(var(--primary) / 0.5);
 }
