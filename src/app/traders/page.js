@@ -287,21 +287,15 @@ export default function TradersPage() {
                   onClick={() => navigateToProfile(trader.id)}
                 >
                   <div className={styles.traderAvatar}>
-                    {trader.avatar_url ? (
-                      <img 
-                        src={trader.avatar_url}
-                        alt={trader.username}
-                        onError={(e) => {
-                          console.log(`Failed to load avatar for ${trader.username}, using fallback`);
-                          e.target.onerror = null;
-                          e.target.src = '/default-avatar.svg';
-                        }}
-                      />
-                    ) : (
-                      <div className={styles.avatarPlaceholder}>
-                        {trader.username?.charAt(0).toUpperCase() || '?'}
-                      </div>
-                    )}
+                    <img 
+                      src={trader.avatar_url || '/default-avatar.svg'}
+                      alt={trader.username}
+                      onError={(e) => {
+                        // Silent fallback to default avatar
+                        e.target.onerror = null;
+                        e.target.src = '/default-avatar.svg';
+                      }}
+                    />
                   </div>
                   <div className={styles.traderInfo}>
                     <h3>{trader.name || trader.full_name || trader.username || 'Trader'}</h3>

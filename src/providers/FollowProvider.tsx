@@ -29,16 +29,20 @@ export const FollowProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
+      // Use a more specific query that should work with RLS policies
       const { data, error: dbError } = await supabase
         .from('user_followings')
         .select('id')
         .eq('follower_id', user.id)
         .eq('following_id', profileIdToFollow)
-        .single();
+        .maybeSingle(); // Use maybeSingle instead of single to avoid PGRST116 errors
 
-      if (dbError && dbError.code !== 'PGRST116') { // PGRST116 is no rows found
+      if (dbError) {
         console.error('Error checking follow status:', dbError);
-        setError(dbError.message);
+        // Don't set error state for common "no rows found" cases
+        if (dbError.code !== 'PGRST116') {
+          setError(dbError.message);
+        }
         return false;
       }
       
@@ -72,6 +76,7 @@ export const FollowProvider = ({ children }: { children: ReactNode }) => {
         const response = await fetch('/api/unfollow', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', // Include cookies for authentication
           body: JSON.stringify({ follower_id: user.id, following_id: profileIdToToggle }),
         });
 
@@ -87,6 +92,7 @@ export const FollowProvider = ({ children }: { children: ReactNode }) => {
         const response = await fetch('/api/follow', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', // Include cookies for authentication
           body: JSON.stringify({ follower_id: user.id, following_id: profileIdToToggle }),
         });
 
