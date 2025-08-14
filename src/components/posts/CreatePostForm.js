@@ -7,13 +7,12 @@ import { generateEodLastCloseUrl, countries, BASE_URL, API_KEY } from '@/utils/s
 import { getCountrySymbolCounts, searchStocks } from '@/utils/symbolSearch';
 import { uploadPostImage } from '@/utils/supabase';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider'; // Updated from contexts/CreatePostFormContext
+import { createPost } from '@/utils/supabase'; // Adjust this import based on your actual supabase client
+import styles from '@/styles/create-post-page.css'; // Assuming you have a CSS module for this page
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { usePosts } from '@/hooks/usePosts'; // Use the addPost function from usePosts hook
 import { createClient } from '@supabase/supabase-js';
-import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData'; // Import from models
-import { CURRENCY_SYMBOLS, getCurrencySymbol, COUNTRY_ISO_CODES } from '@/models/CurrencyData'; // Import from models
-import 'flag-icons/css/flag-icons.min.css';
-import '@/styles/create-post-page.css';
-import '@/styles/animation.css';
-import countrySummaryData from '@/symbols_data/country_summary_20250304_171206.json';
 
 // Create reusable Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -68,8 +67,10 @@ const formatSymbolForApi = (symbol, country) => {
 };
 
 export default function CreatePostForm() {
-  const { user } = useSupabase();
+  const { user, supabase } = useSupabase(); // Get the supabase client from the provider
   const { profile, getEffectiveAvatarUrl, addPost } = useProfile();
+  const router = useRouter();
+  const { addPost: addPostFromPosts } = usePosts(); // Use the addPost function from usePosts hook
   
   // Since there's no formState, directly destructure values from context with defaults
   const { 
@@ -137,6 +138,11 @@ export default function CreatePostForm() {
   const strategySelectRef = useRef(null);
   const formWrapperRef = useRef(null);
   const [showStrategyDialog, setShowStrategyDialog] = useState(false);
+  const [imageFiles, setImageFiles] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
 
   // الاستراتيجيات الافتراضية
   const DEFAULT_STRATEGIES = [
@@ -225,21 +231,35 @@ export default function CreatePostForm() {
             .order('created_at', { ascending: false });
             
           if (error) {
-            console.error('Error fetching strategies from database:', error);
-            // Keep using default strategies
+            // If there's an error, check if it's because the table doesn't exist
+            if (error.code === '42P01') { // PostgreSQL error code for undefined_table
+              // Attempt to create the table - this might not work due to permissions or if it's a server-side only operation
+              try {
+                await setupDatabase(); // Assuming this function handles table creation
+                const { data: newData, error: newError } = await getUserStrategies(user.id); // Retry fetching
+                if (newError) {
+                  // console.error('Table user_strategies does not exist. Please run the migration script.');
+                } else {
+                  setUserStrategies(newData || []);
+                }
+              } catch (setupError) {
+                // console.error('Database error fetching strategies:', setupError);
+              }
+            }
+            // For other errors, set default strategies
+            setDefaultStrategies();
           } else if (data && data.length > 0) {
-            console.log('Retrieved user strategies from database:', data);
-            // Combine user strategies with default ones
-            const userStrategyNames = data.map(s => s.name);
-            const combinedStrategies = [...userStrategyNames, ...DEFAULT_STRATEGIES.filter(s => !userStrategyNames.includes(s))];
-            setStrategies(combinedStrategies);
+            // console.log('Retrieved user strategies from database:', data);
+            setUserStrategies(data);
           } else {
-            console.log('No user strategies found, using default strategies');
-            // Already set to default strategies above
+            // console.log('No user strategies found, using default strategies');
+            setDefaultStrategies();
           }
-        } catch (dbError) {
-          console.error('Database error fetching strategies:', dbError);
-          // Keep using default strategies
+        } catch (error) {
+          // console.error('Error fetching strategies:', error);
+          setDefaultStrategies();
+        } finally {
+          setStrategiesLoading(false);
         }
       } else {
         console.log('Supabase client not available, using default strategies');
@@ -371,7 +391,7 @@ export default function CreatePostForm() {
         let searchCountry = selectedCountry === 'all' ? null : selectedCountry;
         if (searchCountry && COUNTRY_CODE_TO_NAME[searchCountry]) {
           searchCountry = COUNTRY_CODE_TO_NAME[searchCountry];
-          console.log(`Searching in country: ${searchCountry}`);
+          // console.log(`Searching in country: ${searchCountry}`);
         }
         
         // Use our local symbol search instead of API
@@ -394,63 +414,12 @@ export default function CreatePostForm() {
         
         updateField('searchResults', formattedResults);
       } catch (error) {
-        console.error('Error searching stocks:', error);
-        
-        // When search fails, load popular stocks from the current country
-        if (selectedCountry !== 'all') {
-          // Don't show loading state as requested
-          setIsSearching(false);
-          
-          // Convert ISO country code to country name
-          let countryName = selectedCountry;
-          if (countryName.length === 2 && COUNTRY_CODE_TO_NAME[countryName.toLowerCase()]) {
-            countryName = COUNTRY_CODE_TO_NAME[countryName.toLowerCase()];
-          }
-          
-          // Load up to 250 popular stocks from the selected country
-          try {
-            const popularStocks = await searchStocks('', countryName, 250);
-            if (popularStocks && popularStocks.length > 0) {
-              console.log(`Loaded ${popularStocks.length} popular stocks for ${countryName}`);
-              
-              // Format the results to match the expected structure
-              const formattedResults = popularStocks.map(item => ({
-                symbol: item.Symbol || item.symbol,
-                name: item.Name || item.name,
-                country: item.Country || item.country,
-                exchange: item.Exchange || item.exchange,
-                uniqueId: item.uniqueId || `${item.symbol || item.Symbol}-${item.country || item.Country}-${Math.random().toString(36).substring(7)}`
-              }));
-              
-              updateField('searchResults', formattedResults);
-            } else {
-              updateField('searchResults', [{
-                symbol: `No stocks available for ${countryName}`,
-                name: "Please try another country",
-                country: selectedCountry,
-                exchange: "",
-                uniqueId: "no-stocks-available"
-              }]);
-            }
-          } catch (popularStocksError) {
-            console.error('Error loading popular stocks:', popularStocksError);
-            updateField('searchResults', [{
-              symbol: `Could not load stocks from ${countryName}`,
-              name: "Please try again later",
-              country: selectedCountry,
-              exchange: "",
-              uniqueId: "popular-stocks-error"
-            }]);
-          } finally {
-            setIsSearching(false);
-          }
-        } else {
-          // For 'All Countries', just clear the results
-          updateField('searchResults', []);
-          setIsSearching(false);
-        }
+        // console.error('Error searching stocks:', error);
+        setSearchResults([]);
+      } finally {
+        setLoadingSearch(false);
       }
-    }, 500);
+    }, [selectedCountry?.name]);
 
     // Cleanup function
     return () => {
@@ -491,13 +460,13 @@ export default function CreatePostForm() {
         countryName = COUNTRY_CODE_TO_NAME[countryName.toLowerCase()];
       }
       
-      console.log(`Loading all symbols for country: ${countryName}`);
+      // console.log(`Loading all symbols for country: ${countryName}`);
       
       // Use empty query to load all symbols for the country
       searchStocks('', countryName, 250)
         .then(results => {
           if (results && results.length > 0) {
-            console.log(`Loaded ${results.length} symbols for ${countryName}`);
+            // console.log(`Loaded ${results.length} symbols for ${countryName}`);
             
             // Check if the first result is an error message
             if (results[0].uniqueId && (
@@ -519,14 +488,12 @@ export default function CreatePostForm() {
             
             updateField('searchResults', formattedResults);
           } else {
-            console.warn(`No symbols returned for ${countryName}`);
-            // Show a friendly message within the search results if no symbols are found
             updateField('searchResults', [{
-              symbol: `${countryName} - No symbols available`,
+              symbol: `No stocks available for ${countryName}`,
               name: "Please try another country",
-              country: value,
+              country: selectedCountry,
               exchange: "",
-              uniqueId: "no-symbols-message"
+              uniqueId: "no-stocks-available"
             }]);
           }
         })
@@ -536,7 +503,7 @@ export default function CreatePostForm() {
           updateField('searchResults', [{
             symbol: `${countryName} - Temporarily unavailable`,
             name: "Please try again later or select another country",
-            country: value,
+            country: selectedCountry,
             exchange: "",
             uniqueId: "error-message"
           }]);
@@ -575,8 +542,35 @@ export default function CreatePostForm() {
       
       // First, let's properly format the symbol for consistent API use
       const formattedSymbol = formatSymbolForApi(stock.symbol, stock.country);
-      console.log(`Formatted symbol for API: ${formattedSymbol}`);
-      
+      // console.log(`Formatted symbol for API: ${formattedSymbol}`);
+
+      setPriceLoading(true);
+      setPriceError(null);
+      try {
+        // console.log(`Fetching price directly from API for ${stock.symbol} (${stock.country})`);
+        const { data: priceData, error: priceError } = await getStockPrice(formattedSymbol, stock.country);
+
+        if (priceError) {
+          // console.error(`Error fetching stock price from API: ${priceError.message}`);
+          setPriceError(priceError.message);
+        }
+        else if (priceData) {
+          // console.log(`API response:`, priceData);
+          const price = priceData.price;
+          if (price) {
+            // console.log(`Successfully parsed price from API: $${price}`);
+            updateField('currentPrice', price);
+          } else {
+            setPriceError('Price data not found.');
+          }
+        }
+      } catch (error) {
+        // console.error(`Error fetching stock price from API: ${error.message}`);
+        setPriceError('Failed to fetch price. Please try again.');
+      } finally {
+        setPriceLoading(false);
+      }
+
       // Get the full country name if needed
       let countryName = stock.country;
       if (countryName.length === 2 && COUNTRY_CODE_TO_NAME[countryName.toLowerCase()]) {
@@ -584,7 +578,7 @@ export default function CreatePostForm() {
       }
       
       // Always use the API directly
-      console.log(`Fetching price directly from API for ${stock.symbol} (${countryName})`);
+      // console.log(`Fetching price directly from API for ${stock.symbol} (${countryName})`);
       
       // No local data available, proceed directly to API call
       
@@ -594,7 +588,7 @@ export default function CreatePostForm() {
       // Store the properly formatted API URL for display
       setApiUrl(currentApiUrl);
       setFormattedApiUrl(currentApiUrl);
-      console.log(`Fetching price from API URL: ${currentApiUrl}`);
+      // console.log(`Fetching price from API URL: ${currentApiUrl}`);
       
       // For exchanges, don't try to get price data
       if (stock.exchange) {
@@ -611,7 +605,7 @@ export default function CreatePostForm() {
       } else {
         // Fetch price data using the generated URL
         try {
-          console.log(`Fetching price data from API: ${currentApiUrl}`);
+          // console.log(`Fetching price data from API: ${currentApiUrl}`);
           // Always fetch the data from the API for the most up-to-date price
           
           // Track fetch start time
@@ -628,7 +622,7 @@ export default function CreatePostForm() {
           }
           
           const priceData = await response.json();
-          console.log(`API response:`, priceData);
+          // console.log(`API response:`, priceData);
           
           // Store the full response
           setApiResponse({
@@ -641,7 +635,7 @@ export default function CreatePostForm() {
           
           if (Array.isArray(priceData) && priceData.length > 0 && priceData[0] && typeof priceData[0].close === 'number') {
             const price = priceData[0].close;
-            console.log(`Successfully parsed price from API: $${price}`);
+            // console.log(`Successfully parsed price from API: $${price}`);
             
             updateField('currentPrice', price);
             
@@ -672,7 +666,7 @@ export default function CreatePostForm() {
           
           // Try to fetch directly from the URL as a fallback
           try {
-            console.log(`Attempting direct fetch from: ${currentApiUrl}`);
+            // console.log(`Attempting direct fetch from: ${currentApiUrl}`);
             
             // Create a new AbortController to limit fetch time
             const controller = new AbortController();
@@ -699,7 +693,7 @@ export default function CreatePostForm() {
             }
             
             const directData = await directResponse.json();
-            console.log('Direct API response:', directData);
+            // console.log('Direct API response:', directData);
             
             setApiResponse({
               source: 'direct_api',
@@ -716,7 +710,7 @@ export default function CreatePostForm() {
               updateField('targetPrice', (directPrice * 1.05).toFixed(2));
               updateField('stopLossPrice', (directPrice * 0.95).toFixed(2));
               
-              console.log(`Successfully parsed price from direct API: $${directPrice}`);
+              // console.log(`Successfully parsed price from direct API: $${directPrice}`);
             }
           } catch (directError) {
             console.error(`Direct fetch failed: ${directError.message}`);
@@ -754,90 +748,47 @@ export default function CreatePostForm() {
   };
 
   // Helper function to scroll to stock info with improved reliability
-  const scrollToStockInfo = () => {
-    console.log('scrollToStockInfo called');
-    
-    // Force scroll to top immediately for all possible containers
-    const scrollContainers = [
-      formWrapperRef.current,
-      document.querySelector('.form-wrapper'),
-      document.querySelector('.create-post-form-container'),
-      document.querySelector('.dialog-content'),
-      document.querySelector('.modal-content')
-    ];
-    
-    // Try to scroll all possible containers to top
-    scrollContainers.forEach(container => {
+  const scrollToStockInfo = useCallback(() => {
+    // console.log('scrollToStockInfo called');
+    if (stockInfoRef.current) {
+      const stockInfoElement = stockInfoRef.current;
+      const container = document.querySelector('.create-post-form-container'); // Adjust this selector if needed
+
       if (container) {
+        // Try to scroll the container to the top first, then to the element
         try {
-          // Try both methods
-          container.scrollTo(0, 0);
-          container.scrollTop = 0;
-          console.log('Scrolled container to top');
-        } catch (e) {
-          console.error('Error scrolling container:', e);
-        }
-      }
-    });
-    
-    // Schedule multiple scroll attempts with increasing delays
-    for (let i = 0; i < 5; i++) {
-      setTimeout(() => {
-        // Try to find the stock info container
-        const stockInfoContainer = document.querySelector('.stock-info-container');
-        const stockItem = document.querySelector('.stock-item');
-        const targetElement = stockInfoContainer || stockItem || document.querySelector('.form-group');
-        
-        if (targetElement) {
-          console.log(`Found target element on attempt ${i+1}`);
-          
-          // Get all possible scroll containers again
-          scrollContainers.forEach(container => {
-            if (container) {
-              try {
-                // Get the position of the element
-                const offsetTop = targetElement.offsetTop;
-                
-                // Scroll to the element
-                container.scrollTo({
-                  top: offsetTop - 20,
-                  behavior: 'smooth'
-                });
-                
-                // Also try direct assignment
-                setTimeout(() => {
-                  container.scrollTop = offsetTop - 20;
-                }, 50);
-                
-                console.log(`Scrolled container to element at ${offsetTop}px`);
-              } catch (e) {
-                console.error('Error scrolling to element:', e);
-              }
-            }
+          container.scrollTo({
+            top: 0,
+            behavior: 'smooth',
           });
-          
-          // Add highlight effect
-          targetElement.classList.add('highlight-selection');
-          setTimeout(() => {
-            targetElement.classList.remove('highlight-selection');
-          }, 1000);
+          // console.log('Scrolled container to top');
+        } catch (e) {
+          // console.error('Error scrolling container:', e);
         }
-      }, i * 300); // Increasing delays: 0ms, 300ms, 600ms, 900ms, 1200ms
-    }
-    
-    // Add additional focus attempts with delay
-    setTimeout(() => {
-      // Force focus on price value to ensure it's visible
-      const priceElement = document.querySelector('.stock-price-value');
-      if (priceElement) {
+
+        // Use a small delay to allow the first scroll to complete
         setTimeout(() => {
-          priceElement.focus();
-          console.log('Focused on price element');
-        }, 300);
+          const elementRect = stockInfoElement.getBoundingClientRect();
+          const containerRect = container.getBoundingClientRect();
+          const offsetTop = elementRect.top - containerRect.top + container.scrollTop;
+
+          // Only scroll if the element is not fully visible
+          if (elementRect.top < containerRect.top || elementRect.bottom > containerRect.bottom) {
+            container.scrollTo({
+              top: offsetTop,
+              behavior: 'smooth',
+            });
+            // console.log(`Scrolled container to element at ${offsetTop}px`);
+          } else {
+            // console.log(`Found target element on attempt ${i+1}`);
+          }
+        }, 100); // Small delay
+      } else {
+        // console.error('Error scrolling to element:', e);
       }
-    }, 1500);
-  };
-  
+    }
+  }, []);
+
   // Handle image selection
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -1230,9 +1181,9 @@ export default function CreatePostForm() {
   }, [showStrategyDialog]);
 
   // Function to update global status - declare once here
-  const updateGlobalStatus = (message, type = 'processing') => {
+  const updateGlobalStatus = useCallback((message, type = 'processing') => {
     // This would connect to your global status context or state
-    console.log(`Status: ${type} - ${message}`);
+    // console.log(`Status: ${type} - ${message}`);
     // If you have a global status component, update it here
     if (setGlobalStatus) {
       setGlobalStatus({
@@ -1241,7 +1192,12 @@ export default function CreatePostForm() {
         message
       });
     }
-  };
+    // Clear status after 5 seconds if not a persistent error
+    if (type !== 'error') {
+      const timer = setTimeout(() => setGlobalStatus(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [setGlobalStatus]);
 
   // New improved handleSubmit function with better timeout handling
   const handleSubmit = async (event) => {
@@ -1286,16 +1242,16 @@ export default function CreatePostForm() {
       };
 
       // Process image uploads
-      if (imageFile) {
+      if (imageFiles.length > 0) {
         try {
-          updateGlobalStatus('Uploading image...', 'processing');
-          const uploadedUrl = await uploadPostImage(imageFile, user?.id);
-          if (uploadedUrl) {
-            postData.image_url = uploadedUrl;
-          }
+          updateGlobalStatus('Uploading images...', 'processing');
+          const uploadedUrls = await Promise.all(
+            imageFiles.map((file) => uploadPostImage(file, user.id))
+          );
+          postData.images = uploadedUrls;
         } catch (error) {
-          console.error('Error uploading image:', error);
-          updateGlobalStatus(`Error uploading image: ${error.message}`, 'error');
+          console.error('Error uploading images:', error);
+          updateGlobalStatus(`Error uploading images: ${error.message}`, 'error');
           setIsSubmitting(false); // Reset submitting state on error
           if (setSubmitState) {
             setSubmitState('error');
@@ -1320,11 +1276,7 @@ export default function CreatePostForm() {
       }
       
       // Insert post into 'posts' table
-      const { data: post, error } = await supabase
-        .from('posts')
-        .insert(postData)
-        .select()
-        .single();
+      const { data: post, error } = await createPost(postData, user.id);
       
       if (error) {
         setIsSubmitting(false); // Reset submitting state on error
@@ -1359,8 +1311,8 @@ export default function CreatePostForm() {
       updateField('description', '');
       
       // Reset all form fields
-      updateField('imageFile', null);
-      updateField('imagePreview', '');
+      updateField('imageFiles', []);
+      updateField('imagePreviews', []);
       updateField('imageUrl', '');
       updateField('selectedStock', null);
       updateField('selectedStrategy', '');
@@ -1469,14 +1421,9 @@ export default function CreatePostForm() {
     };
   }, [showStockSearch, searchResults.length, handleStockResultsScroll, handleStockResultsKeyDown]);
 
-  const handleRemoveImage = () => {
-    updateField('imageFile', null);
-    updateField('imagePreview', '');
-    updateField('imageUrl', '');
-    // Clear the file input value
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+  const handleRemoveImage = (indexToRemove) => {
+    setImagePreviews((prev) => prev.filter((_, index) => index !== indexToRemove));
+    setImageFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
   // Add ARIA attributes and improved keyboard navigation
@@ -1852,30 +1799,59 @@ export default function CreatePostForm() {
     return null;
   };
 
+  // Load country symbol counts
+  useEffect(() => {
+    const loadCounts = async () => {
+      try {
+        const counts = await getCountrySymbolCounts();
+        // console.log("Loaded country symbol counts:", counts);
+        setCountrySymbolCounts(counts);
+      } catch (error) {
+        // console.error("Error loading country symbol counts:", error);
+      }
+    };
+    loadCounts();
+  }, []);
+
+  const fetchAvatarUrl = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const url = await getAvatarImageUrl(user.id);
+      setAvatar(url);
+    } catch (error) {
+      // console.error('Error loading avatar URL:', error);
+    }
+  }, [user?.id]);
+  fetchAvatarUrl();
+
+  const focusPriceInput = useCallback(() => {
+    if (priceInputRef.current) {
+      priceInputRef.current.focus();
+      // console.log('Focused on price element');
+    }
+  }, []);
+
   return (
     <>
       <div className="create-post-form-container" ref={formWrapperRef}>
         {/* Form content starts here */}
         <div className="form-wrapper">
           {/* Image Preview */}
-          {imagePreview && (
+          {imagePreviews.length > 0 && (
             <div className="form-group">
               <div className="file-preview-item">
-                <img
-                  src={imagePreview}
-                  alt="Preview"
-                  className="file-preview-item img"
-                />
-                <button
-                  className="file-remove"
-                  onClick={handleRemoveImage}
-                  aria-label="Remove image"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                </button>
+                {imagePreviews.map((src, index) => (
+                  <div key={index} className={styles.imagePreviewWrapper}>
+                    <Image src={src} alt="Preview" width={100} height={100} className={styles.imagePreview} />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage(index)}
+                      className={styles.removeImageButton}
+                    >
+                      X
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           )}

@@ -1,8 +1,9 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useRef } from 'react';
-import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
+import { SupabaseClient, User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
+import { supabase as globalSupabase } from '@/utils/supabase'; // Import the shared instance
 
 interface SupabaseContextType {
   supabase: SupabaseClient;
@@ -37,12 +38,8 @@ interface SupabaseContextType {
 const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined);
 
 export function SupabaseProvider({ children }: { children: React.ReactNode }) {
-  const [supabase] = useState(() => 
-    createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-  );
+  // Use the globally imported Supabase client instance
+  const supabase = globalSupabase;
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -59,7 +56,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Error getting session:', error.message);
+          // console.error('Error getting session:', error.message);
           setError(error);
           setLoading(false);
           return;
@@ -71,12 +68,16 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
 
     // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-          console.log('[Auth] State change:', event);
+          // console.log(`[Auth] State change: ${event}`);
+          if (event === 'SIGNED_IN') {
+            const currentUser = await supabase.auth.getUser();
+            setUser(currentUser.data.user);
+            setIsAuthenticated(true);
+          } else if (event === 'SIGNED_OUT') {
+            setUser(null);
+            setIsAuthenticated(false);
+          }
           
-      const hasUser = !!session?.user;
-      setUser(session?.user ?? null);
-      setIsAuthenticated(hasUser);
-
           // Clear any pending refresh
           if (refreshTimeout.current) {
             clearTimeout(refreshTimeout.current);
@@ -109,7 +110,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
           }
         };
       } catch (err) {
-        console.error('Error initializing auth:', err);
+        // console.error('Error initializing auth:', err);
         setError(err instanceof Error ? err : new Error('Failed to initialize auth'));
         setLoading(false);
       }
@@ -132,7 +133,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, userData: any = {}) => {
     try {
-      console.log('SupabaseProvider: Starting signUp with email:', email);
+      // console.log('SupabaseProvider: Starting signUp with email:', email);
       
       // Step 1: Sign up the user with Supabase Auth
       const { data, error } = await supabase.auth.signUp({
@@ -142,11 +143,11 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       });
       
       if (error) {
-        console.error('SupabaseProvider: Signup error:', error.message);
+        // console.error('SupabaseProvider: Signup error:', error.message);
         throw error;
       }
       
-      console.log('SupabaseProvider: Auth signup successful, user ID:', data?.user?.id);
+      // console.log('SupabaseProvider: Auth signup successful, user ID:', data?.user?.id);
       
       // Step 2: Wait briefly to allow database triggers to run
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -159,7 +160,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
           const now = new Date().toISOString();
           
           // Check if profile already exists (to avoid duplicate profile errors)
-          console.log('SupabaseProvider: Checking if profile exists for user:', userId);
+          // console.log('SupabaseProvider: Checking if profile exists for user:', userId);
           const { data: existingProfile, error: profileCheckError } = await supabase
             .from('profiles')
             .select('id')
@@ -167,12 +168,12 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
             .single();
             
           if (profileCheckError) {
-            console.log('SupabaseProvider: Error checking for profile:', profileCheckError.message);
+            // console.log('SupabaseProvider: Error checking for profile:', profileCheckError.message);
           }
             
           // Only create profile if it doesn't exist
           if (!existingProfile) {
-            console.log('SupabaseProvider: Creating new profile with username:', username);
+            // console.log('SupabaseProvider: Creating new profile with username:', username);
             const defaultProfile = {
               id: userId,
               username: username,
@@ -198,21 +199,21 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
               .insert([defaultProfile]);
               
             if (profileError) {
-              console.error('SupabaseProvider: Profile creation error:', profileError.message, profileError);
+              // console.error('SupabaseProvider: Profile creation error:', profileError.message, profileError);
               // We continue without throwing since the auth signup was successful
             } else {
-              console.log('SupabaseProvider: Profile created successfully');
+              // console.log('SupabaseProvider: Profile created successfully');
             }
           } else {
-            console.log('SupabaseProvider: Profile already exists, no need to create');
+            // console.log('SupabaseProvider: Profile already exists, no need to create');
           }
         } catch (profileError) {
-          console.error('SupabaseProvider: Error during profile creation:', profileError);
+          // console.error('SupabaseProvider: Error during profile creation:', profileError);
           // We don't throw since auth was successful
         }
       }
     } catch (err) {
-      console.error('SupabaseProvider: Sign up process failed:', err);
+      // console.error('SupabaseProvider: Sign up process failed:', err);
       setError(err instanceof Error ? err : new Error('Failed to sign up'));
       throw err;
     }
@@ -233,13 +234,13 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     
     try {
       setIsRefreshing(true);
-      console.log('Refreshing authentication session...');
+      // console.log('Refreshing authentication session...');
       
       // First check if we have a current session
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       
       if (!currentSession) {
-        console.log('No current session found');
+        // console.log('No current session found');
         setIsAuthenticated(false);
         setUser(null);
         return { success: false, authenticated: false };
@@ -249,7 +250,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase.auth.refreshSession();
       
       if (error) {
-        console.error('Error refreshing session:', error.message);
+        // console.error('Error refreshing session:', error.message);
         setIsAuthenticated(false);
         setUser(null);
         throw error;
@@ -262,7 +263,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       
       return { success: true, authenticated: isUserAuthenticated };
     } catch (err) {
-      console.error('Failed to refresh session:', err);
+      // console.error('Failed to refresh session:', err);
       setError(err instanceof Error ? err : new Error('Failed to refresh session'));
       setIsAuthenticated(false);
       setUser(null);
@@ -441,7 +442,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoggingOut(true);
       await signOut();
-      console.log('User logged out successfully');
+      // console.log('User logged out successfully');
       
       // Get the current path
       const currentPath = window.location.pathname;
@@ -459,7 +460,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
         router.push('/landing');
       }
     } catch (error) {
-      console.error('Error logging out:', error);
+      // console.error('Error logging out:', error);
     } finally {
       setIsLoggingOut(false);
     }

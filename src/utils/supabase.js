@@ -5,25 +5,13 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Check if environment variables are set
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase Environment Variables');
-}
-
-// Create a single client for use throughout the app
+// Create a new supabase client instance and export it
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Test the connection on initialization
-(async function testConnection() {
-  if (typeof window !== 'undefined' && supabaseUrl && supabaseAnonKey) {
-    try {
-      const { error } = await supabase.from('_connection_test').select('*').limit(1).single();
-      // If we get a "relation does not exist" error, that's actually good
-      // It means we connected to the database but the table doesn't exist
-    } catch (err) {
-    }
-  }
-})();
+// Check if environment variables are set
+if (!supabaseUrl || !supabaseAnonKey) {
+  // console.error('Missing Supabase Environment Variables');
+}
 
 // Authentication helpers
 /**
@@ -35,11 +23,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
  */
 export const signUp = async (email, password, userData = {}) => {
   try {
-    console.log('signUp utility: Attempting to create new user with email:', email);
+    // console.log('signUp utility: Attempting to create new user with email:', email);
     
     // Check if password meets minimum requirements
     if (password.length < 6) {
-      console.error('Password too short');
+      // console.error('Password too short');
       return { 
         data: null, 
         error: new Error('Password must be at least 6 characters long') 
@@ -50,7 +38,7 @@ export const signUp = async (email, password, userData = {}) => {
     const username = userData?.username || email.split('@')[0];
     
     // 1. Sign up the user with Supabase Auth
-    console.log('signUp utility: Sending auth.signUp request with username:', username);
+    // console.log('signUp utility: Sending auth.signUp request with username:', username);
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -64,20 +52,20 @@ export const signUp = async (email, password, userData = {}) => {
       }
     });
     
-    console.log('signUp utility: Supabase response:', { 
-      user: data?.user ? 'User object present' : 'No user object',
-      identities: data?.user?.identities?.length,
-      error: error ? error.message : 'No error'
-    });
+    // console.log('signUp utility: Supabase response:', { 
+    //   user: data?.user ? 'User object present' : 'No user object',
+    //   identities: data?.user?.identities?.length,
+    //   error: error ? error.message : 'No error'
+    // });
     
     if (error) {
-      console.error('signUp utility: Auth error:', error.message);
+      // console.error('signUp utility: Auth error:', error.message);
       throw error;
     }
     
     // Check if the user already exists
     if (data?.user?.identities?.length === 0) {
-      console.error('User already exists');
+      // console.error('User already exists');
       return { 
         data: null, 
         error: new Error('This email is already registered. Please sign in instead.') 
@@ -114,14 +102,14 @@ export const signUp = async (email, password, userData = {}) => {
         // No need to check for errors, as we expect this might fail due to RLS
         // or because the profile already exists from the trigger
       } catch (profileError) {
-        console.error('signUp utility: Profile creation attempt error:', profileError);
+        // console.error('signUp utility: Profile creation attempt error:', profileError);
         // Continue even if profile creation fails - the trigger might have worked
       }
     }
     
     return { data, error: null };
   } catch (e) {
-    console.error('signUp utility: Error during sign up:', e);
+    // console.error('signUp utility: Error during sign up:', e);
     return { data: null, error: e };
   }
 };
@@ -318,7 +306,7 @@ export const updateUserProfile = async (userId, updates) => {
   if (!userId) return { data: null, error: 'No user ID provided' };
 
   try {
-    console.log('updateUserProfile called with:', { userId, updates });
+    // console.log('updateUserProfile called with:', { userId, updates });
     
     // Create a clean updates object for the database
     const dbUpdates = {};
@@ -331,22 +319,22 @@ export const updateUserProfile = async (userId, updates) => {
     // Handle avatarUrl (from form) or avatar_url (directly provided)
     if (updates.avatarUrl) {
       dbUpdates.avatar_url = updates.avatarUrl.split('?')[0]; // Remove cache params
-      console.log('Setting avatar_url in database to:', dbUpdates.avatar_url);
+      // console.log('Setting avatar_url in database to:', dbUpdates.avatar_url);
     } else if (updates.avatar_url) {
       dbUpdates.avatar_url = updates.avatar_url.split('?')[0]; // Remove cache params
-      console.log('Setting avatar_url in database to:', dbUpdates.avatar_url);
+      // console.log('Setting avatar_url in database to:', dbUpdates.avatar_url);
     }
     
     // Handle backgroundUrl (from form) or background_url (directly provided)
     if (updates.backgroundUrl) {
       dbUpdates.background_url = updates.backgroundUrl.split('?')[0]; // Remove cache params
-      console.log('Setting background_url in database to:', dbUpdates.background_url);
+      // console.log('Setting background_url in database to:', dbUpdates.background_url);
     } else if (updates.background_url) {
       dbUpdates.background_url = updates.background_url.split('?')[0]; // Remove cache params
-      console.log('Setting background_url in database to:', dbUpdates.background_url);
+      // console.log('Setting background_url in database to:', dbUpdates.background_url);
     }
     
-    console.log('Final database updates:', dbUpdates);
+    // console.log('Final database updates:', dbUpdates);
     
     const { data, error } = await supabase
       .from('profiles')
@@ -356,14 +344,14 @@ export const updateUserProfile = async (userId, updates) => {
       .single();
     
     if (error) {
-      console.error('Error updating profile in database:', error);
+      // console.error('Error updating profile in database:', error);
       return { data: null, error };
     }
     
-    console.log('Profile updated successfully in database:', data);
+    // console.log('Profile updated successfully in database:', data);
     return { data, error: null };
   } catch (error) {
-    console.error('Error in updateUserProfile:', error);
+    // console.error('Error in updateUserProfile:', error);
     return { data: null, error };
   }
 };
@@ -964,7 +952,7 @@ export async function checkTableExists(tableName) {
 
     return false;
   }
-}
+};
 
 /**
  * Check if the Supabase connection is working
@@ -1016,7 +1004,7 @@ export async function checkSupabaseConnection() {
     
     return false;
   }
-}
+};
 
 // Cache for posts data
 const postsCache = {
@@ -1475,7 +1463,7 @@ global.fetch = async function monitoredFetch(url, options) {
     const startDate = new Date().toISOString();
     
     // Log the start of the request
-
+    // console.log(`[Supabase Fetch] START - ${url} at ${startDate}`);
     
     try {
       // Continue with the original fetch
@@ -1489,7 +1477,7 @@ global.fetch = async function monitoredFetch(url, options) {
       const clonedResponse = response.clone();
       
       // Log the response status and timing
-
+      // console.log(`[Supabase Fetch] END - ${url} in ${duration.toFixed(2)}ms, Status: ${response.status}`);
       
       try {
         // Try to get content length from headers
@@ -1527,7 +1515,7 @@ global.fetch = async function monitoredFetch(url, options) {
       // Calculate the time when the error occurred
       const errorTime = performance.now();
       const errorDuration = errorTime - startTime;
-
+      // console.error(`[Supabase Fetch] ERROR - ${url} in ${errorDuration.toFixed(2)}ms:`, error);
       
       throw error;
     }
@@ -1547,28 +1535,28 @@ function withDebug(fn, name) {
   return async function debugWrapper(...args) {
     const startTime = performance.now();
 
-    
+    // console.log(`[Debug] ${name} started with args:`, args);
     // Log basic info about the args, but don't log sensitive data
     if (args.length > 0) {
-
+      // console.log(`[Debug] ${name} arguments:`);
       
       // Safely log some argument details
       args.forEach((arg, index) => {
         if (arg === null || arg === undefined) {
-
+          // console.log(`  arg ${index}: null/undefined`);
         } else if (typeof arg === 'object') {
           // Don't log the full object, just its keys
           try {
             const isArray = Array.isArray(arg);
             const keys = isArray ? [`Array(${arg.length})`] : Object.keys(arg);
-
+            // console.log(`  arg ${index} (${typeof arg}${isArray ? ' array' : ''}): keys: ${keys.join(', ')}`);
           } catch (e) {
-
+            // console.warn(`  arg ${index} (object, failed to get keys):`, e);
           }
         } else if (typeof arg === 'string' && arg.length > 100) {
-
+          // console.log(`  arg ${index} (string, length ${arg.length}): ${arg.substring(0, 100)}...`);
         } else {
-
+          // console.log(`  arg ${index} (${typeof arg}):`, arg);
         }
       });
     }
@@ -1581,26 +1569,26 @@ function withDebug(fn, name) {
       if (result && typeof result === 'object') {
         // Check for error in the Supabase response format
         if (result.error) {
-
+          // console.error(`[Debug] ${name} completed with error in ${duration.toFixed(2)}ms:`, result.error);
         } else {
-
+          // console.log(`[Debug] ${name} completed successfully in ${duration.toFixed(2)}ms.`);
           
           // Log some details about the result, but don't log the entire response
           if (result.data) {
             const dataInfo = Array.isArray(result.data) 
               ? `Array with ${result.data.length} items` 
               : `Object with keys: ${Object.keys(result.data).join(', ')}`;
-
+            // console.log(`[Debug] ${name} result data: ${dataInfo}`);
           } else {
-
+            // console.log(`[Debug] ${name} result: No data property.`);
           }
         }
       } else {
-
+        // console.log(`[Debug] ${name} completed in ${duration.toFixed(2)}ms. Result:`, result);
         if (result === undefined) {
-
+          // console.log(`[Debug] ${name} returned undefined.`);
         } else {
-
+          // console.log(`[Debug] ${name} returned a non-object value.`);
         }
       }
       
@@ -1608,7 +1596,7 @@ function withDebug(fn, name) {
     } catch (error) {
       const endTime = performance.now();
       const duration = endTime - startTime;
-
+      // console.error(`[Debug] ${name} failed in ${duration.toFixed(2)}ms:`, error);
       
       throw error;
     }
@@ -1621,7 +1609,7 @@ const getUserPostsWithDebug = withDebug(getUserPosts, 'getUserPosts');
 const createPostWithDebug = withDebug(createPost, 'createPost');
 
 // Export the wrapped versions only
-export { 
+export {
   getPostsWithDebug as getPosts,
   getUserPostsWithDebug as getUserPosts,
   createPostWithDebug as createPost

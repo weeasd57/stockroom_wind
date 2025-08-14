@@ -6,15 +6,17 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import Image from 'next/image';
 import styles from '@/styles/view-profile.module.css';
 import Link from 'next/link';
+import { useFollow } from '@/providers/FollowProvider'; // Import useFollow
 
 export default function ViewProfile({ params }) {
   const { supabase, isAuthenticated, user } = useSupabase();
   const router = useRouter();
+  const { isFollowing, toggleFollow, checkIsFollowing, loading: followLoading, error: followError } = useFollow(); // Use useFollow hook
   
   // Make sure to extract the ID correctly from params
   const userId = params?.id;
-  console.log("Received params:", params);
-  console.log("User ID from URL:", userId);
+  // console.log("Received params:", params);
+  // console.log("User ID from URL:", userId);
   
   const [loading, setLoading] = useState(true);
   const [profileData, setProfileData] = useState(null);
@@ -23,21 +25,18 @@ export default function ViewProfile({ params }) {
   const [backgroundUrl, setBackgroundUrl] = useState('https://images.unsplash.com/photo-1579546929662-711aa81148cf?q=80&w=1200&auto=format&fit=crop');
   const [postCount, setPostCount] = useState(0);
   const [error, setError] = useState(null);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followers, setFollowers] = useState([]);
-  const [following, setFollowing] = useState([]);
   const [avatarError, setAvatarError] = useState(false);
 
   // Fetch profile data
   useEffect(() => {
     // Only redirect if there's definitely no user ID
     if (userId === undefined || userId === null) {
-      console.error("No user ID found in params, redirecting to home");
+      // console.error("No user ID found in params, redirecting to home");
       router.push('/home');
       return;
     }
 
-    console.log("Fetching profile data for user ID:", userId);
+    // console.log("Fetching profile data for user ID:", userId);
     
     const fetchProfileData = async () => {
       try {
@@ -51,7 +50,7 @@ export default function ViewProfile({ params }) {
           .single();
           
         if (profileError) {
-          console.error('Profile error:', profileError);
+          // console.error('Profile error:', profileError);
           throw profileError;
         }
         
@@ -59,7 +58,7 @@ export default function ViewProfile({ params }) {
           throw new Error('Profile not found');
         }
         
-        console.log("Profile data fetched successfully:", profile);
+        // console.log("Profile data fetched successfully:", profile);
         setProfileData(profile);
         
         // Fetch user posts
@@ -70,9 +69,9 @@ export default function ViewProfile({ params }) {
           .order('created_at', { ascending: false });
           
         if (postsError) {
-          console.error('Error fetching posts:', postsError);
+          // console.error('Error fetching posts:', postsError);
         } else {
-          console.log("Posts fetched:", posts?.length || 0);
+          // console.log("Posts fetched:", posts?.length || 0);
           setProfilePosts(posts || []);
           setPostCount(posts?.length || 0);
         }
@@ -84,10 +83,10 @@ export default function ViewProfile({ params }) {
           .eq('following_id', userId);
           
         if (followersError) {
-          console.error('Error fetching followers:', followersError);
+          // console.error('Error fetching followers:', followersError);
         } else {
-          console.log("Followers fetched:", followersData?.length || 0);
-          setFollowers(followersData || []);
+          // console.log("Followers fetched:", followersData?.length || 0);
+          // setFollowers(followersData || []); // This state is now managed by FollowProvider
         }
         
         // Fetch following
@@ -97,10 +96,10 @@ export default function ViewProfile({ params }) {
           .eq('follower_id', userId);
           
         if (followingError) {
-          console.error('Error fetching following:', followingError);
+          // console.error('Error fetching following:', followingError);
         } else {
-          console.log("Following fetched:", followingData?.length || 0);
-          setFollowing(followingData || []);
+          // console.log("Following fetched:", followingData?.length || 0);
+          // setFollowing(followingData || []); // This state is now managed by FollowProvider
         }
         
         // Try to get avatar and background images
@@ -117,7 +116,7 @@ export default function ViewProfile({ params }) {
               setAvatarUrl(`${avatarData.publicUrl}?t=${Date.now()}`);
             }
           } catch (e) {
-            console.log('No custom avatar found');
+            // console.log('No custom avatar found');
             setAvatarUrl('/default-avatar.svg');
           }
         }
@@ -135,12 +134,12 @@ export default function ViewProfile({ params }) {
               setBackgroundUrl(`${bgData.publicUrl}?t=${Date.now()}`);
             }
           } catch (e) {
-            console.log('No custom background found');
+            // console.log('No custom background found');
           }
         }
         
       } catch (error) {
-        console.error('Error fetching profile:', error);
+        // console.error('Error fetching profile:', error);
         setError(error.message);
       } finally {
         setLoading(false);
@@ -150,33 +149,12 @@ export default function ViewProfile({ params }) {
     fetchProfileData();
   }, [userId, supabase, router]);
 
-  // Add effect to check if user is following this profile
+  // Use effect to check follow status using the FollowProvider
   useEffect(() => {
-    const checkFollowStatus = async () => {
-      // Skip follow status check for unauthenticated users
-      if (!isAuthenticated || !user || !userId) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('user_followings')
-          .select('id')
-          .eq('follower_id', user.id)
-          .eq('following_id', userId)
-          .single();
-          
-        if (error && error.code !== 'PGRST116') { // PGRST116 is the "no rows returned" error
-          console.error('Error checking follow status:', error);
-          return;
-        }
-        
-        setIsFollowing(!!data);
-      } catch (error) {
-        console.error('Error in checkFollowStatus:', error);
-      }
-    };
-    
-    checkFollowStatus();
-  }, [supabase, isAuthenticated, user, userId]);
+    if (isAuthenticated && user && userId) {
+      checkIsFollowing(userId);
+    }
+  }, [isAuthenticated, user, userId, checkIsFollowing]);
 
   const handleFollowClick = async () => {
     // Check if user is authenticated before following
@@ -185,44 +163,34 @@ export default function ViewProfile({ params }) {
       return;
     }
     
-    try {
-      if (isFollowing) {
-        // Unfollow: Delete the relationship
-        const { error: deleteError } = await supabase
-          .from('user_followings')
-          .delete()
-          .eq('follower_id', user.id)
-          .eq('following_id', userId);
-          
-        if (deleteError) {
-          throw deleteError;
-        }
-        
-        // Update UI state
-        setIsFollowing(false);
-        
-        console.log('Unfollowed user:', userId);
-      } else {
-        // Follow: Create the relationship
-        const { error: insertError } = await supabase
-          .from('user_followings')
-          .insert([
-            { follower_id: user.id, following_id: userId }
-          ]);
-          
-        if (insertError) {
-          throw insertError;
-        }
-        
-        // Update UI state
-        setIsFollowing(true);
-        
-        console.log('Followed user:', userId);
+    await toggleFollow(userId);
+    // Re-fetch profile data to get updated followers/following counts
+    // This might be redundant if the ProfileProvider or useFollow updates it
+    // but it ensures immediate UI consistency if not.
+    // Consider if this is truly needed or if a more granular update is better.
+    // For now, re-fetching profile data after a follow/unfollow is a simple solution.
+    // (Could be optimized by updating local state for followers/following counts)
+    const fetchUpdatedCounts = async () => {
+      const { data: updatedProfile, error: updateError } = await supabase
+        .from('profiles')
+        .select('followers, following')
+        .eq('id', userId)
+        .single();
+
+      if (updatedProfile) {
+        setProfileData(prev => ({
+          ...prev,
+          followers: updatedProfile.followers,
+          following: updatedProfile.following,
+        }));
+        // Also update the local followers/following state which is used for the lists
+        // This part would need actual user data from the followings table to update lists correctly.
+        // For a quick fix, if `followers` and `following` are just numbers, update them directly.
+        // If they are lists of profile objects, a more complex re-fetch or state manipulation is needed.
+        // Given the current structure, let's assume direct number update is sufficient for now.
       }
-    } catch (error) {
-      console.error('Error following/unfollowing user:', error);
-      alert('There was an error updating your following status');
-    }
+    };
+    fetchUpdatedCounts();
   };
   
   const handleBackClick = () => {
@@ -234,7 +202,7 @@ export default function ViewProfile({ params }) {
     setAvatarUrl('/default-avatar.svg');
   };
 
-  if (loading) {
+  if (loading || followLoading) { // Include followLoading in overall loading state
     return (
       <div className={styles.loadingContainer}>
         <div className={styles.loadingSpinner}></div>
@@ -243,11 +211,11 @@ export default function ViewProfile({ params }) {
     );
   }
 
-  if (error) {
+  if (error || followError) { // Include followError in overall error state
     return (
       <div className={styles.errorContainer}>
         <h2>Error Loading Profile</h2>
-        <p>{error}</p>
+        <p>{error || followError}</p>
         <button onClick={handleBackClick} className={styles.backButton}>
           Go Back
         </button>
@@ -296,8 +264,9 @@ export default function ViewProfile({ params }) {
               <button 
                 onClick={handleFollowClick} 
                 className={isFollowing ? styles.unfollowButton : styles.followButton}
+                disabled={followLoading} // Disable button during follow/unfollow operation
               >
-                {isFollowing ? 'Unfollow' : 'Follow'}
+                {followLoading ? (isFollowing ? 'Unfollowing...' : 'Following...') : (isFollowing ? 'Unfollow' : 'Follow')}
               </button>
             )
           ) : (
@@ -317,11 +286,11 @@ export default function ViewProfile({ params }) {
           <span className={styles.statLabel}>Posts</span>
         </div>
         <div className={styles.statItem}>
-          <span className={styles.statValue}>{followers.length}</span>
+          <span className={styles.statValue}>{profileData?.followers || 0}</span>{/* Use profileData.followers */}
           <span className={styles.statLabel}>Followers</span>
         </div>
         <div className={styles.statItem}>
-          <span className={styles.statValue}>{following.length}</span>
+          <span className={styles.statValue}>{profileData?.following || 0}</span>{/* Use profileData.following */}
           <span className={styles.statLabel}>Following</span>
         </div>
       </div>

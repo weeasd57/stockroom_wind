@@ -147,7 +147,7 @@ CREATE TABLE likes (
 -- ===================================================================
 -- جدول المتابعة / Followers Table
 -- ===================================================================
-CREATE TABLE followers (
+CREATE TABLE user_followings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     follower_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     following_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -238,8 +238,8 @@ CREATE INDEX idx_likes_post_id ON likes(post_id);
 CREATE INDEX idx_likes_user_id ON likes(user_id);
 
 -- فهارس المتابعة
-CREATE INDEX idx_followers_follower_id ON followers(follower_id);
-CREATE INDEX idx_followers_following_id ON followers(following_id);
+CREATE INDEX idx_followers_follower_id ON user_followings(follower_id);
+CREATE INDEX idx_followers_following_id ON user_followings(following_id);
 
 -- فهارس المحفظة
 CREATE INDEX idx_portfolio_user_id ON portfolio(user_id);
@@ -269,8 +269,8 @@ SELECT
     u.created_at
 FROM users u
 LEFT JOIN posts p ON u.id = p.user_id
-LEFT JOIN followers f1 ON u.id = f1.following_id
-LEFT JOIN followers f2 ON u.id = f2.follower_id
+LEFT JOIN user_followings f1 ON u.id = f1.following_id
+LEFT JOIN user_followings f2 ON u.id = f2.follower_id
 GROUP BY u.id, u.username, u.full_name, u.experience_score, u.created_at;
 
 -- عرض المنشورات مع تفاصيل المستخدم
@@ -304,9 +304,9 @@ BEGIN
         RETURN NEW;
     ELSIF TG_OP = 'DELETE' THEN
         -- تقليل عدد المتابعين للمستخدم المتابَع
-        UPDATE users SET followers = followers - 1 WHERE id = OLD.following_id;
+        UPDATE users SET followers = GREATEST(0, followers - 1) WHERE id = OLD.following_id;
         -- تقليل عدد المتابعين للمستخدم المتابِع
-        UPDATE users SET following = following - 1 WHERE id = OLD.follower_id;
+        UPDATE users SET following = GREATEST(0, following - 1) WHERE id = OLD.follower_id;
         RETURN OLD;
     END IF;
     RETURN NULL;
@@ -315,7 +315,7 @@ $$ LANGUAGE plpgsql;
 
 -- ربط الإجراء بجدول المتابعة
 CREATE TRIGGER follow_counts_trigger
-    AFTER INSERT OR DELETE ON followers
+    AFTER INSERT OR DELETE ON user_followings
     FOR EACH ROW EXECUTE FUNCTION update_follow_counts();
 
 -- إجراء لتحديث updated_at تلقائياً

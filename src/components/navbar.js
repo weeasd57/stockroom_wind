@@ -12,12 +12,12 @@ import styles from '@/styles/navbar.module.css';
 // Navigation configuration
 const navigationConfig = {
   authenticated: [
-    { href: '/home', label: 'Home', icon: '🏠' },
-    { href: '/traders', label: 'Traders', icon: '📊' },
+    { href: '/home', label: 'Home'},
+    { href: '/traders', label: 'Traders' },
   ],
   unauthenticated: [
-    { href: '/landing', label: 'Home', icon: '🏠' },
-    { href: '/traders', label: 'Traders', icon: '📊' },
+    { href: '/landing', label: 'Home' },
+    { href: '/traders', label: 'Traders' },
   ]
 };
 
@@ -31,7 +31,6 @@ export default function Navbar() {
 
   // State management
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState('/default-avatar.svg');
   const [avatarLoading, setAvatarLoading] = useState(true);
@@ -49,11 +48,7 @@ export default function Navbar() {
   useEffect(() => {
     setMounted(true);
     
-    const handleScroll = () => {
-      const scrolled = window.scrollY > 20;
-      setIsScrolled(scrolled);
-    };
-
+    // No scroll listener needed as per new requirement
     const handleClickOutside = (event) => {
       if (navRef.current && !navRef.current.contains(event.target)) {
         setIsMenuOpen(false);
@@ -66,8 +61,6 @@ export default function Navbar() {
       }
     };
 
-    handleScroll();
-    window.addEventListener('scroll', handleScroll, { passive: true });
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
     
@@ -75,7 +68,6 @@ export default function Navbar() {
     if (typeof window !== 'undefined' && window.imageCacheManager && user) {
       const handleImageChange = (userId, imageType, newUrl) => {
         if (imageType === 'avatar' && userId === user.id) {
-          console.log('Navbar: Received avatar update notification:', newUrl);
           setAvatarUrl(newUrl);
           lastAvatarRefresh.current = Date.now();
           setAvatarLoading(false);
@@ -92,7 +84,7 @@ export default function Navbar() {
     }
     
     return () => {
-      window.removeEventListener('scroll', handleScroll);
+      // No scroll listener to remove
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
       if (unsubscribeRef.current) {
@@ -175,7 +167,7 @@ export default function Navbar() {
   return (
     <header 
       ref={navRef}
-      className={`${styles.navbar} ${isScrolled ? styles.scrolled : ''}`} 
+      className={styles.navbar} 
       suppressHydrationWarning
     >
       <div className={styles.container}>

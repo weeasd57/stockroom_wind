@@ -7,6 +7,7 @@ import { AuthGuard } from '@/providers/AuthGuard';
 import { ClientSideLayout } from '@/providers/ClientSideLayout';
 import ClientImagePreloader from '@/providers/ClientImagePreloader';
 import Script from 'next/script';
+import { FollowProvider } from '@/providers/FollowProvider'; // Import FollowProvider
 
 const inter = Inter({
   subsets: ['latin'],
@@ -148,7 +149,9 @@ export default function RootLayout({ children }) {
                   <ClientSideLayout>
                     <AuthGuard>
                       <ClientImagePreloader />
+                      <FollowProvider> {/* Wrap children with FollowProvider */}
                         {children}
+                      </FollowProvider>
                     </AuthGuard>
                   </ClientSideLayout>
                 </CreatePostFormProvider>
