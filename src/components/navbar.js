@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
@@ -9,53 +9,71 @@ import { ModeToggle } from '@/components/mode-toggle';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import styles from '@/styles/navbar.module.css';
 
-// Different nav links for logged in and logged out users
-const getNavLinks = (isAuthenticated) => {
-  if (isAuthenticated) {
-    return [
-      { href: '/home', label: 'Home' },
-      { href: '/traders', label: 'Traders' },
-    ];
-  } else {
-    return [
-      { href: '/landing', label: 'Home' },
-      { href: '/traders', label: 'Traders' },
-    ];
-  }
+// Navigation configuration
+const navigationConfig = {
+  authenticated: [
+    { href: '/home', label: 'Home', icon: '🏠' },
+    { href: '/traders', label: 'Traders', icon: '📊' },
+  ],
+  unauthenticated: [
+    { href: '/landing', label: 'Home', icon: '🏠' },
+    { href: '/traders', label: 'Traders', icon: '📊' },
+  ]
 };
 
 export default function Navbar() {
-  const pathname = useRouter();
   const router = useRouter();
+  const pathname = usePathname();
   const { user, signOut, handleLogout, isAuthenticated } = useSupabase();
   const profileContext = useProfile();
   const profile = profileContext?.profile;
   const getEffectiveAvatarUrl = profileContext?.getEffectiveAvatarUrl;
+
+  // State management
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState('/default-avatar.svg');
   const [avatarLoading, setAvatarLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const navLinks = getNavLinks(isAuthenticated);
-
-  // Create a ref to track the last avatar refresh time
-  const lastAvatarRefresh = useRef(Date.now());
   
-  // Add unsubscribe ref to clean up listener on unmount
+  // Refs
+  const lastAvatarRefresh = useRef(Date.now());
   const unsubscribeRef = useRef(null);
+  const navRef = useRef(null);
 
+  // Get navigation links based on authentication status
+  const navLinks = navigationConfig[isAuthenticated ? 'authenticated' : 'unauthenticated'];
+
+  // Initialize component and set up scroll listener
   useEffect(() => {
     setMounted(true);
-    const handleScroll = () => setIsScrolled(window.scrollY > 10);
+    
+    const handleScroll = () => {
+      const scrolled = window.scrollY > 20;
+      setIsScrolled(scrolled);
+    };
+
+    const handleClickOutside = (event) => {
+      if (navRef.current && !navRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsMenuOpen(false);
+      }
+    };
+
     handleScroll();
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
     
     // Subscribe to avatar changes from imageCacheManager
     if (typeof window !== 'undefined' && window.imageCacheManager && user) {
-      // Handle image change notifications
       const handleImageChange = (userId, imageType, newUrl) => {
-        // Only update if it's an avatar change for the current user
         if (imageType === 'avatar' && userId === user.id) {
           console.log('Navbar: Received avatar update notification:', newUrl);
           setAvatarUrl(newUrl);
@@ -64,10 +82,8 @@ export default function Navbar() {
         }
       };
       
-      // Subscribe and store unsubscribe function
       unsubscribeRef.current = window.imageCacheManager.subscribe(handleImageChange);
       
-      // Get initial avatar from cache
       const cachedAvatar = window.imageCacheManager.getAvatarUrl(user.id);
       if (cachedAvatar) {
         setAvatarUrl(cachedAvatar);
@@ -77,31 +93,28 @@ export default function Navbar() {
     
     return () => {
       window.removeEventListener('scroll', handleScroll);
-      // Clean up the subscription
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
       }
     };
   }, [user]);
 
+  // Handle avatar loading
   useEffect(() => {
     if (profile && getEffectiveAvatarUrl) {
-      // Only fetch a new avatar URL if it's been at least 30 seconds since last refresh
-      // or if we don't have an avatar URL yet
       const now = Date.now();
-      const shouldRefresh = !avatarUrl || avatarUrl === '/default-avatar.svg' || 
+      const shouldRefresh = !avatarUrl || 
+                          avatarUrl === '/default-avatar.svg' || 
                           now - lastAvatarRefresh.current > 30000;
       
       if (shouldRefresh) {
         const loadAvatar = async () => {
           setAvatarLoading(true);
           try {
-            
             const url = await getEffectiveAvatarUrl();
-            
-            // Only update if we got a valid URL that's different from current
             if (url && url !== avatarUrl) {
-              
               setAvatarUrl(url);
               lastAvatarRefresh.current = now;
             } 
@@ -115,38 +128,38 @@ export default function Navbar() {
         loadAvatar();
       } 
     }
-  }, [profile, getEffectiveAvatarUrl]);
+  }, [profile, getEffectiveAvatarUrl, avatarUrl]);
+
+  // Menu handlers
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
 
   const closeMenu = () => {
     setIsMenuOpen(false);
   };
 
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
-  };
-
-  // Handler for home navigation based on authentication status
+  // Navigation handlers
   const handleHomeNavigation = (e) => {
     e.preventDefault();
     closeMenu();
-    
-    if (isAuthenticated) {
-      
-      router.push('/home');
-    } else {
-      
-      router.push('/landing');
-    }
+    const targetPath = isAuthenticated ? '/home' : '/landing';
+    router.push(targetPath);
   };
 
-  // Handler for logout - use the provider's handleLogout instead
-  const logoutHandler = async () => {
+  const handleNavigation = (href) => {
+    closeMenu();
+    router.push(href);
+  };
+
+  // Logout handler
+  const handleLogoutClick = async () => {
     if (isLoggingOut) return;
     
     try {
       setIsLoggingOut(true);
       closeMenu();
-      await handleLogout(); // Use handleLogout from SupabaseProvider
+      await handleLogout();
     } catch (error) {
       console.error('Error logging out:', error);
     } finally {
@@ -154,118 +167,231 @@ export default function Navbar() {
     }
   };
 
-  // No rendering at all on server-side
+  // Don't render on server-side
   if (!mounted) {
     return null;
   }
 
   return (
-    <header className={`${styles.header} ${isScrolled ? styles.scrolled : ''}`} suppressHydrationWarning>
+    <header 
+      ref={navRef}
+      className={`${styles.navbar} ${isScrolled ? styles.scrolled : ''}`} 
+      suppressHydrationWarning
+    >
       <div className={styles.container}>
-        <Link href={isAuthenticated ? '/home' : '/landing'} className={styles.logo} onClick={closeMenu} style={{ textDecoration: 'none' }}>
+        {/* Logo */}
+        <Link 
+          href={isAuthenticated ? '/home' : '/landing'} 
+          className={styles.logo}
+          onClick={closeMenu}
+        >
           <div className={styles.logoWrapper}>
             <img 
               src="/favicon_io/android-chrome-192x192.png" 
               alt="FireStocks Logo" 
-              width={40}
-              height={40}
+              width={32}
+              height={32}
               className={styles.logoImage}
-              priority
             />
             <span className={styles.logoText}>
-              <span className="text-gradient">Fire</span>Stocks
+              <span className="gradient-text">Fire</span>Stocks
             </span>
           </div>
         </Link>
 
-        <button 
-          className={styles.menuButton} 
-          onClick={toggleMenu}
-          aria-label="Toggle menu"
-          aria-expanded={isMenuOpen}
-        >
-          <div className={isMenuOpen ? `${styles.menuIcon} ${styles.open}` : styles.menuIcon}>
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-        </button>
-
-        <nav className={isMenuOpen ? `${styles.nav} ${styles.open}` : `${styles.nav} ${styles.hidden}`} aria-hidden={!isMenuOpen}>
+        {/* Desktop Navigation */}
+        <nav className={styles.desktopNav} aria-label="Main navigation">
           <ul className={styles.navList}>
-            <li className={styles.navItem}>
-              <a 
-                href="#" 
-                className={pathname === (isAuthenticated ? '/home' : '/landing') ? `${styles.navLink} ${styles.active}` : styles.navLink}
-                onClick={handleHomeNavigation}
-                style={{ textDecoration: 'none' }}
-              >
-                Home
-              </a>
-            </li>
-            
-            {navLinks.slice(1).map(link => (
+            {navLinks.map((link, index) => (
               <li key={link.href} className={styles.navItem}>
                 <Link 
-                  href={link.href} 
-                  className={pathname === link.href ? `${styles.navLink} ${styles.active}` : styles.navLink}
-                  onClick={closeMenu}
-                  style={{ textDecoration: 'none' }}
+                  href={link.href}
+                  className={`${styles.navLink} ${pathname === link.href ? styles.active : ''}`}
                 >
+                  <span className={styles.navIcon} aria-hidden="true">
+                    {link.icon}
+                  </span>
                   {link.label}
                 </Link>
               </li>
             ))}
           </ul>
+        </nav>
 
-          <div className={styles.actions}>
-            <ModeToggle />
+        {/* Desktop Actions */}
+        <div className={styles.desktopActions}>
+          <ModeToggle />
+          
+          {isAuthenticated ? (
+            <div className={styles.userSection}>
+              <Link href="/profile" className={styles.profileButton}>
+                <div className={styles.avatarWrapper}>
+                  {avatarLoading ? (
+                    <div className={styles.avatarSkeleton}>
+                      <span className={styles.avatarFallback}>
+                        {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                      </span>
+                    </div>
+                  ) : (
+                    <Avatar className={styles.avatar}>
+                      <AvatarImage 
+                        src={avatarUrl} 
+                        alt={`${profile?.username || 'User'}'s Avatar`}
+                        onError={(e) => {
+                          console.error('Error loading navbar avatar image');
+                          e.target.src = '/default-avatar.svg';
+                        }}
+                      />
+                      <AvatarFallback>
+                        {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
+                </div>
+                <span className={styles.profileText}>Profile</span>
+              </Link>
+              
+              <button 
+                className={styles.logoutButton} 
+                onClick={handleLogoutClick}
+                disabled={isLoggingOut}
+              >
+                {isLoggingOut ? (
+                  <>
+                    <span className={styles.spinner} aria-hidden="true"></span>
+                    Logging out...
+                  </>
+                ) : (
+                  <>
+                    <span aria-hidden="true">👋</span>
+                    Logout
+                  </>
+                )}
+              </button>
+            </div>
+          ) : (
+            <Link href="/login" className={styles.signInButton}>
+              <span aria-hidden="true">🚀</span>
+              Sign In
+            </Link>
+          )}
+        </div>
+
+        {/* Mobile Menu Toggle */}
+        <button 
+          className={styles.mobileMenuToggle}
+          onClick={toggleMenu}
+          aria-label="Toggle mobile menu"
+          aria-expanded={isMenuOpen}
+          aria-controls="mobile-menu"
+        >
+          <div className={`${styles.menuToggle} ${isMenuOpen ? styles.open : ''}`}>
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </button>
+      </div>
+
+      {/* Mobile Menu */}
+      <div 
+        id="mobile-menu"
+        className={`${styles.mobileMenu} ${isMenuOpen ? styles.open : ''}`}
+        aria-hidden={!isMenuOpen}
+      >
+        <nav className={styles.mobileNav} aria-label="Mobile navigation">
+          <ul className={styles.mobileNavList}>
+            {navLinks.map((link, index) => (
+              <li key={link.href} className={styles.mobileNavItem} style={{ animationDelay: `${index * 100}ms` }}>
+                <button 
+                  onClick={() => handleNavigation(link.href)}
+                  className={`${styles.mobileNavLink} ${pathname === link.href ? styles.active : ''}`}
+                >
+                  <span className={styles.navIcon} aria-hidden="true">
+                    {link.icon}
+                  </span>
+                  {link.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          <div className={styles.mobileActions}>
+            <div className={styles.mobileThemeToggle}>
+              <ModeToggle />
+            </div>
 
             {isAuthenticated ? (
-              <>
-                <div className={styles.userMenu}>
-                  <Link href="/profile" className={styles.profileLink} style={{ textDecoration: 'none' }} onClick={closeMenu}>
-                    <div className={styles.avatar}>
-                      {avatarLoading ? (
-                        <div className="rounded-full w-10 h-10 border-2 border-primary bg-primary/10 flex items-center justify-center animate-pulse">
-                          <span className="font-semibold text-primary">
-                            {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
-                          </span>
-                        </div>
-                      ) : (
-                        <img 
+              <div className={styles.mobileUserSection}>
+                <button 
+                  onClick={() => handleNavigation('/profile')}
+                  className={styles.mobileProfileButton}
+                >
+                  <div className={styles.avatarWrapper}>
+                    {avatarLoading ? (
+                      <div className={styles.avatarSkeleton}>
+                        <span className={styles.avatarFallback}>
+                          {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                        </span>
+                      </div>
+                    ) : (
+                      <Avatar className={styles.avatar}>
+                        <AvatarImage 
                           src={avatarUrl} 
                           alt={`${profile?.username || 'User'}'s Avatar`}
-                          width={40}
-                          height={40}
                           onError={(e) => {
-                            console.error('Error loading navbar avatar image');
-                            e.target.onerror = null;
+                            console.error('Error loading mobile navbar avatar image');
                             e.target.src = '/default-avatar.svg';
                           }}
                         />
-                      )}
-                    </div>
-                    <span className={styles.profileText}>Profile</span>
-                  </Link>
-                </div>
+                        <AvatarFallback>
+                          {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                  </div>
+                  <span>View Profile</span>
+                </button>
                 
                 <button 
-                  className={styles.logoutButton} 
-                  onClick={logoutHandler}
+                  className={styles.mobileLogoutButton} 
+                  onClick={handleLogoutClick}
                   disabled={isLoggingOut}
                 >
-                  {isLoggingOut ? 'Logging out...' : 'Logout'}
+                  {isLoggingOut ? (
+                    <>
+                      <span className={styles.spinner} aria-hidden="true"></span>
+                      Logging out...
+                    </>
+                  ) : (
+                    <>
+                      <span aria-hidden="true">👋</span>
+                      Logout
+                    </>
+                  )}
                 </button>
-              </>
+              </div>
             ) : (
-              <Link href="/login" className={styles.signInButton} style={{ textDecoration: 'none' }} onClick={closeMenu}>
+              <button 
+                onClick={() => handleNavigation('/login')}
+                className={styles.mobileSignInButton}
+              >
+                <span aria-hidden="true">🚀</span>
                 Sign In
-              </Link>
+              </button>
             )}
           </div>
         </nav>
       </div>
+
+      {/* Mobile Menu Overlay */}
+      {isMenuOpen && (
+        <div 
+          className={styles.mobileOverlay}
+          onClick={closeMenu}
+          aria-hidden="true"
+        />
+      )}
     </header>
   );
 }

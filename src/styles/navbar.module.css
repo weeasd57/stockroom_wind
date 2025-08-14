@@ -1,40 +1,59 @@
-.header {
+/* ==========================================================================
+   Modern Navbar Styles
+   ========================================================================== */
+
+/* Navbar Container */
+.navbar {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  width: 100%;
-  z-index: 1150;
-  background-color: hsla(var(--background), 0.95);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid transparent;
-  transition: all 0.3s ease;
+  height: var(--navbar-height);
+  z-index: 50;
+  background: var(--navbar-bg);
+  backdrop-filter: blur(var(--navbar-blur));
+  border: 1px solid var(--navbar-border);
+  box-shadow: var(--navbar-shadow);
+  transition: all var(--animation-normal) var(--animation-ease);
 }
 
-.header.scrolled,
-.scrolled {
-  border-bottom-color: hsla(var(--border), 0.5);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+.navbar.scrolled {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(25px);
 }
 
+.dark .navbar.scrolled {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  background: rgba(15, 23, 42, 0.95);
+}
+
+/* Container */
 .container {
-  max-width: 1200px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 0 1rem;
-  height: 64px;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
   position: relative;
-  width: 100%;
-  box-sizing: border-box;
 }
+
+/* ==========================================================================
+   Logo Section
+   ========================================================================== */
 
 .logo {
   display: flex;
   align-items: center;
   text-decoration: none;
   z-index: 60;
+  transition: transform var(--animation-normal) var(--animation-ease);
+}
+
+.logo:hover {
+  transform: scale(1.05);
 }
 
 .logoWrapper {
@@ -44,11 +63,13 @@
 }
 
 .logoImage {
-  transition: transform 0.3s ease;
+  transition: all var(--animation-normal) var(--animation-ease);
+  border-radius: 6px;
 }
 
 .logo:hover .logoImage {
-  transform: scale(1.1);
+  transform: rotate(5deg) scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .logoText {
@@ -56,717 +77,597 @@
   font-weight: 700;
   color: hsl(var(--foreground));
   display: inline-block;
+  letter-spacing: -0.025em;
 }
 
-/* Remove gold gradient and update to use primary color */
-:global(.dark) .logoText :global(.text-gradient) {
-  color: hsl(var(--primary));
-}
+/* ==========================================================================
+   Desktop Navigation
+   ========================================================================== */
 
-/* Placeholder styles */
-.logoPlaceholder {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.logoIconPlaceholder {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  background-color: hsl(var(--muted));
-  opacity: 0.7;
-}
-
-.logoTextPlaceholder {
-  width: 100px;
-  height: 24px;
-  border-radius: 4px;
-  background-color: hsl(var(--muted));
-  opacity: 0.7;
-}
-
-.menuButtonPlaceholder {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  background-color: hsl(var(--muted));
-  opacity: 0.7;
-}
-
-.placeholder {
-  display: flex;
-  align-items: center;
-}
-
-.menuButton {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  z-index: 60;
-}
-
-.menuButton:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
-.menuIcon {
-  position: relative;
-  width: 24px;
-  height: 18px;
-}
-
-.menuIcon span {
-  position: absolute;
-  width: 100%;
-  height: 2px;
-  background-color: hsl(var(--foreground));
-  border-radius: 2px;
-  transition: all 0.3s ease;
-}
-
-/* Update menu icon colors */
-:global(.dark) .menuIcon span {
-  background-color: hsl(var(--foreground));
-  box-shadow: none;
-}
-
-.menuIcon span:nth-child(1) {
-  top: 0;
-}
-
-.menuIcon span:nth-child(2) {
-  top: 8px;
-}
-
-.menuIcon span:nth-child(3) {
-  bottom: 0;
-}
-
-.menuIcon.open span:nth-child(1) {
-  transform: translateY(8px) rotate(45deg);
-}
-
-.menuIcon.open span:nth-child(2) {
-  opacity: 0;
-}
-
-.menuIcon.open span:nth-child(3) {
-  transform: translateY(-8px) rotate(-45deg);
-}
-
-.nav {
-  position: fixed;
-  top: 0;
-  right: 0;
-  width: 100%;
-  height: 100vh;
-  background-color: hsl(var(--background));
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 2rem;
-  transform: translateX(100%);
-  transition: transform 0.3s ease-in-out, visibility 0.3s, opacity 0.3s;
-  z-index: 50;
-  visibility: hidden;
-  opacity: 0;
-}
-
-.nav.hidden {
+.desktopNav {
   display: none;
 }
 
-.nav.open {
-  transform: translateX(0);
-  visibility: visible;
-  opacity: 1;
-  display: flex;
-}
-
 .navList {
-  list-style: none;
-  padding: 0;
-  margin: 0;
   display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  text-align: center;
-  visibility: hidden;
-  opacity: 0;
-  transition: visibility 0s, opacity 0.3s ease;
-}
-
-.nav.open .navList {
-  visibility: visible;
-  opacity: 1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 2rem;
 }
 
 .navItem {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.3s ease, transform 0.3s ease, visibility 0s;
-  visibility: hidden;
-  position: absolute;
-  pointer-events: none;
-}
-
-.nav.open .navItem {
-  opacity: 1;
-  transform: translateY(0);
-  visibility: visible;
   position: relative;
-  pointer-events: all;
-}
-
-.nav.open .navItem:nth-child(1) {
-  transition-delay: 0.1s;
-}
-
-.nav.open .navItem:nth-child(2) {
-  transition-delay: 0.2s;
-}
-
-.nav.open .navItem:nth-child(3) {
-  transition-delay: 0.3s;
-}
-
-.nav.open .navItem:nth-child(4) {
-  transition-delay: 0.4s;
 }
 
 .navLink {
-  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.95rem;
   font-weight: 500;
-  color: hsl(var(--foreground));
+  color: hsl(var(--foreground) / 0.8);
   text-decoration: none;
-  transition: color 0.2s ease;
+  border-radius: 0.5rem;
+  transition: all var(--animation-normal) var(--animation-ease);
   position: relative;
-  padding: 0.5rem 0;
+  overflow: hidden;
 }
 
 .navLink:hover {
   color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.1);
+  transform: translateY(-1px);
 }
 
 .navLink.active {
   color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.15);
+  font-weight: 600;
 }
 
 .navLink.active::after {
   content: '';
   position: absolute;
-  bottom: 0;
+  bottom: -2px;
   left: 50%;
   transform: translateX(-50%);
   width: 20px;
   height: 2px;
-  background-color: hsl(var(--primary));
-  border-radius: 2px;
+  background: hsl(var(--primary));
+  border-radius: 1px;
+  animation: slideIn var(--animation-normal) var(--animation-ease);
 }
 
-.actions {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.5rem;
-  margin-top: 1rem;
-  width: 100%;
+.navIcon {
+  font-size: 1rem;
+  opacity: 0.8;
+  transition: all var(--animation-fast) var(--animation-ease);
 }
 
-.themeToggle {
-  position: relative;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: hsl(var(--background) / 0.5);
-  backdrop-filter: blur(4px);
-  border: none;
-  cursor: pointer;
-  transition: all 0.3s ease-in-out;
-}
-
-.themeToggle:hover {
-  background: hsl(var(--accent));
-  color: hsl(var(--accent-foreground));
+.navLink:hover .navIcon {
+  opacity: 1;
   transform: scale(1.1);
 }
 
-.dark .themeToggle {
-  box-shadow: 0 0 0 2px hsl(var(--border));
-}
+/* ==========================================================================
+   Desktop Actions
+   ========================================================================== */
 
-.dark .themeToggle:hover {
-  box-shadow: 0 0 0 2px hsl(var(--primary)),
-              0 4px 8px hsl(var(--primary) / 0.25);
-}
-
-.light .themeToggle {
-  box-shadow: 0 0 0 2px hsl(var(--border));
-}
-
-.light .themeToggle:hover {
-  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.5);
-}
-
-.sunIcon,
-.moonIcon {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 1.3rem;
-  height: 1.3rem;
-  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.sunIcon {
-  color: hsl(var(--foreground));
-}
-
-.moonIcon {
-  color: hsl(var(--foreground));
-}
-
-.iconHidden {
-  opacity: 0;
-  transform: translate(-50%, -50%) scale(0) rotate(-90deg);
-}
-
-.iconVisible {
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1) rotate(0);
-}
-
-.userMenu {
-  display: flex;
-  flex-direction: column;
+.desktopActions {
+  display: none;
   align-items: center;
   gap: 1rem;
-  width: 100%;
 }
 
-.profileLink {
+.userSection {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius);
-  text-decoration: none;
-  color: hsl(var(--foreground));
-  transition: all 0.2s ease;
-  background-color: hsla(var(--primary), 0.1);
 }
 
-.profileLink:hover {
-  background-color: hsla(var(--primary), 0.2);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+.profileButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.75rem;
+  text-decoration: none;
+  color: hsl(var(--foreground));
+  background: hsl(var(--muted) / 0.5);
+  border: 1px solid hsl(var(--border));
+  transition: all var(--animation-normal) var(--animation-ease);
+}
+
+.profileButton:hover {
+  background: hsl(var(--muted));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.avatarWrapper {
+  position: relative;
 }
 
 .avatar {
-  position: relative;
-  width: 40px;
-  height: 40px;
-  overflow: hidden;
+  width: 2rem;
+  height: 2rem;
   border-radius: 50%;
-  box-shadow: 0 0 0 2px hsla(var(--primary), 0.5);
-  transition: all 0.2s ease;
+  border: 2px solid hsl(var(--primary) / 0.3);
+  transition: all var(--animation-normal) var(--animation-ease);
 }
 
-.avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 50%;
-}
-
-.userMenu:hover .avatar {
-  box-shadow: 0 0 0 3px hsla(var(--primary), 0.8);
+.profileButton:hover .avatar {
+  border-color: hsl(var(--primary));
   transform: scale(1.05);
 }
 
+.avatarSkeleton {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: hsl(var(--muted));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.avatarFallback {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+
 .profileText {
+  font-size: 0.875rem;
   font-weight: 500;
-  display: none; /* Hidden by default on mobile */
-}
-
-/* Show the profile text on larger screens */
-@media (min-width: 768px) {
-  .profileText {
-    display: inline-block;
-  }
-  
-  .profileLink {
-    min-width: 120px;
-    justify-content: center;
-  }
-}
-
-.loginButton,
-.logoutButton {
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius);
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.loginButton {
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-}
-
-.loginButton:hover {
-  background-color: hsl(var(--primary) / 0.9);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px hsla(var(--foreground), 0.1);
 }
 
 .logoutButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background-color: hsl(var(--destructive));
-  color: white;
-  border: none;
+  gap: 0.375rem;
+  border-radius: 0.5rem;
   font-size: 0.875rem;
   font-weight: 500;
   padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
+  background: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+  border: none;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .logoutButton:hover {
-  background-color: hsl(var(--destructive) / 0.9);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-}
-
-.logoutButton:active {
-  transform: translateY(0);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  background: hsl(var(--destructive) / 0.9);
 }
 
 .logoutButton:disabled {
-  opacity: 0.7;
+  opacity: 0.6;
   cursor: not-allowed;
   transform: none;
-  box-shadow: none;
 }
 
 .signInButton {
-  padding: 0.6rem 1.2rem;
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  border-radius: var(--radius);
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-  overflow: hidden;
-  z-index: 1;
   gap: 0.5rem;
-  box-shadow: 0 0 10px hsla(var(--primary), 0.2);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.625rem 1.25rem;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px hsl(var(--primary) / 0.2);
 }
 
 .signInButton:hover {
-  background-color: hsl(var(--primary) / 0.9);
+  background: hsl(var(--primary) / 0.9);
+  box-shadow: 0 4px 16px hsl(var(--primary) / 0.3);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px hsla(var(--primary), 0.25);
 }
 
-.signInButton:active {
+/* ==========================================================================
+   Mobile Menu Toggle
+   ========================================================================== */
+
+.mobileMenuToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  z-index: 60;
+  border-radius: 0.5rem;
+  transition: all var(--animation-fast) var(--animation-ease);
+}
+
+.mobileMenuToggle:hover {
+  background: hsl(var(--muted));
+}
+
+.mobileMenuToggle:active {
+  transform: scale(0.95);
+}
+
+/* ==========================================================================
+   Mobile Menu
+   ========================================================================== */
+
+  .mobileMenu {
+    position: fixed;
+    top: var(--navbar-height);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--navbar-bg);
+    backdrop-filter: blur(var(--navbar-blur));
+    border: 1px solid var(--navbar-border);
+    transform: translateY(-100%);
+    opacity: 0;
+    visibility: hidden;
+    transition: all var(--animation-normal) var(--animation-ease);
+    z-index: 40;
+  }
+
+.mobileMenu.open {
   transform: translateY(0);
-  box-shadow: 0 2px 6px hsla(var(--primary), 0.2);
+  opacity: 1;
+  visibility: visible;
 }
 
-.signInButton::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
+.mobileNav {
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    hsla(var(--primary-foreground), 0.2),
-    transparent
-  );
-  transition: left 0.8s ease;
-  z-index: -1;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem 1rem;
 }
 
-.signInButton:hover::before {
-  left: 100%;
+.mobileNavList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
 }
 
-.signInButton::after {
-  content: '→';
-  display: inline-block;
-  transition: transform 0.2s ease;
-  font-size: 1.1em;
+.mobileNavItem {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: slideUpFade var(--animation-normal) var(--animation-ease) forwards;
 }
 
-.signInButton:hover::after {
-  transform: translateX(3px);
+.mobileMenu.open .mobileNavItem:nth-child(1) { animation-delay: 100ms; }
+.mobileMenu.open .mobileNavItem:nth-child(2) { animation-delay: 200ms; }
+.mobileMenu.open .mobileNavItem:nth-child(3) { animation-delay: 300ms; }
+.mobileMenu.open .mobileNavItem:nth-child(4) { animation-delay: 400ms; }
+
+.mobileNavLink {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 1rem;
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+  background: transparent;
+  border: none;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all var(--animation-normal) var(--animation-ease);
+  text-align: left;
 }
+
+.mobileNavLink:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--primary));
+  transform: translateX(8px);
+}
+
+.mobileNavLink.active {
+  background: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+  font-weight: 600;
+}
+
+.mobileActions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid hsl(var(--border));
+}
+
+.mobileThemeToggle {
+  display: flex;
+  justify-content: center;
+}
+
+.mobileUserSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mobileProfileButton {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 1rem;
+  background: hsl(var(--muted) / 0.5);
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all var(--animation-normal) var(--animation-ease);
+  font-size: 1rem;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+}
+
+.mobileProfileButton:hover {
+  background: hsl(var(--muted));
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.mobileLogoutButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.875rem;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  gap: 0.5rem;
+  background: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+  border: none;
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobileSignInButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.875rem;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  gap: 0.5rem;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobileLogoutButton:hover {
+  background: hsl(var(--destructive) / 0.9);
+}
+
+.mobileSignInButton:hover {
+  background: hsl(var(--primary) / 0.9);
+}
+
+/* ==========================================================================
+   Mobile Overlay
+   ========================================================================== */
+
+.mobileOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 30;
+  animation: fadeIn var(--animation-fast) var(--animation-ease);
+}
+
+/* ==========================================================================
+   Loading Spinner
+   ========================================================================== */
+
+.spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid currentColor;
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* ==========================================================================
+   Responsive Design
+   ========================================================================== */
 
 @media (min-width: 768px) {
-  .menuButton {
+  .desktopNav {
+    display: block;
+  }
+
+  .desktopActions {
+    display: flex;
+  }
+
+  .mobileMenuToggle {
     display: none;
   }
 
-  .nav, 
-  .nav.hidden {
-    position: static;
-    width: 100%;
-    height: auto;
-    background: none;
-    transform: none;
-    flex-direction: row;
-    padding: 0;
-    justify-content: flex-end;
-    visibility: visible !important;
-    opacity: 1 !important;
-    display: flex !important;
+  .mobileMenu {
+    display: none;
   }
 
-  .navList {
-    flex-direction: row;
-    gap: 2rem;
-    visibility: visible !important;
-    opacity: 1 !important;
-  }
-
-  .navItem {
-    opacity: 1 !important;
-    transform: none !important;
-    visibility: visible !important;
-    position: relative !important;
-    pointer-events: all !important;
-  }
-
-  .actions {
-    flex-direction: row;
-    margin-left: 2rem;
-    width: auto;
-    margin-top: 0;
-  }
-
-  .userMenu {
-    flex-direction: row;
-    width: auto;
-  }
-
-  .loginButton,
-  .logoutButton {
-    width: auto;
+  .container {
+    padding: 0 1.5rem;
   }
 }
 
-/* Mobile dropdown menu - make it more compact */
+@media (min-width: 1024px) {
+  .container {
+    padding: 0 2rem;
+  }
+
+  .navList {
+    gap: 2.5rem;
+  }
+
+  .profileText {
+    display: inline-block;
+  }
+}
+
 @media (max-width: 767px) {
   .container {
     padding: 0 1rem;
-    height: 60px;
   }
-  
+
   .logoText {
     font-size: 1.25rem;
   }
-  
-  .nav {
-    justify-content: flex-start;
-    padding: 70px 1rem 1rem;
-    overflow-y: auto;
-    align-items: center;
-  }
-  
-  .nav.open {
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  }
-  
-  .navList {
-    width: 100%;
-    max-width: 230px;
-    padding: 0.5rem;
-    background-color: hsl(var(--card));
-    border-radius: var(--radius);
-    border: 1px solid hsl(var(--border));
-    gap: 0;
-    margin-bottom: 0;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  }
-  
-  .dark .navList {
-    border-color: hsl(var(--border));
-    background-color: hsl(var(--card));
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-  }
-  
-  .navItem {
-    width: 100%;
-    margin: 0;
-    border-bottom: 1px solid hsl(var(--border) / 0.5);
-  }
-  
-  .dark .navItem {
-    border-color: hsl(var(--border) / 0.5);
-  }
-  
-  .navItem:last-child {
-    border-bottom: none;
+
+  .logoWrapper {
+    gap: 0.5rem;
   }
 
-  .navLink {
-    padding: 0.625rem 0;
-    font-size: 1rem;
-    display: block;
-    width: 100%;
-    text-align: center;
-  }
-  
-  .navLink.active::after {
-    width: 20px;
-    bottom: -2px;
-  }
-
-  .actions {
-    margin-top: 1rem;
-    width: 100%;
-    max-width: 230px;
-  }
-  
-  .profileLink {
-    justify-content: center;
-    width: 100%;
-    font-size: 0.95rem;
-    padding: 0.5rem;
-  }
-  
-  .userMenu {
-    max-width: 100%;
-    padding: 0.5rem;
-    background-color: hsl(var(--card));
-    border-radius: var(--radius);
-    border: 1px solid hsl(var(--border));
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  }
-  
-  .dark .userMenu {
-    border-color: hsl(var(--border));
-    background-color: hsl(var(--card));
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-  }
-  
-  .loginButton,
-  .logoutButton {
-    height: 40px;
-    padding: 0.5rem 1rem;
-  }
-}
-
-.switchButton:hover {
-  color: hsl(var(--primary) / 0.8);
-  text-decoration: none;
-}
-
-/* Dark mode gold accents for navbar */
-@media (prefers-color-scheme: dark) {
-  .header {
-    background-color: rgba(0, 0, 0, 0.8);
-    backdrop-filter: blur(10px);
-    border-bottom-color: var(--gold-border);
-    box-shadow: 0 4px 20px var(--gold-shadow);
-  }
-  
-  .logo .logoText {
-    color: var(--gold-primary);
-  }
-  
-  .logo:hover .logoImage {
-    filter: drop-shadow(0 0 5px var(--gold-shadow));
-  }
-  
-  .menuIcon span {
-    background-color: var(--gold-primary);
-  }
-  
-  .navLink {
-    color: var(--gold-muted) !important;
-  }
-  
-  .navLink:hover {
-    color: var(--gold-primary) !important;
-    text-shadow: 0 0 5px var(--gold-shadow);
-  }
-  
-  .navLink.active {
-    color: var(--gold-primary) !important;
-  }
-  
-  .navLink.active::after {
-    background-color: var(--gold-primary);
-    box-shadow: 0 0 5px var(--gold-shadow);
-  }
-  
-  .userMenu .avatar {
-    border: 2px solid var(--gold-border);
-    box-shadow: 0 0 10px var(--gold-shadow);
-  }
-  
-  .userMenu .avatar:hover {
-    border-color: var(--gold-primary);
-    box-shadow: 0 0 15px var(--gold-shadow);
-  }
-  
   .profileText {
-    color: var(--gold-muted);
+    display: none;
   }
-  
-  .signInButton {
-    background: linear-gradient(to bottom, var(--gold-gradient-start), var(--gold-gradient-end));
-    color: #2d3748;
-    border: none;
-    box-shadow: 0 2px 10px var(--gold-shadow);
+
+  /* Hide desktop elements on mobile */
+  .desktopNav,
+  .desktopActions {
+    display: none !important;
   }
-  
-  .signInButton:hover {
-    background: linear-gradient(to bottom, var(--gold-highlight), var(--gold-secondary));
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px var(--gold-shadow);
+
+  .mobileMenuToggle {
+    display: flex;
   }
-  
-  .logoutButton {
-    background: linear-gradient(to right, #d35400, #e74c3c);
-    color: white;
-    border: 1px solid var(--gold-border);
-    box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
+}
+
+/* ==========================================================================
+   Animations
+   ========================================================================== */
+
+@keyframes slideIn {
+  from {
+    width: 0;
+    opacity: 0;
   }
-  
-  .logoutButton:hover {
-    background: linear-gradient(to right, #e74c3c, #c0392b);
-    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+  to {
+    width: 20px;
+    opacity: 1;
+  }
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================================
+   Focus States & Accessibility
+   ========================================================================== */
+
+.navLink:focus-visible,
+.profileButton:focus-visible,
+.logoutButton:focus-visible,
+.signInButton:focus-visible,
+.mobileMenuToggle:focus-visible,
+.mobileNavLink:focus-visible,
+.mobileProfileButton:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .navbar,
+  .navbar *,
+  .mobileMenu,
+  .mobileMenu * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast support */
+@media (prefers-contrast: high) {
+  .navbar {
+    border-bottom: 2px solid hsl(var(--border));
+  }
+
+  .navLink,
+  .profileButton,
+  .mobileNavLink {
+    border: 1px solid hsl(var(--border));
+  }
+
+  .navLink:hover,
+  .profileButton:hover,
+  .mobileNavLink:hover {
+    border-color: hsl(var(--primary));
+  }
+}
+
+/* ==========================================================================
+   Print Styles
+   ========================================================================== */
+
+@media print {
+  .navbar {
+    display: none;
   }
 }

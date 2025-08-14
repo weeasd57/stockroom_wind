@@ -8,7 +8,7 @@ export function ClientSideLayout({ children }) {
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
 
-  // تحديد الصفحات التي لا تحتاج إلى Navbar
+  // Define pages that don't need the navbar
   const pagesWithoutNavbar = ['/landing'];
   const shouldShowNavbar = !pagesWithoutNavbar.includes(pathname);
 
@@ -86,12 +86,24 @@ export function ClientSideLayout({ children }) {
   // Only render the full layout on the client side
   return (
     <div 
-      className="min-h-screen"
+      className="min-h-screen bg-background"
       suppressHydrationWarning
     >
       {shouldShowNavbar && <Navbar />}
-      <main className={`w-full ${shouldShowNavbar ? 'pt-20' : ''}`} style={{ marginTop: shouldShowNavbar ? '0' : '0' }}>
-        {children}
+      <main 
+        className={`w-full transition-all duration-300 ease-in-out ${
+          shouldShowNavbar 
+            ? 'pt-16 md:pt-16' // Use consistent padding for navbar height
+            : 'pt-0'
+        }`}
+        style={{ 
+          minHeight: shouldShowNavbar ? 'calc(100vh - 4rem)' : '100vh',
+          marginTop: 0 
+        }}
+      >
+        <div className="animate-fade-in">
+          {children}
+        </div>
       </main>
     </div>
   );
