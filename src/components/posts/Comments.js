@@ -1,43 +1,34 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getPostCommentCount } from '@/utils/comments';
+import { useComments } from '@/providers/CommentProvider';
 import CommentsDialog from './CommentsDialog';
 import styles from '@/styles/Comments.module.css';
 
 export default function Comments({ postId, initialCommentCount = 0 }) {
-  const [commentCount, setCommentCount] = useState(initialCommentCount);
+  const { getPostStats, fetchCommentsForPost } = useComments();
   const [showDialog, setShowDialog] = useState(false);
 
-  // Update comment count when initialCommentCount changes
-  useEffect(() => {
-    if (initialCommentCount !== commentCount) {
-      setCommentCount(initialCommentCount);
-    }
-  }, [initialCommentCount]);
+  const postStats = getPostStats(postId);
+  const commentCount = postStats.commentCount || initialCommentCount;
 
-  // Fetch fresh comment count when needed
-  const refreshCommentCount = async () => {
-    if (!postId) return;
-    
-    try {
-      const count = await getPostCommentCount(postId);
-      setCommentCount(count);
-    } catch (error) {
-      console.error('Error fetching comment count:', error);
+  // Fetch comments for this post when component mounts
+  useEffect(() => {
+    if (postId) {
+      fetchCommentsForPost(postId);
     }
-  };
+  }, [postId, fetchCommentsForPost]);
 
   const handleOpenDialog = () => {
     setShowDialog(true);
-    // Refresh comment count when opening dialog
-    refreshCommentCount();
+    // Fetch latest comments when opening dialog
+    if (postId) {
+      fetchCommentsForPost(postId);
+    }
   };
 
   const handleCloseDialog = () => {
     setShowDialog(false);
-    // Refresh comment count when closing dialog to reflect any new comments
-    refreshCommentCount();
   };
 
   return (
@@ -60,7 +51,7 @@ export default function Comments({ postId, initialCommentCount = 0 }) {
         postId={postId}
         isOpen={showDialog}
         onClose={handleCloseDialog}
-        initialCommentCount={commentCount}
+        commentCount={commentCount}
       />
     </>
   );
