@@ -1,7 +1,7 @@
 .profileContainer {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 3rem 1rem 1rem 1rem; /* Add more padding to the top */
+  padding: 1rem; /* Adjust padding to avoid conflict with navbar height */
   animation: fadeIn 0.5s ease-out;
   position: relative;
   overflow-x: hidden;

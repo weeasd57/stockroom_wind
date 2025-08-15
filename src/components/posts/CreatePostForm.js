@@ -7,23 +7,29 @@ import { generateEodLastCloseUrl, countries, BASE_URL, API_KEY } from '@/utils/s
 import { getCountrySymbolCounts, searchStocks } from '@/utils/symbolSearch';
 import { uploadPostImage } from '@/utils/supabase';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider'; // Updated from contexts/CreatePostFormContext
-import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData'; // Import from models
-import { CURRENCY_SYMBOLS, getCurrencySymbol, COUNTRY_ISO_CODES } from '@/models/CurrencyData'; // Import from models
-import 'flag-icons/css/flag-icons.min.css';
-import '@/styles/create-post-page.css'; // Updated from styles/create-post-page.css 
-import '@/styles/animation.css';
-import countrySummaryData from '@/symbols_data/country_summary_20250304_171206.json';
-import { supabase } from '@/utils/supabase'; // Moved here and removed local client creation
+import { createPost } from '@/utils/supabase'; // Adjust this import based on your actual supabase client
+import styles from '@/styles/create-post-page.css'; // Assuming you have a CSS module for this page
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { usePosts } from '@/hooks/usePosts'; // Use the addPost function from usePosts hook
+import { COUNTRY_ISO_CODES, CURRENCY_SYMBOLS, getCurrencySymbol } from '@/models/CurrencyData.js';
+import { COUNTRY_CODE_TO_NAME } from "../../models/CountryData";
+import countryData from '@/symbols_data/country_summary_20250304_171206.json';
+import { toast } from 'sonner';
+// Create reusable Supabase client
+// const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+// const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 // Add a function to load country symbol counts from the JSON file
-const loadCountrySymbolCounts = () => {
+const loadCountrySymbolCounts = (data) => {
   const counts = {};
   let total = 0;
   
   // Process the country summary data
-  Object.keys(countrySummaryData).forEach(country => {
+  Object.keys(data).forEach(country => {
     // Convert country names to ISO codes
-    const countryData = countrySummaryData[country];
+    const countryData = data[country];
     const isoCode = COUNTRY_ISO_CODES[country] || country.toLowerCase();
     
     if (countryData && countryData.TotalSymbols) {
@@ -62,9 +68,12 @@ const formatSymbolForApi = (symbol, country) => {
   return formattedSymbol;
 };
 
-export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSubmit, isSubmitting: propIsSubmitting, setSubmitState, setGlobalStatus }) {
-  const { user } = useSupabase();
+export default function CreatePostForm() {
+  const { user, supabase } = useSupabase(); // Get the supabase client from the provider
   const { profile, getEffectiveAvatarUrl, addPost } = useProfile();
+  const router = useRouter();
+  const { refresh: refreshPosts, createPost: createPostInList } = usePosts(); // Use refresh or createPost to update posts
+  const [initialPrice, setInitialPrice] = useState(null); // Added initialPrice state
   
   // Since there's no formState, directly destructure values from context with defaults
   const { 
@@ -88,7 +97,16 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
     selectedStrategy = '',
     targetPercentage = '',
     stopLossPercentage = '',
-    submissionProgress = ''
+    isSubmitting: contextIsSubmitting = false,
+    submissionProgress = '',
+    setGlobalStatus,
+    setSubmitState,
+    setPriceError,
+    selectedImageFile,
+    setSelectedImageFile,
+    isManualPrice,
+    manualPrice,
+    apiPrice
   } = useCreatePostForm() || {};
 
   // addPost function is imported from ProfileProvider
@@ -100,7 +118,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
   const [showImageUrlInput, setShowImageUrlInput] = useState(false);
   const [showStrategyInput, setShowStrategyInput] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState('/default-avatar.svg');
-  const [selectedCountry, setSelectedCountry] = useState('all');
+  const [selectedCountry, setSelectedCountry] = useState(null);
   const [apiUrl, setApiUrl] = useState('');
   const [formattedApiUrl, setFormattedApiUrl] = useState('');
   const [countrySymbolCounts, setCountrySymbolCounts] = useState({});
@@ -120,15 +138,35 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
   const [currentAvatar, setCurrentAvatar] = useState(null);
   const [previewAvatar, setPreviewAvatar] = useState(null);
   const [isAddingStrategy, setIsAddingStrategy] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(propIsSubmitting);
-  
-  const fileInputRef = useRef(null);
-  const searchTimeoutRef = useRef(null);
-  const searchInputRef = useRef(null);
-  const stockSearchResultsRef = useRef(null);
-  const strategySelectRef = useRef(null);
-  const formWrapperRef = useRef(null);
+  const [isSubmitting, setIsSubmitting] = useState(contextIsSubmitting); // New state for submission status
+  // Whether the post is public (visible to others) — default to true
+  const [isPublic, setIsPublic] = useState(true);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState('');
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [debugLogs, setDebugLogs] = useState([]);
+  const pushDebug = useCallback((msg) => {
+    try {
+      console.debug('[CreatePostForm DEBUG]', msg);
+    } catch (e) {}
+    setDebugLogs((prev) => {
+      const next = [...prev, `${new Date().toISOString()} - ${msg}`];
+      // keep last 50 logs
+      return next.slice(-50);
+    });
+  }, []);
+  const [activeTab, setActiveTab] = useState('stocks');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isSearchInputFocused, setIsSearchInputFocused] = useState(false);
+  const [hasUserSearched, setHasUserSearched] = useState(false);
   const [showStrategyDialog, setShowStrategyDialog] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [isFormVisible, setIsFormVisible] = useState(false);
+  const [symbolSearchQuery, setSymbolSearchQuery] = useState('');
+  const [countrySearchQuery, setCountrySearchQuery] = useState('');
+  const [imagePreviews, setImagePreviews] = useState([]);
+  const [imageFiles, setImageFiles] = useState([]);
+  const [strategiesLoading, setStrategiesLoading] = useState(true);
 
   // الاستراتيجيات الافتراضية
   const DEFAULT_STRATEGIES = [
@@ -152,7 +190,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
     const loadPopularCountriesData = () => {
       try {
         // Get counts directly from our JSON file
-        const counts = loadCountrySymbolCounts();
+        const counts = loadCountrySymbolCounts(countryData);
         setCountrySymbolCounts(counts);
         console.log("Loaded country symbol counts:", counts);
       } catch (error) {
@@ -193,8 +231,8 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
 
   // Keep local isSubmitting state in sync with context
   useEffect(() => {
-    setIsSubmitting(propIsSubmitting);
-  }, [propIsSubmitting]);
+    setIsSubmitting(contextIsSubmitting);
+  }, [contextIsSubmitting]);
 
   // Fetch user's strategies
   const fetchStrategies = async () => {
@@ -217,21 +255,35 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
             .order('created_at', { ascending: false });
             
           if (error) {
-            console.error('Error fetching strategies from database:', error);
-            // Keep using default strategies
+            // If there's an error, check if it's because the table doesn't exist
+            if (error.code === '42P01') { // PostgreSQL error code for undefined_table
+              // Attempt to create the table - this might not work due to permissions or if it's a server-side only operation
+              try {
+                await setupDatabase(); // Assuming this function handles table creation
+                const { data: newData, error: newError } = await getUserStrategies(user.id); // Retry fetching
+                if (newError) {
+                  // console.error('Table user_strategies does not exist. Please run the migration script.');
+                } else {
+                  setUserStrategies(newData || []);
+                }
+              } catch (setupError) {
+                // console.error('Database error fetching strategies:', setupError);
+              }
+            }
+            // For other errors, set default strategies
+            setDefaultStrategies();
           } else if (data && data.length > 0) {
-            console.log('Retrieved user strategies from database:', data);
-            // Combine user strategies with default ones
-            const userStrategyNames = data.map(s => s.name);
-            const combinedStrategies = [...userStrategyNames, ...DEFAULT_STRATEGIES.filter(s => !userStrategyNames.includes(s))];
-            setStrategies(combinedStrategies);
+            // console.log('Retrieved user strategies from database:', data);
+            setUserStrategies(data);
           } else {
-            console.log('No user strategies found, using default strategies');
-            // Already set to default strategies above
+            // console.log('No user strategies found, using default strategies');
+            setDefaultStrategies();
           }
-        } catch (dbError) {
-          console.error('Database error fetching strategies:', dbError);
-          // Keep using default strategies
+        } catch (error) {
+          // console.error('Error fetching strategies:', error);
+          setDefaultStrategies();
+        } finally {
+          setStrategiesLoading(false);
         }
       } else {
         console.log('Supabase client not available, using default strategies');
@@ -363,7 +415,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
         let searchCountry = selectedCountry === 'all' ? null : selectedCountry;
         if (searchCountry && COUNTRY_CODE_TO_NAME[searchCountry]) {
           searchCountry = COUNTRY_CODE_TO_NAME[searchCountry];
-          console.log(`Searching in country: ${searchCountry}`);
+          // console.log(`Searching in country: ${searchCountry}`);
         }
         
         // Use our local symbol search instead of API
@@ -386,63 +438,12 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
         
         updateField('searchResults', formattedResults);
       } catch (error) {
-        console.error('Error searching stocks:', error);
-        
-        // When search fails, load popular stocks from the current country
-        if (selectedCountry !== 'all') {
-          // Don't show loading state as requested
-          setIsSearching(false);
-          
-          // Convert ISO country code to country name
-          let countryName = selectedCountry;
-          if (countryName.length === 2 && COUNTRY_CODE_TO_NAME[countryName.toLowerCase()]) {
-            countryName = COUNTRY_CODE_TO_NAME[countryName.toLowerCase()];
-          }
-          
-          // Load up to 250 popular stocks from the selected country
-          try {
-            const popularStocks = await searchStocks('', countryName, 250);
-            if (popularStocks && popularStocks.length > 0) {
-              console.log(`Loaded ${popularStocks.length} popular stocks for ${countryName}`);
-              
-              // Format the results to match the expected structure
-              const formattedResults = popularStocks.map(item => ({
-                symbol: item.Symbol || item.symbol,
-                name: item.Name || item.name,
-                country: item.Country || item.country,
-                exchange: item.Exchange || item.exchange,
-                uniqueId: item.uniqueId || `${item.symbol || item.Symbol}-${item.country || item.Country}-${Math.random().toString(36).substring(7)}`
-              }));
-              
-              updateField('searchResults', formattedResults);
-            } else {
-              updateField('searchResults', [{
-                symbol: `No stocks available for ${countryName}`,
-                name: "Please try another country",
-                country: selectedCountry,
-                exchange: "",
-                uniqueId: "no-stocks-available"
-              }]);
-            }
-          } catch (popularStocksError) {
-            console.error('Error loading popular stocks:', popularStocksError);
-            updateField('searchResults', [{
-              symbol: `Could not load stocks from ${countryName}`,
-              name: "Please try again later",
-              country: selectedCountry,
-              exchange: "",
-              uniqueId: "popular-stocks-error"
-            }]);
-          } finally {
-            setIsSearching(false);
-          }
-        } else {
-          // For 'All Countries', just clear the results
-          updateField('searchResults', []);
-          setIsSearching(false);
-        }
+        // console.error('Error searching stocks:', error);
+        setSearchResults([]);
+      } finally {
+        setLoadingSearch(false);
       }
-    }, 500);
+    }, [selectedCountry?.name]);
 
     // Cleanup function
     return () => {
@@ -483,13 +484,13 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
         countryName = COUNTRY_CODE_TO_NAME[countryName.toLowerCase()];
       }
       
-      console.log(`Loading all symbols for country: ${countryName}`);
+      // console.log(`Loading all symbols for country: ${countryName}`);
       
       // Use empty query to load all symbols for the country
       searchStocks('', countryName, 250)
         .then(results => {
           if (results && results.length > 0) {
-            console.log(`Loaded ${results.length} symbols for ${countryName}`);
+            // console.log(`Loaded ${results.length} symbols for ${countryName}`);
             
             // Check if the first result is an error message
             if (results[0].uniqueId && (
@@ -511,14 +512,12 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
             
             updateField('searchResults', formattedResults);
           } else {
-            console.warn(`No symbols returned for ${countryName}`);
-            // Show a friendly message within the search results if no symbols are found
             updateField('searchResults', [{
-              symbol: `${countryName} - No symbols available`,
+              symbol: `No stocks available for ${countryName}`,
               name: "Please try another country",
-              country: value,
+              country: selectedCountry,
               exchange: "",
-              uniqueId: "no-symbols-message"
+              uniqueId: "no-stocks-available"
             }]);
           }
         })
@@ -528,7 +527,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
           updateField('searchResults', [{
             symbol: `${countryName} - Temporarily unavailable`,
             name: "Please try again later or select another country",
-            country: value,
+            country: selectedCountry,
             exchange: "",
             uniqueId: "error-message"
           }]);
@@ -567,8 +566,36 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
       
       // First, let's properly format the symbol for consistent API use
       const formattedSymbol = formatSymbolForApi(stock.symbol, stock.country);
-      console.log(`Formatted symbol for API: ${formattedSymbol}`);
-      
+      // console.log(`Formatted symbol for API: ${formattedSymbol}`);
+
+      setPriceLoading(true);
+      setPriceError(null);
+      try {
+        // console.log(`Fetching price directly from API for ${stock.symbol} (${stock.country})`);
+        const { data: priceData, error: priceError } = await getStockPrice(formattedSymbol, stock.country);
+
+        if (priceError) {
+          // console.error(`Error fetching stock price from API: ${priceError.message}`);
+          setPriceError(priceError.message);
+        }
+        else if (priceData) {
+          // console.log(`API response:`, priceData);
+          const price = priceData.price;
+          if (price) {
+            // console.log(`Successfully parsed price from API: $${price}`);
+            updateField('currentPrice', price);
+            updateField('initialPrice', price);
+          } else {
+            setPriceError('Price data not found.');
+          }
+        }
+      } catch (error) {
+        // console.error(`Error fetching stock price from API: ${error.message}`);
+        setPriceError('Failed to fetch price. Please try again.');
+      } finally {
+        setPriceLoading(false);
+      }
+
       // Get the full country name if needed
       let countryName = stock.country;
       if (countryName.length === 2 && COUNTRY_CODE_TO_NAME[countryName.toLowerCase()]) {
@@ -576,7 +603,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
       }
       
       // Always use the API directly
-      console.log(`Fetching price directly from API for ${stock.symbol} (${countryName})`);
+      // console.log(`Fetching price directly from API for ${stock.symbol} (${countryName})`);
       
       // No local data available, proceed directly to API call
       
@@ -586,7 +613,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
       // Store the properly formatted API URL for display
       setApiUrl(currentApiUrl);
       setFormattedApiUrl(currentApiUrl);
-      console.log(`Fetching price from API URL: ${currentApiUrl}`);
+      // console.log(`Fetching price from API URL: ${currentApiUrl}`);
       
       // For exchanges, don't try to get price data
       if (stock.exchange) {
@@ -603,7 +630,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
       } else {
         // Fetch price data using the generated URL
         try {
-          console.log(`Fetching price data from API: ${currentApiUrl}`);
+          // console.log(`Fetching price data from API: ${currentApiUrl}`);
           // Always fetch the data from the API for the most up-to-date price
           
           // Track fetch start time
@@ -620,7 +647,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
           }
           
           const priceData = await response.json();
-          console.log(`API response:`, priceData);
+          // console.log(`API response:`, priceData);
           
           // Store the full response
           setApiResponse({
@@ -633,9 +660,10 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
           
           if (Array.isArray(priceData) && priceData.length > 0 && priceData[0] && typeof priceData[0].close === 'number') {
             const price = priceData[0].close;
-            console.log(`Successfully parsed price from API: $${price}`);
+            // console.log(`Successfully parsed price from API: $${price}`);
             
             updateField('currentPrice', price);
+            updateField('initialPrice', price);
             
             // Set default target prices based on the fetched price
             updateField('targetPrice', (price * 1.05).toFixed(2));
@@ -664,7 +692,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
           
           // Try to fetch directly from the URL as a fallback
           try {
-            console.log(`Attempting direct fetch from: ${currentApiUrl}`);
+            // console.log(`Attempting direct fetch from: ${currentApiUrl}`);
             
             // Create a new AbortController to limit fetch time
             const controller = new AbortController();
@@ -691,7 +719,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
             }
             
             const directData = await directResponse.json();
-            console.log('Direct API response:', directData);
+            // console.log('Direct API response:', directData);
             
             setApiResponse({
               source: 'direct_api',
@@ -705,10 +733,11 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
             if (Array.isArray(directData) && directData.length > 0 && directData[0]?.close) {
               const directPrice = directData[0].close;
               updateField('currentPrice', directPrice);
+              updateField('initialPrice', directPrice);
               updateField('targetPrice', (directPrice * 1.05).toFixed(2));
               updateField('stopLossPrice', (directPrice * 0.95).toFixed(2));
               
-              console.log(`Successfully parsed price from direct API: $${directPrice}`);
+              // console.log(`Successfully parsed price from direct API: $${directPrice}`);
             }
           } catch (directError) {
             console.error(`Direct fetch failed: ${directError.message}`);
@@ -746,108 +775,253 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
   };
 
   // Helper function to scroll to stock info with improved reliability
-  const scrollToStockInfo = () => {
-    console.log('scrollToStockInfo called');
-    
-    // Force scroll to top immediately for all possible containers
-    const scrollContainers = [
-      formWrapperRef.current,
-      document.querySelector('.form-wrapper'),
-      document.querySelector('.create-post-form-container'),
-      document.querySelector('.dialog-content'),
-      document.querySelector('.modal-content')
-    ];
-    
-    // Try to scroll all possible containers to top
-    scrollContainers.forEach(container => {
+  const scrollToStockInfo = useCallback(() => {
+    // console.log('scrollToStockInfo called');
+    if (stockInfoRef.current) {
+      const stockInfoElement = stockInfoRef.current;
+      const container = document.querySelector('.create-post-form-container'); // Adjust this selector if needed
+
       if (container) {
+        // Try to scroll the container to the top first, then to the element
         try {
-          // Try both methods
-          container.scrollTo(0, 0);
-          container.scrollTop = 0;
-          console.log('Scrolled container to top');
+          container.scrollTo({
+            top: 0,
+            behavior: 'smooth',
+          });
+          // console.log('Scrolled container to top');
         } catch (e) {
-          console.error('Error scrolling container:', e);
+          // console.error('Error scrolling container:', e);
         }
+
+        // Use a small delay to allow the first scroll to complete
+        setTimeout(() => {
+          const elementRect = stockInfoElement.getBoundingClientRect();
+          const containerRect = container.getBoundingClientRect();
+          const offsetTop = elementRect.top - containerRect.top + container.scrollTop;
+
+          // Only scroll if the element is not fully visible
+          if (elementRect.top < containerRect.top || elementRect.bottom > containerRect.bottom) {
+            container.scrollTo({
+              top: offsetTop,
+              behavior: 'smooth',
+            });
+            // console.log(`Scrolled container to element at ${offsetTop}px`);
+          } else {
+            // console.log(`Found target element on attempt ${i+1}`);
+          }
+        }, 100); // Small delay
+      } else {
+        // console.error('Error scrolling to element:', e);
       }
+    }
+  }, []);
+
+  // Handle image selection with improved feedback
+  const handleImageChange = (e) => {
+    console.log('=== IMAGE CHANGE EVENT TRIGGERED ===');
+    const file = e.target.files[0];
+    
+    if (!file) {
+      console.log('No file selected');
+      return;
+    }
+
+    console.log('File details:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: file.lastModified
     });
     
-    // Schedule multiple scroll attempts with increasing delays
-    for (let i = 0; i < 5; i++) {
-      setTimeout(() => {
-        // Try to find the stock info container
-        const stockInfoContainer = document.querySelector('.stock-info-container');
-        const stockItem = document.querySelector('.stock-item');
-        const targetElement = stockInfoContainer || stockItem || document.querySelector('.form-group');
-        
-        if (targetElement) {
-          console.log(`Found target element on attempt ${i+1}`);
-          
-          // Get all possible scroll containers again
-          scrollContainers.forEach(container => {
-            if (container) {
-              try {
-                // Get the position of the element
-                const offsetTop = targetElement.offsetTop;
-                
-                // Scroll to the element
-                container.scrollTo({
-                  top: offsetTop - 20,
-                  behavior: 'smooth'
-                });
-                
-                // Also try direct assignment
-                setTimeout(() => {
-                  container.scrollTop = offsetTop - 20;
-                }, 50);
-                
-                console.log(`Scrolled container to element at ${offsetTop}px`);
-              } catch (e) {
-                console.error('Error scrolling to element:', e);
-              }
-            }
-          });
-          
-          // Add highlight effect
-          targetElement.classList.add('highlight-selection');
-          setTimeout(() => {
-            targetElement.classList.remove('highlight-selection');
-          }, 1000);
-        }
-      }, i * 300); // Increasing delays: 0ms, 300ms, 600ms, 900ms, 1200ms
-    }
-    
-    // Add additional focus attempts with delay
-    setTimeout(() => {
-      // Force focus on price value to ensure it's visible
-      const priceElement = document.querySelector('.stock-price-value');
-      if (priceElement) {
-        setTimeout(() => {
-          priceElement.focus();
-          console.log('Focused on price element');
-        }, 300);
+    try {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        console.error('Invalid file type:', file.type);
+        const errorMsg = 'Please select a valid image file';
+        toast.error(errorMsg);
+        setImageUploadError(errorMsg);
+        return;
       }
-    }, 1500);
-  };
-  
-  // Handle image selection
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
+      
+      // Validate file size (less than 5MB)
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (file.size > maxSize) {
+        console.error('File too large:', file.size, 'bytes');
+        const errorMsg = 'Image size is too large. Please select an image smaller than 5MB';
+        toast.error(errorMsg);
+        setImageUploadError(errorMsg);
+        return;
+      }
+      
+      // Clear any previous errors and URL image
+      setImageUploadError('');
+      console.log('File validation passed!');
+      
+      // Clear URL image when uploading file
+      updateField('imageUrl', '');
+      
+      // Show success message
+      const successMsg = `Image selected: ${file.name}`;
+      console.log('Success:', successMsg);
+      toast.success(successMsg);
+      
+      // Update form fields
+      console.log('Updating form fields...');
       updateField('imageFile', file);
+      
+      // Also set the provider-level selectedImageFile if available (some code paths use this)
+      if (typeof setSelectedImageFile === 'function') {
+        try { 
+          setSelectedImageFile(file); 
+          console.log('Provider-level selectedImageFile updated');
+        } catch (err) { 
+          console.error('setSelectedImageFile failed:', err);
+        }
+      }
+      
+      pushDebug(`Selected file: ${file.name} (${Math.round(file.size/1024)} KB) type=${file.type}`);
+      
       // Create a URL for the preview
       const objectUrl = URL.createObjectURL(file);
+      console.log('Created object URL:', objectUrl);
       updateField('imagePreview', objectUrl);
-      // Clean up the old URL to prevent memory leaks
-      return () => URL.revokeObjectURL(objectUrl);
+      
+      // Set status to show preview is ready
+      setStatus('preview_ready');
+      console.log('Status set to preview_ready');
+      
+      // Clean up function
+      const cleanup = () => {
+        URL.revokeObjectURL(objectUrl);
+        console.log('Object URL cleaned up');
+      };
+      
+      // Clean up after a delay or component unmount
+      setTimeout(cleanup, 300000); // 5 minutes
+      
+      console.log('=== IMAGE CHANGE COMPLETED SUCCESSFULLY ===');
+      
+    } catch (error) {
+      console.error('Error in handleImageChange:', error);
+      setImageUploadError('Error processing image: ' + error.message);
     }
   };
 
-  // Handle image URL input
-  const handleImageUrlChange = (e) => {
-    updateField('imageUrl', e.target.value);
+  // Enhanced image URL handler with validation and metadata extraction
+  const handleImageUrlChange = async (e) => {
+    const url = e.target.value;
+    updateField('imageUrl', url);
+    
+    // Clear uploaded file when URL is set
     updateField('imageFile', null);
-    updateField('imagePreview', '');
+    if (typeof setSelectedImageFile === 'function') {
+      try { setSelectedImageFile(null); } catch (err) { console.debug('setSelectedImageFile failed', err); }
+    }
+    
+    // Set URL as preview if it's a valid image URL
+    if (url && url.trim()) {
+      try {
+        // Validate URL format
+        const urlObj = new URL(url);
+        
+        // Check if it's likely an image URL by extension
+        const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+        const hasImageExtension = imageExtensions.some(ext => 
+          url.toLowerCase().includes(ext.toLowerCase())
+        );
+        
+        if (hasImageExtension) {
+          // Create a virtual image object to get metadata
+          const img = new Image();
+          img.crossOrigin = 'anonymous'; // Try to handle CORS
+          
+          const imageLoadPromise = new Promise((resolve, reject) => {
+            img.onload = () => {
+              // Extract filename from URL
+              const filename = url.split('/').pop().split('?')[0] || 'image-from-url';
+              
+              // Create a virtual file object for consistency
+              const virtualFile = {
+                name: filename,
+                size: null, // We can't get actual file size from URL without fetching
+                type: `image/${filename.split('.').pop() || 'unknown'}`,
+                lastModified: Date.now(),
+                width: img.naturalWidth,
+                height: img.naturalHeight,
+                isFromUrl: true
+              };
+              
+              // Set the virtual file for display consistency
+              if (typeof setSelectedImageFile === 'function') {
+                try { 
+                  setSelectedImageFile(virtualFile); 
+                  console.log('Virtual file object created for URL image:', virtualFile);
+                } catch (err) { 
+                  console.debug('setSelectedImageFile failed for virtual file', err); 
+                }
+              }
+              
+              resolve(virtualFile);
+            };
+            
+            img.onerror = () => {
+              reject(new Error('Failed to load image from URL'));
+            };
+          });
+          
+          img.src = url;
+          
+          // Set preview immediately (don't wait for metadata)
+          updateField('imagePreview', url);
+          setStatus('preview_ready');
+          toast.success('Image URL set successfully!');
+          
+          // Try to get metadata (non-blocking)
+          try {
+            await imageLoadPromise;
+            console.log('Image metadata loaded successfully');
+          } catch (metaError) {
+            console.warn('Could not load image metadata:', metaError.message);
+            // Still create a basic virtual file
+            const filename = url.split('/').pop().split('?')[0] || 'image-from-url';
+            const basicVirtualFile = {
+              name: filename,
+              size: null,
+              type: `image/${filename.split('.').pop() || 'unknown'}`,
+              lastModified: Date.now(),
+              isFromUrl: true
+            };
+            
+            if (typeof setSelectedImageFile === 'function') {
+              try { 
+                setSelectedImageFile(basicVirtualFile);
+              } catch (err) { 
+                console.debug('setSelectedImageFile failed for basic virtual file', err); 
+              }
+            }
+          }
+        } else {
+          // Set preview anyway but warn user
+          updateField('imagePreview', url);
+          setStatus('preview_ready');
+          toast.warning('URL might not be an image. Preview may not work.');
+        }
+        
+      } catch (urlError) {
+        console.error('Invalid URL format:', urlError);
+        toast.error('Please enter a valid URL');
+        updateField('imagePreview', '');
+        setStatus('idle');
+      }
+    } else {
+      updateField('imagePreview', '');
+      if (typeof setSelectedImageFile === 'function') {
+        try { setSelectedImageFile(null); } catch (err) { console.debug('setSelectedImageFile cleanup failed', err); }
+      }
+      setStatus('idle');
+    }
+    
+    pushDebug(`Image URL set: ${url}`);
   };
 
   /**
@@ -1099,6 +1273,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
       if (price !== null && !isNaN(price)) {
         console.log(`Successfully parsed price from API: $${price}`);
         updateField('currentPrice', price);
+        updateField('initialPrice', price);
         
         // نسبة الهدف 5% فوق سعر السهم الحالي
         const targetPercentage = 5;
@@ -1222,9 +1397,9 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
   }, [showStrategyDialog]);
 
   // Function to update global status - declare once here
-  const updateGlobalStatus = (message, type = 'processing') => {
+  const updateGlobalStatus = useCallback((message, type = 'processing') => {
     // This would connect to your global status context or state
-    console.log(`Status: ${type} - ${message}`);
+    // console.log(`Status: ${type} - ${message}`);
     // If you have a global status component, update it here
     if (setGlobalStatus) {
       setGlobalStatus({
@@ -1233,130 +1408,137 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
         message
       });
     }
-  };
+    // Clear status after 5 seconds if not a persistent error
+    if (type !== 'error') {
+      const timer = setTimeout(() => setGlobalStatus(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [setGlobalStatus]);
 
   // New improved handleSubmit function with better timeout handling
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (isSubmitting) return; // Prevent multiple submissions
+    setIsSubmitting(true); // Set submitting state to true
     setErrors({}); // Reset errors
 
     // Simple validation checks
     if (!selectedStock || !selectedStock.symbol) {
       setErrors({ stock: 'Please select a stock symbol' });
+      setIsSubmitting(false); // Reset submitting state on error
       return;
     }
 
     try {
-      // Start the submission process
-      setStatus('uploading');
-      setIsSubmitting(true); // Set submitting state
-      if (setSubmitState) {
-        setSubmitState('submitting');
-      }
-      updateGlobalStatus('Uploading post content...', 'processing');
-
-      // Prepare post data with all required fields matching Supabase posts table
-      const postData = {
-        // Required fields
-        user_id: user?.id,
-        content: contextDescription,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        
-        // Optional fields matching posts table columns exactly
-        description: contextDescription, // For backwards compatibility
-        image_url: undefined, // Will be set after upload if needed
-        symbol: selectedStock?.symbol || undefined,
-        company_name: selectedStock?.name || undefined,
-        country: selectedStock?.country || undefined,
-        exchange: selectedStock?.exchange || undefined,
-        current_price: currentPrice || undefined,
-        initial_price: currentPrice || undefined, // Set initial price once during creation
-        target_price: targetPrice ? parseFloat(targetPrice) : undefined,
-        stop_loss_price: stopLossPrice ? parseFloat(stopLossPrice) : undefined,
-        strategy: selectedStrategy || undefined
-      };
-
-      // Process image uploads
-      if (imageFile) {
-        console.time('Image Upload Time');
+      console.debug('[handleSubmit] building post, selectedStock:', selectedStock && selectedStock.symbol, 'selectedImageFile:', !!selectedImageFile);
+      console.debug('[handleSubmit] formErrors:', formErrors, 'isSubmitting:', isSubmitting);
+      // Try upload if a local file was selected; otherwise use the image URL input
+      let uploadedImageUrl = null;
+      if (selectedImageFile) {
+        console.debug('[handleSubmit] selectedImageFile present, preparing to upload', { name: selectedImageFile.name, size: selectedImageFile.size, type: selectedImageFile.type, userId: user?.id });
+        setImageUploading(true);
+        setImageUploadError('');
         try {
-          updateGlobalStatus('Uploading image...', 'processing');
-          const uploadedUrl = await uploadPostImage(imageFile, user?.id);
-          if (uploadedUrl) {
-            postData.image_url = uploadedUrl;
+          const { publicUrl, error: uploadError } = await uploadPostImage(
+            selectedImageFile,
+            user.id
+          );
+          console.debug('[handleSubmit] uploadPostImage returned', { publicUrl, uploadError });
+          if (uploadError) {
+            console.error("Error uploading image:", uploadError);
+            setImageUploadError(uploadError.message || 'Upload failed');
+            setErrors({ image: `Error uploading image: ${uploadError.message}` });
+            setIsSubmitting(false); // Reset submitting state on error
+            setImageUploading(false);
+            return;
           }
-        } catch (error) {
-          console.error('Error uploading image:', error);
-          updateGlobalStatus(`Error uploading image: ${error.message}`, 'error');
-          setIsSubmitting(false); // Reset submitting state on error
-          if (setSubmitState) {
-            setSubmitState('error');
-          }
-          throw error;
+          uploadedImageUrl = publicUrl;
+          console.debug('[handleSubmit] uploadedImageUrl set to', uploadedImageUrl);
+        } catch (uploadErr) {
+          console.error('uploadPostImage threw:', uploadErr);
+          setImageUploadError(uploadErr?.message || String(uploadErr));
+          setErrors({ image: `Error uploading image: ${uploadErr?.message || 'Upload failed'}` });
+          setIsSubmitting(false);
+          setImageUploading(false);
+          return;
+        } finally {
+          setImageUploading(false);
         }
-        console.timeEnd('Image Upload Time');
-      } else if (imageUrl) {
-        postData.image_url = imageUrl;
       }
 
-      // Optimistic UI update: Create a temporary post object
-      const tempPost = {
-        ...postData,
-        id: `temp-${Date.now()}`, // Temporary ID for optimistic update
-        syncing: true, // Flag to indicate it\'s an optimistic entry
-      };
+      // Use currentPrice from context that was set when stock was selected
+      console.debug('[handleSubmit] currentPrice from context:', currentPrice, 'targetPrice:', targetPrice, 'stopLossPrice:', stopLossPrice);
       
-      if (onPostCreated) {
-        onPostCreated(tempPost); // Notify parent component immediately
+      // Ensure required `content` column is populated (DB has NOT NULL on `content`)
+      const contentValue = (contextDescription || selectedStock?.symbol || '').toString().trim().slice(0, 255);
+      
+      // Use the currentPrice that was fetched and set when stock was selected
+      const numericInitial = currentPrice && !isNaN(parseFloat(currentPrice)) ? parseFloat(currentPrice) : 0;
+      const numericTarget = targetPrice && !isNaN(parseFloat(targetPrice)) ? parseFloat(targetPrice) : numericInitial;
+      const numericStopLoss = stopLossPrice && !isNaN(parseFloat(stopLossPrice)) ? parseFloat(stopLossPrice) : numericInitial;
+      
+      console.debug('[handleSubmit] calculated prices:', { numericInitial, numericTarget, numericStopLoss });
+
+      const postData = {
+        user_id: user.id,
+        symbol: selectedStock.symbol,
+        country: selectedStock.country,
+        // `content` is required by the DB schema (short summary)
+        content: contentValue,
+        // `description` can be longer and optional
+        description: contextDescription || '',
+        // Fill required numeric columns
+        current_price: numericInitial,
+        initial_price: numericInitial,
+        target_price: numericTarget,
+        stop_loss_price: numericStopLoss,
+        // Stock/company metadata required by schema
+        company_name: selectedStock?.name || selectedStock?.company_name || selectedStock?.symbol || '',
+        exchange: selectedStock?.exchange || '',
+        // Prefer uploaded image URL, fall back to image URL input from context
+        image_url: uploadedImageUrl || imageUrl || null,
+        strategy: selectedStrategy || null,
+        is_public: isPublic,
+        status: 'open',
+        // Human-readable status message required by schema
+        status_message: 'open',
+      };
+
+      // Prefer using the local posts hook to create the post so UI updates optimistically
+      console.debug('[handleSubmit] calling posts.createPost with postData keys:', Object.keys(postData));
+      const startCreate = performance.now();
+      try {
+        await createPostInList(postData);
+      } catch (err) {
+        console.error('Error creating post via posts hook:', err);
+        setErrors({ general: `Error creating post: ${err?.message || err}` });
+        setIsSubmitting(false);
+        return;
+      }
+      const createDuration = performance.now() - startCreate;
+      console.debug('[handleSubmit] posts.createPost completed', { createDuration });
+
+      // Assuming post creation is successful
+      toast.success("Post created successfully!");
+
+      // Refresh posts list so the new post appears in the feed
+      try {
+        await refreshPosts();
+      } catch (refreshErr) {
+        console.debug('[handleSubmit] refreshPosts failed', refreshErr);
       }
 
-      updateGlobalStatus('Publishing post...', 'processing');
-      // No longer need a timeout for the actual Supabase insert since we are focusing on performance
-      // and optimistic UI is handled by immediate onPostCreated call.
-      console.time('Supabase Insert Time');
-      const { data: createdPost, error: postError } = await supabase
-        .from('posts')
-        .insert([postData]) // Use postData (without temp ID or syncing flag)
-        .select();
-      console.timeEnd('Supabase Insert Time');
-
-      if (postError) {
-        console.error('Error creating post:', postError);
-        updateGlobalStatus('Failed to publish post. Please try again.', 'error');
-        setErrors({ submit: postError.message || 'Failed to create post' });
-        // If optimistic update was done, notify parent to remove or mark as failed
-        if (onPostCreated) {
-          onPostCreated({ ...tempPost, error: true, syncing: false }); // Mark as failed
-        }
-        throw postError;
+      resetForm();
+      // Use context-provided dialog closer
+      if (typeof closeDialog === 'function') {
+        closeDialog();
       }
-
-      updateGlobalStatus('Post published successfully!', 'success');
-      resetForm(); // Clear form fields
-
-      // Notify parent about the successfully created post (with real ID)
-      if (onPostCreated && createdPost && createdPost.length > 0) {
-        onPostCreated({ ...createdPost[0], syncing: false }); // Replace optimistic with real data
-      }
-
-      // Call onSuccessfulSubmit to perform any additional actions in the parent
-      if (onSuccessfulSubmit) {
-        onSuccessfulSubmit(createdPost[0]);
-      }
-
-      closeDialog(); // Close the post creation dialog
     } catch (error) {
-      console.error('Submission error:', error);
-      updateGlobalStatus('An unexpected error occurred.', 'error');
-      setErrors({ submit: 'An unexpected error occurred during submission.' });
+      console.error("Unhandled error during post creation:", error);
+      setErrors({ general: 'An unexpected error occurred during post creation.' });
+      setIsSubmitting(false); // Always reset submitting state on unhandled error
     } finally {
-      setIsSubmitting(false); // Reset submitting state
-      if (setSubmitState) {
-        setSubmitState('idle');
-      }
-      // Optionally clear global status after a short delay for success/error messages
-      setTimeout(() => updateGlobalStatus('', 'processing'), 3000);
+      setIsSubmitting(false); // Ensure submitting state is reset
     }
   };
 
@@ -1433,14 +1615,9 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
     };
   }, [showStockSearch, searchResults.length, handleStockResultsScroll, handleStockResultsKeyDown]);
 
-  const handleRemoveImage = () => {
-    updateField('imageFile', null);
-    updateField('imagePreview', '');
-    updateField('imageUrl', '');
-    // Clear the file input value
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+  const handleRemoveImage = (indexToRemove) => {
+    setImagePreviews((prev) => prev.filter((_, index) => index !== indexToRemove));
+    setImageFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
   // Add ARIA attributes and improved keyboard navigation
@@ -1816,33 +1993,342 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
     return null;
   };
 
+  // Load country symbol counts
+  useEffect(() => {
+    const loadCounts = async () => {
+      try {
+        const counts = await getCountrySymbolCounts();
+        // console.log("Loaded country symbol counts:", counts);
+        setCountrySymbolCounts(counts);
+      } catch (error) {
+        // console.error("Error loading country symbol counts:", error);
+      }
+    };
+    loadCounts();
+  }, []);
+
+  const fetchAvatarUrl = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const url = await getAvatarImageUrl(user.id);
+      setAvatar(url);
+    } catch (error) {
+      // console.error('Error loading avatar URL:', error);
+    }
+  }, [user?.id]);
+  fetchAvatarUrl();
+
+  const focusPriceInput = useCallback(() => {
+    if (priceInputRef.current) {
+      priceInputRef.current.focus();
+      // console.log('Focused on price element');
+    }
+  }, []);
+
+  // Refs
+  const lastAvatarRefresh = useRef(Date.now());
+  const unsubscribeRef = useRef(null);
+  const navRef = useRef(null);
+  const stockInfoRef = useRef(null);
+  const formWrapperRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const strategySelectRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
+  const stockSearchResultsRef = useRef(null);
+
+  // Function to set default strategies
+  const setDefaultStrategies = useCallback(() => {
+    setStrategies([]);
+  }, []);
+
+  // Effects
+  useEffect(() => {
+    if (user) {
+      fetchStrategies();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    setIsSubmitting(contextIsSubmitting);
+  }, [contextIsSubmitting]);
+
   return (
     <>
       <div className="create-post-form-container" ref={formWrapperRef}>
         {/* Form content starts here */}
         <div className="form-wrapper">
-          {/* Image Preview */}
-          {imagePreview && (
-            <div className="form-group">
-              <div className="file-preview-item">
-                <img
-                  src={imagePreview}
-                  alt="Preview"
-                  className="file-preview-item img"
-                />
-                <button
-                  className="file-remove"
-                  onClick={handleRemoveImage}
-                  aria-label="Remove image"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                </button>
+          {/* Modern Image Preview Section */}
+          {(imagePreview || selectedImageFile || imageFile) && (
+            <div className="form-group image-preview-section">
+              <div className="image-preview-container" style={{
+                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                borderRadius: '16px',
+                padding: '20px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                position: 'relative',
+                overflow: 'hidden'
+              }}>
+                {/* Background Pattern */}
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  opacity: 0.05,
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+                  pointerEvents: 'none'
+                }} />
+                
+                {imagePreview && (
+                  <div className="image-preview-wrapper" style={{
+                    position: 'relative',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginBottom: '16px'
+                  }}>
+                    <div style={{
+                      position: 'relative',
+                      borderRadius: '12px',
+                      overflow: 'hidden',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                      background: 'white',
+                      padding: '4px'
+                    }}>
+                      <img 
+                        src={imagePreview} 
+                        alt="Image preview" 
+                        style={{
+                          maxWidth: '300px',
+                          maxHeight: '200px',
+                          objectFit: 'contain',
+                          borderRadius: '8px',
+                          display: 'block'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          console.log('Removing image preview...');
+                          updateField('imagePreview', '');
+                          updateField('imageFile', null);
+                          if (typeof setSelectedImageFile === 'function') {
+                            setSelectedImageFile(null);
+                          }
+                          setStatus('idle');
+                          toast.success('Image removed successfully!');
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: '8px',
+                          right: '8px',
+                          background: 'rgba(239, 68, 68, 0.9)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '28px',
+                          height: '28px',
+                          cursor: 'pointer',
+                          fontSize: '16px',
+                          fontWeight: 'bold',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backdropFilter: 'blur(4px)',
+                          transition: 'all 0.2s ease',
+                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = 'rgba(239, 68, 68, 1)';
+                          e.target.style.transform = 'scale(1.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = 'rgba(239, 68, 68, 0.9)';
+                          e.target.style.transform = 'scale(1)';
+                        }}
+                        title="Remove image"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Modern File Info Cards - Enhanced for both uploaded files and URLs */}
+                {selectedImageFile && (
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      backdropFilter: 'blur(4px)',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      border: '1px solid rgba(226, 232, 240, 0.6)',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      color: '#475569',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14,2 14,8 20,8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10,9 9,9 8,9"></polyline>
+                      </svg>
+                      {selectedImageFile.name}
+                    </div>
+                    
+                    {/* Show file size only if available (not from URL) */}
+                    {selectedImageFile.size && (
+                      <div style={{
+                        background: 'rgba(255, 255, 255, 0.8)',
+                        backdropFilter: 'blur(4px)',
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        border: '1px solid rgba(226, 232, 240, 0.6)',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        color: '#475569',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <polyline points="12,6 12,12 16,14"></polyline>
+                        </svg>
+                        {Math.round(selectedImageFile.size / 1024)} KB
+                      </div>
+                    )}
+                    
+                    {/* Show image dimensions if available (from URL metadata) */}
+                    {selectedImageFile.width && selectedImageFile.height && (
+                      <div style={{
+                        background: 'rgba(255, 255, 255, 0.8)',
+                        backdropFilter: 'blur(4px)',
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        border: '1px solid rgba(226, 232, 240, 0.6)',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        color: '#475569',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"></path>
+                          <path d="M14.5 8.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"></path>
+                          <path d="M21 15l-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+                        </svg>
+                        {selectedImageFile.width} × {selectedImageFile.height}px
+                      </div>
+                    )}
+                    
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      backdropFilter: 'blur(4px)',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      border: '1px solid rgba(226, 232, 240, 0.6)',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      color: '#475569',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21,15 16,10 5,21"></polyline>
+                      </svg>
+                      {selectedImageFile.type ? selectedImageFile.type.split('/')[1].toUpperCase() : 'IMG'}
+                    </div>
+                    
+                    {/* Show URL source indicator if image is from URL */}
+                    {selectedImageFile.isFromUrl && (
+                      <div style={{
+                        background: 'rgba(59, 130, 246, 0.1)',
+                        backdropFilter: 'blur(4px)',
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        color: '#1d4ed8',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                        </svg>
+                        من URL
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Success Status */}
+                {status === 'preview_ready' && (
+                  <div style={{ 
+                    background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+                    color: '#166534',
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    marginTop: '16px',
+                    border: '1px solid #bbf7d0',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                  }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M9 12l2 2 4-4"></path>
+                      <circle cx="12" cy="12" r="10"></circle>
+                    </svg>
+                    Image ready for upload! You can now create your post.
+                  </div>
+                )}
+                
+                {/* Ready Indicator */}
+                {selectedImageFile && (
+                  <div style={{
+                    background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                    color: '#1e40af',
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    marginTop: '16px',
+                    border: '1px solid #bfdbfe',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                  }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M7 10l5 5 5-5"></path>
+                      <path d="M12 19V5"></path>
+                    </svg>
+                    Image selected and ready to post
+                  </div>
+                )}
               </div>
             </div>
           )}
+          
 
           {/* Selected Stock Info */}
           {selectedStock && (
@@ -2253,7 +2739,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
                   alt="User avatar" 
                   className="persistent-image" 
                   loading="eager"
-                  fetchpriority="high"
+                  fetchPriority="high"
                   decoding="sync"
                 />
               </div>
@@ -2318,11 +2804,25 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
                   id="imageUrl"
                   type="url"
                   value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
+                  onChange={handleImageUrlChange}
                   placeholder="Enter image URL"
                   className="form-control"
                 />
                 <div className="focus-ring"></div>
+                {imageUploadError && (
+                  <div className="invalid-feedback">{imageUploadError}</div>
+                )}
+                {/* Debug logs for image actions (visible in form) */}
+                {debugLogs.length > 0 && (
+                  <div className="debug-logs">
+                    <strong>Image debug:</strong>
+                    <ul>
+                      {debugLogs.map((d, i) => (
+                        <li key={`dbg-${i}`}>{d}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2524,7 +3024,11 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
                 (currentPrice && stopLossPrice && parseFloat(stopLossPrice) >= parseFloat(currentPrice)) ? 'Stop loss price must be less than current price' : 
                 ''}
             >
-              Post
+              {isSubmitting ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Posting...</>
+              ) : (
+                "Post"
+              )}
             </button>
           ) : (
             <div className="posting-status">
@@ -2551,6 +3055,7 @@ export default function CreatePostForm({ onPostCreated, onCancel, onSuccessfulSu
               // Otherwise just close the dialog
               closeDialog();
             }}
+            disabled={isSubmitting}
           >
             Cancel
           </button>

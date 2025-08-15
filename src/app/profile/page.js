@@ -40,7 +40,9 @@ export default function Profile() {
     selectedStrategy,
     setSelectedStrategy,
     clearSelectedStrategy,
-    strategies // Add this line to get the strategies from the ProfileProvider
+    strategies, // Add this line to get the strategies from the ProfileProvider
+    lastFetched, // Added lastFetched
+    isRefreshing // Added isRefreshing
   } = useProfile();
 
   // Debug authentication on mount
@@ -114,7 +116,7 @@ export default function Profile() {
     // Force an immediate refresh to get latest experience data - only if not recently refreshed
     const getLatestExperienceData = async () => {
       // Check if we've already forced a refresh recently
-      const { lastFetched } = useProfile.getState();
+      // const { lastFetched } = useProfile.getState(); // Removed: Violates Rules of Hooks
       const now = Date.now();
       const oneMinuteAgo = now - 60 * 1000; // 1 minute ago
       
@@ -147,13 +149,13 @@ export default function Profile() {
         dataAvailable: !!profile
       });
     }
-  }, [user?.id, isAuthenticated, isInitialized]);
+  }, [user?.id, isAuthenticated, isInitialized, lastFetched, refreshData, profile, profileLoading, contextAvatarUrl, contextBackgroundUrl]);
 
   // Set up background refresh interval with reduced frequency
   useEffect(() => {
     if (user && isAuthenticated) {
       // Don't refresh immediately if data is less than 5 minutes old
-      const { lastFetched } = useProfile.getState();
+      // const { lastFetched, isRefreshing } = useProfile.getState(); // Removed: Violates Rules of Hooks
       const now = Date.now();
       const fiveMinutesAgo = now - 5 * 60 * 1000; // 5 minutes in milliseconds
       
@@ -168,7 +170,7 @@ export default function Profile() {
       // Set up interval for background refresh (every 5 minutes instead of 2 minutes)
       refreshInterval.current = setInterval(() => {
         // Get the latest lastFetched value
-        const { lastFetched, isRefreshing } = useProfile.getState();
+        // const { lastFetched, isRefreshing } = useProfile.getState(); // Removed: Violates Rules of Hooks
         const now = Date.now();
         const fiveMinutesAgo = now - 5 * 60 * 1000;
         
@@ -187,7 +189,7 @@ export default function Profile() {
         clearInterval(refreshInterval.current);
       }
     };
-  }, [user?.id, isAuthenticated]); // Only depend on user ID and auth status
+  }, [user?.id, isAuthenticated, lastFetched, isRefreshing, refreshData]); // Depend on lastFetched and isRefreshing directly from hook
 
   // Update form data when profile changes
   useEffect(() => {

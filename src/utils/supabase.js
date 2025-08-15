@@ -482,18 +482,22 @@ export const uploadImage = async (file, bucket, userId, fileType = 'avatar', opt
     // Automatically update the profile with the new image URL
     try {
       const profileField = fileType === 'avatar' ? 'avatar_url' : 'background_url';
-      const { error: updateError } = await supabase
+      console.log(`[uploadImage] Updating profile ${profileField} for user ${userId} with URL: ${baseUrl}`);
+      const { data: updateData, error: updateError } = await supabase
         .from('profiles')
         .update({ [profileField]: baseUrl })
-        .eq('id', userId);
+        .eq('id', userId)
+        .select('*');
       
       if (updateError) {
-
+        console.error(`[uploadImage] Error updating profile ${profileField}:`, updateError);
+        console.error(`[uploadImage] Update details - userId: ${userId}, field: ${profileField}, baseUrl: ${baseUrl}`);
+        // Don't fail the upload if profile update fails, but log it
       } else {
-
+        console.log(`[uploadImage] Successfully updated profile ${profileField}:`, updateData);
       }
     } catch (updateError) {
-
+      console.error(`[uploadImage] Exception updating profile ${profileField}:`, updateError);
       // Continue even if profile update fails
     }
 
@@ -758,15 +762,24 @@ async function createPost(post, userId) {
   };
   
   try {
-    // Start timing the post creation
-    console.time('Post Creation');
+    // Start timing the post creation using a unique label to avoid duplicate timer errors
+    const timerLabel = `Post Creation ${Date.now()} ${Math.random().toString(36).slice(2,8)}`;
+    console.time(timerLabel);
+    try {
+      // Log a safe summary of the sanitized post to help debug long-running inserts
+      const safeSanitized = JSON.stringify(sanitizedPost);
+      console.debug('[createPost] starting insert', { sanitizedKeys: Object.keys(sanitizedPost), safeSanitized });
+    } catch (e) {
+      console.debug('[createPost] starting insert (could not stringify sanitizedPost)', e);
+    }
     const { data, error } = await supabase
       .from('posts')
       .insert([sanitizedPost]) // Use sanitized post without images
       .select();
     
     const insertDuration = performance.now() - startTime;
-    console.timeEnd('Post Creation'); // End timing here
+    console.timeEnd(timerLabel); // End timing here
+    console.debug('[createPost] insert completed', { insertDuration, returnedRows: Array.isArray(data) ? data.length : 0, error });
 
     
     if (error) {
@@ -864,31 +877,38 @@ async function createPost(post, userId) {
  * Upload post image with performance tracking and client-side compression
  * @param {File} file - Image file to upload
  * @param {string} userId - User ID
- * @returns {Promise<string>} - Public URL of the uploaded image
+ * @returns {Promise<object>} - Object with publicUrl and error (consistent with other functions)
  */
 export async function uploadPostImage(file, userId) {
   const uploadStart = performance.now();
-  const originalFileSize = Math.round(file.size / 1024); // in KB
-  const fileType = file.type;
+  console.log('[uploadPostImage] Starting upload:', { name: file.name, size: Math.round(file.size / 1024) + 'KB', type: file.type, userId });
+  
+  if (!file || !userId) {
+    console.error('[uploadPostImage] Missing required parameters');
+    return { publicUrl: null, error: 'Missing file or userId parameter' };
+  }
 
   let compressedFile = file;
 
   // Compress image before uploading if it's an image
-  if (fileType.startsWith('image/')) {
+  if (file.type.startsWith('image/')) {
     try {
-      console.log('Original image file size:', originalFileSize, 'KB');
+      const originalSizeKB = Math.round(file.size / 1024);
+      console.log('[uploadPostImage] Compressing image. Original size:', originalSizeKB, 'KB');
+      
       const options = {
         maxSizeMB: 1,           // Max size in MB
         maxWidthOrHeight: 1920, // Max width or height in pixels
-        useWebWorker: true,    // Use web worker for better performance
-        initialQuality: 0.8, // Initial quality, 0 to 1
-        maxIteration: 10, // Max number of iterations to compress the image
+        useWebWorker: true,     // Use web worker for better performance
+        initialQuality: 0.8,    // Initial quality, 0 to 1
+        maxIteration: 10,       // Max number of iterations to compress the image
       };
+      
       compressedFile = await imageCompression(file, options);
-      const compressedFileSize = Math.round(compressedFile.size / 1024); // in KB
-      console.log('Compressed image file size:', compressedFileSize, 'KB');
+      const compressedSizeKB = Math.round(compressedFile.size / 1024);
+      console.log('[uploadPostImage] Compression complete. New size:', compressedSizeKB, 'KB');
     } catch (error) {
-      console.error('Image compression error:', error);
+      console.error('[uploadPostImage] Image compression failed:', error);
       // Fallback to original file if compression fails
       compressedFile = file;
     }
@@ -901,45 +921,69 @@ export async function uploadPostImage(file, userId) {
     const fileName = `${userId}-post-${timestamp}.${fileExt}`;
 
     let bucketName = 'post_images';
-    let filePath = `${fileName}`;
+    let filePath = fileName;
+
+    console.log('[uploadPostImage] Attempting upload to bucket:', bucketName, 'path:', filePath);
 
     // Try to upload directly to 'post_images' bucket first
     const { data, error } = await supabase.storage
       .from(bucketName)
-      .upload(filePath, compressedFile, { // Use compressedFile here
+      .upload(filePath, compressedFile, {
         cacheControl: '3600',
         upsert: true
       });
+      
+    console.log('[uploadPostImage] Upload attempt result:', { data: !!data, error: error?.message });
 
     // If upload to 'post_images' fails and it's a bucket-related error, fall back to 'avatars'
     if (error && (error.message.includes('Bucket not found') || error.message.includes('permission denied'))) {
-      console.warn(`[uploadPostImage] Failed to upload to '${bucketName}' bucket, falling back to 'avatars'. Error:`, error.message);
+      console.warn(`[uploadPostImage] Primary bucket '${bucketName}' failed, trying fallback. Error:`, error.message);
+      
       bucketName = 'avatars';
       filePath = `posts/${fileName}`; // Store in a 'posts' subfolder
+
+      console.log('[uploadPostImage] Attempting fallback upload to bucket:', bucketName, 'path:', filePath);
 
       // Retry upload with the fallback bucket
       const { data: fallbackData, error: fallbackError } = await supabase.storage
         .from(bucketName)
-        .upload(filePath, compressedFile, { // Use compressedFile here
+        .upload(filePath, compressedFile, {
           cacheControl: '3600',
           upsert: true
         });
 
       if (fallbackError) {
-        throw fallbackError;
+        console.error('[uploadPostImage] Fallback upload failed:', fallbackError);
+        return { publicUrl: null, error: fallbackError };
       }
-      return supabase.storage.from(bucketName).getPublicUrl(filePath).data.publicUrl;
+      
+      // Get public URL for fallback upload
+      const fallbackPublicUrl = supabase.storage.from(bucketName).getPublicUrl(filePath).data.publicUrl;
+      console.log('[uploadPostImage] Fallback upload successful:', fallbackPublicUrl);
+      return { publicUrl: fallbackPublicUrl, error: null };
     }
 
     if (error) {
-      throw error;
+      console.error('[uploadPostImage] Upload failed:', error);
+      return { publicUrl: null, error };
     }
 
     // Get the public URL for the successfully uploaded file
-    return supabase.storage.from(bucketName).getPublicUrl(filePath).data.publicUrl;
+    const publicUrl = supabase.storage.from(bucketName).getPublicUrl(filePath).data.publicUrl;
+    const uploadDuration = performance.now() - uploadStart;
+    
+    console.log('[uploadPostImage] Upload successful:', {
+      publicUrl,
+      duration: Math.round(uploadDuration) + 'ms',
+      bucket: bucketName,
+      path: filePath
+    });
+    
+    return { publicUrl, error: null };
 
   } catch (error) {
-    throw error;
+    console.error('[uploadPostImage] Unexpected error during upload:', error);
+    return { publicUrl: null, error };
   }
 }
 
@@ -1472,8 +1516,8 @@ export const getPostById = async (postId) => {
 const originalFetch = global.fetch;
 
 global.fetch = async function monitoredFetch(url, options) {
-  // Only monitor Supabase API calls
-  if (url && url.toString().includes('supabase.co')) {
+  // Only monitor Supabase API calls, and exclude local Next.js API routes
+  if (url && url.toString().includes('supabase.co') && !url.toString().includes('/api/')) {
     const startTime = performance.now();
     const startDate = new Date().toISOString();
     

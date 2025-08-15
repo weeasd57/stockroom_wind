@@ -35,6 +35,7 @@
   --navbar-border: hsl(0 0% 90%); /* Use existing border color for consistency */
   --navbar-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); /* Lighter shadow */
   --navbar-blur: 0px; /* No blur */
+  --navbar-height: 4rem; /* Define the navbar height */
 }
 
 /* Dark theme overrides */

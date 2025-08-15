@@ -25,6 +25,7 @@ interface CreatePostFormState {
   stopLossPercentage: string;
   entryPrice: string;
   priceHistory: any | null;
+  priceError: string | null; // Added priceError
   newStrategy: string;
   showStrategyDialog: boolean;
   formErrors: Record<string, string>;
@@ -34,6 +35,7 @@ interface CreatePostFormState {
   submitState: 'idle' | 'submitting' | 'success' | 'error';
   isSubmitting: boolean;
   dialogOpen: boolean;
+  selectedImageFile: File | null; // Added selectedImageFile
 }
 
 interface CreatePostFormContextType extends CreatePostFormState {
@@ -52,6 +54,8 @@ interface CreatePostFormContextType extends CreatePostFormState {
   setGlobalStatus: (status: { type: string; message?: string }) => void;
   setGlobalStatusVisibility: (visible: boolean) => void;
   resetSubmitState: () => void;
+  setPriceError: (error: string | null) => void; // Added setPriceError
+  setSelectedImageFile: (file: File | null) => void; // Added setSelectedImageFile
   isOpen: boolean;
 }
 
@@ -77,6 +81,7 @@ const initialState: CreatePostFormState = {
   stopLossPercentage: '',
   entryPrice: '',
   priceHistory: null,
+  priceError: null,
   newStrategy: '',
   showStrategyDialog: false,
   formErrors: {},
@@ -86,6 +91,7 @@ const initialState: CreatePostFormState = {
   submitState: 'idle',
   isSubmitting: false,
   dialogOpen: false,
+  selectedImageFile: null,
 };
 
 const CreatePostFormContext = createContext<CreatePostFormContextType | undefined>(undefined);
@@ -172,7 +178,11 @@ export function CreatePostFormProvider({ children }: { children: React.ReactNode
     }
   }, [submissionTimeout]);
 
-  const setGlobalStatus = useCallback((status: { type: string; message?: string }) => {
+  const setGlobalStatus = useCallback((status: { type: string; message?: string } | null) => {
+    if (!status) {
+      setSubmitState('idle');
+      return;
+    }
     const submitState = status.type === 'success' ? 'success' : 
                        status.type === 'error' ? 'error' :
                        status.type === 'processing' ? 'submitting' : 'idle';
@@ -207,6 +217,8 @@ export function CreatePostFormProvider({ children }: { children: React.ReactNode
   }, []);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [priceError, setPriceError] = useState<string | null>(null); // Added
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null); // Added
 
   const value: CreatePostFormContextType = {
     ...state,
@@ -244,7 +256,9 @@ export function CreatePostFormProvider({ children }: { children: React.ReactNode
         type: 'SET_SUBMIT_STATE',
         value: 'idle',
       });
-    }
+    },
+    setPriceError,
+    setSelectedImageFile,
   };
 
   return (

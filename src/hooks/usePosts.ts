@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { PostWithUser, UsePostsOptions, PaginatedResponse } from '@/types';
 import { fetchWithTimeout } from '@/services/api';
+import { supabase } from '@/utils/supabase';
 
 interface UsePostsReturn {
   posts: PostWithUser[];
@@ -70,9 +71,22 @@ export const usePosts = (options: UsePostsOptions = {}): UsePostsReturn => {
   const createPost = useCallback(async (postData: any) => {
     try {
       setError(null);
+      // Attach current user's access token so the server-side route can evaluate RLS
+      let authHeader: Record<string, string> = {};
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (token) authHeader.Authorization = `Bearer ${token}`;
+      } catch (e) {
+        // ignore - we'll fall back to anon client on the server which may be blocked by RLS
+      }
+
       const response = await fetchWithTimeout('/api/posts', {
         method: 'POST',
         body: JSON.stringify(postData),
+        headers: {
+          ...authHeader,
+        },
       });
 
       if (response.success && response.data) {
@@ -89,9 +103,20 @@ export const usePosts = (options: UsePostsOptions = {}): UsePostsReturn => {
   const updatePost = useCallback(async (postId: string, updates: Partial<PostWithUser>) => {
     try {
       setError(null);
-      const response = await fetchWithTimeout(`/api/posts/${postId}`, {
+      // The API route expects { id, updates } in the body for PATCH
+      let authHeader: Record<string, string> = {};
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (token) authHeader.Authorization = `Bearer ${token}`;
+      } catch (e) {}
+
+      const response = await fetchWithTimeout('/api/posts', {
         method: 'PATCH',
-        body: JSON.stringify(updates),
+        body: JSON.stringify({ id: postId, updates }),
+        headers: {
+          ...authHeader,
+        },
       });
 
       if (response.success) {
@@ -112,8 +137,20 @@ export const usePosts = (options: UsePostsOptions = {}): UsePostsReturn => {
   const deletePost = useCallback(async (postId: string) => {
     try {
       setError(null);
-      const response = await fetchWithTimeout(`/api/posts/${postId}`, {
+      // The API route expects { id } in the body for DELETE
+      let authHeader: Record<string, string> = {};
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (token) authHeader.Authorization = `Bearer ${token}`;
+      } catch (e) {}
+
+      const response = await fetchWithTimeout('/api/posts', {
         method: 'DELETE',
+        body: JSON.stringify({ id: postId }),
+        headers: {
+          ...authHeader,
+        },
       });
 
       if (response.success) {
@@ -130,6 +167,7 @@ export const usePosts = (options: UsePostsOptions = {}): UsePostsReturn => {
   const likePost = useCallback(async (postId: string) => {
     try {
       setError(null);
+      // There is no local /like endpoint in the API route - use postsService or backend
       const response = await fetchWithTimeout(`/api/posts/${postId}/like`, {
         method: 'POST',
       });

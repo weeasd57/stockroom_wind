@@ -146,7 +146,7 @@ export async function POST(request) {
     const today = new Date().toISOString().split('T')[0]; 
     console.log(`[DEBUG] Checking usage for user ${userId} on date ${today}`);
     
-    const { data: usageData, error: usageError } = await supabase
+    const { data: usageData, error: usageError } = await adminSupabase
       .from('price_check_usage')
       .select('count')
       .eq('user_id', userId)
@@ -171,7 +171,7 @@ export async function POST(request) {
       }
       
       console.log(`[DEBUG] Updating usage count from ${usageData.count} to ${usageData.count + 1}`);
-      const { error: updateError } = await supabase
+      const { error: updateError } = await adminSupabase
         .from('price_check_usage')
         .update({ 
           count: usageData.count + 1,
@@ -186,7 +186,7 @@ export async function POST(request) {
     } else {
       console.log(`[DEBUG] No existing usage record found, creating new record`);
       
-      const { error: insertError } = await supabase
+      const { error: insertError } = await adminSupabase
         .from('price_check_usage')
         .insert([
           { user_id: userId, check_date: today, count: 1 }
@@ -959,7 +959,7 @@ export async function POST(request) {
     }
     
     
-    const { data: currentUsage, error: currentUsageError } = await supabase
+    const { data: currentUsage, error: currentUsageError } = await adminSupabase
       .from('price_check_usage')
       .select('count')
       .eq('user_id', userId)

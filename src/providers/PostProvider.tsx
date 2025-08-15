@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Post } from '../models/Post';
 import { fetchWithTimeout } from '../services/api';
+import { supabase } from '@/utils/supabase';
 
 interface PostContextType {
   posts: Post[];
@@ -43,14 +44,45 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
 
   const createPost = async (post: Partial<Post>): Promise<Post> => {
     setLoading(true);
+    // Create optimistic post to show immediately in dashboard/profile
+    const tempId = `temp-${Date.now()}`;
+    const optimisticPost: Post = {
+      // @ts-ignore allow partial fields
+      ...post,
+      id: tempId,
+      created_at: new Date().toISOString(),
+      syncing: true as any, // marker for UI
+    } as Post;
+
+    setPosts(prev => [optimisticPost, ...prev]);
+
     try {
-      const newPost = await fetchWithTimeout('/api/posts', {
+      // Attach user token so server-side route can satisfy RLS
+      let authHeader: Record<string, string> = {};
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (token) authHeader.Authorization = `Bearer ${token}`;
+      } catch (e) {
+        // ignore and let server handle anon client fallback
+      }
+
+      const created = await fetchWithTimeout('/api/posts', {
         method: 'POST',
         body: JSON.stringify(post),
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeader,
+        },
       });
-      setPosts(prev => [...prev, newPost]);
-      return newPost;
+
+      // Replace optimistic post with real one returned from server
+      setPosts(prev => prev.map(p => (p.id === tempId ? created : p)));
+
+      return created as Post;
     } catch (err) {
+      // Rollback optimistic post on failure
+      setPosts(prev => prev.filter(p => p.id !== tempId));
       setError(err instanceof Error ? err.message : 'Failed to create post');
       throw err;
     } finally {

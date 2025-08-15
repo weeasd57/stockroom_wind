@@ -48,9 +48,11 @@ export function ProfileProvider({ children }) {
   const [lastFetched, setLastFetched] = useState(null);
   const [selectedStrategy, setSelectedStrategy] = useState(null);
 
-  // Add a ref to track the last refresh time
+  // Add refs to track the last refresh times for different operations
   const lastRefreshTime = useRef(0);
+  const lastPostRefreshTime = useRef(0);
   const REFRESH_THROTTLE_MS = 5000; // 5 seconds minimum between refreshes
+  const POST_REFRESH_THROTTLE_MS = 2000; // 2 seconds for post-related operations
   
   // Update global state when local state changes
   useEffect(() => {
@@ -567,9 +569,116 @@ export function ProfileProvider({ children }) {
     }
   };
 
-  // Add a new post to the posts array
+  // Add a new post to the posts array with optimistic updates
   const addPost = (post) => {
-    setPosts(prevPosts => [post, ...prevPosts]);
+    console.log('[PROFILE] Adding new post:', post.id);
+    setPosts(prevPosts => {
+      // Check if post already exists to avoid duplicates
+      const existingPost = prevPosts.find(p => p.id === post.id);
+      if (existingPost) {
+        console.log('[PROFILE] Post already exists, skipping duplicate');
+        return prevPosts;
+      }
+      return [post, ...prevPosts];
+    });
+    
+    // Update profile post count if this is the current user's post
+    if (user?.id === post.user_id && profile) {
+      setProfile(prev => ({
+        ...prev,
+        posts_count: (prev.posts_count || 0) + 1
+      }));
+    }
+  };
+  
+  // Update an existing post in the posts array
+  const updatePost = (postId, updates) => {
+    console.log('[PROFILE] Updating post:', postId, updates);
+    setPosts(prevPosts => 
+      prevPosts.map(post => 
+        post.id === postId 
+          ? { ...post, ...updates }
+          : post
+      )
+    );
+  };
+  
+  // Remove a post from the posts array
+  const removePost = (postId) => {
+    console.log('[PROFILE] Removing post:', postId);
+    setPosts(prevPosts => {
+      const filteredPosts = prevPosts.filter(post => post.id !== postId);
+      const removedCount = prevPosts.length - filteredPosts.length;
+      
+      // Update profile post count if posts were removed
+      if (removedCount > 0 && profile) {
+        setProfile(prev => ({
+          ...prev,
+          posts_count: Math.max((prev.posts_count || 0) - removedCount, 0)
+        }));
+      }
+      
+      return filteredPosts;
+    });
+  };
+  
+  // Batch update posts for better performance
+  const batchUpdatePosts = (postUpdates) => {
+    console.log('[PROFILE] Batch updating posts:', postUpdates.length, 'updates');
+    setPosts(prevPosts => {
+      const updatedPosts = [...prevPosts];
+      postUpdates.forEach(({ postId, updates }) => {
+        const index = updatedPosts.findIndex(post => post.id === postId);
+        if (index !== -1) {
+          updatedPosts[index] = { ...updatedPosts[index], ...updates };
+        }
+      });
+      return updatedPosts;
+    });
+  };
+  
+  // Fast refresh for post-related operations with reduced throttling
+  const refreshPostsQuickly = async (userId) => {
+    if (!supabaseContextAvailable || !userId) {
+      console.error('Cannot refresh posts quickly: SupabaseProvider not available');
+      return;
+    }
+    
+    // Don't refresh if already refreshing
+    if (isRefreshing) return;
+    
+    // Apply reduced throttling for post operations
+    const now = Date.now();
+    if (now - lastPostRefreshTime.current < POST_REFRESH_THROTTLE_MS) {
+      console.log('[PROFILE] Post refresh throttled, skipping');
+      return;
+    }
+    
+    try {
+      console.log('[PROFILE] Quick refreshing posts for user:', userId);
+      // Update the last post refresh time
+      lastPostRefreshTime.current = now;
+      
+      // Only fetch posts for faster response
+      const { data: postsData, error: postsError } = await supabase
+        .from('posts')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+        
+      if (postsError) {
+        console.error('Error refreshing posts:', postsError);
+        return;
+      }
+      
+      // Update only the posts data
+      setPosts(postsData || []);
+      setLastFetched(Date.now());
+      
+      console.log('[PROFILE] Posts refreshed successfully:', postsData?.length || 0, 'posts');
+    } catch (error) {
+      console.error('Error in quick post refresh:', error);
+    }
   };
 
   // Modified getState function to update the global store
@@ -642,6 +751,10 @@ export function ProfileProvider({ children }) {
       setSelectedStrategy,
       clearSelectedStrategy,
       addPost,
+      updatePost,
+      removePost,
+      batchUpdatePosts,
+      refreshPostsQuickly,
       
       // Follow-related functions
       updateFollowCounts,

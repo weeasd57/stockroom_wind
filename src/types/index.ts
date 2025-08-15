@@ -241,6 +241,7 @@ export interface CreatePostFormData {
   description?: string;
   image_url?: string;
   visibility?: 'public' | 'private' | 'followers';
+  status_message?: string;
 }
 
 export interface UpdateProfileFormData {

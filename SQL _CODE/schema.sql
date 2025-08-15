@@ -68,6 +68,14 @@ CREATE TABLE posts (
 CREATE INDEX idx_posts_user_id ON posts(user_id);
 CREATE INDEX idx_posts_created_at ON posts(created_at DESC);
 
+-- Ensure posts have an explicit visibility flag for public/private posts
+ALTER TABLE posts
+  ADD COLUMN IF NOT EXISTS is_public boolean DEFAULT TRUE;
+
+-- Ensure posts have a simple status column (e.g., 'open', 'closed') used by the API
+ALTER TABLE posts
+  ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'open';
+
 -- ===================================================================
 -- Table: USER_STRATEGIES (0 rows)
 -- ===================================================================
@@ -222,6 +230,18 @@ ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE price_check_usage ENABLE ROW LEVEL SECURITY;
+
+-- Ensure posts RLS and insert policy (explicitly added)
+ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
+
+-- Allow insert only when the authenticated user is the post owner
+-- Drop existing policy if present to avoid errors when running repeatedly
+DROP POLICY IF EXISTS allow_insert_own_posts ON public.posts;
+
+CREATE POLICY allow_insert_own_posts
+  ON public.posts
+  FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
 
 
 -- Profiles policies

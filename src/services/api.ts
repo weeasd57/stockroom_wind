@@ -2,7 +2,7 @@ import { ApiResponse, PaginatedResponse, NetworkError } from '@/types';
 
 // Configuration
 const API_CONFIG = {
-  baseUrl: process.env.NEXT_PUBLIC_API_URL || '/api',
+  baseUrl: process.env.NEXT_PUBLIC_API_URL || '', // Changed to empty string for relative paths
   timeout: 10000,
   retryAttempts: 3,
   retryDelay: 1000,

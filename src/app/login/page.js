@@ -91,6 +91,9 @@ export default function Login() {
       if (isSignUp) {
         console.log('Login page: Attempting to sign up with:', email, 'Username:', username);
         
+        // Remember to redirect to profile after auth completes
+        try { localStorage.setItem('postAuthRedirect', '/profile'); } catch (e) { /* ignore */ }
+
         // Call our custom API route instead of the utility function
         const response = await fetch('/api/signup', {
           method: 'POST',
@@ -115,11 +118,9 @@ export default function Login() {
         // Show success message
         setSuccess('Account created successfully!');
         
-        // Auto sign-in was handled by the API
-        // Redirect to home page after a short delay
+        // Auto sign-in was handled by the API; SupabaseProvider will redirect to postAuthRedirect
         setTimeout(() => {
           setVisible(false);
-          setTimeout(() => router.push('/'), 300);
         }, 1500);
       } else {
         // Use utility function for sign in
@@ -171,6 +172,8 @@ export default function Login() {
         ? 'http://localhost:3000/auth/callback' 
         : 'https://firestocks.vercel.app/auth/callback';
       
+      try { localStorage.setItem('postAuthRedirect', '/profile'); } catch (e) { /* ignore */ }
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {

@@ -73,6 +73,19 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
             const currentUser = await supabase.auth.getUser();
             setUser(currentUser.data.user);
             setIsAuthenticated(true);
+
+            // If a post-auth redirect was requested (set before OAuth flow), follow it
+            try {
+              const postAuth = typeof window !== 'undefined' ? localStorage.getItem('postAuthRedirect') : null;
+              if (postAuth) {
+                try { localStorage.removeItem('postAuthRedirect'); } catch (e) { /* ignore */ }
+                router.push(postAuth);
+                return; // stop further processing
+              }
+            } catch (e) {
+              // localStorage may not be available in some environments
+              console.debug('[SupabaseProvider] postAuth redirect check failed', e);
+            }
           } else if (event === 'SIGNED_OUT') {
             setUser(null);
             setIsAuthenticated(false);

@@ -48,7 +48,10 @@ export class PostsService {
       throw new Error('All price fields must be greater than zero');
     }
 
-    return apiService.post<PostWithUser>('/posts', postData);
+    return apiService.post<PostWithUser>('/posts', {
+      ...postData,
+      status_message: postData.status_message || '',
+    });
   }
 
   // Update existing post

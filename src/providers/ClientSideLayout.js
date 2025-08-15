@@ -93,11 +93,11 @@ export function ClientSideLayout({ children }) {
       <main 
         className={`w-full transition-all duration-300 ease-in-out ${
           shouldShowNavbar 
-            ? 'pt-16 md:pt-16' // Use consistent padding for navbar height
+            ? 'pt-[var(--navbar-height)]' // Use consistent padding for navbar height
             : 'pt-0'
-        }`}
+        }`} 
         style={{ 
-          minHeight: shouldShowNavbar ? 'calc(100vh - 4rem)' : '100vh',
+          minHeight: shouldShowNavbar ? 'calc(100vh - var(--navbar-height))' : '100vh',
           marginTop: 0 
         }}
       >

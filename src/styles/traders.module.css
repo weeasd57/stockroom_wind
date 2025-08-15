@@ -3,7 +3,7 @@
 .tradersPage {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 3rem 1rem 2rem 1rem; /* Add more padding to the top */
+  padding: 1rem 1rem 2rem 1rem; /* Adjusted padding to avoid conflict with navbar height */
   opacity: 0;
   transform: translateY(10px);
   transition: opacity 0.3s ease, transform 0.3s ease;
@@ -221,7 +221,6 @@
   margin: 0;
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   line-height: 1.5;
   flex: 1;
