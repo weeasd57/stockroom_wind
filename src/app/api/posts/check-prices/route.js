@@ -234,7 +234,7 @@ export async function POST(request) {
         closed
       `)
       .eq('user_id', userId)
-      .is('closed', null); 
+      .or('closed.is.null,closed.eq.false'); // جلب المنشورات التي closed = null أو closed = false
 
     
     

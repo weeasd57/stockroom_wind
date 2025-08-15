@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { getPosts, getUserProfile } from '@/utils/supabase';
 import { formatDistanceToNow } from 'date-fns';
+import PostActions from '@/components/posts/PostActions';
+import PostSentiment from '@/components/posts/PostSentiment';
+import Comments from '@/components/posts/Comments';
 import styles from '@/styles/home/PostsFeed.module.css';
 
 export function PostsFeed() {
@@ -14,22 +17,33 @@ export function PostsFeed() {
   const [filter, setFilter] = useState('all'); // all, following, trending
 
   useEffect(() => {
+    let isMounted = true;
+    const abortController = new AbortController();
+
     async function fetchPosts() {
       try {
         setLoading(true);
         setError(null);
 
-        // Get recent posts
-        const { data: postsData, error: postsError } = await getPosts(1, 10);
+        // Get recent posts with abort signal
+        const postsResponse = await getPosts(1, 10, abortController.signal);
         
-        if (postsError) {
-          throw postsError;
+        // Check if component is still mounted
+        if (!isMounted) return;
+        
+        if (postsResponse.error) {
+          throw postsResponse.error;
         }
+
+        const postsData = postsResponse.data || [];
 
         // Get user profiles for each post
         const postsWithProfiles = await Promise.all(
           postsData.map(async (post) => {
             try {
+              // Check if component is still mounted before each profile fetch
+              if (!isMounted) return null;
+              
               const { data: profileData } = await getUserProfile(post.user_id);
               const profile = profileData && profileData.length > 0 ? profileData[0] : null;
               
@@ -53,17 +67,36 @@ export function PostsFeed() {
           })
         );
 
-        setPosts(postsWithProfiles);
+        // Filter out null results and check if still mounted
+        if (isMounted) {
+          const validPosts = postsWithProfiles.filter(post => post !== null);
+          setPosts(validPosts);
+        }
 
       } catch (error) {
+        if (error.name === 'AbortError') {
+          console.log('Posts fetch was aborted');
+          return;
+        }
+        
         console.error('Error fetching posts:', error);
-        setError('Failed to load posts');
+        if (isMounted) {
+          setError('Failed to load posts. Please try again.');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
 
     fetchPosts();
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
   }, [filter]);
 
   function formatPrice(price) {
@@ -95,7 +128,7 @@ export function PostsFeed() {
     return (
       <div className={styles.postsFeed}>
         <div className={styles.header}>
-          <h2 className={styles.title}>📝 Recent Posts</h2>
+          <h2 className={styles.title}>Recent Posts</h2>
         </div>
         <div className={styles.loadingContainer}>
           {[...Array(3)].map((_, i) => (
@@ -114,7 +147,7 @@ export function PostsFeed() {
     return (
       <div className={styles.postsFeed}>
         <div className={styles.header}>
-          <h2 className={styles.title}>📝 Recent Posts</h2>
+          <h2 className={styles.title}>Recent Posts</h2>
         </div>
         <div className={styles.errorMessage}>
           <p>{error}</p>
@@ -130,7 +163,7 @@ export function PostsFeed() {
     return (
       <div className={styles.postsFeed}>
         <div className={styles.header}>
-          <h2 className={styles.title}>📝 Recent Posts</h2>
+          <h2 className={styles.title}>Recent Posts</h2>
         </div>
         <div className={styles.emptyState}>
           <p>No posts yet. Be the first to share your trading insights!</p>
@@ -142,7 +175,7 @@ export function PostsFeed() {
   return (
     <div className={styles.postsFeed}>
       <div className={styles.header}>
-        <h2 className={styles.title}>📝 Recent Posts</h2>
+        <h2 className={styles.title}>Recent Posts</h2>
         <div className={styles.filters}>
           <button 
             className={`${styles.filterButton} ${filter === 'all' ? styles.active : ''}`}
@@ -239,18 +272,25 @@ export function PostsFeed() {
               </div>
             )}
 
-            {/* Post Footer */}
-            <div className={styles.postFooter}>
-              <button className={styles.actionButton}>
-                <span>💬</span> Discuss
-              </button>
-              <button className={styles.actionButton}>
-                <span>📊</span> Analyze
-              </button>
-              <button className={styles.actionButton}>
-                <span>🔖</span> Save
-              </button>
-            </div>
+            
+            {/* Buy/Sell Actions */}
+            <PostActions 
+              postId={post.id} 
+              initialBuyCount={post.buy_count || 0}
+              initialSellCount={post.sell_count || 0}
+            />
+
+            {/* Market Sentiment */}
+            <PostSentiment 
+              buyCount={post.buy_count || 0}
+              sellCount={post.sell_count || 0}
+            />
+
+            {/* Comments Section */}
+            <Comments 
+              postId={post.id}
+              initialCommentCount={post.comment_count || 0}
+            />
 
           </div>
         ))}

@@ -1,96 +1,51 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
-import { ThumbsUp, ThumbsDown } from 'lucide-react';
+import { usePostActions } from '@/hooks/usePostActions';
 import styles from '../../styles/PostActions.module.css';
 
-export default function PostActions({ postId, initialBuyCount = 0, initialSellCount = 0 }) {
+export default function PostActions({ postId, initialBuyCount = 0, initialSellCount = 0, onVoteChange }) {
   const { user } = useSupabase();
-  const [buyCount, setBuyCount] = useState(initialBuyCount);
-  const [sellCount, setSellCount] = useState(initialSellCount);
-  const [userAction, setUserAction] = useState('none');
-  const [isLoading, setIsLoading] = useState(false);
+  const {
+    buyCount,
+    sellCount,
+    userAction,
+    isLoading,
+    error,
+    handleAction
+  } = usePostActions(postId, initialBuyCount, initialSellCount);
 
-  useEffect(() => {
-    if (user) {
-      fetchUserAction();
-    }
-  }, [user, postId]);
-
-  const fetchUserAction = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('post_actions')
-        .select('action_type')
-        .eq('post_id', postId)
-        .eq('user_id', user.id)
-        .single();
-
-      if (data) {
-        setUserAction(data.action_type);
-      }
-    } catch (error) {
-      console.error('Error fetching user action:', error);
-    }
-  };
-
-  const handleAction = async (actionType) => {
-    if (!user) return;
+  // Notify parent component when vote counts change
+  const handleVote = async (actionType) => {
+    await handleAction(actionType);
     
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.rpc('toggle_post_action', {
-        p_post_id: postId,
-        p_user_id: user.id,
-        p_action_type: actionType
+    // Call the callback to update parent component if provided
+    if (onVoteChange) {
+      onVoteChange({
+        buyCount: actionType === 'buy' ? buyCount + 1 : buyCount,
+        sellCount: actionType === 'sell' ? sellCount + 1 : sellCount
       });
-
-      if (error) throw error;
-
-      // Update local state based on the result
-      if (data) {
-        // Action was added
-        if (actionType === 'buy') {
-          setBuyCount(prev => prev + 1);
-          if (userAction === 'sell') {
-            setSellCount(prev => prev - 1);
-          }
-          setUserAction('buy');
-        } else {
-          setSellCount(prev => prev + 1);
-          if (userAction === 'buy') {
-            setBuyCount(prev => prev - 1);
-          }
-          setUserAction('sell');
-        }
-      } else {
-        // Action was removed
-        if (actionType === 'buy') {
-          setBuyCount(prev => prev - 1);
-          setUserAction('none');
-        } else {
-          setSellCount(prev => prev - 1);
-          setUserAction('none');
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling action:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   if (!user) {
     return (
       <div className={styles.actionsContainer}>
-        <div className={styles.actionButton}>
-          <ThumbsUp className={styles.icon} />
-          <span>{buyCount}</span>
-        </div>
-        <div className={styles.actionButton}>
-          <ThumbsDown className={styles.icon} />
-          <span>{sellCount}</span>
+        <div className={styles.buttonsContainer}>
+          <div className={styles.actionButton}>
+            <span className={styles.iconEmoji}>👍</span>
+            <span className={styles.actionText}>
+              <span className={styles.actionLabel}>Buy</span>
+              <span className={styles.actionCount}>{buyCount}</span>
+            </span>
+          </div>
+          <div className={styles.actionButton}>
+            <span className={styles.iconEmoji}>👎</span>
+            <span className={styles.actionText}>
+              <span className={styles.actionLabel}>Sell</span>
+              <span className={styles.actionCount}>{sellCount}</span>
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -98,25 +53,45 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
 
   return (
     <div className={styles.actionsContainer}>
-      <button
-        className={`${styles.actionButton} ${userAction === 'buy' ? styles.active : ''}`}
-        onClick={() => handleAction('buy')}
-        disabled={isLoading}
-        title="Vote Buy"
-      >
-        <ThumbsUp className={styles.icon} />
-        <span>{buyCount}</span>
-      </button>
+      {error && (
+        <div className={styles.errorMessage}>
+          <span className={styles.errorText}>⚠️ {error}</span>
+        </div>
+      )}
       
-      <button
-        className={`${styles.actionButton} ${userAction === 'sell' ? styles.active : ''}`}
-        onClick={() => handleAction('sell')}
-        disabled={isLoading}
-        title="Vote Sell"
-      >
-        <ThumbsDown className={styles.icon} />
-        <span>{sellCount}</span>
-      </button>
+      <div className={styles.buttonsContainer}>
+        <button
+          className={`${styles.actionButton} ${userAction === 'buy' ? styles.active : ''}`}
+          onClick={() => handleAction('buy')}
+          disabled={isLoading}
+          title={userAction === 'buy' ? 'Remove Buy Vote' : 'Vote Buy'}
+        >
+          <span className={styles.iconEmoji}>👍</span>
+          <span className={styles.actionText}>
+            <span className={styles.actionLabel}>Buy</span>
+            <span className={styles.actionCount}>{buyCount}</span>
+          </span>
+          {isLoading && userAction !== 'sell' && (
+            <div className={styles.loadingSpinner}></div>
+          )}
+        </button>
+        
+        <button
+          className={`${styles.actionButton} ${userAction === 'sell' ? styles.active : ''}`}
+          onClick={() => handleAction('sell')}
+          disabled={isLoading}
+          title={userAction === 'sell' ? 'Remove Sell Vote' : 'Vote Sell'}
+        >
+          <span className={styles.iconEmoji}>👎</span>
+          <span className={styles.actionText}>
+            <span className={styles.actionLabel}>Sell</span>
+            <span className={styles.actionCount}>{sellCount}</span>
+          </span>
+          {isLoading && userAction !== 'buy' && (
+            <div className={styles.loadingSpinner}></div>
+          )}
+        </button>
+      </div>
     </div>
   );
 }

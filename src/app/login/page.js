@@ -130,7 +130,7 @@ export default function Login() {
         
         // Fade out before navigation
         setVisible(false);
-        setTimeout(() => router.push('/'), 300);
+        setTimeout(() => router.push('/profile'), 300);
       }
     } catch (err) {
       console.error('Login page: Authentication error:', err);

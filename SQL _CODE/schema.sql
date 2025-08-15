@@ -159,28 +159,6 @@ CREATE INDEX idx_comments_parent_comment_id ON comments(parent_comment_id);
 CREATE INDEX idx_comments_created_at ON comments(created_at DESC);
 
 
--- ===================================================================
--- Table: LIKES (Reactions on posts or comments)
--- ===================================================================
--- A like belongs to either a post or a comment (mutually exclusive)
-CREATE TABLE likes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
-    comment_id UUID REFERENCES comments(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT likes_unique_comment UNIQUE (comment_id, user_id),
-    CONSTRAINT likes_unique_post UNIQUE (post_id, user_id),
-    CONSTRAINT likes_post_or_comment_check CHECK (
-        (post_id IS NULL AND comment_id IS NOT NULL)
-        OR (post_id IS NOT NULL AND comment_id IS NULL)
-    )
-);
-
-CREATE INDEX idx_likes_comment_id ON likes(comment_id);
-CREATE INDEX idx_likes_post_id ON likes(post_id);
-CREATE INDEX idx_likes_user_id ON likes(user_id);
 
 
 -- ===================================================================

@@ -1021,44 +1021,49 @@ export async function checkSupabaseConnection() {
   try {
     // First check if Supabase is configured
     if (!supabaseUrl || !supabaseAnonKey) {
-
+      console.warn('[checkSupabaseConnection] Missing Supabase configuration');
       return false;
     }
 
     // Try a simple query to check if the connection works
-    const { data, error } = await supabase.from('_anon_auth_check').select('*').limit(1);
+    // Use profiles table instead of non-existent _anon_auth_check table
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .limit(1);
     
     // If we get a "relation does not exist" error, that's actually good
     // It means we connected to the database but the table doesn't exist
     if (error && error.code === '42P01') {
-
+      console.log('[checkSupabaseConnection] Connected to database (table does not exist, which is expected)');
       return true;
     }
     
     if (error) {
-
+      console.warn('[checkSupabaseConnection] Connection error:', error.message);
       
       // Check for specific error types to provide better diagnostics
       if (error.code === 'PGRST301') {
-
+        console.warn('[checkSupabaseConnection] JWT expired or invalid');
       } else if (error.code === 'PGRST401') {
-
+        console.warn('[checkSupabaseConnection] Unauthorized access');
       } else if (error.message && error.message.includes('Failed to fetch')) {
-
+        console.warn('[checkSupabaseConnection] Network connection failed');
       }
       
       return false;
     }
 
+    console.log('[checkSupabaseConnection] Connection successful');
     return true;
   } catch (error) {
-
+    console.error('[checkSupabaseConnection] Unexpected error:', error);
     
     // Provide more specific error information
     if (error.message && error.message.includes('fetch')) {
-
+      console.warn('[checkSupabaseConnection] Network fetch error');
     } else if (error.message && error.message.includes('timeout')) {
-
+      console.warn('[checkSupabaseConnection] Connection timeout');
     }
     
     return false;

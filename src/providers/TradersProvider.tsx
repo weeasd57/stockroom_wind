@@ -13,6 +13,14 @@ interface Trader {
   post_count: number;
   followers: number;
   following: number;
+  latestPost?: {
+    id: string;
+    symbol: string;
+    country: string;
+    image_url?: string;
+    created_at: string;
+    description?: string;
+  } | null;
 }
 
 interface TradersContextType {
@@ -106,18 +114,37 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
         throw profilesError;
       }
 
-      // Get post counts for each user (simplified version)
+      // Get post counts and latest post for each user
       const postCountsPromises = (profilesData || []).map(async (profile) => {
         try {
+          // Get post count
           const { count } = await supabase
             .from('posts')
             .select('*', { count: 'exact', head: true })
             .eq('user_id', profile.id);
           
-          return { userId: profile.id, count: count || 0 };
+          // Get latest post with image and country info
+          const { data: latestPostArray } = await supabase
+            .from('posts')
+            .select('id, symbol, country, image_url, created_at, description')
+            .eq('user_id', profile.id)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          
+          const latestPost = latestPostArray && latestPostArray.length > 0 ? latestPostArray[0] : null;
+          
+          return { 
+            userId: profile.id, 
+            count: count || 0,
+            latestPost: latestPost || null
+          };
         } catch (error) {
-          console.warn(`[TRADERS PROVIDER] Failed to get post count for user ${profile.id}:`, error);
-          return { userId: profile.id, count: 0 };
+          console.warn(`[TRADERS PROVIDER] Failed to get post info for user ${profile.id}:`, error);
+          return { 
+            userId: profile.id, 
+            count: 0,
+            latestPost: null
+          };
         }
       });
 
@@ -126,6 +153,11 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
         acc[userId] = count;
         return acc;
       }, {} as Record<string, number>);
+      
+      const latestPostsMap = postCounts.reduce((acc, { userId, latestPost }) => {
+        acc[userId] = latestPost;
+        return acc;
+      }, {} as Record<string, any>);
 
       // Process the data
       const processedTraders = (profilesData || []).map(profile => ({
@@ -134,6 +166,7 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
         post_count: postCountsMap[profile.id] || 0,
         followers: profile.followers || 0,
         following: profile.following || 0,
+        latestPost: latestPostsMap[profile.id] || null,
       }));
 
       console.log(`[TRADERS PROVIDER] Processed ${processedTraders.length} traders`);

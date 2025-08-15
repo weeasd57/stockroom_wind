@@ -1,27 +1,49 @@
 .postsFeed {
   background: var(--card-background, #ffffff);
-  border-radius: 12px;
-  padding: 24px;
+  border-radius: 16px;
+  padding: 28px;
   margin-bottom: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   border: 1px solid var(--border-color, #e5e7eb);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.postsFeed:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .title {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.75rem;
+  font-weight: 800;
   color: var(--text-primary, #1f2937);
   margin: 0;
   display: flex;
   align-items: center;
   gap: 8px;
+  position: relative;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.title::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 28px;
+  background: linear-gradient(135deg, var(--primary-color, #3b82f6), var(--primary-hover, #2563eb));
+  border-radius: 2px;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
 }
 
 .filters {
@@ -30,10 +52,10 @@
 }
 
 .filterButton {
-  padding: 6px 12px;
+  padding: 8px 16px;
   border: 1px solid var(--border-color, #e5e7eb);
   background: var(--card-background, #ffffff);
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--text-secondary, #6b7280);
@@ -43,12 +65,15 @@
 
 .filterButton:hover {
   background: var(--card-secondary, #f9fafb);
+  border-color: var(--primary-color, #3b82f6);
+  color: var(--text-primary, #1f2937);
 }
 
 .filterButton.active {
   background: var(--primary-color, #3b82f6);
   color: white;
   border-color: var(--primary-color, #3b82f6);
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
 }
 
 /* Posts Container */
@@ -374,26 +399,84 @@
   }
 }
 
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .postsFeed {
-    --card-background: #1f2937;
-    --card-secondary: #374151;
-    --border-color: #4b5563;
-    --border-light: #374151;
-    --text-primary: #f9fafb;
-    --text-secondary: #d1d5db;
-    --primary-color: #3b82f6;
-    --primary-hover: #2563eb;
-    --primary-light: #1e40af;
-  }
-  
-  .skeletonHeader,
-  .skeletonContent,
-  .skeletonFooter {
-    background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
-    background-size: 200% 100%;
-  }
+/* Dark mode support - follows global .dark theme class */
+:global(.dark) .postsFeed {
+  --card-background: #000000;
+  --card-secondary: #000000;
+  --border-color: #1f2937;
+  --border-light: #111827;
+  --text-primary: #ffffff;
+  --text-secondary: #9ca3af;
+  --primary-color: #3b82f6;
+  --primary-hover: #2563eb;
+  --primary-light: #1e40af;
+  background: #000000;
+}
+
+/* Title should be light in dark mode */
+:global(.dark) .title {
+  color: #ffffff !important;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+}
+
+:global(.dark) .postCard {
+  background: #000000;
+  border-color: #1f2937;
+}
+
+:global(.dark) .postCard:hover {
+  box-shadow: 0 4px 16px rgba(255, 255, 255, 0.05);
+}
+
+:global(.dark) .filterButton {
+  background: #000000;
+  border-color: #1f2937;
+}
+
+:global(.dark) .filterButton:hover {
+  background: #111827;
+}
+
+:global(.dark) .loadMoreButton {
+  background: #000000;
+  border-color: #1f2937;
+}
+
+:global(.dark) .loadMoreButton:hover {
+  background: #111827;
+}
+
+:global(.dark) .postSkeleton {
+  background: #000000;
+  border-color: #1f2937;
+}
+
+:global(.dark) .exchange {
+  background: #111827;
+}
+
+:global(.dark) .strategyTag {
+  background: #1e40af;
+  color: #ffffff;
+}
+
+:global(.dark) .actionButton:hover {
+  background: #111827;
+}
+
+:global(.dark) .title::before {
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.5);
+}
+
+:global(.dark) .filterButton.active {
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.5);
+}
+
+:global(.dark) .skeletonHeader,
+:global(.dark) .skeletonContent,
+:global(.dark) .skeletonFooter {
+  background: linear-gradient(90deg, #111827 25%, #1f2937 50%, #111827 75%);
+  background-size: 200% 100%;
 }
 
 /* Mobile responsive */
@@ -407,10 +490,16 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+    margin-bottom: 20px;
   }
   
   .title {
-    font-size: 1.25rem;
+    font-size: 1.5rem;
+  }
+  
+  .title::before {
+    left: -8px;
+    height: 24px;
   }
   
   .postCard {
@@ -458,5 +547,9 @@
   .priceGrid {
     grid-template-columns: 1fr 1fr;
     gap: 8px;
+  }
+  
+  .title {
+    font-size: 1.25rem;
   }
 }

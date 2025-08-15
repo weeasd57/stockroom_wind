@@ -1,0 +1,155 @@
+.sentimentContainer {
+  background: var(--card-background, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 12px 0;
+  transition: all 0.2s ease;
+}
+
+.sentimentContainer:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.sentimentHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sentimentIcon {
+  font-size: 18px;
+}
+
+.sentimentText {
+  font-weight: 600;
+  font-size: 14px;
+  flex: 1;
+}
+
+.totalVotes {
+  font-size: 12px;
+  color: var(--text-secondary, #64748b);
+  font-weight: 500;
+}
+
+.progressBar {
+  margin: 8px 0;
+}
+
+.progressTrack {
+  position: relative;
+  height: 8px;
+  background: var(--progress-bg, #e2e8f0);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progressFill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.buyFill {
+  left: 0;
+  z-index: 2;
+}
+
+.sellFill {
+  right: 0;
+  z-index: 1;
+}
+
+.percentageLabels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.buyLabel {
+  color: #10b981;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sellLabel {
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Responsive design */
+@media (max-width: 640px) {
+  .sentimentContainer {
+    padding: 12px;
+    margin: 8px 0;
+  }
+  
+  .sentimentHeader {
+    margin-bottom: 8px;
+  }
+  
+  .sentimentIcon {
+    font-size: 16px;
+  }
+  
+  .sentimentText {
+    font-size: 13px;
+  }
+  
+  .totalVotes {
+    font-size: 11px;
+  }
+  
+  .percentageLabels {
+    font-size: 11px;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .sentimentContainer {
+    --card-background: #1f2937;
+    --border-color: #374151;
+    --text-secondary: #9ca3af;
+    --progress-bg: #374151;
+  }
+  
+  .sentimentText {
+    color: #f3f4f6;
+  }
+}
+
+/* Animation for progress bars */
+@keyframes fillProgress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: var(--target-width);
+  }
+}
+
+.progressFill {
+  animation: fillProgress 0.8s ease-out;
+}
+
+/* Hover effects */
+.sentimentContainer:hover .progressFill {
+  transform: scaleY(1.1);
+}
+
+.sentimentContainer:hover .buyLabel,
+.sentimentContainer:hover .sellLabel {
+  transform: scale(1.05);
+  transition: transform 0.2s ease;
+}

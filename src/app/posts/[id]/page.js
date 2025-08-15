@@ -337,10 +337,28 @@ export default function PostDetailsPage() {
             
             <div className={styles.priceItem}>
               <span className={styles.priceLabel}>Current Price:</span>
-              <span className={styles.priceValue}>{post.last_price || 'N/A'}</span>
-              {post.last_price_check && (
+              <span className={styles.priceValue}>
+                {(() => {
+                  // أولوية للسعر الأخير إذا كان متاحاً ومحدثاً
+                  if (post.last_price && post.last_price_check) {
+                    return post.last_price;
+                  }
+                  // ثم السعر الحالي إذا كان متاحاً
+                  if (post.current_price) {
+                    return post.current_price;
+                  }
+                  // وأخيراً السعر الابتدائي
+                  if (post.initial_price) {
+                    return post.initial_price;
+                  }
+                  // إذا لم يكن هناك أي سعر
+                  return 'N/A';
+                })()}
+              </span>
+              {(post.last_price_check || post.created_at) && (
                 <span className={styles.priceDate}>
-                  {formatDate(post.last_price_check)} (UTC)
+                  {formatDate(post.last_price_check || post.created_at)} (UTC)
+                  {!post.last_price_check && ' (Initial)'}
                 </span>
               )}
             </div>

@@ -2381,10 +2381,10 @@ export default function CreatePostForm() {
                     <div className="stock-price-label">
                       Current Price {selectedStock?.country && <span className="stock-country-code">({selectedStock.country})</span>}
                     </div>
-                    {isSearching ? (
-                      <div className="stock-price-loading">
-                        Loading...
-                      </div>
+                    {(isSearching || priceLoading) ? (
+                    <div className="stock-price-loading">
+                    {priceLoading ? 'Fetching latest price...' : 'Loading...'}
+                    </div>
                     ) : currentPrice !== null && !isNaN(currentPrice) ? (
                       <div className="stock-price stock-price-value">
                         {getCurrencySymbol(selectedStock.country) || '$'} {typeof currentPrice === 'number' ? currentPrice.toFixed(2) : parseFloat(currentPrice).toFixed(2)}
@@ -3010,20 +3010,37 @@ export default function CreatePostForm() {
 
         {/* Submit Buttons - Fixed at bottom */}
         <div className="form-actions form-actions-bottom">
-          {!isSubmitting ? (
-            <button
-              onClick={handleSubmit}
-              disabled={!selectedStock || !selectedStock.symbol || 
-                formErrors.targetPrice || formErrors.stopLossPrice || 
-                (currentPrice && targetPrice && parseFloat(targetPrice) <= parseFloat(currentPrice)) || 
-                (currentPrice && stopLossPrice && parseFloat(stopLossPrice) >= parseFloat(currentPrice))}
-              className="btn btn-primary"
-              title={
-                formErrors.targetPrice || formErrors.stopLossPrice ? 'Please fix validation errors before posting' : 
-                (currentPrice && targetPrice && parseFloat(targetPrice) <= parseFloat(currentPrice)) ? 'Target price must be greater than current price' : 
-                (currentPrice && stopLossPrice && parseFloat(stopLossPrice) >= parseFloat(currentPrice)) ? 'Stop loss price must be less than current price' : 
-                ''}
-            >
+        {/* Price loading hint */}
+        {priceLoading && selectedStock && (
+        <div className="price-loading-hint" style={{
+        fontSize: '12px',
+        color: '#6b7280',
+        textAlign: 'center',
+        marginBottom: '8px',
+        padding: '4px 8px',
+        backgroundColor: '#f3f4f6',
+        borderRadius: '4px',
+        border: '1px solid #e5e7eb'
+        }}>
+        💡 You can create your post while the price is loading
+        </div>
+        )}
+        
+        {!isSubmitting ? (
+        <button
+        onClick={handleSubmit}
+        disabled={!selectedStock || !selectedStock.symbol ||
+        formErrors.targetPrice || formErrors.stopLossPrice ||
+        (currentPrice && targetPrice && parseFloat(targetPrice) <= parseFloat(currentPrice)) ||
+        (currentPrice && stopLossPrice && parseFloat(stopLossPrice) >= parseFloat(currentPrice))}
+        className="btn btn-primary"
+        title={
+        formErrors.targetPrice || formErrors.stopLossPrice ? 'Please fix validation errors before posting' :
+        (currentPrice && targetPrice && parseFloat(targetPrice) <= parseFloat(currentPrice)) ? 'Target price must be greater than current price' :
+        (currentPrice && stopLossPrice && parseFloat(stopLossPrice) >= parseFloat(currentPrice)) ? 'Stop loss price must be less than current price' :
+        priceLoading ? 'You can create your post while the price is loading' :
+        ''}
+        >
               {isSubmitting ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Posting...</>
               ) : (
