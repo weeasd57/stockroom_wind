@@ -50,7 +50,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       // @ts-ignore allow partial fields
       ...post,
       id: tempId,
-      created_at: new Date().toISOString(),
+      created_at: new Date(),
       syncing: true as any, // marker for UI
     } as Post;
 
