@@ -1,8 +1,21 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/utils/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request) {
   try {
+    // Check if Supabase is properly configured
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json({
+        error: 'Database configuration not available',
+        success: false
+      }, { status: 503 });
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    
     const { userId, email, username } = await request.json();
 
     if (!userId || !email) {

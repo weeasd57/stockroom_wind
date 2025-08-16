@@ -4,19 +4,39 @@ import { createClient } from '@supabase/supabase-js';
 // Initialize Supabase clients
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Check if required environment variables are set
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Missing required Supabase environment variables:', {
+    supabaseUrl: !!supabaseUrl,
+    supabaseAnonKey: !!supabaseAnonKey
+  });
+  // Return a fallback response instead of crashing
+  const fallbackResponse = {
+    error: 'Database configuration not available',
+    data: [],
+    meta: { page: 1, limit: 10, total: 0, totalPages: 0, hasNext: false, hasPrev: false },
+    success: false
+  };
+}
 
 // Server-side client that can bypass RLS when using the service role key
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
-let supabaseServer = null;
-if (serviceRoleKey) {
-  supabaseServer = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
-} else {
-  // supabaseServer remains null if service role not provided — we'll handle this later
-}
 
 export async function GET(request) {
   try {
+    // Check if Supabase is properly configured
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json({
+        error: 'Database configuration not available',
+        data: [],
+        meta: { page: 1, limit: 10, total: 0, totalPages: 0, hasNext: false, hasPrev: false },
+        success: false
+      }, { status: 503 });
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '10', 10);
@@ -88,6 +108,16 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    // Check if Supabase is properly configured
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json({
+        error: 'Database configuration not available',
+        success: false
+      }, { status: 503 });
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
     const newPost = await request.json();
     // Log incoming payload for debugging
     console.debug('[API /posts] POST payload received:', JSON.stringify(newPost, Object.keys(newPost).slice(0,50)));
@@ -141,7 +171,7 @@ export async function POST(request) {
       if (authHeader && authHeader.startsWith('Bearer ')) {
         try {
           // Create a temporary client that forwards the user's JWT in requests
-          dbClient = createClient(supabaseUrl, supabaseAnonKey, {
+          dbClient = createClient(supabaseUrl || '', supabaseAnonKey || '', {
             global: {
               headers: {
                 Authorization: authHeader,
@@ -155,6 +185,7 @@ export async function POST(request) {
         }
       } else {
         console.debug('[API /posts] no service role and no user token provided; using anon client');
+        dbClient = supabase; // ensure dbClient is always defined
       }
     }
 
@@ -181,6 +212,16 @@ export async function POST(request) {
 
 export async function PATCH(request) {
   try {
+    // Check if Supabase is properly configured
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json({
+        error: 'Database configuration not available',
+        success: false
+      }, { status: 503 });
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
     const { id, updates } = await request.json();
 
     if (!id) {
@@ -214,6 +255,16 @@ export async function PATCH(request) {
 
 export async function DELETE(request) {
   try {
+    // Check if Supabase is properly configured
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json({
+        error: 'Database configuration not available',
+        success: false
+      }, { status: 503 });
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
     const { id } = await request.json();
 
     if (!id) {
