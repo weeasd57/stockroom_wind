@@ -11,7 +11,7 @@ import { createPost } from '@/utils/supabase'; // Adjust this import based on yo
 import styles from '@/styles/create-post-page.css'; // Assuming you have a CSS module for this page
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { usePosts } from '@/hooks/usePosts'; // Use the addPost function from usePosts hook
+import { usePosts } from '@/providers/PostProvider'; // Use PostProvider's usePosts hook
 import { COUNTRY_ISO_CODES, CURRENCY_SYMBOLS, getCurrencySymbol } from '@/models/CurrencyData.js';
 import { COUNTRY_CODE_TO_NAME } from "../../models/CountryData";
 import countryData from '@/symbols_data/country_summary_20250304_171206.json';

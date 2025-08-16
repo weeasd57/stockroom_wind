@@ -54,43 +54,33 @@ export function ProfileProvider({ children }) {
   const REFRESH_THROTTLE_MS = 5000; // 5 seconds minimum between refreshes
   const POST_REFRESH_THROTTLE_MS = 2000; // 2 seconds for post-related operations
 
-  // New: Import PostProvider context for listening to post creation events
-  const postContextRef = useRef(null);
-  
-  // Set up post creation listener
+  // Listen to post creation events from PostProvider
   useEffect(() => {
-    // We'll use a dynamic import to avoid circular dependencies
-    import('./PostProvider').then(({ usePosts }) => {
-      try {
-        const postContext = usePosts();
-        postContextRef.current = postContext;
-        
-        // Subscribe to post creation events
-        if (postContext.onPostCreated && user?.id) {
-          const unsubscribe = postContext.onPostCreated((newPost) => {
-            console.log('[PROFILE] New post created, updating profile posts:', newPost.id);
-            
-            // Only add to profile if it's the current user's post
-            if (newPost.user_id === user.id) {
-              addPost(newPost);
-              
-              // Update profile post count
-              setProfile(prev => prev ? ({
-                ...prev,
-                posts_count: (prev.posts_count || 0) + 1
-              }) : prev);
-            }
-          });
+    // We'll use a try/catch to avoid circular dependency issues
+    try {
+      // Import usePosts hook dynamically to prevent circular dependency
+      if (typeof window !== 'undefined' && window.postProviderCallbacks) {
+        // If PostProvider has global callbacks, use them
+        const unsubscribe = window.postProviderCallbacks.onPostCreated((newPost) => {
+          console.log('[PROFILE] New post created, updating profile posts:', newPost.id);
           
-          return unsubscribe;
-        }
-      } catch (error) {
-        // PostProvider might not be available in this context, that's okay
-        console.log('[PROFILE] PostProvider not available in this context');
+          // Only add to profile if it's the current user's post
+          if (newPost.user_id === user?.id) {
+            addPost(newPost);
+            
+            // Update profile post count
+            setProfile(prev => prev ? ({
+              ...prev,
+              posts_count: (prev.posts_count || 0) + 1
+            }) : prev);
+          }
+        });
+        
+        return unsubscribe;
       }
-    }).catch(() => {
-      // Silent fail - PostProvider might not be available
-    });
+    } catch (error) {
+      console.log('[PROFILE] PostProvider callbacks not available:', error);
+    }
   }, [user?.id]);
   
   // Update global state when local state changes

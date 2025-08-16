@@ -3,6 +3,7 @@ import '@/styles/globals.css';
 import { ThemeProvider } from "@/providers/theme-provider";
 import { SupabaseProvider, UserProvider, CreatePostFormProvider } from '@/providers';
 import { ProfileProvider } from '@/providers/ProfileProvider';
+import { PostProvider } from '@/providers/PostProvider'; // Import PostProvider
 import { TradersProvider } from '@/providers/TradersProvider';
 import { AuthGuard } from '@/providers/AuthGuard';
 import { ClientSideLayout } from '@/providers/ClientSideLayout';
@@ -145,22 +146,24 @@ export default function RootLayout({ children }) {
         </Script>
         <SupabaseProvider>
           <UserProvider>
-            <ProfileProvider>
-              <TradersProvider>
-                <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={true}>
-                  <CreatePostFormProvider>
-                    <ClientSideLayout>
-                      <AuthGuard>
-                        <ClientImagePreloader />
-                        <FollowProvider> {/* Wrap children with FollowProvider */}
-                          {children}
-                        </FollowProvider>
-                      </AuthGuard>
-                    </ClientSideLayout>
-                  </CreatePostFormProvider>
-                </ThemeProvider>
-              </TradersProvider>
-            </ProfileProvider>
+            <PostProvider> {/* Add PostProvider for real-time post updates */}
+              <ProfileProvider>
+                <TradersProvider>
+                  <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={true}>
+                    <CreatePostFormProvider>
+                      <ClientSideLayout>
+                        <AuthGuard>
+                          <ClientImagePreloader />
+                          <FollowProvider> {/* Wrap children with FollowProvider */}
+                            {children}
+                          </FollowProvider>
+                        </AuthGuard>
+                      </ClientSideLayout>
+                    </CreatePostFormProvider>
+                  </ThemeProvider>
+                </TradersProvider>
+              </ProfileProvider>
+            </PostProvider>
           </UserProvider>
         </SupabaseProvider>
       </body>

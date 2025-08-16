@@ -55,7 +55,46 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
         console.error('Error in post created callback:', error);
       }
     });
+    
+    // Also notify global callbacks for cross-provider communication
+    if (typeof window !== 'undefined' && window.postProviderCallbacks) {
+      try {
+        window.postProviderCallbacks.notifyPostCreated(post);
+      } catch (error) {
+        console.error('Error in global post created callback:', error);
+      }
+    }
   }, [postCreatedCallbacks]);
+
+  // Set up global callbacks for cross-provider communication
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.postProviderCallbacks = {
+        callbacks: new Set(),
+        onPostCreated: (callback: (post: Post) => void) => {
+          window.postProviderCallbacks.callbacks.add(callback);
+          return () => {
+            window.postProviderCallbacks.callbacks.delete(callback);
+          };
+        },
+        notifyPostCreated: (post: Post) => {
+          window.postProviderCallbacks.callbacks.forEach((callback: (post: Post) => void) => {
+            try {
+              callback(post);
+            } catch (error) {
+              console.error('Error in global callback:', error);
+            }
+          });
+        }
+      };
+    }
+    
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete window.postProviderCallbacks;
+      }
+    };
+  }, []);
 
   const fetchPosts = async (filter?: string) => {
     setLoading(true);
@@ -354,3 +393,6 @@ export const usePosts = () => {
   if (!context) throw new Error('usePosts must be used within PostProvider');
   return context;
 };
+
+// Also export as named export for compatibility
+export { usePosts as usePostsProvider };
