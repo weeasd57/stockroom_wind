@@ -7,75 +7,100 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const serviceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5b2VlY3BydmhwcWZpcnhtcGt4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNTE5MjI5MSwiZXhwIjoyMDUwNzY4MjkxfQ.HRkWciT9LzUF3b1zh-SdpdsQH2OaRqlnUpw7_73sJls';
 
+// Check if required environment variables are set
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Missing required Supabase environment variables:', {
+    supabaseUrl: !!supabaseUrl,
+    supabaseAnonKey: !!supabaseAnonKey
+  });
+}
 
-const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
 
 
-const adminSupabase = createClient(supabaseUrl || '', serviceRoleKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  },
-  global: {
-    headers: {
-      'x-supabase-role': 'service_role',
-      'Authorization': `Bearer ${serviceRoleKey}`
-    },
-  }
-});
 
-// Helper function to log status updates and DB operations
-const logStatusUpdate = async (postId, symbol, status, result) => {
-  const timestamp = new Date().toISOString();
-  console.log(`[STATUS UPDATE][${timestamp}] Post ${postId} (${symbol}): ${status}`);
-  
-  // Log more detailed information if result contains data
-  if (result.data) {
-    console.log(`[STATUS DATA][${timestamp}] Post ${postId}: ${JSON.stringify(result.data).substring(0, 200)}${result.data.length > 200 ? '...' : ''}`);
-  }
-  
-  // Log errors more clearly
-  if (result.error) {
-    console.error(`[STATUS ERROR][${timestamp}] Post ${postId}: ${result.error.message}`);
-    if (result.error.details) {
-      console.error(`[STATUS ERROR DETAILS][${timestamp}] Post ${postId}: ${JSON.stringify(result.error.details)}`);
-    }
-  }
-  
-  // Log to database if needed
-  try {
-    const logStartTime = Date.now();
-    const { error } = await adminSupabase
-      .from('operation_logs')
-      .insert({
-        operation_type: 'post_status_update',
-        post_id: postId,
-        symbol: symbol,
-        status: status,
-        success: !result.error,
-        error_message: result.error ? result.error.message : null,
-        data_summary: result.data ? JSON.stringify(result.data).substring(0, 1000) : null,
-        created_at: timestamp
-      })
-      .select();
-    const logDuration = Date.now() - logStartTime;
-      
-    if (error) {
-      console.error(`[ERROR] Failed to log operation for post ${postId}: ${error.message}`);
-    } else {
-      console.log(`[DEBUG] Successfully logged operation for post ${postId} in ${logDuration}ms`);
-    }
-  } catch (err) {
-    console.error(`[ERROR] Exception logging operation for post ${postId}: ${err.message}`);
-    // Continue execution even if logging fails
-  }
-};
 
 const MAX_DAILY_CHECKS = 100;
 
 export async function POST(request) {
   console.log(`[DEBUG] Check-prices API route called at ${new Date().toISOString()}`);
+  
+  // Create Supabase client
+  const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+  
+  // Create admin client function to be called when needed
+  const createAdminClient = () => {
+    return createClient(supabaseUrl || '', serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      },
+      global: {
+        headers: {
+          'x-supabase-role': 'service_role',
+          'Authorization': `Bearer ${serviceRoleKey}`
+        },
+      }
+    });
+  };
+  
+  // Helper function to log status updates and DB operations
+  const logStatusUpdate = async (postId, symbol, status, result) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[STATUS UPDATE][${timestamp}] Post ${postId} (${symbol}): ${status}`);
+    
+    // Log more detailed information if result contains data
+    if (result.data) {
+      console.log(`[STATUS DATA][${timestamp}] Post ${postId}: ${JSON.stringify(result.data).substring(0, 200)}${result.data.length > 200 ? '...' : ''}`);
+    }
+    
+    // Log errors more clearly
+    if (result.error) {
+      console.error(`[STATUS ERROR][${timestamp}] Post ${postId}: ${result.error.message}`);
+      if (result.error.details) {
+        console.error(`[STATUS ERROR DETAILS][${timestamp}] Post ${postId}: ${JSON.stringify(result.error.details)}`);
+      }
+    }
+    
+    // Log to database if needed
+    try {
+      const logStartTime = Date.now();
+      const adminSupabase = createAdminClient();
+      const { error } = await adminSupabase
+        .from('operation_logs')
+        .insert({
+          operation_type: 'post_status_update',
+          post_id: postId,
+          symbol: symbol,
+          status: status,
+          success: !result.error,
+          error_message: result.error ? result.error.message : null,
+          data_summary: result.data ? JSON.stringify(result.data).substring(0, 1000) : null,
+          created_at: timestamp
+        })
+        .select();
+      const logDuration = Date.now() - logStartTime;
+        
+      if (error) {
+        console.error(`[ERROR] Failed to log operation for post ${postId}: ${error.message}`);
+      } else {
+        console.log(`[DEBUG] Successfully logged operation for post ${postId} in ${logDuration}ms`);
+      }
+    } catch (err) {
+      console.error(`[ERROR] Exception logging operation for post ${postId}: ${err.message}`);
+      // Continue execution even if logging fails
+    }
+  };
+  
   try {
+    // Check if Supabase is properly configured
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json({
+        success: false,
+        message: 'Database configuration not available',
+        error: 'missing_database_config'
+      }, { status: 503 });
+    }
+
     // Check if API key is configured
     if (!hasValidApiKey()) {
       console.error('[ERROR] EOD Historical Data API key is not configured');
@@ -146,6 +171,7 @@ export async function POST(request) {
     const today = new Date().toISOString().split('T')[0]; 
     console.log(`[DEBUG] Checking usage for user ${userId} on date ${today}`);
     
+    const adminSupabase = createAdminClient();
     const { data: usageData, error: usageError } = await adminSupabase
       .from('price_check_usage')
       .select('count')
@@ -409,6 +435,7 @@ export async function POST(request) {
           console.error(`No historical data available for ${symbol}`);
           
           // Update the post with the status flag
+          const adminSupabase = createAdminClient();
           const updateResult = await adminSupabase
             .from('posts')
             .update({
@@ -768,6 +795,7 @@ export async function POST(request) {
           const newLossPosts = (profileData.loss_posts || 0) + lostPosts;
           
           // Update the profile with new counts
+          const adminSupabase = createAdminClient();
           const { error: updateProfileError } = await adminSupabase
             .from('profiles')
             .update({
@@ -861,6 +889,7 @@ export async function POST(request) {
       
       while (!updateSuccess && retryCount <= maxRetries) {
         try {
+          const adminSupabase = createAdminClient();
           const { data: updateData, error: updateError } = await adminSupabase
             .from('posts')
             .upsert(updatedPosts, { onConflict: 'id', returning: 'minimal' });

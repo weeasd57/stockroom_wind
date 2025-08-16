@@ -1,7 +1,18 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/utils/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 export async function GET(request) {
+  // Check if Supabase is properly configured
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  if (!supabaseUrl || !supabaseAnonKey) {
+    // Redirect to login with error if database is not configured
+    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent('Database configuration not available')}`, request.url));
+  }
+  
+  const supabase = createClient(supabaseUrl, supabaseAnonKey);
+  
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
   const next = url.searchParams.get('next') || '/';
