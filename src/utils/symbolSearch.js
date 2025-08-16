@@ -1,10 +1,31 @@
 import { COUNTRY_ISO_CODES } from '@/models/CurrencyData.js';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
-import countrySummaryData from '@/symbols_data/country_summary_20250304_171206.json';
+let countrySummaryData = null;
 
 // Cache object for symbol data
 const symbolDataCache = new Map();
 const countrySymbolsCache = new Map();
+
+// Lazy-load country summary JSON at runtime and cache it
+let countrySummaryLoadedPromise = null;
+async function ensureCountrySummaryLoaded() {
+  if (countrySummaryData) return countrySummaryData;
+  if (!countrySummaryLoadedPromise) {
+    countrySummaryLoadedPromise = (async () => {
+      const response = await fetch('/symbols_data/country_summary_20250304_171206.json');
+      if (!response.ok) {
+        throw new Error('Failed to load country summary');
+      }
+      const json = await response.json();
+      countrySummaryData = json;
+      return json;
+    })().catch(err => {
+      countrySummaryLoadedPromise = null;
+      throw err;
+    });
+  }
+  return countrySummaryLoadedPromise;
+}
 
 /**
  * Converts between country name and ISO code as needed
@@ -24,59 +45,48 @@ const getCountryMapping = (countryInput) => {
 };
 
 /**
- * Helper function to get standardized country file name format
- * with correct date suffix pattern
+ * Helper to build the exact country file name as it exists under public/symbols_data
+ * Keeps original casing and spaces to match real filenames, and URL-encodes when fetching.
  */
 const getCountryFilenameSafe = (countryName) => {
-  // Date suffix pattern from the actual files
   const dateSuffix = '_20250304_171206';
   
-  // First try to find direct mapping in countrySummaryData
+  // Exact match in summary (preserves original casing and spaces)
   if (countrySummaryData[countryName]) {
-    return `${countryName.toLowerCase().replace(/\s+/g, '_')}_all_symbols${dateSuffix}`;
+    return `${countryName}_all_symbols${dateSuffix}`;
   }
   
-  // Look for a case-insensitive match in countrySummaryData
+  // Case-insensitive match in summary
   const matchingKey = Object.keys(countrySummaryData).find(
-    key => key.toLowerCase() === countryName.toLowerCase()
+    (key) => key.toLowerCase() === String(countryName).toLowerCase()
   );
-  
   if (matchingKey) {
-    return `${matchingKey.toLowerCase().replace(/\s+/g, '_')}_all_symbols${dateSuffix}`;
+    return `${matchingKey}_all_symbols${dateSuffix}`;
   }
   
-  // If we have a country code, try to find its name in COUNTRY_ISO_CODES
-  if (countryName.length === 2) {
-    // Convert from code to country name
-    for (const [name, code] of Object.entries(COUNTRY_ISO_CODES)) {
-      if (code.toLowerCase() === countryName.toLowerCase()) {
-        // Found a matching country name for this code
-        return `${name.toLowerCase().replace(/\s+/g, '_')}_all_symbols${dateSuffix}`;
-      }
+  // If ISO code provided, convert to country name
+  if (typeof countryName === 'string' && countryName.length === 2) {
+    const fromCode = COUNTRY_CODE_TO_NAME[countryName.toLowerCase()];
+    if (fromCode) {
+      return `${fromCode}_all_symbols${dateSuffix}`;
     }
   }
   
-  // If we have a country name, try to find matching code in COUNTRY_CODE_TO_NAME
-  for (const [code, name] of Object.entries(COUNTRY_CODE_TO_NAME)) {
-    if (name.toLowerCase() === countryName.toLowerCase()) {
-      const matchedName = Object.keys(countrySummaryData).find(
-        key => key.toLowerCase() === name.toLowerCase()
-      );
-      if (matchedName) {
-        return `${matchedName.toLowerCase().replace(/\s+/g, '_')}_all_symbols${dateSuffix}`;
-      }
-    }
-  }
-  
-  // Fallback: just use the input as is
-  return `${countryName.toLowerCase().replace(/\s+/g, '_')}_all_symbols${dateSuffix}`;
+  // Last resort: use the input as-is
+  return `${countryName}_all_symbols${dateSuffix}`;
 };
 
 /**
  * Search for stock symbols in local data files
+ * @param {string} query
+ * @param {string | null | undefined} [country]
+ * @param {number} [limit]
+ * @returns {Promise<Array<{Symbol: string, Name?: string, Exchange?: string, Country: string, uniqueId?: string}>>}
  */
 export async function searchStocks(query, country = null, limit = 50) {
   try {
+    // Ensure summary is loaded before using it
+    await ensureCountrySummaryLoaded();
     // Convert country code to name if needed
     const countryName = getCountryMapping(country);
     console.log(`Searching for symbols in country: ${countryName || 'All Countries'}`);
@@ -117,8 +127,8 @@ export async function searchStocks(query, country = null, limit = 50) {
           const normalizedQuery = query.toLowerCase();
           return cachedSymbols
             .filter(stock => 
-              stock.Symbol.toLowerCase().includes(normalizedQuery) || 
-              stock.Name.toLowerCase().includes(normalizedQuery)
+              (stock.Symbol || '').toLowerCase().includes(normalizedQuery) || 
+              (stock.Name || '').toLowerCase().includes(normalizedQuery)
             )
             .slice(0, limit);
         }
@@ -127,7 +137,7 @@ export async function searchStocks(query, country = null, limit = 50) {
         try {
           // Convert country name to format used in file names
           const fileCountryName = getCountryFilenameSafe(countrySummaryKey);
-          const response = await fetch(`/symbols_data/${fileCountryName}.json`);
+          const response = await fetch(`/symbols_data/${encodeURIComponent(fileCountryName)}.json`);
           
           if (!response.ok) {
             throw new Error(`Failed to load symbols for ${countrySummaryKey} (${response.status})`);
@@ -136,11 +146,19 @@ export async function searchStocks(query, country = null, limit = 50) {
           const symbolsData = await response.json();
           
           // Process symbols data and add unique IDs
-          const processedSymbols = symbolsData.map((item, index) => ({
-            ...item,
-            Country: countrySummaryKey,
-            uniqueId: `${item.Symbol}-${countrySummaryKey}-${index}`
-          }));
+          const processedSymbols = symbolsData.map((item, index) => {
+            const symbol = item.Symbol || item.symbol || '';
+            const name = item.Name || item.name || '';
+            const exchange = item.Exchange || item.exchange || '';
+            const countryCode = (COUNTRY_ISO_CODES[countrySummaryKey] || (country && country.length === 2 ? country : '') || countrySummaryKey).toLowerCase();
+            return {
+              Symbol: symbol,
+              Name: name,
+              Exchange: exchange,
+              Country: countryCode,
+              uniqueId: `${symbol}-${countryCode}-${index}`
+            };
+          });
           
           // Cache the processed symbols
           countrySymbolsCache.set(countrySummaryKey, processedSymbols);
@@ -155,8 +173,8 @@ export async function searchStocks(query, country = null, limit = 50) {
           const normalizedQuery = query.toLowerCase();
           return processedSymbols
             .filter(stock => 
-              stock.Symbol.toLowerCase().includes(normalizedQuery) || 
-              stock.Name.toLowerCase().includes(normalizedQuery)
+              (stock.Symbol || '').toLowerCase().includes(normalizedQuery) || 
+              (stock.Name || '').toLowerCase().includes(normalizedQuery)
             )
             .slice(0, limit);
         } catch (fileError) {
@@ -192,11 +210,19 @@ export async function searchStocks(query, country = null, limit = 50) {
             console.log(`Found ${countrySymbols.length} symbols for ${countryName} in all_symbols_by_country file`);
             
             // Process data to ensure consistent format
-            const processedSymbols = countrySymbols.map((item, index) => ({
-              ...item,
-              Country: countryName,
-              uniqueId: `${item.Symbol || item.symbol}-${countryName}-${index}`
-            }));
+            const processedSymbols = countrySymbols.map((item, index) => {
+              const symbol = item.Symbol || item.symbol || '';
+              const name = item.Name || item.name || '';
+              const exchange = item.Exchange || item.exchange || '';
+              const code = (COUNTRY_ISO_CODES[countryName] || (country && country.length === 2 ? country : '') || countryName).toLowerCase();
+              return {
+                Symbol: symbol,
+                Name: name,
+                Exchange: exchange,
+                Country: code,
+                uniqueId: `${symbol}-${code}-${index}`
+              };
+            });
             
             // Cache the processed data
             countrySymbolsCache.set(countryName, processedSymbols);
@@ -210,8 +236,8 @@ export async function searchStocks(query, country = null, limit = 50) {
             const normalizedQuery = query.toLowerCase();
             return processedSymbols
               .filter(stock => 
-                stock.Symbol.toLowerCase().includes(normalizedQuery) || 
-                stock.Name.toLowerCase().includes(normalizedQuery)
+                (stock.Symbol || '').toLowerCase().includes(normalizedQuery) || 
+                (stock.Name || '').toLowerCase().includes(normalizedQuery)
               )
               .slice(0, limit);
           } catch (allSymbolsError) {
@@ -252,7 +278,7 @@ export async function searchStocks(query, country = null, limit = 50) {
     const searchPromises = [];
     
     // Look for matching countries in the summary data
-    for (const countryKey of Object.keys(countrySummaryData)) {
+    for (const countryKey of Object.keys(countrySummaryData || {})) {
       if (results.length >= limit) break;
       
       // Skip countries with no symbols
@@ -267,7 +293,7 @@ export async function searchStocks(query, country = null, limit = 50) {
               try {
                 // Convert country name to format used in file names
                 const fileCountryName = getCountryFilenameSafe(countryKey);
-                const response = await fetch(`/symbols_data/${fileCountryName}.json`);
+                const response = await fetch(`/symbols_data/${encodeURIComponent(fileCountryName)}.json`);
                 
                 if (!response.ok) {
                   throw new Error(`Failed to load symbols for ${countryKey} (${response.status})`);
@@ -275,12 +301,20 @@ export async function searchStocks(query, country = null, limit = 50) {
                 
                 const symbolsData = await response.json();
                 
-                // Process symbols data and add unique IDs
-                const processedSymbols = symbolsData.map((item, index) => ({
-                  ...item,
-                  Country: countryKey,
-                  uniqueId: `${item.Symbol}-${countryKey}-${index}`
-                }));
+                // Process symbols data and add unique IDs with normalized fields
+                const processedSymbols = symbolsData.map((item, index) => {
+                  const symbol = item.Symbol || item.symbol || '';
+                  const name = item.Name || item.name || '';
+                  const exchange = item.Exchange || item.exchange || '';
+                  const code = (COUNTRY_ISO_CODES[countryKey] || countryKey).toLowerCase();
+                  return {
+                    Symbol: symbol,
+                    Name: name,
+                    Exchange: exchange,
+                    Country: code,
+                    uniqueId: `${symbol}-${code}-${index}`
+                  };
+                });
                 
                 // Cache the processed symbols
                 countrySymbolsCache.set(countryKey, processedSymbols);
@@ -289,8 +323,8 @@ export async function searchStocks(query, country = null, limit = 50) {
                 // Filter by query
                 const countryResults = processedSymbols
                   .filter(stock => 
-                    stock.Symbol.toLowerCase().includes(normalizedQuery) || 
-                    stock.Name.toLowerCase().includes(normalizedQuery)
+                    (stock.Symbol || '').toLowerCase().includes(normalizedQuery) || 
+                    (stock.Name || '').toLowerCase().includes(normalizedQuery)
                   )
                   .slice(0, Math.max(5, Math.ceil(limit / Object.keys(countrySummaryData).length)));
                 
@@ -306,8 +340,8 @@ export async function searchStocks(query, country = null, limit = 50) {
               // Filter by query
               const countryResults = cachedSymbols
                 .filter(stock => 
-                  stock.Symbol.toLowerCase().includes(normalizedQuery) || 
-                  stock.Name.toLowerCase().includes(normalizedQuery)
+                  (stock.Symbol || '').toLowerCase().includes(normalizedQuery) || 
+                  (stock.Name || '').toLowerCase().includes(normalizedQuery)
                 )
                 .slice(0, Math.max(5, Math.ceil(limit / Object.keys(countrySummaryData).length)));
               
@@ -360,10 +394,11 @@ async function loadCountrySymbols(country) {
     return countrySymbolsCache.get(country);
   }
 
+  await ensureCountrySummaryLoaded();
   try {
     // Use the safe filename helper to get the proper filename format
     const fileCountryName = getCountryFilenameSafe(country);
-    let response = await fetch(`/symbols_data/${fileCountryName}.json`);
+    let response = await fetch(`/symbols_data/${encodeURIComponent(fileCountryName)}.json`);
     
     // If country-specific file not found, try to extract from all_symbols_by_country file
     if (!response.ok) {
@@ -390,12 +425,20 @@ async function loadCountrySymbols(country) {
       
       console.log(`Found ${countrySymbols.length} symbols for ${country} in all_symbols_by_country file`);
       
-      // Process data to ensure consistent format
-      const processedData = countrySymbols.map((item, index) => ({
-        ...item,
-        Country: country,
-        uniqueId: `${item.Symbol || item.symbol}-${country}-${index}`
-      }));
+      // Process data to ensure consistent format and ISO country code (lowercase)
+      const processedData = countrySymbols.map((item, index) => {
+        const symbol = item.Symbol || item.symbol || '';
+        const name = item.Name || item.name || '';
+        const exchange = item.Exchange || item.exchange || '';
+        const code = (COUNTRY_ISO_CODES[country] || (typeof country === 'string' && country.length === 2 ? country : country)).toLowerCase();
+        return {
+          Symbol: symbol,
+          Name: name,
+          Exchange: exchange,
+          Country: code,
+          uniqueId: `${symbol}-${code}-${index}`
+        };
+      });
       
       // Cache the processed data
       countrySymbolsCache.set(country, processedData);
@@ -406,12 +449,20 @@ async function loadCountrySymbols(country) {
     // If we got here, the country-specific file was found
     const data = await response.json();
     
-    // Process data to ensure consistent format
-    const processedData = data.map((item, index) => ({
-      ...item,
-      Country: country,
-      uniqueId: `${item.Symbol || item.symbol}-${country}-${index}`
-    }));
+    // Process data to ensure consistent format and ISO country code (lowercase)
+    const processedData = data.map((item, index) => {
+      const symbol = item.Symbol || item.symbol || '';
+      const name = item.Name || item.name || '';
+      const exchange = item.Exchange || item.exchange || '';
+      const code = (COUNTRY_ISO_CODES[country] || (typeof country === 'string' && country.length === 2 ? country : country)).toLowerCase();
+      return {
+        Symbol: symbol,
+        Name: name,
+        Exchange: exchange,
+        Country: code,
+        uniqueId: `${symbol}-${code}-${index}`
+      };
+    });
     
     // Cache the processed data
     countrySymbolsCache.set(country, processedData);
@@ -429,7 +480,7 @@ async function loadCountrySymbols(country) {
  */
 async function loadCountrySummary() {
   try {
-    const response = await fetch('/symbols_data/country_summary.json');
+    const response = await fetch('/symbols_data/country_summary_20250304_171206.json');
     if (!response.ok) {
       throw new Error('Failed to load country summary');
     }
@@ -439,16 +490,16 @@ async function loadCountrySummary() {
     return null;
   }
 }
-
 /**
  * Get symbol counts by country from local data
  */
-export function getCountrySymbolCounts() {
+export async function getCountrySymbolCounts() {
+  await ensureCountrySummaryLoaded();
   const counts = {};
   let total = 0;
   
   // Process the country summary data
-  Object.keys(countrySummaryData).forEach(country => {
+  Object.keys(countrySummaryData || {}).forEach(country => {
     // Convert country names to ISO codes
     const countryData = countrySummaryData[country];
     const isoCode = COUNTRY_ISO_CODES[country] || country.toLowerCase();
@@ -460,5 +511,7 @@ export function getCountrySymbolCounts() {
   });
   
   counts.total = total;
+  // Add 'all' alias so UIs expecting it (e.g., CreatePostForm) render totals correctly
+  counts.all = total;
   return counts;
 }

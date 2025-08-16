@@ -17,6 +17,10 @@ import '@/styles/create-post-page.css';
 import ProfilePostCard from '@/components/profile/ProfilePostCard';
 import CheckPostPricesButton from '@/components/profile/CheckPostPricesButton';
 import StrategyDetailsModal from '@/components/profile/StrategyDetailsModal';
+import CountrySelectDialog from '@/components/ui/CountrySelectDialog';
+import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
+import SymbolSearchDialog from '@/components/ui/SymbolSearchDialog';
+import { getCountrySymbolCounts } from '@/utils/symbolSearch';
 
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useSupabase();
@@ -99,7 +103,12 @@ export default function Profile() {
   const [isStrategyModalOpen, setIsStrategyModalOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedCountry, setSelectedCountry] = useState('');
+  const [isCountryDialogOpen, setIsCountryDialogOpen] = useState(false);
   const [filterLoading, setFilterLoading] = useState(false);
+  const [isSymbolDialogOpen, setIsSymbolDialogOpen] = useState(false);
+  const [selectedSymbol, setSelectedSymbol] = useState('');
+  const [selectedSymbolLabel, setSelectedSymbolLabel] = useState('');
+  const [countryCounts, setCountryCounts] = useState(null);
 
   // Initialize data once when authenticated
   useEffect(() => {
@@ -267,6 +276,22 @@ export default function Profile() {
       setBackgroundUploadError(null);
     }
   }, [showEditModal]);
+
+  // Load country symbol counts for CountrySelectDialog (used to display counts next to countries)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const counts = await getCountrySymbolCounts();
+        if (mounted) setCountryCounts(counts);
+      } catch (e) {
+        console.error('Error loading country symbol counts:', e);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Add a useEffect to update the local state when the store's selectedStrategy changes
   useEffect(() => {
@@ -872,14 +897,33 @@ export default function Profile() {
     return null;
   };
 
-  // Add a function to check if a post matches a country filter
+  // Add a function to check if a post matches a country filter (normalize to 2-letter codes)
   const matchesCountry = (post, countryFilter) => {
     if (!countryFilter) {
       return true; // No filter applied, so it matches
     }
-    
+
+    const toCode = (val) => {
+      if (!val) return null;
+      const v = String(val).trim();
+      if (v.length === 2) return v.toLowerCase();
+      // Try to map country name to code (case-insensitive)
+      const lower = v.toLowerCase();
+      const entry = Object.entries(COUNTRY_CODE_TO_NAME).find(([, name]) =>
+        String(name).toLowerCase() === lower
+      );
+      return entry ? entry[0] : lower;
+    };
+
     const postCountry = getPostCountry(post);
-    return postCountry === countryFilter;
+    return toCode(postCountry) === toCode(countryFilter);
+  };
+
+  // Check if a post matches the selected symbol (normalize to base symbol without exchange suffix)
+  const matchesSymbol = (post, symbolFilter) => {
+    if (!symbolFilter) return true;
+    const normalize = (s) => String(s || '').toUpperCase().split('.')[0];
+    return normalize(post.symbol) === normalize(symbolFilter);
   };
 
   return (
@@ -1108,32 +1152,18 @@ export default function Profile() {
               <div className={styles.filterItem}>
                 <label htmlFor="countryFilter" className={styles.filterLabel}>Country:</label>
                 <div className={styles.filterSelectContainer}>
-                  <select
+                  <button
                     id="countryFilter"
                     className={`${styles.filterSelect} ${selectedCountry ? styles.activeFilter : ''}`}
-                    value={selectedCountry}
-                    onChange={(e) => {
-                      setSelectedCountry(e.target.value);
-                      setFilterLoading(true);
-                      setTimeout(() => setFilterLoading(false), 300);
-                    }}
+                    onClick={() => setIsCountryDialogOpen(true)}
                     disabled={filterLoading}
+                    aria-haspopup="dialog"
+                    aria-expanded={isCountryDialogOpen}
+                    type="button"
                   >
-                    <option value="">All Countries</option>
-                    {Array.from(new Set(posts
-                      .map(post => getPostCountry(post))
-                      .filter(Boolean)))
-                      .map(country => {
-                        // Get country name if available
-                        const countryName = country.length === 2 ? 
-                          (window.COUNTRY_CODE_TO_NAME ? window.COUNTRY_CODE_TO_NAME[country.toLowerCase()] : country) : 
-                          country;
-                        return (
-                          <option key={country} value={country}>{countryName || country}</option>
-                        );
-                      })}
-                  </select>
-                  
+                    {selectedCountry ? (COUNTRY_CODE_TO_NAME[selectedCountry.toLowerCase()] || selectedCountry) : 'All Countries'}
+                  </button>
+
                   {selectedCountry && !filterLoading && (
                     <button 
                       className={styles.clearFilterButton}
@@ -1143,14 +1173,81 @@ export default function Profile() {
                         setTimeout(() => setFilterLoading(false), 300);
                       }}
                       aria-label="Clear country filter"
+                      type="button"
                     >
                       ✕
                     </button>
                   )}
                 </div>
+
+                <CountrySelectDialog
+                  isOpen={isCountryDialogOpen}
+                  onClose={() => setIsCountryDialogOpen(false)}
+                  onSelectCountry={(code) => {
+                    setSelectedCountry(code);
+                    setIsCountryDialogOpen(false);
+                    // Auto-open symbol search dialog after selecting a country
+                    setIsSymbolDialogOpen(true);
+                    setFilterLoading(true);
+                    setTimeout(() => setFilterLoading(false), 300);
+                  }}
+                  selectedCountry={selectedCountry || 'all'}
+                  countryCounts={countryCounts}
+                />
+              </div>
+
+              <div className={styles.filterItem}>
+                <label htmlFor="symbolFilter" className={styles.filterLabel}>Symbol:</label>
+                <div className={styles.filterSelectContainer}>
+                  <button
+                    id="symbolFilter"
+                    className={`${styles.filterSelect} ${selectedSymbol ? styles.activeFilter : ''}`}
+                    onClick={() => setIsSymbolDialogOpen(true)}
+                    disabled={filterLoading}
+                    aria-haspopup="dialog"
+                    aria-expanded={isSymbolDialogOpen}
+                    type="button"
+                  >
+                    {selectedSymbolLabel || selectedSymbol || 'All Symbols'}
+                  </button>
+
+                  {selectedSymbol && !filterLoading && (
+                    <button
+                      className={styles.clearFilterButton}
+                      onClick={() => {
+                        setSelectedSymbol('');
+                        setSelectedSymbolLabel('');
+                        setFilterLoading(true);
+                        setTimeout(() => setFilterLoading(false), 300);
+                      }}
+                      aria-label="Clear symbol filter"
+                      type="button"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                <SymbolSearchDialog
+                  isOpen={isSymbolDialogOpen}
+                  onClose={() => setIsSymbolDialogOpen(false)}
+                  onSelectStock={(stock) => {
+                    const sym = stock?.Symbol || stock?.symbol || '';
+                    const name = stock?.Name || stock?.name || '';
+                    if (sym) {
+                      setSelectedSymbol(sym);
+                      setSelectedSymbolLabel(name ? `${sym} - ${name}` : sym);
+                    }
+                    setIsSymbolDialogOpen(false);
+                    setFilterLoading(true);
+                    setTimeout(() => setFilterLoading(false), 300);
+                  }}
+                  initialStockSearch=""
+                  selectedCountry={selectedCountry || 'all'}
+                />
               </div>
               
-              {(localSelectedStrategy || selectedStatus || selectedCountry) && !filterLoading && (
+              {(localSelectedStrategy || selectedStatus || selectedCountry || selectedSymbol) && !filterLoading && (
                 <button 
                   className={styles.clearAllFiltersButton}
                   onClick={() => {
@@ -1158,6 +1255,8 @@ export default function Profile() {
                     handleStrategyChange({ target: { value: '' } });
                     setSelectedStatus('');
                     setSelectedCountry('');
+                    setSelectedSymbol('');
+                    setSelectedSymbolLabel('');
                     setFilterLoading(true);
                     
                     // If we're not on the posts tab, switch to it to show all posts
@@ -1216,8 +1315,11 @@ export default function Profile() {
                       // Country filter - use the helper function
                       const countryMatch = matchesCountry(post, selectedCountry);
                       
+                      // Symbol filter - use the helper function
+                      const symbolMatch = matchesSymbol(post, selectedSymbol);
+                      
                       // All filters must match
-                      return strategyMatch && statusMatch && countryMatch;
+                      return strategyMatch && statusMatch && countryMatch && symbolMatch;
                     })
                     .map(post => (
                       <ProfilePostCard key={post.id} post={post} />

@@ -44,7 +44,7 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'post_comments',
+        table: 'comments',
         filter: `post_id=eq.${postId}`
       }, async (payload) => {
         console.log('Comments change:', payload);
@@ -59,7 +59,7 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'post_buy_votes',
+        table: 'post_actions',
         filter: `post_id=eq.${postId}`
       }, async (payload) => {
         console.log('Buy votes change:', payload);
@@ -73,7 +73,7 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'post_sell_votes',
+        table: 'post_actions',
         filter: `post_id=eq.${postId}`
       }, async (payload) => {
         console.log('Sell votes change:', payload);
@@ -98,17 +98,19 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
     try {
       const [commentsResponse, buyVotesResponse, sellVotesResponse] = await Promise.all([
         supabase
-          .from('post_comments')
+          .from('comments')
           .select('id')
           .eq('post_id', postId),
         supabase
-          .from('post_buy_votes')
-          .select('id')
-          .eq('post_id', postId),
-        supabase
-          .from('post_sell_votes')
+          .from('post_actions')
           .select('id')
           .eq('post_id', postId)
+          .eq('action_type', 'buy'),
+        supabase
+          .from('post_actions')
+          .select('id')
+          .eq('post_id', postId)
+          .eq('action_type', 'sell')
       ]);
 
       const stats: PostStats = {
@@ -132,7 +134,7 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const { data, error } = await supabase
-        .from('post_comments')
+        .from('comments')
         .select(`
           *,
           profiles:user_id (
@@ -175,7 +177,7 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const { data, error } = await supabase
-        .from('post_comments')
+        .from('comments')
         .insert({
           post_id: postId,
           user_id: user.id,
@@ -225,7 +227,7 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       const { error } = await supabase
-        .from('post_comments')
+        .from('comments')
         .delete()
         .eq('id', id)
         .eq('user_id', user.id); // Only allow users to delete their own comments
@@ -258,32 +260,35 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
     try {
       // Check if user already has a buy vote
       const { data: existingVote } = await supabase
-        .from('post_buy_votes')
+        .from('post_actions')
         .select('id')
         .eq('post_id', postId)
         .eq('user_id', user.id)
+        .eq('action_type', 'buy')
         .maybeSingle();
 
       if (existingVote) {
         // Remove buy vote
         await supabase
-          .from('post_buy_votes')
+          .from('post_actions')
           .delete()
           .eq('id', existingVote.id);
       } else {
         // Remove any existing sell vote first
         await supabase
-          .from('post_sell_votes')
+          .from('post_actions')
           .delete()
           .eq('post_id', postId)
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .eq('action_type', 'sell');
 
         // Add buy vote
         await supabase
-          .from('post_buy_votes')
+          .from('post_actions')
           .insert({
             post_id: postId,
-            user_id: user.id
+            user_id: user.id,
+            action_type: 'buy'
           });
       }
 
@@ -300,32 +305,35 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
     try {
       // Check if user already has a sell vote
       const { data: existingVote } = await supabase
-        .from('post_sell_votes')
+        .from('post_actions')
         .select('id')
         .eq('post_id', postId)
         .eq('user_id', user.id)
+        .eq('action_type', 'sell')
         .maybeSingle();
 
       if (existingVote) {
         // Remove sell vote
         await supabase
-          .from('post_sell_votes')
+          .from('post_actions')
           .delete()
           .eq('id', existingVote.id);
       } else {
         // Remove any existing buy vote first
         await supabase
-          .from('post_buy_votes')
+          .from('post_actions')
           .delete()
           .eq('post_id', postId)
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .eq('action_type', 'buy');
 
         // Add sell vote
         await supabase
-          .from('post_sell_votes')
+          .from('post_actions')
           .insert({
             post_id: postId,
-            user_id: user.id
+            user_id: user.id,
+            action_type: 'sell'
           });
       }
 

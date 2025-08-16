@@ -1,3 +1,5 @@
+import { User } from './User';
+
 export interface Post {
   id: string;
   user_id: string;
@@ -30,6 +32,10 @@ export interface Post {
   postAfterMarketClose: boolean;
   noDataAvailable: boolean;
   status_message?: string;
+  profile: User; // Add profile data
+  comment_count: number; // Add comment count
+  buy_count: number; // Add buy actions count
+  sell_count: number; // Add sell actions count
 }
 
 export class PostModel implements Post {

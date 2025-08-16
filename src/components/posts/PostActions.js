@@ -24,16 +24,18 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
       try {
         const [buyVoteResponse, sellVoteResponse] = await Promise.all([
           supabase
-            .from('post_buy_votes')
+            .from('post_actions')
             .select('id')
             .eq('post_id', postId)
             .eq('user_id', user.id)
+            .eq('action_type', 'buy') // Filter for buy actions
             .maybeSingle(),
           supabase
-            .from('post_sell_votes')
+            .from('post_actions')
             .select('id')
             .eq('post_id', postId)
             .eq('user_id', user.id)
+            .eq('action_type', 'sell') // Filter for sell actions
             .maybeSingle()
         ]);
 

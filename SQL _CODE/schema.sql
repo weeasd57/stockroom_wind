@@ -798,3 +798,10 @@ CREATE TRIGGER prevent_circular_comments_trigger
 -- ===================================================================
 -- END OF SCHEMA
 -- ===================================================================
+
+-- User-requested View for posts with only buy/sell action counts
+CREATE OR REPLACE VIEW posts_with_action_counts AS
+SELECT posts.*, COALESCE(buy_counts.count, 0) AS buy_count, COALESCE(sell_counts.count, 0) AS sell_count
+FROM posts
+LEFT JOIN ( SELECT post_id, COUNT(*) AS count FROM post_actions WHERE action_type = 'buy' GROUP BY post_id ) AS buy_counts ON posts.id = buy_counts.post_id
+LEFT JOIN ( SELECT post_id, COUNT(*) AS count FROM post_actions WHERE action_type = 'sell' GROUP BY post_id ) AS sell_counts ON posts.id = sell_counts.post_id;
