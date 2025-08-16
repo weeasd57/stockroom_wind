@@ -1,30 +1,85 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
-import { usePostActions } from '@/hooks/usePostActions';
+import { useComments } from '@/providers/CommentProvider';
 import styles from '../../styles/PostActions.module.css';
 
 export default function PostActions({ postId, initialBuyCount = 0, initialSellCount = 0, onVoteChange }) {
-  const { user } = useSupabase();
-  const {
-    buyCount,
-    sellCount,
-    userAction,
-    isLoading,
-    error,
-    handleAction
-  } = usePostActions(postId, initialBuyCount, initialSellCount);
+  const { user, supabase } = useSupabase();
+  const { getPostStats, toggleBuyVote, toggleSellVote } = useComments();
+  const [userAction, setUserAction] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Notify parent component when vote counts change
-  const handleVote = async (actionType) => {
-    await handleAction(actionType);
-    
-    // Call the callback to update parent component if provided
-    if (onVoteChange) {
-      onVoteChange({
-        buyCount: actionType === 'buy' ? buyCount + 1 : buyCount,
-        sellCount: actionType === 'sell' ? sellCount + 1 : sellCount
-      });
+  const postStats = getPostStats(postId);
+  const buyCount = postStats.buyCount || initialBuyCount;
+  const sellCount = postStats.sellCount || initialSellCount;
+
+  // Check user's current vote status
+  useEffect(() => {
+    async function checkUserVote() {
+      if (!user || !supabase) return;
+
+      try {
+        const [buyVoteResponse, sellVoteResponse] = await Promise.all([
+          supabase
+            .from('post_buy_votes')
+            .select('id')
+            .eq('post_id', postId)
+            .eq('user_id', user.id)
+            .maybeSingle(),
+          supabase
+            .from('post_sell_votes')
+            .select('id')
+            .eq('post_id', postId)
+            .eq('user_id', user.id)
+            .maybeSingle()
+        ]);
+
+        if (buyVoteResponse.data) {
+          setUserAction('buy');
+        } else if (sellVoteResponse.data) {
+          setUserAction('sell');
+        } else {
+          setUserAction(null);
+        }
+      } catch (error) {
+        console.error('Error checking user vote:', error);
+      }
+    }
+
+    checkUserVote();
+  }, [user, supabase, postId]);
+
+  const handleAction = async (actionType) => {
+    if (!user) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      if (actionType === 'buy') {
+        await toggleBuyVote(postId);
+        setUserAction(userAction === 'buy' ? null : 'buy');
+      } else if (actionType === 'sell') {
+        await toggleSellVote(postId);
+        setUserAction(userAction === 'sell' ? null : 'sell');
+      }
+
+      // Notify parent component when vote counts change
+      if (onVoteChange) {
+        const stats = getPostStats(postId);
+        onVoteChange({
+          buyCount: stats.buyCount,
+          sellCount: stats.sellCount
+        });
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to update vote');
+      console.error('Vote action error:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
 

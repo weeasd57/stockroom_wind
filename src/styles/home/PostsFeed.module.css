@@ -16,8 +16,17 @@
 .header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-end;
 }
 
 .title {
@@ -74,6 +83,40 @@
   color: white;
   border-color: var(--primary-color, #3b82f6);
   box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+/* Sort and Filter Controls */
+.sortControls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.sortSelect,
+.categorySelect {
+  padding: 6px 12px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--card-background, #ffffff);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary, #1f2937);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 140px;
+}
+
+.sortSelect:hover,
+.categorySelect:hover {
+  border-color: var(--primary-color, #3b82f6);
+  background: var(--card-secondary, #f9fafb);
+}
+
+.sortSelect:focus,
+.categorySelect:focus {
+  outline: none;
+  border-color: var(--primary-color, #3b82f6);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 /* Posts Container */
@@ -446,6 +489,19 @@
   background: #111827;
 }
 
+:global(.dark) .sortSelect,
+:global(.dark) .categorySelect {
+  background: #000000;
+  border-color: #1f2937;
+  color: #ffffff;
+}
+
+:global(.dark) .sortSelect:hover,
+:global(.dark) .categorySelect:hover {
+  background: #111827;
+  border-color: #3b82f6;
+}
+
 :global(.dark) .postSkeleton {
   background: #000000;
   border-color: #1f2937;
@@ -491,6 +547,28 @@
     align-items: flex-start;
     gap: 12px;
     margin-bottom: 20px;
+  }
+  
+  .controls {
+    width: 100%;
+    align-items: stretch;
+  }
+  
+  .sortControls {
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+  
+  .filters {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .sortSelect,
+  .categorySelect {
+    width: 100%;
+    min-width: unset;
   }
   
   .title {

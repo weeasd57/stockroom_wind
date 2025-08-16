@@ -11,6 +11,7 @@ export interface Post {
   target_price: number;
   stop_loss_price: number;
   strategy: string;
+  sentiment?: 'bullish' | 'bearish' | 'neutral';
   created_at: Date;
   updated_at: Date;
   description?: string;
@@ -44,6 +45,7 @@ export class PostModel implements Post {
   target_price: number;
   stop_loss_price: number;
   strategy: string;
+  sentiment?: 'bullish' | 'bearish' | 'neutral';
   created_at: Date;
   updated_at: Date;
   description?: string;
@@ -76,6 +78,7 @@ export class PostModel implements Post {
     this.target_price = data.target_price || 0;
     this.stop_loss_price = data.stop_loss_price || 0;
     this.strategy = data.strategy || '';
+    this.sentiment = data.sentiment || 'neutral';
     this.created_at = data.created_at || new Date();
     this.updated_at = data.updated_at || new Date();
     this.description = data.description;
