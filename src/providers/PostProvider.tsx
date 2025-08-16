@@ -163,22 +163,24 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       stop_loss_price: post.stop_loss_price || 0,
       description: post.description || '',
       strategy: post.strategy || '',
-      sentiment: post.sentiment || 'neutral',
+      sentiment: (post as any).sentiment || 'neutral',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       target_reached: false,
       stop_loss_triggered: false,
       ...post,
-      profile: {
-        username: user?.email?.split('@')[0] || 'You',
-        avatar_url: null,
-        id: user?.id || ''
-      },
       comment_count: 0,
       buy_count: 0,
       sell_count: 0,
       syncing: true as any, // UI indicator
-    } as Post;
+    } as any; // Use any to handle additional properties like profile
+
+    // Add profile information
+    (optimisticPost as any).profile = {
+      username: user?.email?.split('@')[0] || 'You',
+      avatar_url: null,
+      id: user?.id || ''
+    };
 
     setPosts(prev => [optimisticPost, ...prev]);
     return tempId;
@@ -189,7 +191,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       post.id === tempId 
         ? { 
             ...actualPost,
-            profile: post.profile, // Keep the profile from optimistic update
+            profile: (post as any).profile, // Keep the profile from optimistic update
             comment_count: 0,
             buy_count: 0,
             sell_count: 0,
@@ -224,7 +226,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
         stop_loss_price: post.stop_loss_price,
         description: post.description,
         strategy: post.strategy,
-        sentiment: post.sentiment || 'neutral',
+        sentiment: (post as any).sentiment || 'neutral',
         target_reached: false,
         stop_loss_triggered: false,
         ...post
