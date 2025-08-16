@@ -236,4 +236,138 @@ export function PostsFeed() {
         <div className={styles.controls}>
           <div className={styles.filters}>
             <button 
-              className={`${styles.filterButton} ${filter === 'following' ? styles.active : ''}`
+              className={`${styles.filterButton} ${filter === 'following' ? styles.active : ''}`}
+              onClick={() => setFilter('following')}
+            >
+              Following
+            </button>
+            <button
+              className={`${styles.filterButton} ${filter === 'all' ? styles.active : ''}`}
+              onClick={() => setFilter('all')}
+            >
+              All
+            </button>
+            <button
+              className={`${styles.filterButton} ${filter === 'trending' ? styles.active : ''}`}
+              onClick={() => setFilter('trending')}
+            >
+              Trending
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.postsContainer}>
+        {posts.map((post) => (
+          <div key={post.id} className={styles.postCard}>
+            
+            {/* Post Header */}
+            <div className={styles.postHeader}>
+              <div className={styles.userInfo}>
+                <div className={styles.avatar}>
+                  {post.profile.avatar_url ? (
+                    <img 
+                      src={post.profile.avatar_url} 
+                      alt={post.profile.username}
+                      className={styles.avatarImage}
+                    />
+                  ) : (
+                    <div className={styles.avatarPlaceholder}>
+                      {post.profile.username.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className={styles.userDetails}>
+                  <h4 className={styles.username}>{post.profile.username}</h4>
+                  <p className={styles.timestamp}>
+                    {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                  </p>
+                </div>
+              </div>
+              <div className={`${styles.status} ${getStatusColor(post)}`}>
+                {getStatusText(post)}
+              </div>
+            </div>
+
+            {/* Stock Info */}
+            <div className={styles.stockInfo}>
+              <div className={styles.stockHeader}>
+                <h3 className={styles.stockSymbol}>{post.symbol}</h3>
+                <span className={styles.exchange}>{post.exchange}</span>
+              </div>
+              <p className={styles.companyName}>{post.company_name}</p>
+              <p className={styles.country}>📍 {post.country}</p>
+            </div>
+
+            {/* Price Analysis */}
+            <div className={styles.priceAnalysis}>
+              <div className={styles.priceGrid}>
+                <div className={styles.priceItem}>
+                  <span className={styles.priceLabel}>Current</span>
+                  <span className={styles.priceValue}>{formatPrice(post.current_price)}</span>
+                </div>
+                <div className={styles.priceItem}>
+                  <span className={styles.priceLabel}>Target</span>
+                  <span className={styles.priceValue}>{formatPrice(post.target_price)}</span>
+                </div>
+                <div className={styles.priceItem}>
+                  <span className={styles.priceLabel}>Stop Loss</span>
+                  <span className={styles.priceValue}>{formatPrice(post.stop_loss_price)}</span>
+                </div>
+                <div className={styles.priceItem}>
+                  <span className={styles.priceLabel}>Potential</span>
+                  <span className={`${styles.priceValue} ${styles.potential}`}>
+                    +{calculatePotentialReturn(post.current_price, post.target_price)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            {post.description && (
+              <div className={styles.postContent}>
+                <p>{post.description}</p>
+              </div>
+            )}
+
+            {/* Strategy Tag */}
+            {post.strategy && (
+              <div className={styles.strategy}>
+                <span className={styles.strategyTag}>📈 {post.strategy}</span>
+              </div>
+            )}
+
+            
+            {/* Buy/Sell Actions */}
+            <PostActions 
+              postId={post.id} 
+              initialBuyCount={post.buy_count || 0}
+              initialSellCount={post.sell_count || 0}
+            />
+
+            {/* Market Sentiment */}
+            <PostSentiment 
+              buyCount={post.buy_count || 0}
+              sellCount={post.sell_count || 0}
+            />
+
+            {/* Comments Section */}
+            <Comments 
+              postId={post.id}
+              initialCommentCount={post.comment_count || 0}
+            />
+
+          </div>
+        ))}
+      </div>
+
+      {posts.length >= 10 && (
+        <div className={styles.loadMore}>
+          <button className={styles.loadMoreButton}>
+            Load More Posts
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
