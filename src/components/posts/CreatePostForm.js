@@ -11,7 +11,7 @@ import { createPost } from '@/utils/supabase'; // Adjust this import based on yo
 import styles from '@/styles/create-post-page.css'; // Assuming you have a CSS module for this page
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { usePosts } from '@/hooks/usePosts'; // Use the addPost function from usePosts hook
+import { usePosts } from '@/providers/PostProvider'; // Use PostProvider's usePosts hook
 import { COUNTRY_ISO_CODES, CURRENCY_SYMBOLS, getCurrencySymbol } from '@/models/CurrencyData.js';
 import { COUNTRY_CODE_TO_NAME } from "../../models/CountryData";
 import countryData from '@/symbols_data/country_summary_20250304_171206.json';
@@ -70,9 +70,9 @@ const formatSymbolForApi = (symbol, country) => {
 
 export default function CreatePostForm() {
   const { user, supabase } = useSupabase(); // Get the supabase client from the provider
-  const { profile, getEffectiveAvatarUrl, addPost } = useProfile();
+  const { profile, getEffectiveAvatarUrl } = useProfile();
   const router = useRouter();
-  const { refresh: refreshPosts, createPost: createPostInList } = usePosts(); // Use refresh or createPost to update posts
+  const { createPost: createPostViaProvider } = usePosts(); // Use PostProvider's createPost for optimistic updates
   const [initialPrice, setInitialPrice] = useState(null); // Added initialPrice state
   
   // Since there's no formState, directly destructure values from context with defaults
@@ -1504,29 +1504,24 @@ export default function CreatePostForm() {
         status_message: 'open',
       };
 
-      // Prefer using the local posts hook to create the post so UI updates optimistically
-      console.debug('[handleSubmit] calling posts.createPost with postData keys:', Object.keys(postData));
+      // Use PostProvider's createPost for optimistic updates
+      console.debug('[handleSubmit] calling PostProvider createPost with postData keys:', Object.keys(postData));
       const startCreate = performance.now();
       try {
-        await createPostInList(postData);
+        await createPostViaProvider(postData);
       } catch (err) {
-        console.error('Error creating post via posts hook:', err);
+        console.error('Error creating post via PostProvider:', err);
         setErrors({ general: `Error creating post: ${err?.message || err}` });
         setIsSubmitting(false);
         return;
       }
       const createDuration = performance.now() - startCreate;
-      console.debug('[handleSubmit] posts.createPost completed', { createDuration });
+      console.debug('[handleSubmit] PostProvider createPost completed', { createDuration });
 
-      // Assuming post creation is successful
+      // Post creation successful - optimistic updates already handled by PostProvider
       toast.success("Post created successfully!");
 
-      // Refresh posts list so the new post appears in the feed
-      try {
-        await refreshPosts();
-      } catch (refreshErr) {
-        console.debug('[handleSubmit] refreshPosts failed', refreshErr);
-      }
+      // No need to manually refresh - PostProvider handles real-time updates
 
       resetForm();
       // Use context-provided dialog closer

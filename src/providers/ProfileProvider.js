@@ -53,6 +53,35 @@ export function ProfileProvider({ children }) {
   const lastPostRefreshTime = useRef(0);
   const REFRESH_THROTTLE_MS = 5000; // 5 seconds minimum between refreshes
   const POST_REFRESH_THROTTLE_MS = 2000; // 2 seconds for post-related operations
+
+  // Listen to post creation events from PostProvider
+  useEffect(() => {
+    // We'll use a try/catch to avoid circular dependency issues
+    try {
+      // Import usePosts hook dynamically to prevent circular dependency
+      if (typeof window !== 'undefined' && window.postProviderCallbacks) {
+        // If PostProvider has global callbacks, use them
+        const unsubscribe = window.postProviderCallbacks.onPostCreated((newPost) => {
+          console.log('[PROFILE] New post created, updating profile posts:', newPost.id);
+          
+          // Only add to profile if it's the current user's post
+          if (newPost.user_id === user?.id) {
+            addPost(newPost);
+            
+            // Update profile post count
+            setProfile(prev => prev ? ({
+              ...prev,
+              posts_count: (prev.posts_count || 0) + 1
+            }) : prev);
+          }
+        });
+        
+        return unsubscribe;
+      }
+    } catch (error) {
+      console.log('[PROFILE] PostProvider callbacks not available:', error);
+    }
+  }, [user?.id]);
   
   // Update global state when local state changes
   useEffect(() => {

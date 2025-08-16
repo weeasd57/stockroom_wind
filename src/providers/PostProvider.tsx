@@ -18,6 +18,8 @@ interface PostContextType {
   optimisticAddPost: (post: Partial<Post>) => string; // Returns temp ID
   confirmPost: (tempId: string, actualPost: Post) => void;
   rollbackPost: (tempId: string) => void;
+  // New function to register profile update callbacks
+  onPostCreated: (callback: (post: Post) => void) => () => void;
 }
 
 const PostContext = createContext<PostContextType | null>(null);
@@ -27,6 +29,72 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Callbacks for when posts are created
+  const [postCreatedCallbacks, setPostCreatedCallbacks] = useState<Set<(post: Post) => void>>(new Set());
+
+  // Register callback for post creation events
+  const onPostCreated = useCallback((callback: (post: Post) => void) => {
+    setPostCreatedCallbacks(prev => new Set(prev).add(callback));
+    
+    // Return unsubscribe function
+    return () => {
+      setPostCreatedCallbacks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(callback);
+        return newSet;
+      });
+    };
+  }, []);
+
+  // Helper function to notify all registered callbacks
+  const notifyPostCreated = useCallback((post: Post) => {
+    postCreatedCallbacks.forEach(callback => {
+      try {
+        callback(post);
+      } catch (error) {
+        console.error('Error in post created callback:', error);
+      }
+    });
+    
+    // Also notify global callbacks for cross-provider communication
+    if (typeof window !== 'undefined' && window.postProviderCallbacks) {
+      try {
+        window.postProviderCallbacks.notifyPostCreated(post);
+      } catch (error) {
+        console.error('Error in global post created callback:', error);
+      }
+    }
+  }, [postCreatedCallbacks]);
+
+  // Set up global callbacks for cross-provider communication
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.postProviderCallbacks = {
+        callbacks: new Set(),
+        onPostCreated: (callback: (post: Post) => void) => {
+          window.postProviderCallbacks.callbacks.add(callback);
+          return () => {
+            window.postProviderCallbacks.callbacks.delete(callback);
+          };
+        },
+        notifyPostCreated: (post: Post) => {
+          window.postProviderCallbacks.callbacks.forEach((callback: (post: Post) => void) => {
+            try {
+              callback(post);
+            } catch (error) {
+              console.error('Error in global callback:', error);
+            }
+          });
+        }
+      };
+    }
+    
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete window.postProviderCallbacks;
+      }
+    };
+  }, []);
 
   const fetchPosts = async (filter?: string) => {
     setLoading(true);
@@ -243,6 +311,9 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       // Confirm the optimistic update with actual data
       confirmPost(tempId, data);
       
+      // Notify ProfileProvider and other subscribers about the new post
+      notifyPostCreated(data as Post);
+      
       return data as Post;
     } catch (err) {
       // Rollback optimistic update on error
@@ -309,7 +380,8 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       posts, loading, error, 
       fetchPosts, createPost, updatePost, deletePost,
       getPostById, getUserPosts,
-      optimisticAddPost, confirmPost, rollbackPost
+      optimisticAddPost, confirmPost, rollbackPost,
+      onPostCreated
     }}>
       {children}
     </PostContext.Provider>
@@ -321,3 +393,6 @@ export const usePosts = () => {
   if (!context) throw new Error('usePosts must be used within PostProvider');
   return context;
 };
+
+// Also export as named export for compatibility
+export { usePosts as usePostsProvider };

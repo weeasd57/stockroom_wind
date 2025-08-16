@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useFollow } from '@/providers/FollowProvider';
+import { usePosts } from '@/providers/PostProvider'; // Add PostProvider for real-time updates
 import { getPosts, getUserProfile } from '@/utils/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import PostActions from '@/components/posts/PostActions';
@@ -12,7 +13,10 @@ import styles from '@/styles/home/PostsFeed.module.css';
 
 export function PostsFeed() {
   const { user, supabase } = useSupabase();
-  const [posts, setPosts] = useState([]);
+  
+  // Get posts from PostProvider for real-time updates
+  const { posts: providerPosts, fetchPosts, loading: providerLoading, error: providerError } = usePosts();
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('following'); // following, all, trending
@@ -41,127 +45,82 @@ export function PostsFeed() {
     getFollowingUsers();
   }, [user, supabase]);
 
+  // Fetch posts with the appropriate filter when filter changes
   useEffect(() => {
-    let isMounted = true;
-    const abortController = new AbortController();
-
-    async function fetchPosts() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        let postsQuery = supabase
-          .from('posts')
-          .select(`
-            *,
-            profiles:user_id (
-              username,
-              avatar_url,
-              id
-            ),
-            comments:post_comments (count),
-            buy_votes:post_buy_votes (count),
-            sell_votes:post_sell_votes (count)
-          `);
-
-        // Apply filters
-        if (filter === 'following' && followingUsers.length > 0) {
-          postsQuery = postsQuery.in('user_id', followingUsers);
-        } else if (filter === 'following' && followingUsers.length === 0) {
-          // If user is not following anyone, show empty results
-          if (isMounted) {
-            setPosts([]);
-            setLoading(false);
-          }
-          return;
-        }
-
-        // Apply category filter
-        if (categoryFilter === 'buy') {
-          postsQuery = postsQuery.eq('sentiment', 'bullish');
-        } else if (categoryFilter === 'sell') {
-          postsQuery = postsQuery.eq('sentiment', 'bearish');
-        }
-
-        // Apply sorting
-        switch (sortBy) {
-          case 'date_asc':
-            postsQuery = postsQuery.order('created_at', { ascending: true });
-            break;
-          case 'engagement':
-            // For engagement, we'll sort by total interactions (comments + votes)
-            postsQuery = postsQuery.order('created_at', { ascending: false }); // fallback to date for now
-            break;
-          case 'price_change':
-            postsQuery = postsQuery.order('current_price', { ascending: false });
-            break;
-          default: // date_desc
-            postsQuery = postsQuery.order('created_at', { ascending: false });
-        }
-
-        postsQuery = postsQuery.limit(20);
-
-        const { data: postsData, error: postsError } = await postsQuery;
-        
-        if (!isMounted) return;
-        
-        if (postsError) {
-          throw postsError;
-        }
-
-        // Calculate engagement and sort if needed
-        let processedPosts = postsData || [];
-        
-        if (sortBy === 'engagement') {
-          processedPosts = processedPosts.sort((a, b) => {
-            const aEngagement = (a.comments?.[0]?.count || 0) + (a.buy_votes?.[0]?.count || 0) + (a.sell_votes?.[0]?.count || 0);
-            const bEngagement = (b.comments?.[0]?.count || 0) + (b.buy_votes?.[0]?.count || 0) + (b.sell_votes?.[0]?.count || 0);
-            return bEngagement - aEngagement;
-          });
-        }
-
-        // Format posts with correct structure
-        const formattedPosts = processedPosts.map(post => ({
-          ...post,
-          profile: post.profiles || {
-            username: 'Unknown User',
-            avatar_url: null
-          },
-          comment_count: post.comments?.[0]?.count || 0,
-          buy_count: post.buy_votes?.[0]?.count || 0,
-          sell_count: post.sell_votes?.[0]?.count || 0,
-        }));
-
-        if (isMounted) {
-          setPosts(formattedPosts);
-        }
-
-      } catch (error) {
-        if (error.name === 'AbortError') {
-          console.log('Posts fetch was aborted');
-          return;
-        }
-        
-        console.error('Error fetching posts:', error);
-        if (isMounted) {
-          setError('Failed to load posts. Please try again.');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+    if (providerPosts.length === 0) {
+      // If PostProvider doesn't have posts yet, fetch them
+      if (filter === 'following') {
+        fetchPosts('following');
+      } else {
+        fetchPosts(); // Fetch all posts
       }
     }
+  }, [filter, fetchPosts, providerPosts.length]);
 
-    fetchPosts();
+  // Update loading and error states from PostProvider
+  useEffect(() => {
+    setLoading(providerLoading);
+    setError(providerError);
+  }, [providerLoading, providerError]);
 
-    // Cleanup function
-    return () => {
-      isMounted = false;
-      abortController.abort();
-    };
-  }, [filter, sortBy, categoryFilter, followingUsers, supabase]);
+  // Filter and sort posts based on current settings
+  const filteredAndSortedPosts = useMemo(() => {
+    let filtered = [...providerPosts];
 
+    // Apply main filter (following/all/trending)
+    if (filter === 'following') {
+      if (followingUsers.length > 0) {
+        filtered = filtered.filter(post => followingUsers.includes(post.user_id));
+      } else {
+        // If not following anyone, show empty
+        filtered = [];
+      }
+    }
+    // For 'all' filter, we show all posts (no additional filtering)
+    // For 'trending' filter, we'll sort by engagement later
+
+    // Apply category filter
+    if (categoryFilter === 'buy') {
+      filtered = filtered.filter(post => post.sentiment === 'bullish');
+    } else if (categoryFilter === 'sell') {
+      filtered = filtered.filter(post => post.sentiment === 'bearish');
+    }
+
+    // Apply sorting
+    switch (sortBy) {
+      case 'date_asc':
+        filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        break;
+      case 'engagement':
+        filtered.sort((a, b) => {
+          const aEngagement = (a.comment_count || 0) + (a.buy_count || 0) + (a.sell_count || 0);
+          const bEngagement = (b.comment_count || 0) + (b.buy_count || 0) + (b.sell_count || 0);
+          return bEngagement - aEngagement;
+        });
+        break;
+      case 'price_change':
+        filtered.sort((a, b) => (b.current_price || 0) - (a.current_price || 0));
+        break;
+      default: // date_desc
+        filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
+
+    // For trending filter, prioritize by engagement regardless of sort
+    if (filter === 'trending') {
+      filtered.sort((a, b) => {
+        const aEngagement = (a.comment_count || 0) + (a.buy_count || 0) + (a.sell_count || 0);
+        const bEngagement = (b.comment_count || 0) + (b.buy_count || 0) + (b.sell_count || 0);
+        return bEngagement - aEngagement;
+      });
+    }
+
+    return filtered.slice(0, 20); // Limit to 20 posts
+  }, [providerPosts, filter, sortBy, categoryFilter, followingUsers]);
+
+  // Use filtered posts instead of local posts state
+  const posts = filteredAndSortedPosts;
+
+  // Helper functions remain the same
   function formatPrice(price) {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -277,162 +236,4 @@ export function PostsFeed() {
         <div className={styles.controls}>
           <div className={styles.filters}>
             <button 
-              className={`${styles.filterButton} ${filter === 'following' ? styles.active : ''}`}
-              onClick={() => setFilter('following')}
-            >
-              Following
-            </button>
-            <button 
-              className={`${styles.filterButton} ${filter === 'all' ? styles.active : ''}`}
-              onClick={() => setFilter('all')}
-            >
-              All
-            </button>
-            <button 
-              className={`${styles.filterButton} ${filter === 'trending' ? styles.active : ''}`}
-              onClick={() => setFilter('trending')}
-            >
-              Trending
-            </button>
-          </div>
-          
-          <div className={styles.sortControls}>
-            <select 
-              className={styles.sortSelect}
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-            >
-              <option value="date_desc">Newest First</option>
-              <option value="date_asc">Oldest First</option>
-              <option value="engagement">Most Engaged</option>
-              <option value="price_change">Price Movement</option>
-            </select>
-            
-            <select 
-              className={styles.categorySelect}
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-            >
-              <option value="all">All Types</option>
-              <option value="buy">Buy Signals</option>
-              <option value="sell">Sell Signals</option>
-              <option value="analysis">Analysis</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div className={styles.postsContainer}>
-        {posts.map((post) => (
-          <div key={post.id} className={styles.postCard}>
-            
-            {/* Post Header */}
-            <div className={styles.postHeader}>
-              <div className={styles.userInfo}>
-                <div className={styles.avatar}>
-                  {post.profile.avatar_url ? (
-                    <img 
-                      src={post.profile.avatar_url} 
-                      alt={post.profile.username}
-                      className={styles.avatarImage}
-                    />
-                  ) : (
-                    <div className={styles.avatarPlaceholder}>
-                      {post.profile.username.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                </div>
-                <div className={styles.userDetails}>
-                  <h4 className={styles.username}>{post.profile.username}</h4>
-                  <p className={styles.timestamp}>
-                    {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                  </p>
-                </div>
-              </div>
-              <div className={`${styles.status} ${getStatusColor(post)}`}>
-                {getStatusText(post)}
-              </div>
-            </div>
-
-            {/* Stock Info */}
-            <div className={styles.stockInfo}>
-              <div className={styles.stockHeader}>
-                <h3 className={styles.stockSymbol}>{post.symbol}</h3>
-                <span className={styles.exchange}>{post.exchange}</span>
-              </div>
-              <p className={styles.companyName}>{post.company_name}</p>
-              <p className={styles.country}>📍 {post.country}</p>
-            </div>
-
-            {/* Price Analysis */}
-            <div className={styles.priceAnalysis}>
-              <div className={styles.priceGrid}>
-                <div className={styles.priceItem}>
-                  <span className={styles.priceLabel}>Current</span>
-                  <span className={styles.priceValue}>{formatPrice(post.current_price)}</span>
-                </div>
-                <div className={styles.priceItem}>
-                  <span className={styles.priceLabel}>Target</span>
-                  <span className={styles.priceValue}>{formatPrice(post.target_price)}</span>
-                </div>
-                <div className={styles.priceItem}>
-                  <span className={styles.priceLabel}>Stop Loss</span>
-                  <span className={styles.priceValue}>{formatPrice(post.stop_loss_price)}</span>
-                </div>
-                <div className={styles.priceItem}>
-                  <span className={styles.priceLabel}>Potential</span>
-                  <span className={`${styles.priceValue} ${styles.potential}`}>
-                    +{calculatePotentialReturn(post.current_price, post.target_price)}%
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Content */}
-            {post.description && (
-              <div className={styles.postContent}>
-                <p>{post.description}</p>
-              </div>
-            )}
-
-            {/* Strategy Tag */}
-            {post.strategy && (
-              <div className={styles.strategy}>
-                <span className={styles.strategyTag}>📈 {post.strategy}</span>
-              </div>
-            )}
-
-            
-            {/* Buy/Sell Actions */}
-            <PostActions 
-              postId={post.id} 
-              initialBuyCount={post.buy_count || 0}
-              initialSellCount={post.sell_count || 0}
-            />
-
-            {/* Market Sentiment */}
-            <PostSentiment 
-              buyCount={post.buy_count || 0}
-              sellCount={post.sell_count || 0}
-            />
-
-            {/* Comments Section */}
-            <Comments 
-              postId={post.id}
-              initialCommentCount={post.comment_count || 0}
-            />
-
-          </div>
-        ))}
-      </div>
-
-      {posts.length >= 20 && (
-        <div className={styles.loadMore}>
-          <button className={styles.loadMoreButton}>
-            Load More Posts
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
+              className={`${styles.filterButton} ${filter === 'following' ? styles.active : ''}`
