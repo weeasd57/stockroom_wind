@@ -53,6 +53,45 @@ export function ProfileProvider({ children }) {
   const lastPostRefreshTime = useRef(0);
   const REFRESH_THROTTLE_MS = 5000; // 5 seconds minimum between refreshes
   const POST_REFRESH_THROTTLE_MS = 2000; // 2 seconds for post-related operations
+
+  // New: Import PostProvider context for listening to post creation events
+  const postContextRef = useRef(null);
+  
+  // Set up post creation listener
+  useEffect(() => {
+    // We'll use a dynamic import to avoid circular dependencies
+    import('./PostProvider').then(({ usePosts }) => {
+      try {
+        const postContext = usePosts();
+        postContextRef.current = postContext;
+        
+        // Subscribe to post creation events
+        if (postContext.onPostCreated && user?.id) {
+          const unsubscribe = postContext.onPostCreated((newPost) => {
+            console.log('[PROFILE] New post created, updating profile posts:', newPost.id);
+            
+            // Only add to profile if it's the current user's post
+            if (newPost.user_id === user.id) {
+              addPost(newPost);
+              
+              // Update profile post count
+              setProfile(prev => prev ? ({
+                ...prev,
+                posts_count: (prev.posts_count || 0) + 1
+              }) : prev);
+            }
+          });
+          
+          return unsubscribe;
+        }
+      } catch (error) {
+        // PostProvider might not be available in this context, that's okay
+        console.log('[PROFILE] PostProvider not available in this context');
+      }
+    }).catch(() => {
+      // Silent fail - PostProvider might not be available
+    });
+  }, [user?.id]);
   
   // Update global state when local state changes
   useEffect(() => {
