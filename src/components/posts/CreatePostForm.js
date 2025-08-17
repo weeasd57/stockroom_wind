@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSupabase } from '@/providers/SupabaseProvider'; // Updated from useAuth
 import { useProfile } from '@/providers/ProfileProvider'; // Updated from contexts/ProfileContext
-import { generateEodLastCloseUrl } from '@/utils/stockApi';
 import { getCountrySymbolCounts, searchStocks } from '@/utils/symbolSearch';
 import { uploadPostImage } from '@/utils/supabase';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider'; // Updated from contexts/CreatePostFormContext
@@ -12,7 +11,7 @@ import styles from '@/styles/create-post-page.css'; // Assuming you have a CSS m
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { usePosts } from '@/providers/PostProvider'; // Use PostProvider's usePosts hook
-import { COUNTRY_ISO_CODES, CURRENCY_SYMBOLS, getCurrencySymbol } from '@/models/CurrencyData.js';
+import { COUNTRY_ISO_CODES, CURRENCY_SYMBOLS } from '@/models/CurrencyData.js';
 import { COUNTRY_CODE_TO_NAME, COUNTRY_CODES } from "../../models/CountryData";
 import { toast } from 'sonner';
 import CountrySelectDialog from '@/components/ui/CountrySelectDialog'; // Import the new dialog component
@@ -45,6 +44,17 @@ const formatSymbolForApi = (symbol, country) => {
   }
   
   return formattedSymbol;
+};
+
+// Case-insensitive lookup for currency symbol from CURRENCY_SYMBOLS.
+// Accepts either a country name or ISO code and returns the matching symbol or '$' as default.
+const currencySymbolFor = (countryOrCode) => {
+  if (!countryOrCode) return '$';
+  const countryName = COUNTRY_CODE_TO_NAME[countryOrCode] || countryOrCode;
+  const key = Object.keys(CURRENCY_SYMBOLS).find(
+    (k) => k.toLowerCase() === String(countryName).toLowerCase()
+  );
+  return key ? CURRENCY_SYMBOLS[key] : '$';
 };
 
 export default function CreatePostForm() {
@@ -100,6 +110,7 @@ export default function CreatePostForm() {
     setPriceError,
     setSelectedImageFile,
     selectedImageFile, // Add this missing variable
+    setShowStrategyDialog,
   } = useCreatePostForm() || {};
 
   // Create alias for contextDescription to maintain compatibility
@@ -373,7 +384,7 @@ export default function CreatePostForm() {
       
       // Reset the input field
       setNewStrategy('');
-      setShowStrategyInput(false);
+      updateField('showStrategyInput', false);
     } catch (error) {
       console.error('Error creating strategy:', error);
       // Still add strategy locally in case of error
@@ -609,6 +620,24 @@ export default function CreatePostForm() {
     }
   };
 
+  // Helper to clear selected image and reset file input so the same file can be re-selected
+  const clearSelectedImage = () => {
+    try {
+      updateField('imagePreview', '');
+      updateField('imageFile', null);
+      if (typeof setSelectedImageFile === 'function') {
+        try { setSelectedImageFile(null); } catch (err) { console.debug('setSelectedImageFile cleanup failed', err); }
+      }
+      // Reset the native file input so selecting the same file again will fire change
+      if (fileInputRef && fileInputRef.current) {
+        try { fileInputRef.current.value = ''; } catch (e) { /* ignore */ }
+      }
+      setStatus('idle');
+    } catch (err) {
+      console.debug('clearSelectedImage failed', err);
+    }
+  };
+
   // Enhanced image URL handler with validation and metadata extraction
   const handleImageUrlChange = async (e) => {
     const url = e.target.value;
@@ -716,11 +745,8 @@ export default function CreatePostForm() {
         setStatus('idle');
       }
     } else {
-      updateField('imagePreview', '');
-      if (typeof setSelectedImageFile === 'function') {
-        try { setSelectedImageFile(null); } catch (err) { console.debug('setSelectedImageFile cleanup failed', err); }
-      }
-      setStatus('idle');
+      // Use centralized clear helper to ensure file input reset
+      clearSelectedImage();
     }
     
     pushDebug(`Image URL set: ${url}`);
@@ -845,7 +871,7 @@ export default function CreatePostForm() {
       // Handle escape key to close
       const handleKeyDown = (e) => {
         if (e.key === 'Escape') {
-          setShowStrategyInput(false);
+          updateField('showStrategyInput', false);
         }
       };
       
@@ -936,79 +962,71 @@ export default function CreatePostForm() {
         top: 0,
         behavior: 'smooth'
       });
-      
-      // If inside a dialog or modal, scroll that to top as well
-      const dialogElement = document.querySelector('.dialog-content');
-      if (dialogElement) {
-        dialogElement.scrollTop = 0;
-      }
     }
   };
 
-  // تعديل الدالة لجلب السعر الحالي مباشرة من API
+  // Fetch current price via internal Next.js API proxy to avoid CORS and hide API keys
   const fetchCurrentPrice = async (symbol, country) => {
+    if (!symbol) return;
+    setPriceLoading(true);
     try {
-      // استخدام API مباشرة بدون محاولة الحصول على البيانات من الملفات المحلية
-      const apiUrl = generateEodLastCloseUrl(symbol, country);
-      console.log(`Fetching price directly from API: ${apiUrl}`);
+      const qs = new URLSearchParams({ symbol: String(symbol) });
+      if (country) qs.set('country', String(country));
+      const apiUrl = `/api/stocks/price?${qs.toString()}`;
       
-      const response = await fetch(apiUrl);
-      
+      const response = await fetch(apiUrl, { method: 'GET' });
       if (!response.ok) {
-        throw new Error(`Failed to fetch price data: ${response.status}`);
+        let errMsg = `Failed to fetch price data: ${response.status}`;
+        try {
+          const e = await response.json();
+          if (e?.error) errMsg = `${errMsg} - ${e.error}`;
+        } catch (_) {}
+        throw new Error(errMsg);
       }
       
       const data = await response.json();
-      console.log("API Data received:", data);
-      
-      // تحديث السعر الحالي استنادًا إلى شكل البيانات المستلمة
-      let price = null;
-      
-      if (Array.isArray(data) && data.length > 0 && data[0] && typeof data[0].close === 'number') {
-        price = parseFloat(data[0].close);
-      } else if (data && (data.close || data.price)) {
-        price = parseFloat(data.close || data.price);
-      } else if (typeof data === 'number') {
-        price = parseFloat(data);
+      const priceNum = Number(data?.price);
+      if (!Number.isFinite(priceNum)) {
+        throw new Error('Invalid price in API response');
       }
       
-      if (price !== null && !isNaN(price)) {
-        console.log(`Successfully parsed price from API: $${price}`);
-        updateField('currentPrice', price);
-        updateField('initialPrice', price);
-        
-        // نسبة الهدف 5% فوق سعر السهم الحالي
-        const targetPercentage = 5;
-        // نسبة إيقاف الخسارة 5% تحت سعر السهم الحالي
-        const stopLossPercentage = 5;
-        
-        // تعيين أسعار الهدف ووقف الخسارة مع النسب المئوية
-        const targetValue = (price * (1 + targetPercentage/100)).toFixed(2);
-        const stopLossValue = (price * (1 - stopLossPercentage/100)).toFixed(2);
-        
-        updateField('targetPrice', targetValue);
-        updateField('stopLoss', stopLossValue);
-        // تخزين النسب المئوية لاستخدامها في العرض
-        updateField('targetPricePercentage', targetPercentage);
-        updateField('stopLossPercentage', stopLossPercentage);
-      } else {
-        console.warn(`Invalid API response structure for ${symbol}:`, data);
-        throw new Error('Invalid price data structure in API response');
-      }
+      updateField('currentPrice', priceNum);
+      updateField('initialPrice', priceNum);
+      
+      // Default 5% target and stop-loss around current price
+      const targetPercentage = 5;
+      const stopLossPercentage = 5;
+      const targetValue = (priceNum * (1 + targetPercentage/100)).toFixed(2);
+      const stopLossValue = (priceNum * (1 - stopLossPercentage/100)).toFixed(2);
+      
+      updateField('targetPrice', targetValue);
+      updateField('stopLoss', stopLossValue);
+      updateField('targetPricePercentage', targetPercentage);
+      updateField('stopLossPercentage', stopLossPercentage);
     } catch (error) {
-      console.error('Error fetching current price from API:', error);
+      console.error('Error fetching current price:', error);
       updateField('currentPrice', null);
+      setPriceError?.(error.message || 'Failed to fetch price');
+    } finally {
+      setPriceLoading(false);
     }
   };
 
-  // Call the new function when the stock or country changes
+  // Call price fetch when selected stock changes
   useEffect(() => {
-    if (selectedStock && selectedStock.symbol && selectedStock.country) {
+    if (selectedStock && selectedStock.symbol) {
       fetchCurrentPrice(selectedStock.symbol, selectedStock.country);
     }
   }, [selectedStock]);
 
-  // إضافة دالة للتمرير إلى الأعلى عند فتح ديالوج الاستراتيجية
+  // Re-fetch price when the selected country changes (if a stock is already selected)
+  useEffect(() => {
+    if (selectedCountry && selectedCountry !== 'all' && selectedStock && selectedStock.symbol) {
+      fetchCurrentPrice(selectedStock.symbol, selectedCountry);
+    }
+  }, [selectedCountry, selectedStock]);
+
+  // Function to open the strategy dialog
   const openStrategyDialog = () => {
     // First, make sure the strategies are loaded
     if (strategies.length === 0) {
@@ -1016,9 +1034,9 @@ export default function CreatePostForm() {
     }
     
     // Show the dialog
-    setShowStrategyDialog(true);
+    updateField('showStrategyDialog', true);
     
-    // Set the body overflow to hidden to prevent background scrolling
+    // Prevent background scrolling
     document.body.style.overflow = 'hidden';
     
     // Small delay to allow the dialog to render
@@ -1029,7 +1047,6 @@ export default function CreatePostForm() {
       if (dialogElement && formButtons) {
         // Measure distance to bottom for better positioning
         const viewportHeight = window.innerHeight;
-        const formButtonsHeight = formButtons.offsetHeight;
         const formButtonsTop = formButtons.getBoundingClientRect().top;
         const availableSpace = formButtonsTop - 20; // 20px buffer
         
@@ -1049,14 +1066,14 @@ export default function CreatePostForm() {
     console.log('Closing strategy dialog');
     
     // Hide the dialog
-    setShowStrategyDialog(false);
+    updateField('showStrategyDialog', false);
     
     // Restore normal scrolling
     document.body.style.overflow = '';
     
     // Reset new strategy state
-    setShowStrategyInput(false);
-    setNewStrategy('');
+    updateField('showStrategyInput', false);
+    updateField('newStrategy', '');
     
     // Focus back on the strategy field
     setTimeout(() => {
@@ -1082,7 +1099,7 @@ export default function CreatePostForm() {
     return () => {
       document.removeEventListener('keydown', handleEscapeKey);
     };
-  }, [showStrategyDialog]);
+  }, [showStrategyDialog, updateField]); // Added updateField to dependencies
 
   // Listen for Escape key to close strategy dialog
   useEffect(() => {
@@ -1096,7 +1113,7 @@ export default function CreatePostForm() {
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [showStrategyDialog]);
+  }, [showStrategyDialog, updateField]); // Added updateField to dependencies
 
   // Function to update global status - declare once here
   const updateGlobalStatus = useCallback((message, type = 'processing') => {
@@ -1204,6 +1221,9 @@ export default function CreatePostForm() {
         // Human-readable status message required by schema
         status_message: 'open',
       };
+
+      // Log the postData before sending to Supabase for debugging
+      console.log('[handleSubmit DEBUG] Post data being sent:', postData);
 
       // Use PostProvider's createPost for optimistic updates
       console.debug('[handleSubmit] calling PostProvider createPost with postData keys:', Object.keys(postData));
@@ -1440,8 +1460,9 @@ export default function CreatePostForm() {
             {selectedCountry === 'all' 
               ? 'All Countries' 
               : COUNTRY_CODE_TO_NAME[selectedCountry] || selectedCountry}
-            {selectedCountry !== 'all' && CURRENCY_SYMBOLS[selectedCountry] && 
-              <span className="currency-symbol-indicator"> ({CURRENCY_SYMBOLS[selectedCountry]})</span>}
+            {selectedCountry !== 'all' && (
+              <span className="currency-symbol-indicator"> ({currencySymbolFor(COUNTRY_CODE_TO_NAME[selectedCountry] || selectedCountry)})</span>
+            )}
           </span>
           <div className="select-button-icon">
             <svg viewBox="0 0 24 24" width="16" height="16">
@@ -1487,8 +1508,7 @@ export default function CreatePostForm() {
   const updateSelectedStockDisplay = () => {
     // When updating selected stock UI in the return JSX:
     if (selectedStock) {
-      const countryCode = selectedStock.country.toLowerCase();
-      const currencySymbol = CURRENCY_SYMBOLS[countryCode] || '$';
+      const currencySymbol = currencySymbolFor(selectedStock.country);
       
       // Update the display to include currency symbol
       return (
@@ -1663,12 +1683,8 @@ export default function CreatePostForm() {
                         type="button"
                         onClick={() => {
                           console.log('Removing image preview...');
-                          updateField('imagePreview', '');
-                          updateField('imageFile', null);
-                          if (typeof setSelectedImageFile === 'function') {
-                            setSelectedImageFile(null);
-                          }
-                          setStatus('idle');
+                          // Use centralized helper to ensure file input is fully reset
+                          clearSelectedImage();
                           toast.success('Image removed successfully!');
                         }}
                         style={{
@@ -1903,9 +1919,7 @@ export default function CreatePostForm() {
                     <div className="stock-info">
                       <div className="stock-symbol">
                         {selectedStock.symbol}
-                        {getCurrencySymbol(selectedStock.country) && (
-                          <span className="currency-badge">{getCurrencySymbol(selectedStock.country)}</span>
-                        )}
+                        <span className="currency-badge">{currencySymbolFor(selectedStock.country)}</span>
                       </div>
                       <div className="stock-name">{selectedStock.name}</div>
                       <div className="stock-country">
@@ -1937,7 +1951,7 @@ export default function CreatePostForm() {
                     </div>
                     ) : currentPrice !== null && !isNaN(currentPrice) ? (
                       <div className="stock-price stock-price-value">
-                        {getCurrencySymbol(selectedStock.country) || '$'} {typeof currentPrice === 'number' ? currentPrice.toFixed(2) : parseFloat(currentPrice).toFixed(2)}
+                        {currencySymbolFor(selectedStock.country)} {typeof currentPrice === 'number' ? currentPrice.toFixed(2) : parseFloat(currentPrice).toFixed(2)}
                       </div>
                     ) : (
                       <div className="stock-price-unavailable">
@@ -1954,8 +1968,8 @@ export default function CreatePostForm() {
                     {selectedStock && !isSearching && (
                       <div className="stock-price-info">
                         Symbol: {selectedStock.symbol} • Exchange: {selectedStock.exchange || 'N/A'}
-                        {CURRENCY_SYMBOLS[selectedStock.country.toLowerCase()] && (
-                          <span className="currency-info"> • Currency: {CURRENCY_SYMBOLS[selectedStock.country.toLowerCase()]}</span>
+                        {selectedStock.country && (
+                          <span className="currency-info"> • Currency: {currencySymbolFor(selectedStock.country)}</span>
                         )}
                       </div>
                     )}
@@ -2022,7 +2036,7 @@ export default function CreatePostForm() {
                                   height: `${Math.max(heightPercent, 5)}%`,
                                   backgroundColor: barColor
                                 }}
-                                title={`${day.date}: ${CURRENCY_SYMBOLS[selectedStock.country.toLowerCase()] || '$'}${day.close}`}
+                                title={`${day.date}: ${currencySymbolFor(selectedStock.country)}${day.close}`}
                               ></div>
                               <div className="price-date">{day.date.split('-')[2]}</div>
                             </div>
@@ -2037,10 +2051,15 @@ export default function CreatePostForm() {
                       <div className="form-group col-md-6 target-price-group">
                         <label htmlFor="targetPrice">Target Price</label>
                         <div className="price-input-with-percentage">
+                          {selectedStock && (
+                            <span className="currency-symbol-prefix currency-symbol-indicator" aria-hidden="true">
+                              {currencySymbolFor(selectedStock.country)}
+                            </span>
+                          )}
 
                           <input
                             type="number"
-                            className="form-control"
+                            className={`form-control ${selectedStock ? 'with-currency-symbol' : ''}`}
                             id="targetPrice"
                             value={targetPrice}
                             onChange={(e) => {
@@ -2132,10 +2151,15 @@ export default function CreatePostForm() {
                       <div className="form-group col-md-6 stop-loss-price-group">
                         <label htmlFor="stopLoss">Stop Loss</label>
                         <div className="price-input-with-percentage">
+                          {selectedStock && (
+                            <span className="currency-symbol-prefix currency-symbol-indicator" aria-hidden="true">
+                              {currencySymbolFor(selectedStock.country)}
+                            </span>
+                          )}
 
                           <input
                             type="number"
-                            className="form-control"
+                            className={`form-control ${selectedStock ? 'with-currency-symbol' : ''}`}
                             id="stopLoss"
                             value={stopLoss}
                             onChange={(e) => {
@@ -2449,7 +2473,7 @@ export default function CreatePostForm() {
                   <input
                     type="text"
                     value={newStrategy}
-                    onChange={(e) => setNewStrategy(e.target.value)}
+                    onChange={(e) => updateField('newStrategy', e.target.value)}
                     placeholder="Enter a new strategy name"
                     className="form-control"
                     onKeyDown={(e) => {

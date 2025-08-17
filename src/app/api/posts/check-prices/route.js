@@ -5,7 +5,8 @@ import { NextResponse } from 'next/server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const serviceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5b2VlY3BydmhwcWZpcnhtcGt4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNTE5MjI5MSwiZXhwIjoyMDUwNzY4MjkxfQ.HRkWciT9LzUF3b1zh-SdpdsQH2OaRqlnUpw7_73sJls';
+// Use environment variables for service role key (server-only)
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
 
 // Check if required environment variables are set
 if (!supabaseUrl || !supabaseAnonKey) {
@@ -98,6 +99,16 @@ export async function POST(request) {
         success: false,
         message: 'Database configuration not available',
         error: 'missing_database_config'
+      }, { status: 503 });
+    }
+
+    // Ensure service role key is available for admin operations
+    if (!serviceRoleKey) {
+      console.error('[ERROR] Missing SUPABASE_SERVICE_ROLE_KEY environment variable');
+      return NextResponse.json({
+        success: false,
+        message: 'Server misconfigured: missing service role key',
+        error: 'missing_service_role_key'
       }, { status: 503 });
     }
 
@@ -439,9 +450,9 @@ export async function POST(request) {
           const updateResult = await adminSupabase
             .from('posts')
             .update({
-              postDateAfterPriceDate: false,
-              postAfterMarketClose: false,
-              noDataAvailable: true,
+              postdateafterpricedate: false,
+              postaftermarketclose: false,
+              nodataavailable: true,
               status_message: "No price data available",
               last_price_check: new Date().toISOString()
               // Do not update these fields to preserve their original values
@@ -503,9 +514,9 @@ export async function POST(request) {
             const { error: updateError } = await adminSupabase
               .from('posts')
               .update({
-                postDateAfterPriceDate: true,
-                postAfterMarketClose: false,
-                noDataAvailable: false,
+                postdateafterpricedate: true,
+                postaftermarketclose: false,
+                nodataavailable: false,
                 status_message: "Post created after latest price data - can't check target/stop loss",
                 last_price_check: new Date().toISOString()
                 // Do not update these fields to preserve their original values
@@ -554,9 +565,9 @@ export async function POST(request) {
               const { error: updateError } = await adminSupabase
                 .from('posts')
                 .update({
-                  postDateAfterPriceDate: false,
-                  postAfterMarketClose: true,
-                  noDataAvailable: false,
+                  postdateafterpricedate: false,
+                  postaftermarketclose: true,
+                  nodataavailable: false,
                   status_message: "Post created after market close - recent price data not available",
                   last_price_check: new Date().toISOString()
                   // Do not update these fields to preserve their original values
@@ -652,7 +663,7 @@ export async function POST(request) {
         const shouldClosePost = targetReached || stopLossTriggered;
         
         
-        const shouldUpdate = targetReached || stopLossTriggered || (post.last_price !== lastPrice) || shouldClosePost;
+        const shouldUpdate = targetReached || stopLossTriggered || (post.current_price !== lastPrice) || shouldClosePost;
         
         if (shouldUpdate) {
           // Keep original target, stop loss and initial prices intact
@@ -688,7 +699,6 @@ export async function POST(request) {
             target_hit_time: targetHitTime, // Add the time when target was hit
             stop_loss_triggered_date: stopLossTriggeredDate,
             last_price_check: new Date().toISOString(),
-            last_price: lastPrice,
             closed: shouldClosePost ? true : null,
             postDateAfterPriceDate: false,
             postAfterMarketClose: false,
@@ -850,7 +860,7 @@ export async function POST(request) {
             
             // Add the new price check entry
             priceChecks.push({
-              price: post.last_price,
+              price: lastPrice,
               date: new Date().toISOString(),
               target_reached: post.target_reached,
               stop_loss_triggered: post.stop_loss_triggered,
@@ -883,16 +893,11 @@ export async function POST(request) {
       // Log a sample post update for debugging
       if (updatedPosts.length > 0) {
         const samplePost = updatedPosts[0];
-        console.log(`Sample post update - ID: ${samplePost.id}`);
-        console.log(`Status flags: noDataAvailable=${samplePost.noDataAvailable}, postDateAfterPriceDate=${samplePost.postDateAfterPriceDate}, postAfterMarketClose=${samplePost.postAfterMarketClose}`);
-      }
-      
-      while (!updateSuccess && retryCount <= maxRetries) {
         try {
           const adminSupabase = createAdminClient();
           const { data: updateData, error: updateError } = await adminSupabase
             .from('posts')
-            .upsert(updatedPosts, { onConflict: 'id', returning: 'minimal' });
+            .upsert(updatedPosts.map(mapPostForDb), { onConflict: 'id', returning: 'minimal' });
           
           if (updateError) {
             console.error('Error updating posts:', updateError);
@@ -917,7 +922,7 @@ export async function POST(request) {
             const sampleIds = updatedPosts.slice(0, 3).map(p => p.id); // Check up to 3 posts
             const { data: verifyData, error: verifyError } = await adminSupabase
               .from('posts')
-              .select('id, target_reached, stop_loss_triggered, last_price, closed, postDateAfterPriceDate, postAfterMarketClose, noDataAvailable')
+              .select('id, target_reached, stop_loss_triggered, closed, postdateafterpricedate, postaftermarketclose, nodataavailable')
               .in('id', sampleIds);
               
             if (verifyError) {
@@ -956,11 +961,10 @@ export async function POST(request) {
                 target_reached_date: post.target_reached_date,
                 stop_loss_triggered_date: post.stop_loss_triggered_date,
                 last_price_check: post.last_price_check,
-                last_price: post.last_price,
                 closed: post.closed,
-                postDateAfterPriceDate: post.postDateAfterPriceDate,
-                postAfterMarketClose: post.postAfterMarketClose,
-                noDataAvailable: post.noDataAvailable,
+                postdateafterpricedate: post.postDateAfterPriceDate,
+                postaftermarketclose: post.postAfterMarketClose,
+                nodataavailable: post.noDataAvailable,
                 status_message: post.status_message,
                 // Do not update these fields to prevent them from being set to null
                 // country: post.country,

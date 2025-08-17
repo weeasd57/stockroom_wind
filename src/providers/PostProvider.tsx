@@ -34,6 +34,8 @@ interface SupabaseRawPost {
   created_at: string; // Dates are string from Supabase, convert to Date later if needed
   updated_at: string;
   description?: string;
+  is_public: boolean;
+  status: string;
   target_reached: boolean;
   stop_loss_triggered: boolean;
   target_reached_date?: string;
@@ -365,7 +367,8 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       comment_count: 0,
       buy_count: 0,
       sell_count: 0,
-      syncing: true, // UI indicator
+      is_public: post.is_public || false,
+      status: post.status || 'open', // Default to 'open' if not provided
       profile: {
         username: user?.email?.split('@')[0] || 'You',
         avatar_url: null,
@@ -425,24 +428,27 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
         stop_loss_price: post.stop_loss_price,
         description: post.description,
         strategy: post.strategy,
-        sentiment: post.sentiment || 'neutral',
         target_reached: post.target_reached || false,
         stop_loss_triggered: post.stop_loss_triggered || false,
         closed: post.closed || false,
         initial_price: post.initial_price || 0,
         high_price: post.high_price || 0,
         target_high_price: post.target_high_price || 0,
-        postDateAfterPriceDate: post.postDateAfterPriceDate || false,
-        postAfterMarketClose: post.postAfterMarketClose || false,
-        noDataAvailable: post.noDataAvailable || false,
+        // IMPORTANT: these columns were created without quotes in SQL using camelCase,
+        // so Postgres folded them to lowercase identifiers. The API expects the exact
+        // column names. Use lowercase keys here to avoid PGRST204.
+        postdateafterpricedate: post.postDateAfterPriceDate || false,
+        postaftermarketclose: post.postAfterMarketClose || false,
+        ...(post.noDataAvailable ? { nodataavailable: true } : {}),
         status_message: post.status_message,
         target_reached_date: post.target_reached_date,
         stop_loss_triggered_date: post.stop_loss_triggered_date,
         last_price_check: post.last_price_check,
-        last_price: post.last_price,
         target_hit_time: post.target_hit_time,
         content: post.content, // Ensure content is explicitly included
         image_url: post.image_url, // Ensure image_url is explicitly included
+        is_public: post.is_public || false, // Add is_public
+        status: post.status || 'open', // Add status
       };
 
       const { data, error: createError } = await supabase
@@ -451,7 +457,15 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
         .select('id') // Explicitly select only the ID
         .single();
 
-      if (createError) throw createError;
+      if (createError) {
+        console.error('[PostProvider] createPost insert error:', {
+          message: (createError as any).message,
+          details: (createError as any).details,
+          hint: (createError as any).hint,
+          code: (createError as any).code,
+        });
+        throw new Error((createError as any).message || (createError as any).details || 'Failed to create post');
+      }
 
       // Fetch the newly created post with full profile and counts
       const { data: fetchedPostData, error: fetchNewPostError } = await supabase
@@ -497,9 +511,47 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
   const updatePost = async (id: string, post: Partial<Post>): Promise<Post> => {
     setLoading(true);
     try {
+      // Build a safe update payload that only includes valid DB columns
+      const updateData: Record<string, any> = {};
+      const assignIf = (key: string, value: any) => {
+        if (value !== undefined) updateData[key] = value;
+      };
+
+      // Map fields to DB columns
+      assignIf('content', post.content);
+      assignIf('image_url', post.image_url);
+      assignIf('symbol', post.symbol);
+      assignIf('company_name', post.company_name);
+      assignIf('exchange', post.exchange);
+      assignIf('country', post.country);
+      assignIf('current_price', post.current_price);
+      assignIf('target_price', post.target_price);
+      assignIf('stop_loss_price', post.stop_loss_price);
+      assignIf('description', post.description);
+      assignIf('strategy', post.strategy);
+      // Do NOT include 'sentiment' (not a DB column)
+      assignIf('target_reached', post.target_reached);
+      assignIf('stop_loss_triggered', post.stop_loss_triggered);
+      assignIf('closed', post.closed);
+      assignIf('initial_price', post.initial_price);
+      assignIf('high_price', post.high_price);
+      assignIf('target_high_price', post.target_high_price);
+      // Lowercase DB identifiers for folded camelCase columns
+      if (post.postDateAfterPriceDate !== undefined) updateData.postdateafterpricedate = post.postDateAfterPriceDate;
+      if (post.postAfterMarketClose !== undefined) updateData.postaftermarketclose = post.postAfterMarketClose;
+      if (post.noDataAvailable) updateData.nodataavailable = true;
+      assignIf('status_message', post.status_message);
+      assignIf('target_reached_date', post.target_reached_date as any);
+      assignIf('stop_loss_triggered_date', post.stop_loss_triggered_date as any);
+      assignIf('last_price_check', post.last_price_check as any);
+      // Do NOT include 'last_price' (not a DB column)
+      assignIf('target_hit_time', post.target_hit_time as any);
+      assignIf('is_public', post.is_public);
+      assignIf('status', post.status);
+
       const { data, error } = await supabase
         .from('posts')
-        .update(post)
+        .update(updateData)
         .eq('id', id)
         .select()
         .single();

@@ -22,6 +22,19 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 // Server-side client that can bypass RLS when using the service role key
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
+// Define a service-role client if available (server-only). This fixes usage of an undefined supabaseServer.
+const supabaseServer = serviceRoleKey && supabaseUrl
+  ? createClient(supabaseUrl, serviceRoleKey)
+  : null;
+
+// Minimal payload sanitizer to avoid non-existent columns errors (PGRST204)
+function stripInvalidPostFields(input) {
+  if (!input || typeof input !== 'object') return input;
+  // Destructure to drop forbidden fields, keep the rest intact
+  // Note: do not mutate the original object
+  const { sentiment, last_price, lastPrice, ...rest } = input;
+  return rest;
+}
 
 export async function GET(request) {
   try {
@@ -118,9 +131,12 @@ export async function POST(request) {
     
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-    const newPost = await request.json();
-    // Log incoming payload for debugging
-    console.debug('[API /posts] POST payload received:', JSON.stringify(newPost, Object.keys(newPost).slice(0,50)));
+    // Read and sanitize payload to avoid non-existent DB fields
+    let postPayload = stripInvalidPostFields(await request.json());
+    // Log incoming sanitized payload keys for debugging (avoid logging sensitive values)
+    try {
+      console.debug('[API /posts] POST payload keys:', Object.keys(postPayload));
+    } catch {}
     // Log auth header for RLS debugging
     try {
       console.debug('[API /posts] Authorization header:', request.headers.get('authorization'));
@@ -130,10 +146,10 @@ export async function POST(request) {
 
     // Basic validation to catch schema issues early
     const missing = [];
-    if (!newPost.user_id) missing.push('user_id');
-    if (!newPost.symbol) missing.push('symbol');
-    if (!newPost.country) missing.push('country');
-    if (!newPost.content && !newPost.description) missing.push('content/description');
+    if (!postPayload.user_id) missing.push('user_id');
+    if (!postPayload.symbol) missing.push('symbol');
+    if (!postPayload.country) missing.push('country');
+    if (!postPayload.content && !postPayload.description) missing.push('content/description');
     if (missing.length) {
       // Try to recover missing user_id from Authorization bearer token if available
       const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
@@ -142,7 +158,7 @@ export async function POST(request) {
           const token = authHeader.split(' ')[1];
           const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
           if (payload && payload.sub) {
-            newPost.user_id = payload.sub;
+            postPayload.user_id = payload.sub;
             // remove user_id from missing and continue
             const idx = missing.indexOf('user_id');
             if (idx !== -1) missing.splice(idx, 1);
@@ -191,7 +207,7 @@ export async function POST(request) {
 
     const { data, error } = await dbClient
       .from('posts')
-      .insert([newPost])
+      .insert([postPayload])
       .select(`
         *,
         user:user_id(username, full_name, avatar_url)
@@ -228,9 +244,30 @@ export async function PATCH(request) {
       return NextResponse.json({ error: 'Post ID is required for PATCH' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    // Sanitize updates to strip any non-existent DB fields
+    const safeUpdates = stripInvalidPostFields(updates);
+
+    // Choose the right client (service role > user token client > anon)
+    let dbClient = supabase;
+    if (supabaseServer) {
+      dbClient = supabaseServer;
+    } else {
+      const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+          dbClient = createClient(supabaseUrl || '', supabaseAnonKey || '', {
+            global: { headers: { Authorization: authHeader } },
+          });
+        } catch (e) {
+          console.debug('[API /posts] PATCH: failed to create per-request client with token', e);
+          dbClient = supabase;
+        }
+      }
+    }
+
+    const { data, error } = await dbClient
       .from('posts')
-      .update(updates)
+      .update(safeUpdates)
       .eq('id', id)
       .select(`
         *,

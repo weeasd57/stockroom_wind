@@ -17,6 +17,8 @@ export interface Post {
   created_at: Date;
   updated_at: Date;
   description?: string;
+  is_public: boolean;
+  status: string;
   target_reached: boolean;
   stop_loss_triggered: boolean;
   target_reached_date?: Date;
@@ -55,6 +57,8 @@ export class PostModel implements Post {
   created_at: Date;
   updated_at: Date;
   description?: string;
+  is_public: boolean;
+  status: string;
   target_reached: boolean;
   stop_loss_triggered: boolean;
   target_reached_date?: Date;
@@ -92,6 +96,8 @@ export class PostModel implements Post {
     this.created_at = data.created_at || new Date();
     this.updated_at = data.updated_at || new Date();
     this.description = data.description;
+    this.is_public = data.is_public || false;
+    this.status = data.status || '';
     this.target_reached = data.target_reached || false;
     this.stop_loss_triggered = data.stop_loss_triggered || false;
     this.target_reached_date = data.target_reached_date;

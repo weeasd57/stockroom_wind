@@ -14,10 +14,12 @@ const navigationConfig = {
   authenticated: [
     { href: '/home', label: 'Home'},
     { href: '/traders', label: 'Traders' },
+    { href: '/pricing', label: 'Pricing' },
   ],
   unauthenticated: [
     { href: '/landing', label: 'Home' },
     { href: '/traders', label: 'Traders' },
+    { href: '/pricing', label: 'Pricing' },
   ]
 };
 
