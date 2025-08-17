@@ -1,4 +1,4 @@
-import { User } from './User';
+import { User, createDefaultUser } from './User';
 
 export interface Post {
   id: string;
@@ -70,6 +70,10 @@ export class PostModel implements Post {
   postAfterMarketClose: boolean;
   noDataAvailable: boolean;
   status_message?: string;
+  profile: User;
+  comment_count: number;
+  buy_count: number;
+  sell_count: number;
 
   constructor(data: Partial<Post>) {
     this.id = data.id || '';
@@ -103,5 +107,9 @@ export class PostModel implements Post {
     this.postAfterMarketClose = data.postAfterMarketClose || false;
     this.noDataAvailable = data.noDataAvailable || false;
     this.status_message = data.status_message;
+    this.profile = data.profile || createDefaultUser(this.user_id || '', '');
+    this.comment_count = data.comment_count || 0;
+    this.buy_count = data.buy_count || 0;
+    this.sell_count = data.sell_count || 0;
   }
 }
