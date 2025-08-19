@@ -1,18 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
-import Image from 'next/image';
 import styles from '@/styles/view-profile.module.css';
-import Link from 'next/link';
 import { useFollow } from '@/providers/FollowProvider'; // Import useFollow
+import PostCard from '@/components/posts/PostCard';
 
 export default function ViewProfile({ params }) {
   const { supabase, isAuthenticated, user } = useSupabase();
   const router = useRouter();
   const { isFollowing, toggleFollow, checkIsFollowing, loading: followLoading, error: followError } = useFollow(); // Use useFollow hook
+  const hasFetchedRef = useRef({});
   
   // Try to get ProfileProvider for updating follow counts
   let profileContext;
@@ -37,18 +37,6 @@ export default function ViewProfile({ params }) {
   const [error, setError] = useState(null);
   const [avatarError, setAvatarError] = useState(false);
 
-  // Safety timeout for loading state - in case something goes wrong
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (loading) {
-        console.warn('[VIEW-PROFILE] Loading timeout reached, forcing loading to false');
-        setLoading(false);
-      }
-    }, 10000); // 10 seconds timeout
-
-    return () => clearTimeout(timeoutId);
-  }, [loading]);
-
   // Fetch profile data
   useEffect(() => {
     // Only redirect if there's definitely no user ID
@@ -57,7 +45,19 @@ export default function ViewProfile({ params }) {
       return;
     }
 
+    // Wait until supabase client is ready
+    if (!supabase) {
+      return;
+    }
+
+    // Prevent double-fetch in React Strict Mode (dev)
+    if (hasFetchedRef.current[userId]) {
+      return;
+    }
+    hasFetchedRef.current[userId] = true;
+
     let isCancelled = false;
+    const controller = new AbortController();
 
     const safeSetState = (setter) => {
       if (!isCancelled) setter();
@@ -68,14 +68,59 @@ export default function ViewProfile({ params }) {
         console.log('[VIEW-PROFILE] Starting to fetch profile data for userId:', userId);
         setLoading(true);
         setError(null);
+        const TIMEOUT_MS = 25000;
+        const withTimeoutAbort = async (fn, ms = TIMEOUT_MS) => {
+          const timeoutId = setTimeout(() => controller.abort(), ms);
+          try {
+            return await fn();
+          } catch (e) {
+            // Normalize abort/timeout errors
+            if (
+              (e && (e.name === 'AbortError' || e.message?.includes('aborted'))) ||
+              e?.message === 'Failed to fetch'
+            ) {
+              throw new Error('Request timed out');
+            }
+            throw e;
+          } finally {
+            clearTimeout(timeoutId);
+          }
+        };
         
         // Fetch user profile
         console.log('[VIEW-PROFILE] Fetching profile from database...');
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .single();
+        let profile, profileError;
+        try {
+          const res = await withTimeoutAbort(
+            () =>
+              supabase
+                .from('profiles')
+                .select('id, username, avatar_url, background_url, bio, followers, following, created_at')
+                .eq('id', userId)
+                .maybeSingle()
+                .abortSignal(controller.signal)
+          );
+          profile = res.data;
+          profileError = res.error;
+        } catch (e) {
+          if (e && e.message === 'Request timed out') {
+            // Single retry with a longer timeout
+            const res = await withTimeoutAbort(
+              () =>
+                supabase
+                  .from('profiles')
+                  .select('id, username, avatar_url, background_url, bio, followers, following, created_at')
+                  .eq('id', userId)
+                  .maybeSingle()
+                  .abortSignal(controller.signal),
+              30000
+            );
+            profile = res.data;
+            profileError = res.error;
+          } else {
+            throw e;
+          }
+        }
           
         console.log('[VIEW-PROFILE] Profile query result:', { profile: !!profile, error: profileError });
           
@@ -94,24 +139,40 @@ export default function ViewProfile({ params }) {
           .from('posts')
           .select('*')
           .eq('user_id', userId)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .limit(20)
+          .abortSignal(controller.signal);
           
         if (!postsError) {
-          safeSetState(() => setProfilePosts(posts || []));
-          safeSetState(() => setPostCount(posts?.length || 0));
+          const profileForPost = {
+            id: profile?.id || userId,
+            username: profile?.username || 'User',
+            avatar_url: profile?.avatar_url || '/default-avatar.svg'
+          };
+          const normalizedPosts = (posts || []).map(p => ({
+            ...p,
+            profile: profileForPost,
+            buy_count: p?.buy_count ?? 0,
+            sell_count: p?.sell_count ?? 0,
+            comment_count: p?.comment_count ?? 0
+          }));
+          safeSetState(() => setProfilePosts(normalizedPosts));
+          safeSetState(() => setPostCount(normalizedPosts.length));
         }
         
         // Fetch followers (optional UI-managed)
         await supabase
           .from('user_followings')
           .select('follower_id, profiles!user_followings_follower_id_fkey(id, username, avatar_url)')
-          .eq('following_id', userId);
+          .eq('following_id', userId)
+          .abortSignal(controller.signal);
         
         // Fetch following (optional UI-managed)
         await supabase
           .from('user_followings')
           .select('following_id, profiles!user_followings_following_id_fkey(id, username, avatar_url)')
-          .eq('follower_id', userId);
+          .eq('follower_id', userId)
+          .abortSignal(controller.signal);
         
         // Try to get avatar and background images
         if (profile.avatar_url) {
@@ -161,8 +222,9 @@ export default function ViewProfile({ params }) {
 
     return () => {
       isCancelled = true;
+      controller.abort();
     };
-  }, [userId]);
+  }, [userId, supabase]);
 
   // Use effect to check follow status using the FollowProvider
   useEffect(() => {
@@ -353,23 +415,7 @@ export default function ViewProfile({ params }) {
         {profilePosts.length > 0 ? (
           <div className={styles.postsGrid}>
             {profilePosts.map(post => (
-              <div key={post.id} className={styles.postCard}>
-                <div 
-                  className={styles.postImage} 
-                  style={{ 
-                    backgroundImage: `url(${post.image_url || '/default-post-bg.svg'})`
-                  }}
-                ></div>
-                <h3>{post.title || 'Untitled Post'}</h3>
-                <p>
-                  {post.content?.length > 100
-                    ? `${post.content.substring(0, 100)}...`
-                    : post.content || 'No content'}
-                </p>
-                <Link href={`/posts/${post.id}`} className={styles.viewPostLink}>
-                  View Post
-                </Link>
-              </div>
+              <PostCard key={post.id} post={post} />
             ))}
           </div>
         ) : (
@@ -380,4 +426,4 @@ export default function ViewProfile({ params }) {
       </div>
     </div>
   );
-} 
+}

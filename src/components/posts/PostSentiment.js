@@ -1,11 +1,17 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useComments } from '@/providers/CommentProvider';
 import styles from '../../styles/PostSentiment.module.css';
 
-export default function PostSentiment({ buyCount = 0, sellCount = 0 }) {
+export default function PostSentiment({ postId, buyCount = 0, sellCount = 0 }) {
+  const { getPostStats } = useComments();
+  const stats = postId ? getPostStats(postId) : null;
+  const effectiveBuy = stats?.buyCount ?? buyCount;
+  const effectiveSell = stats?.sellCount ?? sellCount;
+
   const { buyPercentage, sellPercentage, sentiment, totalVotes } = useMemo(() => {
-    const total = buyCount + sellCount;
+    const total = effectiveBuy + effectiveSell;
     
     if (total === 0) {
       return {
@@ -16,7 +22,7 @@ export default function PostSentiment({ buyCount = 0, sellCount = 0 }) {
       };
     }
     
-    const buyPct = Math.round((buyCount / total) * 100);
+    const buyPct = Math.round((effectiveBuy / total) * 100);
     const sellPct = 100 - buyPct;
     
     let sentimentType = 'neutral';
@@ -29,7 +35,7 @@ export default function PostSentiment({ buyCount = 0, sellCount = 0 }) {
       sentiment: sentimentType,
       totalVotes: total
     };
-  }, [buyCount, sellCount]);
+  }, [effectiveBuy, effectiveSell]);
 
   const getSentimentIcon = () => {
     switch (sentiment) {

@@ -1,5 +1,6 @@
 import { Inter, Roboto_Mono } from 'next/font/google';
 import '@/styles/globals.css';
+import 'flag-icons/css/flag-icons.min.css';
 import { ThemeProvider } from "@/providers/theme-provider";
 import { SupabaseProvider, UserProvider, CreatePostFormProvider } from '@/providers';
 import { ProfileProvider } from '@/providers/ProfileProvider';

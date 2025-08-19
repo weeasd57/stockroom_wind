@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useTraders } from '@/providers/TradersProvider';
 import styles from '@/styles/traders.module.css';
-import { COUNTRY_ISO_CODES } from '@/models/CurrencyData';
-import 'flag-icons/css/flag-icons.min.css';
+
+// Removed unused imports for cleaner code
 
 export default function TradersPage() {
   const { supabase, isAuthenticated, user } = useSupabase();
@@ -259,51 +259,6 @@ export default function TradersPage() {
                 </div>
                 
                 <p className={styles.traderBio}>{trader.bio || 'No bio available'}</p>
-                
-                {/* Latest Post Preview */}
-                {trader.latestPost && (
-                  <div className={styles.latestPost}>
-                    <div className={styles.latestPostHeader}>
-                      <span className={styles.latestPostLabel}>Latest Post</span>
-                      <span className={styles.latestPostDate}>
-                        {new Date(trader.latestPost.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className={styles.latestPostContent}>
-                      <div className={styles.stockInfo}>
-                        <span className={styles.stockSymbol}>{trader.latestPost.symbol}</span>
-                        {trader.latestPost.country && COUNTRY_ISO_CODES[trader.latestPost.country] && (
-                          <span className={`fi fi-${COUNTRY_ISO_CODES[trader.latestPost.country].toLowerCase()} ${styles.countryFlag}`}></span>
-                        )}
-                        {/* إظهار علم المنشور إذا لم تكن هناك صورة */}
-                        {!trader.latestPost.image_url && (
-                          <span className={styles.postFlag} title="منشور بدون صورة">
-                            📝
-                          </span>
-                        )}
-                      </div>
-                      {trader.latestPost.image_url && (
-                        <div className={styles.postImagePreview}>
-                          <img 
-                            src={trader.latestPost.image_url} 
-                            alt="Post preview"
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                            }}
-                          />
-                        </div>
-                      )}
-                      {trader.latestPost.description && (
-                        <p className={styles.postDescription}>
-                          {trader.latestPost.description.length > 60 
-                            ? `${trader.latestPost.description.substring(0, 60)}...` 
-                            : trader.latestPost.description
-                          }
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
                 
                 <div className={styles.cardActions}>
                   {isAuthenticated && (

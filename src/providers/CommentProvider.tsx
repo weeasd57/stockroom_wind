@@ -20,8 +20,8 @@ interface CommentContextType {
   getPostComments: (postId: string) => Comment[];
   getPostStats: (postId: string) => PostStats;
   fetchCommentsForPost: (postId: string) => Promise<void>;
-  toggleBuyVote: (postId: string) => Promise<void>;
-  toggleSellVote: (postId: string) => Promise<void>;
+  toggleBuyVote: (postId: string, currentAction?: 'buy' | 'sell' | null) => Promise<void>;
+  toggleSellVote: (postId: string, currentAction?: 'buy' | 'sell' | null) => Promise<void>;
 }
 
 const CommentContext = createContext<CommentContextType | null>(null);
@@ -254,8 +254,30 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const toggleBuyVote = async (postId: string): Promise<void> => {
+  const toggleBuyVote = async (postId: string, currentAction: 'buy' | 'sell' | null = null): Promise<void> => {
     if (!supabase || !user) throw new Error('Not authenticated');
+
+    // Ensure subscription is active for real-time confirmations
+    subscribeToPost(postId);
+
+    // Optimistic update
+    const prevStats = postStats[postId] || { commentCount: 0, buyCount: 0, sellCount: 0 };
+    const prevSnapshot = { ...prevStats };
+    let nextStats = { ...prevStats };
+
+    if (currentAction === 'buy') {
+      // Remove existing buy
+      nextStats.buyCount = Math.max(0, nextStats.buyCount - 1);
+    } else if (currentAction === 'sell') {
+      // Switch from sell to buy
+      nextStats.sellCount = Math.max(0, nextStats.sellCount - 1);
+      nextStats.buyCount = nextStats.buyCount + 1;
+    } else {
+      // Add new buy
+      nextStats.buyCount = nextStats.buyCount + 1;
+    }
+
+    setPostStats(prev => ({ ...prev, [postId]: nextStats }));
 
     try {
       // Check if user already has a buy vote
@@ -296,11 +318,35 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error('Error toggling buy vote:', err);
       setError(err instanceof Error ? err.message : 'Failed to update vote');
+      // Rollback optimistic update on error
+      setPostStats(prev => ({ ...prev, [postId]: prevSnapshot }));
     }
   };
 
-  const toggleSellVote = async (postId: string): Promise<void> => {
+  const toggleSellVote = async (postId: string, currentAction: 'buy' | 'sell' | null = null): Promise<void> => {
     if (!supabase || !user) throw new Error('Not authenticated');
+
+    // Ensure subscription is active for real-time confirmations
+    subscribeToPost(postId);
+
+    // Optimistic update
+    const prevStats = postStats[postId] || { commentCount: 0, buyCount: 0, sellCount: 0 };
+    const prevSnapshot = { ...prevStats };
+    let nextStats = { ...prevStats };
+
+    if (currentAction === 'sell') {
+      // Remove existing sell
+      nextStats.sellCount = Math.max(0, nextStats.sellCount - 1);
+    } else if (currentAction === 'buy') {
+      // Switch from buy to sell
+      nextStats.buyCount = Math.max(0, nextStats.buyCount - 1);
+      nextStats.sellCount = nextStats.sellCount + 1;
+    } else {
+      // Add new sell
+      nextStats.sellCount = nextStats.sellCount + 1;
+    }
+
+    setPostStats(prev => ({ ...prev, [postId]: nextStats }));
 
     try {
       // Check if user already has a sell vote
@@ -341,6 +387,8 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error('Error toggling sell vote:', err);
       setError(err instanceof Error ? err.message : 'Failed to update vote');
+      // Rollback optimistic update on error
+      setPostStats(prev => ({ ...prev, [postId]: prevSnapshot }));
     }
   };
 

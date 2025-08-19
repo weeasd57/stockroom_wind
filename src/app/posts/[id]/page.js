@@ -8,10 +8,13 @@ import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 import { COUNTRY_ISO_CODES } from '@/models/CurrencyData';
 import { getCountryForExchange } from '@/models/ExchangeData';
 import 'flag-icons/css/flag-icons.min.css';
-import Link from 'next/link';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
 import PriceHistoryChart from '@/components/PriceHistoryChart';
+import { CommentProvider } from '@/providers/CommentProvider';
+import PostActions from '@/components/posts/PostActions';
+import PostSentiment from '@/components/posts/PostSentiment';
+import Comments from '@/components/posts/Comments';
 
 // Function to format date
 function formatDate(dateString) {
@@ -258,7 +261,6 @@ export default function PostDetailsPage() {
         <div className={styles.errorContainer}>
           <h2>Error</h2>
           <p>{error}</p>
-          <Link href="/" className={styles.backButton}>Back to Home</Link>
         </div>
       </div>
     );
@@ -270,7 +272,6 @@ export default function PostDetailsPage() {
         <div className={styles.errorContainer}>
           <h2>Post Not Found</h2>
           <p>The post you're looking for doesn't exist or has been removed.</p>
-          <Link href="/" className={styles.backButton}>Back to Home</Link>
         </div>
       </div>
     );
@@ -296,9 +297,6 @@ export default function PostDetailsPage() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <Link href="/profile" className={styles.backButton}>
-          ← Back to Profile
-        </Link>
         <h1 className={styles.title}>Stock Analysis</h1>
       </div>
       
@@ -554,10 +552,28 @@ export default function PostDetailsPage() {
           </div>
         )}
         
+        {/* Community Interactions: Buy/Sell, Sentiment, and Comments */}
+        <div className={styles.section}>
+          <h3 className={styles.sectionTitle}>Community</h3>
+          <CommentProvider>
+            <PostActions 
+              postId={post.id}
+              initialBuyCount={post.buy_count || 0}
+              initialSellCount={post.sell_count || 0}
+            />
+            <PostSentiment 
+              postId={post.id}
+              buyCount={post.buy_count || 0}
+              sellCount={post.sell_count || 0}
+            />
+            <Comments 
+              postId={post.id}
+              initialCommentCount={post.comment_count || 0}
+            />
+          </CommentProvider>
+        </div>
+        
         <div className={styles.footer}>
-          <Link href="/profile" className={styles.footerButton}>
-            Back to Profile
-          </Link>
         </div>
       </div>
     </div>

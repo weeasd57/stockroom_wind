@@ -2,11 +2,12 @@ import { createClient } from '@supabase/supabase-js';
 import { BASE_URL, API_KEY, hasValidApiKey } from '@/models/StockApiConfig';
 import { NextResponse } from 'next/server';
 
-
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 // Use environment variables for service role key (server-only)
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
+// Debug flag to reduce noisy logs in production
+const DEBUG = process.env.PRICE_CHECK_DEBUG === '1' || process.env.PRICE_CHECK_DEBUG === 'true';
 
 // Check if required environment variables are set
 if (!supabaseUrl || !supabaseAnonKey) {
@@ -16,81 +17,81 @@ if (!supabaseUrl || !supabaseAnonKey) {
   });
 }
 
+// Create admin client function to be called when needed
+const createAdminClient = () => {
+  return createClient(supabaseUrl || '', serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    },
+    global: {
+      headers: {
+        'x-supabase-role': 'service_role',
+        'Authorization': `Bearer ${serviceRoleKey}`
+      },
+    }
+  });
+};
 
+// Reuse single admin client
+const adminSupabase = createAdminClient();
 
+// Helper: log status update (gated by DEBUG)
+async function logStatusUpdate(supabaseClient, postId, symbol, message, updateResult) {
+  try {
+    if (DEBUG) {
+      console.log(`[DEBUG] Status update for post ${postId} (${symbol}): ${message}`);
+      if (updateResult && updateResult.error) {
+        console.log(`[DEBUG] Update error:`, updateResult.error);
+      }
+    }
+    // Optional: persist to an audit table if available
+    // await supabaseClient.from('status_logs').insert([{ post_id: postId, symbol, message }]);
+  } catch (e) {
+    console.error('[ERROR] logStatusUpdate failed:', e);
+  }
+}
 
+// Helper: restrict upsert payload to allowed columns only
+const ALLOWED_UPDATE_FIELDS = new Set([
+  'id',
+  'current_price',
+  'high_price',
+  'target_high_price',
+  'target_reached',
+  'stop_loss_triggered',
+  'target_reached_date',
+  'target_hit_time',
+  'stop_loss_triggered_date',
+  'last_price_check',
+  'closed',
+  'postdateafterpricedate',
+  'postaftermarketclose',
+  'nodataavailable',
+  'status_message',
+  'price_checks'
+]);
+
+function mapPostForDb(post) {
+  const out = {};
+  // Always include id for upsert target
+  out.id = post.id;
+  for (const key of ALLOWED_UPDATE_FIELDS) {
+    if (key === 'id') continue;
+    if (post[key] !== undefined) {
+      out[key] = post[key];
+    }
+  }
+  return out;
+}
 
 const MAX_DAILY_CHECKS = 100;
 
 export async function POST(request) {
-  console.log(`[DEBUG] Check-prices API route called at ${new Date().toISOString()}`);
+  if (DEBUG) console.log(`[DEBUG] Check-prices API route called at ${new Date().toISOString()}`);
   
   // Create Supabase client
   const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
-  
-  // Create admin client function to be called when needed
-  const createAdminClient = () => {
-    return createClient(supabaseUrl || '', serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      },
-      global: {
-        headers: {
-          'x-supabase-role': 'service_role',
-          'Authorization': `Bearer ${serviceRoleKey}`
-        },
-      }
-    });
-  };
-  
-  // Helper function to log status updates and DB operations
-  const logStatusUpdate = async (postId, symbol, status, result) => {
-    const timestamp = new Date().toISOString();
-    console.log(`[STATUS UPDATE][${timestamp}] Post ${postId} (${symbol}): ${status}`);
-    
-    // Log more detailed information if result contains data
-    if (result.data) {
-      console.log(`[STATUS DATA][${timestamp}] Post ${postId}: ${JSON.stringify(result.data).substring(0, 200)}${result.data.length > 200 ? '...' : ''}`);
-    }
-    
-    // Log errors more clearly
-    if (result.error) {
-      console.error(`[STATUS ERROR][${timestamp}] Post ${postId}: ${result.error.message}`);
-      if (result.error.details) {
-        console.error(`[STATUS ERROR DETAILS][${timestamp}] Post ${postId}: ${JSON.stringify(result.error.details)}`);
-      }
-    }
-    
-    // Log to database if needed
-    try {
-      const logStartTime = Date.now();
-      const adminSupabase = createAdminClient();
-      const { error } = await adminSupabase
-        .from('operation_logs')
-        .insert({
-          operation_type: 'post_status_update',
-          post_id: postId,
-          symbol: symbol,
-          status: status,
-          success: !result.error,
-          error_message: result.error ? result.error.message : null,
-          data_summary: result.data ? JSON.stringify(result.data).substring(0, 1000) : null,
-          created_at: timestamp
-        })
-        .select();
-      const logDuration = Date.now() - logStartTime;
-        
-      if (error) {
-        console.error(`[ERROR] Failed to log operation for post ${postId}: ${error.message}`);
-      } else {
-        console.log(`[DEBUG] Successfully logged operation for post ${postId} in ${logDuration}ms`);
-      }
-    } catch (err) {
-      console.error(`[ERROR] Exception logging operation for post ${postId}: ${err.message}`);
-      // Continue execution even if logging fails
-    }
-  };
   
   try {
     // Check if Supabase is properly configured
@@ -126,13 +127,13 @@ export async function POST(request) {
     }
 
     const body = await request.json().catch(() => ({}));
-    console.log(`[DEBUG] Request body:`, JSON.stringify(body));
+    if (DEBUG) console.log(`[DEBUG] Request body:`, JSON.stringify(body));
     const cookieHeader = request.headers.get('cookie');
-    console.log(`[DEBUG] Cookie header present: ${!!cookieHeader}`);
+    if (DEBUG) console.log(`[DEBUG] Cookie header present: ${!!cookieHeader}`);
 
     // Check if includeApiDetails flag is set
     const includeApiDetails = body.includeApiDetails === true;
-    console.log(`[DEBUG] Include API details: ${includeApiDetails}`);
+    if (DEBUG) console.log(`[DEBUG] Include API details: ${includeApiDetails}`);
 
     let userId = body.userId;
     let experienceUpdated = false;
@@ -141,7 +142,7 @@ export async function POST(request) {
 
     
     if (!userId) {
-      console.log(`[DEBUG] No userId in request body, attempting to get from session`);
+      if (DEBUG) console.log(`[DEBUG] No userId in request body, attempting to get from session`);
       
       const { data: { session }, error: authError } = await supabase.auth.getSession({
         cookieHeader
@@ -164,7 +165,7 @@ export async function POST(request) {
       }
       
       userId = session.user.id;
-      console.log(`[DEBUG] Retrieved userId from session: ${userId}`);
+      if (DEBUG) console.log(`[DEBUG] Retrieved userId from session: ${userId}`);
     }
     
     
@@ -180,9 +181,9 @@ export async function POST(request) {
     
     
     const today = new Date().toISOString().split('T')[0]; 
-    console.log(`[DEBUG] Checking usage for user ${userId} on date ${today}`);
+    if (DEBUG) console.log(`[DEBUG] Checking usage for user ${userId} on date ${today}`);
     
-    const adminSupabase = createAdminClient();
+    // Reduce SELECT fields to improve performance
     const { data: usageData, error: usageError } = await adminSupabase
       .from('price_check_usage')
       .select('count')
@@ -192,10 +193,10 @@ export async function POST(request) {
     
     
     if (!usageError && usageData) {
-      console.log(`[DEBUG] Found existing usage record: ${JSON.stringify(usageData)}`);
+      if (DEBUG) console.log(`[DEBUG] Found existing usage record: ${JSON.stringify(usageData)}`);
       
       if (usageData.count >= MAX_DAILY_CHECKS) {
-        console.log(`[DEBUG] User has reached maximum daily checks (${usageData.count}/${MAX_DAILY_CHECKS})`);
+        if (DEBUG) console.log(`[DEBUG] User has reached maximum daily checks (${usageData.count}/${MAX_DAILY_CHECKS})`);
         return NextResponse.json(
           { 
             success: false, 
@@ -207,7 +208,7 @@ export async function POST(request) {
         );
       }
       
-      console.log(`[DEBUG] Updating usage count from ${usageData.count} to ${usageData.count + 1}`);
+      if (DEBUG) console.log(`[DEBUG] Updating usage count from ${usageData.count} to ${usageData.count + 1}`);
       const { error: updateError } = await adminSupabase
         .from('price_check_usage')
         .update({ 
@@ -221,7 +222,7 @@ export async function POST(request) {
         console.error('[ERROR] Error updating usage count:', updateError);
       }
     } else {
-      console.log(`[DEBUG] No existing usage record found, creating new record`);
+      if (DEBUG) console.log(`[DEBUG] No existing usage record found, creating new record`);
       
       const { error: insertError } = await adminSupabase
         .from('price_check_usage')
@@ -232,11 +233,11 @@ export async function POST(request) {
       if (insertError) {
         console.error('[ERROR] Error creating new usage record:', insertError);
       } else {
-        console.log(`[DEBUG] Successfully created new usage record`);
+        if (DEBUG) console.log(`[DEBUG] Successfully created new usage record`);
       }
     }
     
-    console.log(`[DEBUG] Fetching all posts to count closed posts`);
+    if (DEBUG) console.log(`[DEBUG] Fetching all posts to count closed posts`);
     const { data: allPosts, error: allPostsError } = await supabase
       .from('posts')
       .select('id, closed')
@@ -247,31 +248,25 @@ export async function POST(request) {
     }
     
     const closedPostsCount = allPosts?.filter(post => post.closed === true).length || 0;
-    console.log(`[DEBUG] Found ${closedPostsCount} closed posts out of ${allPosts?.length || 0} total posts`);
+    if (DEBUG) console.log(`[DEBUG] Found ${closedPostsCount} closed posts out of ${allPosts?.length || 0} total posts`);
     
     
-    console.log(`[DEBUG] Fetching open posts for price check`);
+    if (DEBUG) console.log(`[DEBUG] Fetching open posts for price check`);
     const { data: posts, error: postsError } = await supabase
       .from('posts')
       .select(`
-        id, 
+        id,
         company_name,
         symbol,
-        target_price, 
-        stop_loss_price, 
+        target_price,
+        stop_loss_price,
         current_price,
-        initial_price,
         exchange,
-        country,
-        target_reached,
-        stop_loss_triggered,
         created_at,
-        target_reached_date,
-        stop_loss_triggered_date,
         closed
       `)
       .eq('user_id', userId)
-      .or('closed.is.null,closed.eq.false'); // جلب المنشورات التي closed = null أو closed = false
+      .or('closed.is.null,closed.eq.false'); // Only open posts or null closed
 
     
     
@@ -280,7 +275,7 @@ export async function POST(request) {
       throw postsError;
     }
     
-    console.log(`[DEBUG] Found ${posts.length} open posts to check prices for`);
+    if (DEBUG) console.log(`[DEBUG] Found ${posts.length} open posts to check prices for`);
     
     const results = [];
     const updatedPosts = [];
@@ -291,7 +286,7 @@ export async function POST(request) {
     
     for (const post of posts) {
       try {
-        console.log(`[DEBUG] Processing post ID ${post.id} for symbol ${post.symbol}`);
+        if (DEBUG) console.log(`[DEBUG] Processing post ID ${post.id} for symbol ${post.symbol}`);
         
         if (!post.symbol || !post.target_price || !post.stop_loss_price) {
           console.warn(`[WARN] Skipping post ${post.id} - missing required fields (symbol: ${!!post.symbol}, target: ${!!post.target_price}, stop-loss: ${!!post.stop_loss_price})`);
@@ -300,13 +295,13 @@ export async function POST(request) {
         
         
         if (post.closed === true) {
-          console.log(`[DEBUG] Skipping closed post ${post.id}`);
+          if (DEBUG) console.log(`[DEBUG] Skipping closed post ${post.id}`);
           continue;
         }
         
         
         const symbol = post.exchange ? `${post.symbol}.${post.exchange}` : post.symbol;
-        console.log(`[DEBUG] Using symbol with exchange: ${symbol}`);
+        if (DEBUG) console.log(`[DEBUG] Using symbol with exchange: ${symbol}`);
         
         
         // Get the date from the request or use today's date
@@ -322,7 +317,7 @@ export async function POST(request) {
         // Format dates for API request, using UTC to avoid timezone issues
         const fromDate = createdAt.toISOString().split('T')[0];
         const toDate = todayDate.toISOString().split('T')[0];
-        console.log(`[DEBUG] Date range for historical data: ${fromDate} to ${toDate}`);
+        if (DEBUG) console.log(`[DEBUG] Date range for historical data: ${fromDate} to ${toDate}`);
 
         // Record post creation date and time for comparison with price data later
         const postCreationDate = post.created_at ? new Date(post.created_at) : null;
@@ -333,12 +328,12 @@ export async function POST(request) {
         const postTimeMinutes = postCreationDate ? postCreationDate.getMinutes() : 0;
 
         // Additional logging to track timezone-related issues
-        console.log(`[DEBUG] Post creation date/time: ${postCreationDate ? postCreationDate.toISOString() : 'none'}`);
-        console.log(`[DEBUG] Post date only (UTC): ${postDateOnly}`);
-        console.log(`[DEBUG] Post time (local): ${postTimeHours}:${postTimeMinutes}`);
+        if (DEBUG) console.log(`[DEBUG] Post creation date/time: ${postCreationDate ? postCreationDate.toISOString() : 'none'}`);
+        if (DEBUG) console.log(`[DEBUG] Post date only (UTC): ${postDateOnly}`);
+        if (DEBUG) console.log(`[DEBUG] Post time (local): ${postTimeHours}:${postTimeMinutes}`);
         
         const historicalUrl = `${BASE_URL}/eod/${symbol}?from=${fromDate}&to=${toDate}&period=d&api_token=${API_KEY}&fmt=json`;
-        console.log(`[DEBUG] Fetching historical data for ${symbol} from API`);
+        if (DEBUG) console.log(`[DEBUG] Fetching historical data for ${symbol} from API`);
 
         // Record API request details
         const apiRequestInfo = {
@@ -351,10 +346,14 @@ export async function POST(request) {
         
         let historicalData;
         try {
-          console.log(`[DEBUG] Sending historical data API request for ${symbol}`);
-          
-          const response = await fetch(historicalUrl);
-          console.log(`[DEBUG] API response received with status: ${response.status}`);
+          if (DEBUG) console.log(`[DEBUG] Sending historical data API request for ${symbol}`);
+          // Add timeout to fetch via AbortController
+          const controller = new AbortController();
+          const timeoutMs = parseInt(process.env.PRICE_CHECK_FETCH_TIMEOUT || '12000', 10);
+          const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+          const response = await fetch(historicalUrl, { signal: controller.signal });
+          clearTimeout(timeoutId);
+          if (DEBUG) console.log(`[DEBUG] API response received with status: ${response.status}`);
           
           // Update API tracking with response info
           apiRequestInfo.responseStatus = response.status;
@@ -376,7 +375,7 @@ export async function POST(request) {
             
             // Create a minimal historical data object using the stored current_price
             const currentPriceValue = parseFloat(post.current_price);
-            console.log(`Falling back to stored current price for ${symbol}: ${currentPriceValue}`);
+            if (DEBUG) console.log(`[DEBUG] Falling back to stored current price for ${symbol}: ${currentPriceValue}`);
             
             historicalData = [{
               date: new Date().toISOString().split('T')[0],
@@ -392,7 +391,7 @@ export async function POST(request) {
             
             // Check if the response is valid
             if (!Array.isArray(historicalData) || historicalData.length === 0) {
-              console.warn(`Empty historical data array returned for ${symbol}, falling back to stored current price`);
+              if (DEBUG) console.warn(`Empty historical data array returned for ${symbol}, falling back to stored current price`);
               
               // Fallback directly to using the current_price from the post record
               if (!post.current_price) {
@@ -402,7 +401,7 @@ export async function POST(request) {
               
               // Create a minimal historical data object using the stored current_price
               const currentPriceValue = parseFloat(post.current_price);
-              console.log(`Falling back to stored current price for ${symbol}: ${currentPriceValue}`);
+              if (DEBUG) console.log(`Falling back to stored current price for ${symbol}: ${currentPriceValue}`);
               
               historicalData = [{
                 date: new Date().toISOString().split('T')[0],
@@ -438,15 +437,14 @@ export async function POST(request) {
         }
         
         // Insert before the code that processes price data
-        console.log(`[DEBUG] Post ${post.id}: Processing price data for ${symbol}`);
-        console.log(`[DEBUG] - Target price: ${post.target_price}, Stop loss: ${post.stop_loss_price}`);
+        if (DEBUG) console.log(`[DEBUG] Post ${post.id}: Processing price data for ${symbol}`);
+        if (DEBUG) console.log(`[DEBUG] - Target price: ${post.target_price}, Stop loss: ${post.stop_loss_price}`);
         
         // Check if we have valid historical data
         if (!Array.isArray(historicalData) || historicalData.length === 0) {
           console.error(`No historical data available for ${symbol}`);
           
           // Update the post with the status flag
-          const adminSupabase = createAdminClient();
           const updateResult = await adminSupabase
             .from('posts')
             .update({
@@ -462,7 +460,7 @@ export async function POST(request) {
             .eq('id', post.id);
 
           // Log the update operation
-          await logStatusUpdate(post.id, post.symbol, "No price data available", updateResult);
+          await logStatusUpdate(adminSupabase, post.id, post.symbol, "No price data available", updateResult);
 
           if (updateResult.error) {
             console.error(`Error updating post status for ${symbol}:`, updateResult.error);
@@ -484,9 +482,11 @@ export async function POST(request) {
 
         // Insert at the point where historical data is processed
         if (historicalData && historicalData.length > 0) {
-          console.log(`[DEBUG] Historical data points: ${historicalData.length}`);
-          console.log(`[DEBUG] First data point: ${JSON.stringify(historicalData[0])}`);
-          console.log(`[DEBUG] Last data point: ${JSON.stringify(historicalData[historicalData.length - 1])}`);
+          if (DEBUG) {
+            console.log(`[DEBUG] Historical data points: ${historicalData.length}`);
+            console.log(`[DEBUG] First data point: ${JSON.stringify(historicalData[0])}`);
+            console.log(`[DEBUG] Last data point: ${JSON.stringify(historicalData[historicalData.length - 1])}`);
+          }
         } else {
           console.warn(`[WARN] No historical data points available for ${symbol}`);
         }
@@ -498,17 +498,17 @@ export async function POST(request) {
         const lastPriceDateStr = lastPriceDate ? lastPriceDate.toISOString().split('T')[0] : null;
 
         // Log additional timezone information for debugging
-        console.log(`[DEBUG] Last price date details: ${lastPriceDate} (${lastPriceDateStr})`);
+        if (DEBUG) console.log(`[DEBUG] Last price date details: ${lastPriceDate} (${lastPriceDateStr})`);
 
         // Check if the post date is valid for comparison with the last price date
         if (postCreationDate && lastPriceDate) {
           // Log comparison details
-          console.log(`[DEBUG] Comparing post date (${postDateOnly}) with last price date (${lastPriceDateStr})`);
+          if (DEBUG) console.log(`[DEBUG] Comparing post date (${postDateOnly}) with last price date (${lastPriceDateStr})`);
           
           // If post date is after last price date, we can't check prices
           if (postDateOnly > lastPriceDateStr) {
-            console.log(`[DEBUG] Post created after latest price data for ${symbol}, can't check prices accurately`);
-            console.log(`[DEBUG] Post date: ${postDateOnly}, Last price date: ${lastPriceDateStr}`);
+            if (DEBUG) console.log(`[DEBUG] Post created after latest price data for ${symbol}, can't check prices accurately`);
+            if (DEBUG) console.log(`[DEBUG] Post date: ${postDateOnly}, Last price date: ${lastPriceDateStr}`);
             
             // Update the post with the status flag
             const { error: updateError } = await adminSupabase
@@ -547,7 +547,7 @@ export async function POST(request) {
           // Market data is usually end-of-day, so if post was created before market close,
           // we can compare, otherwise we can't check prices for the same day
           if (postDateOnly === lastPriceDateStr) {
-            console.log(`[DEBUG] Post created on the same day as last price data, checking time`);
+            if (DEBUG) console.log(`[DEBUG] Post created on the same day as last price data, checking time`);
             
             // Convert post creation time to the exchange's timezone
             // For simplicity, we're assuming market close is at 4 PM (16:00) local time
@@ -555,11 +555,11 @@ export async function POST(request) {
             const marketCloseHour = 16;
             
             // Log detailed time information for debugging
-            console.log(`[DEBUG] Post time: ${postTimeHours}:${postTimeMinutes}, Market close hour: ${marketCloseHour}:00`);
+            if (DEBUG) console.log(`[DEBUG] Post time: ${postTimeHours}:${postTimeMinutes}, Market close hour: ${marketCloseHour}:00`);
             
             // If post was created after market close, can't check prices accurately
             if (postTimeHours >= marketCloseHour) {
-              console.log(`[DEBUG] Post created after market close on ${postDateOnly}, can't check prices accurately`);
+              if (DEBUG) console.log(`[DEBUG] Post created after market close on ${postDateOnly}, can't check prices accurately`);
               
               // Update the post with the status flag
               const { error: updateError } = await adminSupabase
@@ -594,7 +594,7 @@ export async function POST(request) {
               continue;
             }
             
-            console.log(`[DEBUG] Post created before market close on ${postDateOnly}, can check prices`);
+            if (DEBUG) console.log(`[DEBUG] Post created before market close on ${postDateOnly}, can check prices`);
           }
         }
         
@@ -666,43 +666,22 @@ export async function POST(request) {
         const shouldUpdate = targetReached || stopLossTriggered || (post.current_price !== lastPrice) || shouldClosePost;
         
         if (shouldUpdate) {
-          // Keep original target, stop loss and initial prices intact
-          // Only update the current price with the last available price
+          // Only include fields that must change; avoid overwriting other columns
           updatedPosts.push({
             id: post.id,
-            user_id: userId, 
-            
-            // Keep original content information
-            content: post.content || '', 
-            company_name: post.company_name || '',
-            symbol: post.symbol || '',
-            strategy: post.strategy || '',
-            description: post.description || '',
-            
-            // Keep original metadata - preserve country even if null
-            image_url: post.image_url,
-            country: post.country,
-            exchange: post.exchange,
-            
-            // Update current price but preserve target, stop loss, and initial price
             current_price: lastPrice,
-            target_price: post.target_price, // Keep original target price
-            stop_loss_price: post.stop_loss_price, // Keep original stop loss
-            initial_price: post.initial_price, // Never change the initial price once set
-            high_price: highestPrice, // Store the highest price in the period
-            target_high_price: highPrice, // Store the high price when target was reached
-            
-            // Update status information
+            high_price: highestPrice,
+            target_high_price: highPrice,
             target_reached: targetReached,
             stop_loss_triggered: stopLossTriggered,
             target_reached_date: targetReachedDate,
-            target_hit_time: targetHitTime, // Add the time when target was hit
+            target_hit_time: targetHitTime,
             stop_loss_triggered_date: stopLossTriggeredDate,
             last_price_check: new Date().toISOString(),
-            closed: shouldClosePost ? true : null,
-            postDateAfterPriceDate: false,
-            postAfterMarketClose: false,
-            noDataAvailable: false,
+            closed: shouldClosePost ? true : undefined,
+            postdateafterpricedate: false,
+            postaftermarketclose: false,
+            nodataavailable: false,
             status_message: shouldClosePost ? "Post closed" : "Post still active"
           });
         }
@@ -740,16 +719,16 @@ export async function POST(request) {
         });
 
         // Insert right before the post is updated
-        console.log(`[DEBUG] Post ${post.id} price check results:`);
-        console.log(`[DEBUG] - Symbol: ${symbol}, Last price: ${lastPrice}`);
-        console.log(`[DEBUG] - Target reached: ${targetReached}, Stop loss triggered: ${stopLossTriggered}`);
-        console.log(`[DEBUG] - Will close post: ${shouldClosePost}`);
+        if (DEBUG) console.log(`[DEBUG] Post ${post.id} price check results:`);
+        if (DEBUG) console.log(`[DEBUG] - Symbol: ${symbol}, Last price: ${lastPrice}`);
+        if (DEBUG) console.log(`[DEBUG] - Target reached: ${targetReached}, Stop loss triggered: ${stopLossTriggered}`);
+        if (DEBUG) console.log(`[DEBUG] - Will close post: ${shouldClosePost}`);
 
         // Add near line ~600 where price processing happens
-        console.log(`[DEBUG] Checking targets for post ${post.id}. Target: ${post.target_price}, Stop-loss: ${post.stop_loss_price}, Current: ${lastPrice}`);
+        if (DEBUG) console.log(`[DEBUG] Checking targets for post ${post.id}. Target: ${post.target_price}, Stop-loss: ${post.stop_loss_price}, Current: ${lastPrice}`);
         
         // Add near line ~700 where posts are being updated
-        console.log(`[DEBUG] Updating post ${post.id}. Setting current_price: ${lastPrice}, target_reached: ${targetReached}, stop_loss_triggered: ${stopLossTriggered}`);
+        if (DEBUG) console.log(`[DEBUG] Updating post ${post.id}. Setting current_price: ${lastPrice}, target_reached: ${targetReached}, stop_loss_triggered: ${stopLossTriggered}`);
 
         // Store historical data in the map
         postHistoricalData[post.id] = historicalData;
@@ -798,14 +777,13 @@ export async function POST(request) {
           .select('success_posts, loss_posts')
           .eq('id', userId)
           .single();
-        
+
         if (!profileError && profileData) {
           // Calculate new totals
           const newSuccessPosts = (profileData.success_posts || 0) + successfulPosts;
           const newLossPosts = (profileData.loss_posts || 0) + lostPosts;
           
-          // Update the profile with new counts
-          const adminSupabase = createAdminClient();
+          // Update the profile with new counts using shared adminSupabase
           const { error: updateProfileError } = await adminSupabase
             .from('profiles')
             .update({
@@ -820,7 +798,7 @@ export async function POST(request) {
             console.error('Error updating user experience score:', updateProfileError);
           } else {
             experienceUpdated = true;
-            console.log(`Updated user experience score: +${successfulPosts} success, +${lostPosts} loss`);
+            if (DEBUG) console.log(`Updated user experience score: +${successfulPosts} success, +${lostPosts} loss`);
           }
         } else {
           console.error('Error fetching profile for experience score update:', profileError);
@@ -829,9 +807,9 @@ export async function POST(request) {
         console.error('Error in experience score calculation:', error);
       }
     }
-    
+
     if (updatedPosts.length > 0) {
-      console.log(`Attempting to update ${updatedPosts.length} posts in Supabase...`);
+      if (DEBUG) console.log(`Attempting to update ${updatedPosts.length} posts in Supabase...`);
       
       // Update each post with its price check results
       for (let i = 0; i < updatedPosts.length; i++) {
@@ -860,7 +838,7 @@ export async function POST(request) {
             
             // Add the new price check entry
             priceChecks.push({
-              price: lastPrice,
+              price: postResult.currentPrice,
               date: new Date().toISOString(),
               target_reached: post.target_reached,
               stop_loss_triggered: post.stop_loss_triggered,
@@ -877,9 +855,14 @@ export async function POST(request) {
             if (historicalData && Array.isArray(historicalData) && historicalData.length > 0) {
               // Store the historical data directly in the price_checks field instead of creating a summary
               post.price_checks = historicalData;
-              console.log(`[DEBUG] Stored ${historicalData.length} historical data points in price_checks for post ${post.id}`);
+              if (DEBUG) console.log(`[DEBUG] Stored ${historicalData.length} historical data points in price_checks for post ${post.id}`);
             } else {
-              console.warn(`[WARN] No historical data available for post ${post.id}, keeping existing price_checks`);
+              if (DEBUG) console.warn(`[WARN] No historical data available for post ${post.id}, keeping existing price_checks`);
+            }
+            // Trim price_checks to a maximum length if needed
+            const MAX_CHECKS = parseInt(process.env.MAX_PRICE_CHECKS || '365', 10);
+            if (Array.isArray(post.price_checks) && post.price_checks.length > MAX_CHECKS) {
+              post.price_checks = post.price_checks.slice(-MAX_CHECKS);
             }
           }
         } catch (error) {
@@ -894,10 +877,21 @@ export async function POST(request) {
       if (updatedPosts.length > 0) {
         const samplePost = updatedPosts[0];
         try {
-          const adminSupabase = createAdminClient();
-          const { data: updateData, error: updateError } = await adminSupabase
-            .from('posts')
-            .upsert(updatedPosts.map(mapPostForDb), { onConflict: 'id', returning: 'minimal' });
+          // Upsert in batches to avoid timeouts and large payloads
+          const UPSERT_BATCH = parseInt(process.env.PRICE_CHECK_UPSERT_BATCH || '100', 10);
+          let updateError = null;
+          for (let start = 0; start < updatedPosts.length; start += UPSERT_BATCH) {
+            const batch = updatedPosts.slice(start, start + UPSERT_BATCH).map(mapPostForDb);
+            const { error } = await adminSupabase
+              .from('posts')
+              .upsert(batch, { onConflict: 'id', returning: 'minimal' });
+            if (error) {
+              updateError = error;
+              console.error('Error updating posts batch:', error);
+              break;
+            }
+          }
+          const updateData = null; // not used
           
           if (updateError) {
             console.error('Error updating posts:', updateError);
@@ -911,11 +905,11 @@ export async function POST(request) {
             retryCount++;
             
             if (retryCount <= maxRetries) {
-              console.log(`Retrying update in ${1000 * retryCount}ms (attempt ${retryCount}/${maxRetries})...`);
+              if (DEBUG) console.log(`Retrying update in ${1000 * retryCount}ms (attempt ${retryCount}/${maxRetries})...`);
               await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
             }
           } else {
-            console.log(`Successfully updated ${updatedPosts.length} posts in Supabase!`);
+            if (DEBUG) console.log(`Successfully updated ${updatedPosts.length} posts in Supabase!`);
             updateSuccess = true;
             
             // Verify the updates by checking a sample of posts
@@ -928,7 +922,7 @@ export async function POST(request) {
             if (verifyError) {
               console.error('Error verifying update:', verifyError);
             } else {
-              console.log(`Verification successful. Sample of updated posts:`, verifyData);
+              if (DEBUG) console.log(`Verification successful. Sample of updated posts:`, verifyData);
             }
           }
         } catch (error) {
@@ -937,7 +931,7 @@ export async function POST(request) {
           retryCount++;
           
           if (retryCount <= maxRetries) {
-            console.log(`Retrying update in ${1000 * retryCount}ms...`);
+            if (DEBUG) console.log(`Retrying update in ${1000 * retryCount}ms...`);
             await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
           }
         }
@@ -962,9 +956,11 @@ export async function POST(request) {
                 stop_loss_triggered_date: post.stop_loss_triggered_date,
                 last_price_check: post.last_price_check,
                 closed: post.closed,
-                postdateafterpricedate: post.postDateAfterPriceDate,
-                postaftermarketclose: post.postAfterMarketClose,
-                nodataavailable: post.noDataAvailable,
+                postdateafterpricedate: post.postdateafterpricedate,
+                postaftermarketclose: post.postaftermarketclose,
+                nodataavailable: post.nodataavailable,
+                // persist price checks when falling back to individual updates
+                price_checks: post.price_checks,
                 status_message: post.status_message,
                 // Do not update these fields to prevent them from being set to null
                 // country: post.country,
@@ -983,7 +979,7 @@ export async function POST(request) {
         }
         
         if (individualUpdateSuccess > 0) {
-          console.log(`Successfully updated ${individualUpdateSuccess}/${updatedPosts.length} posts individually`);
+          if (DEBUG) console.log(`Successfully updated ${individualUpdateSuccess}/${updatedPosts.length} posts individually`);
           updateSuccess = individualUpdateSuccess === updatedPosts.length;
         }
       }
@@ -1002,7 +998,7 @@ export async function POST(request) {
     const usageCount = currentUsage ? currentUsage.count : 1;
     const remainingChecks = MAX_DAILY_CHECKS - usageCount;
     
-    console.log(`[DEBUG] Price check completed for ${posts.length} posts. Updated: ${updatedPosts.length}, Skipped: ${closedPostsCount}, Remaining checks today: ${remainingChecks}`);
+    if (DEBUG) console.log(`[DEBUG] Price check completed for ${posts.length} posts. Updated: ${updatedPosts.length}, Skipped: ${closedPostsCount}, Remaining checks today: ${remainingChecks}`);
     
     return NextResponse.json({
       success: true,

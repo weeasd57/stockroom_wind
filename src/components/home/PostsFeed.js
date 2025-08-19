@@ -2,14 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
-import { useFollow } from '@/providers/FollowProvider';
 import { usePosts } from '@/providers/PostProvider'; // Add PostProvider for real-time updates
-import { getPosts, getUserProfile } from '@/utils/supabase';
-import { formatDistanceToNow } from 'date-fns';
-import PostActions from '@/components/posts/PostActions';
-import PostSentiment from '@/components/posts/PostSentiment';
-import Comments from '@/components/posts/Comments';
-import { CommentProvider } from '@/providers/CommentProvider'; // Import CommentProvider
+import PostCard from '@/components/posts/PostCard';
 import styles from '@/styles/home/PostsFeed.module.css';
 
 export function PostsFeed() {
@@ -126,31 +120,7 @@ export function PostsFeed() {
 
   console.log(`[PostsFeed] Rendering with ${posts.length} posts. Loading: ${loading}, Filter: ${filter}`);
 
-  // Helper functions remain the same
-  function formatPrice(price) {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(price);
-  }
-
-  function calculatePotentialReturn(currentPrice, targetPrice) {
-    if (!currentPrice || !targetPrice) return 0;
-    return ((targetPrice - currentPrice) / currentPrice * 100).toFixed(2);
-  }
-
-  function getStatusColor(post) {
-    if (post.target_reached) return styles.success;
-    if (post.stop_loss_triggered) return styles.loss;
-    return styles.active;
-  }
-
-  function getStatusText(post) {
-    if (post.target_reached) return '🎯 Target Reached';
-    if (post.stop_loss_triggered) return '🛑 Stop Loss Hit';
-    return '📊 Active';
-  }
+  // (refactor) helpers moved into PostCard
 
   if (loading) {
     return (
@@ -265,107 +235,7 @@ export function PostsFeed() {
 
       <div className={styles.postsContainer}>
         {posts.map((post) => (
-          <CommentProvider key={post.id}>
-            <div className={styles.postCard}>
-            
-              {/* Post Header */}
-              <div className={styles.postHeader}>
-                <div className={styles.userInfo}>
-                  <div className={styles.avatar}>
-                    {post.profile.avatar_url ? (
-                      <img 
-                        src={post.profile.avatar_url} 
-                        alt={post.profile.username}
-                        className={styles.avatarImage}
-                      />
-                    ) : (
-                      <div className={styles.avatarPlaceholder}>
-                        {post.profile.username.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                  <div className={styles.userDetails}>
-                    <h4 className={styles.username}>{post.profile.username}</h4>
-                    <p className={styles.timestamp}>
-                      {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                    </p>
-                  </div>
-                </div>
-                <div className={`${styles.status} ${getStatusColor(post)}`}>
-                  {getStatusText(post)}
-                </div>
-              </div>
-
-              {/* Stock Info */}
-              <div className={styles.stockInfo}>
-                <div className={styles.stockHeader}>
-                  <h3 className={styles.stockSymbol}>{post.symbol}</h3>
-                  <span className={styles.exchange}>{post.exchange}</span>
-                </div>
-                <p className={styles.companyName}>{post.company_name}</p>
-                <p className={styles.country}>📍 {post.country}</p>
-              </div>
-
-              {/* Price Analysis */}
-              <div className={styles.priceAnalysis}>
-                <div className={styles.priceGrid}>
-                  <div className={styles.priceItem}>
-                    <span className={styles.priceLabel}>Current</span>
-                    <span className={styles.priceValue}>{formatPrice(post.current_price)}</span>
-                  </div>
-                  <div className={styles.priceItem}>
-                    <span className={styles.priceLabel}>Target</span>
-                    <span className={styles.priceValue}>{formatPrice(post.target_price)}</span>
-                  </div>
-                  <div className={styles.priceItem}>
-                    <span className={styles.priceLabel}>Stop Loss</span>
-                    <span className={styles.priceValue}>{formatPrice(post.stop_loss_price)}</span>
-                  </div>
-                  <div className={styles.priceItem}>
-                    <span className={styles.priceLabel}>Potential</span>
-                    <span className={`${styles.priceValue} ${styles.potential}`}>
-                      +{calculatePotentialReturn(post.current_price, post.target_price)}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Content */}
-              {post.description && (
-                <div className={styles.postContent}>
-                  <p>{post.description}</p>
-                </div>
-              )}
-
-              {/* Strategy Tag */}
-              {post.strategy && (
-                <div className={styles.strategy}>
-                  <span className={styles.strategyTag}>📈 {post.strategy}</span>
-                </div>
-              )}
-
-              
-              {/* Buy/Sell Actions */}
-              <PostActions 
-                postId={post.id} 
-                initialBuyCount={post.buy_count || 0}
-                initialSellCount={post.sell_count || 0}
-              />
-
-              {/* Market Sentiment */}
-              <PostSentiment 
-                buyCount={post.buy_count || 0}
-                sellCount={post.sell_count || 0}
-              />
-
-              {/* Comments Section */}
-              <Comments 
-                postId={post.id}
-                initialCommentCount={post.comment_count || 0}
-              />
-
-            </div>
-          </CommentProvider>
+          <PostCard key={post.id} post={post} />
         ))}
       </div>
 

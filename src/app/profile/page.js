@@ -1161,7 +1161,12 @@ export default function Profile() {
                     aria-expanded={isCountryDialogOpen}
                     type="button"
                   >
-                    {selectedCountry ? (COUNTRY_CODE_TO_NAME[selectedCountry.toLowerCase()] || selectedCountry) : 'All Countries'}
+                    {selectedCountry ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <span className={`fi fi-${String(selectedCountry).toLowerCase()} country-flag`}></span>
+                        {COUNTRY_CODE_TO_NAME[String(selectedCountry).toLowerCase()] || selectedCountry}
+                      </span>
+                    ) : 'All Countries'}
                   </button>
 
                   {selectedCountry && !filterLoading && (

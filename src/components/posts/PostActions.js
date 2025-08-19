@@ -7,14 +7,22 @@ import styles from '../../styles/PostActions.module.css';
 
 export default function PostActions({ postId, initialBuyCount = 0, initialSellCount = 0, onVoteChange }) {
   const { user, supabase } = useSupabase();
-  const { getPostStats, toggleBuyVote, toggleSellVote } = useComments();
+  const { getPostStats, toggleBuyVote, toggleSellVote, fetchCommentsForPost } = useComments();
   const [userAction, setUserAction] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
   const [error, setError] = useState(null);
 
   const postStats = getPostStats(postId);
   const buyCount = postStats.buyCount || initialBuyCount;
   const sellCount = postStats.sellCount || initialSellCount;
+
+  // Bootstrap real-time subscriptions for this post even if comments are not opened
+  useEffect(() => {
+    if (postId) {
+      fetchCommentsForPost(postId);
+    }
+  }, [postId, fetchCommentsForPost]);
 
   // Check user's current vote status
   useEffect(() => {
@@ -54,18 +62,27 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
     checkUserVote();
   }, [user, supabase, postId]);
 
+  // Utility: enforce a maximum wait to avoid infinite spinner on network stalls
+  const withTimeout = (promise, ms = 15000) => {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), ms))
+    ]);
+  };
+
   const handleAction = async (actionType) => {
     if (!user) return;
 
     setIsLoading(true);
+    setPendingAction(actionType);
     setError(null);
 
     try {
       if (actionType === 'buy') {
-        await toggleBuyVote(postId);
+        await withTimeout(toggleBuyVote(postId, userAction));
         setUserAction(userAction === 'buy' ? null : 'buy');
       } else if (actionType === 'sell') {
-        await toggleSellVote(postId);
+        await withTimeout(toggleSellVote(postId, userAction));
         setUserAction(userAction === 'sell' ? null : 'sell');
       }
 
@@ -82,6 +99,7 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
       console.error('Vote action error:', err);
     } finally {
       setIsLoading(false);
+      setPendingAction(null);
     }
   };
 
@@ -128,7 +146,7 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
             <span className={styles.actionLabel}>Buy</span>
             <span className={styles.actionCount}>{buyCount}</span>
           </span>
-          {isLoading && userAction !== 'sell' && (
+          {isLoading && pendingAction === 'buy' && (
             <div className={styles.loadingSpinner}></div>
           )}
         </button>
@@ -144,7 +162,7 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
             <span className={styles.actionLabel}>Sell</span>
             <span className={styles.actionCount}>{sellCount}</span>
           </span>
-          {isLoading && userAction !== 'buy' && (
+          {isLoading && pendingAction === 'sell' && (
             <div className={styles.loadingSpinner}></div>
           )}
         </button>
