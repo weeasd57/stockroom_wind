@@ -2,17 +2,34 @@ import { createClient } from '@supabase/supabase-js';
 // import logger from '@/utils/logger';
 import imageCompression from 'browser-image-compression';
 
-// Create a client with the public anon key
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Lazy initialize Supabase client to avoid build-time env access
+let _supabaseClient = null;
 
-// Create a new supabase client instance and export it
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
-
-// Check if environment variables are set
-if (!supabaseUrl || !supabaseAnonKey) {
-  // console.error('Missing Supabase Environment Variables');
+function initSupabaseClient() {
+  // Read env at call-time (runtime) instead of at module load (build-time)
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) {
+    // Throw at runtime if actually used without proper config
+    throw new Error('Supabase client missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  }
+  return createClient(url, anonKey);
 }
+
+export function getSupabaseClient() {
+  if (!_supabaseClient) {
+    _supabaseClient = initSupabaseClient();
+  }
+  return _supabaseClient;
+}
+
+// Proxy to keep existing `supabase` usage working while deferring initialization
+export const supabase = new Proxy({}, {
+  get(_target, prop) {
+    const client = getSupabaseClient();
+    return client[prop];
+  }
+});
 
 // Authentication helpers
 /**

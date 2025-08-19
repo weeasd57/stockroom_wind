@@ -1,15 +1,23 @@
 // This script sets up the database schema and storage buckets for the StockRoom application
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Lazily initialize client at call-time to avoid build-time env access
+function getAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY; // prefer server key if available
+  const key = service || anon;
+  if (!url || !key) {
+    throw new Error('Missing Supabase env vars for setupDatabase. Ensure NEXT_PUBLIC_SUPABASE_URL and a key exist.');
+  }
+  return createClient(url, key);
+}
 
-async function setupDatabase() {
+export default async function setupDatabase() {
   console.log('Setting up database schema and storage...');
 
   try {
+    const supabase = getAdminClient();
     // Create posts storage bucket if it doesn't exist
     const { data: buckets, error: bucketsError } = await supabase
       .storage
@@ -49,8 +57,6 @@ async function setupDatabase() {
     console.log('Database setup completed successfully');
   } catch (error) {
     console.error('Error setting up database:', error);
+    throw error;
   }
 }
-
-// Run the setup function
-setupDatabase();

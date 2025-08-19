@@ -33,8 +33,7 @@ const createAdminClient = () => {
   });
 };
 
-// Reuse single admin client
-const adminSupabase = createAdminClient();
+// Admin client is created lazily inside the POST handler to avoid build-time env errors
 
 // Helper: log status update (gated by DEBUG)
 async function logStatusUpdate(supabaseClient, postId, symbol, message, updateResult) {
@@ -90,9 +89,6 @@ const MAX_DAILY_CHECKS = 100;
 export async function POST(request) {
   if (DEBUG) console.log(`[DEBUG] Check-prices API route called at ${new Date().toISOString()}`);
   
-  // Create Supabase client
-  const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
-  
   try {
     // Check if Supabase is properly configured
     if (!supabaseUrl || !supabaseAnonKey) {
@@ -125,6 +121,12 @@ export async function POST(request) {
         { status: 500 }
       );
     }
+
+    // Lazily create admin client after verifying env configuration
+    const adminSupabase = createAdminClient();
+
+    // Create public/anon client after validation
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
     const body = await request.json().catch(() => ({}));
     if (DEBUG) console.log(`[DEBUG] Request body:`, JSON.stringify(body));
