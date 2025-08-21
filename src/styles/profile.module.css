@@ -350,6 +350,28 @@
   padding: 3rem 0;
 }
 
+.emptyStateContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 300px; /* matches .contentSection minimum */
+  grid-column: 1 / -1; /* span all grid columns when used inside grid containers */
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.5rem;
+  color: hsl(var(--muted-foreground));
+  width: 100%;
+  padding: 2rem;
+  min-height: 300px; /* center vertically within tab content */
+}
+
 .modalOverlay {
   position: fixed;
   top: 0;

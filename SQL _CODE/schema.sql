@@ -205,7 +205,6 @@ ALTER TABLE user_strategies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_followings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE post_actions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE price_check_usage ENABLE ROW LEVEL SECURITY;
 
@@ -280,16 +279,6 @@ CREATE POLICY "Users can update their own comments" ON comments
   FOR UPDATE USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can delete their own comments" ON comments
-  FOR DELETE USING (auth.uid() = user_id);
-
--- Likes policies
-CREATE POLICY "Likes are viewable by everyone" ON likes
-  FOR SELECT USING (true);
-
-CREATE POLICY "Users can insert their own likes" ON likes
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete their own likes" ON likes
   FOR DELETE USING (auth.uid() = user_id);
 
 -- Notifications policies
@@ -390,28 +379,6 @@ CREATE TRIGGER update_posts_updated_at BEFORE UPDATE ON posts
 
 CREATE TRIGGER update_comments_updated_at BEFORE UPDATE ON comments
   FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-
--- Optional like trigger if helper exists (create only if not exists)
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM pg_proc p
-    JOIN pg_namespace n ON n.oid = p.pronamespace
-    WHERE n.nspname = 'public' AND p.proname = 'handle_new_like'
-  ) AND NOT EXISTS (
-    SELECT 1
-    FROM pg_trigger t
-    JOIN pg_class c ON c.oid = t.tgrelid
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE t.tgname = 'on_like_created'
-      AND c.relname = 'likes'
-      AND n.nspname = 'public'
-  ) THEN
-    CREATE TRIGGER on_like_created
-      AFTER INSERT ON likes
-      FOR EACH ROW EXECUTE PROCEDURE public.handle_new_like();
-  END IF;
-END $$;
 
 -- ===================================================================
 -- USEFUL FUNCTIONS FOR NEW TABLES
@@ -800,8 +767,51 @@ CREATE TRIGGER prevent_circular_comments_trigger
 -- ===================================================================
 
 -- User-requested View for posts with only buy/sell action counts
-CREATE OR REPLACE VIEW posts_with_action_counts AS
-SELECT posts.*, COALESCE(buy_counts.count, 0) AS buy_count, COALESCE(sell_counts.count, 0) AS sell_count
-FROM posts
-LEFT JOIN ( SELECT post_id, COUNT(*) AS count FROM post_actions WHERE action_type = 'buy' GROUP BY post_id ) AS buy_counts ON posts.id = buy_counts.post_id
-LEFT JOIN ( SELECT post_id, COUNT(*) AS count FROM post_actions WHERE action_type = 'sell' GROUP BY post_id ) AS sell_counts ON posts.id = sell_counts.post_id;
+CREATE OR REPLACE VIEW public.posts_with_action_counts
+WITH (security_invoker = on) AS
+ SELECT posts.id,
+    posts.user_id,
+    posts.content,
+    posts.image_url,
+    posts.symbol,
+    posts.company_name,
+    posts.country,
+    posts.exchange,
+    posts.current_price,
+    posts.target_price,
+    posts.stop_loss_price,
+    posts.strategy,
+    posts.created_at,
+    posts.updated_at,
+    posts.description,
+    posts.target_reached,
+    posts.stop_loss_triggered,
+    posts.target_reached_date,
+    posts.stop_loss_triggered_date,
+    posts.last_price_check,
+    posts.closed,
+    posts.initial_price,
+    posts.high_price,
+    posts.target_high_price,
+    posts.target_hit_time,
+    posts.postdateafterpricedate,
+    posts.postaftermarketclose,
+    posts.nodataavailable,
+    posts.status_message,
+    posts.price_checks,
+    posts.closed_date,
+    posts.is_public,
+    posts.status,
+    COALESCE(buy_counts.count, 0::bigint) AS buy_count,
+    COALESCE(sell_counts.count, 0::bigint) AS sell_count
+   FROM posts
+     LEFT JOIN ( SELECT post_actions.post_id,
+            count(*) AS count
+           FROM post_actions
+          WHERE post_actions.action_type::text = 'buy'::text
+          GROUP BY post_actions.post_id) buy_counts ON posts.id = buy_counts.post_id
+     LEFT JOIN ( SELECT post_actions.post_id,
+            count(*) AS count
+           FROM post_actions
+          WHERE post_actions.action_type::text = 'sell'::text
+          GROUP BY post_actions.post_id) sell_counts ON posts.id = sell_counts.post_id;

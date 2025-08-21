@@ -10,7 +10,9 @@ export default function ImageUploadEnhanced({
   userId, 
   disabled = false,
   maxSizeMB = 5,
-  allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+  allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+  autoUpload = true,
+  onFileSelected
 }) {
   const [uploadState, setUploadState] = useState('idle'); // idle, uploading, success, error
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -46,10 +48,20 @@ export default function ImageUploadEnhanced({
       setPreviewUrl(preview);
       
       // Set metadata
-      setImageMetadata({
+      const meta = {
         ...validation.fileInfo,
         ...dimensions
-      });
+      };
+      setImageMetadata(meta);
+
+      // If autoUpload is disabled, expose file and stop here
+      if (!autoUpload) {
+        setUploadState('ready'); // ready to be handled by parent
+        if (onFileSelected) {
+          try { onFileSelected({ file, metadata: meta }); } catch {}
+        }
+        return;
+      }
 
       // Start upload
       setUploadState('uploading');
@@ -59,7 +71,8 @@ export default function ImageUploadEnhanced({
         maxSizeMB,
         onProgress: (progress) => {
           setUploadProgress(progress);
-        }
+        },
+        signal: uploadAbortController.current.signal
       });
 
       if (uploadResult.error) {
@@ -92,7 +105,7 @@ export default function ImageUploadEnhanced({
         setPreviewUrl(null);
       }
     }
-  }, [userId, maxSizeMB, allowedTypes, onImageUploaded, imageMetadata, previewUrl]);
+  }, [userId, maxSizeMB, allowedTypes, onImageUploaded, imageMetadata, previewUrl, autoUpload, onFileSelected]);
 
   // Handle file input change
   const handleInputChange = (e) => {
@@ -158,6 +171,9 @@ export default function ImageUploadEnhanced({
     // Notify parent
     if (onImageRemoved) {
       onImageRemoved();
+    }
+    if (onFileSelected) {
+      try { onFileSelected(null); } catch {}
     }
   };
 

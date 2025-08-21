@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { SupabaseClient, User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { supabase as globalSupabase } from '@/utils/supabase'; // Import the shared instance
@@ -287,7 +287,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Database functions
-  const getProfile = async (userId: string) => {
+  const getProfile = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -300,9 +300,9 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       setError(err instanceof Error ? err : new Error('Failed to get profile'));
       throw err;
     }
-  };
+  }, [supabase]);
 
-  const updateProfile = async (userId: string, updates: any) => {
+  const updateProfile = useCallback(async (userId: string, updates: any) => {
     try {
       const { error } = await supabase
         .from('profiles')
@@ -313,23 +313,27 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       setError(err instanceof Error ? err : new Error('Failed to update profile'));
       throw err;
     }
-  };
+  }, [supabase]);
 
   // Storage functions
-  const uploadFile = async (bucket: string, path: string, file: File): Promise<string> => {
+  const uploadFile = useCallback(async (bucket: string, path: string, file: File): Promise<string> => {
     try {
       const { error } = await supabase.storage
         .from(bucket)
         .upload(path, file);
       if (error) throw error;
-      return getPublicUrl(bucket, path);
+      // Compute public URL inline to avoid dependency on getPublicUrl during initial render
+      return supabase.storage
+        .from(bucket)
+        .getPublicUrl(path)
+        .data.publicUrl;
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to upload file'));
       throw err;
     }
-  };
+  }, [supabase]);
 
-  const deleteFile = async (bucket: string, path: string) => {
+  const deleteFile = useCallback(async (bucket: string, path: string) => {
     try {
       const { error } = await supabase.storage
         .from(bucket)
@@ -339,30 +343,31 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       setError(err instanceof Error ? err : new Error('Failed to delete file'));
       throw err;
     }
-  };
+  }, [supabase]);
 
-  const getPublicUrl = (bucket: string, path: string): string => {
+  const getPublicUrl = useCallback((bucket: string, path: string): string => {
     return supabase.storage
       .from(bucket)
       .getPublicUrl(path)
       .data.publicUrl;
-  };
+  }, [supabase]);
 
   // Posts functions
-  const getPosts = async () => {
+  const getPosts = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('posts')
-        .select('*, profiles(username, avatar_url)');
+        .select('*, profiles(username, avatar_url)')
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to get posts'));
       throw err;
     }
-  };
+  }, [supabase]);
 
-  const createPost = async (postData: any) => {
+  const createPost = useCallback(async (postData: any) => {
     try {
       const { data, error } = await supabase
         .from('posts')
@@ -375,9 +380,9 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       setError(err instanceof Error ? err : new Error('Failed to create post'));
       throw err;
     }
-  };
+  }, [supabase]);
 
-  const updatePost = async (id: string, updates: any) => {
+  const updatePost = useCallback(async (id: string, updates: any) => {
     try {
       const { data, error } = await supabase
         .from('posts')
@@ -391,9 +396,9 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       setError(err instanceof Error ? err : new Error('Failed to update post'));
       throw err;
     }
-  };
+  }, [supabase]);
 
-  const deletePost = async (id: string) => {
+  const deletePost = useCallback(async (id: string) => {
     try {
       const { error } = await supabase
         .from('posts')
@@ -404,10 +409,10 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       setError(err instanceof Error ? err : new Error('Failed to delete post'));
       throw err;
     }
-  };
+  }, [supabase]);
 
   // Comments functions
-  const getComments = async (postId: string) => {
+  const getComments = useCallback(async (postId: string) => {
     try {
       const { data, error } = await supabase
         .from('comments')
@@ -419,9 +424,9 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       setError(err instanceof Error ? err : new Error('Failed to get comments'));
       throw err;
     }
-  };
+  }, [supabase]);
 
-  const addComment = async (postId: string, content: string) => {
+  const addComment = useCallback(async (postId: string, content: string) => {
     try {
       const { data, error } = await supabase
         .from('comments')
@@ -434,9 +439,9 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       setError(err instanceof Error ? err : new Error('Failed to add comment'));
       throw err;
     }
-  };
+  }, [supabase]);
 
-  const deleteComment = async (id: string) => {
+  const deleteComment = useCallback(async (id: string) => {
     try {
       const { error } = await supabase
         .from('comments')
@@ -447,7 +452,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       setError(err instanceof Error ? err : new Error('Failed to delete comment'));
       throw err;
     }
-  };
+  }, [supabase]);
 
   const handleLogout = async () => {
     console.log('[SupabaseProvider] handleLogout: Started');

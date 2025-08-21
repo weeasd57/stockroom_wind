@@ -2051,11 +2051,7 @@ export default function CreatePostForm() {
                       <div className="form-group col-md-6 target-price-group">
                         <label htmlFor="targetPrice">Target Price</label>
                         <div className="price-input-with-percentage">
-                          {selectedStock && (
-                            <span className="currency-symbol-prefix currency-symbol-indicator" aria-hidden="true">
-                              {currencySymbolFor(selectedStock.country)}
-                            </span>
-                          )}
+                          
 
                           <input
                             type="number"
@@ -2073,18 +2069,18 @@ export default function CreatePostForm() {
                                 // Check if target price is smaller than or equal to current price
                                 if (newTargetPrice <= currentPrice) {
                                   // Set validation error
-                                  setFormErrors(prev => ({
-                                    ...prev,
+                                  updateField('formErrors', {
+                                    ...(formErrors || {}),
                                     targetPrice: 'Target price must be greater than current price'
-                                  }));
+                                  });
                                   // Show error message
-                                  updateGlobalStatus('Target price must be greater than current price', 'error');
+                                  setGlobalStatus({ type: 'error', message: 'Target price must be greater than current price' });
                                 } else {
                                   // Clear error if valid
-                                  setFormErrors(prev => ({
-                                    ...prev,
+                                  updateField('formErrors', {
+                                    ...(formErrors || {}),
                                     targetPrice: null
-                                  }));
+                                  });
                                 }
                                 
                                 // Calculate new percentage
@@ -2121,18 +2117,18 @@ export default function CreatePostForm() {
                                     // Validate the new target price
                                     if (parseFloat(newTargetPrice) <= currentPrice) {
                                       // Set validation error
-                                      setFormErrors(prev => ({
-                                        ...prev,
+                                      updateField('formErrors', {
+                                        ...(formErrors || {}),
                                         targetPrice: 'Target price must be greater than current price'
-                                      }));
+                                      });
                                       // Show error message
-                                      updateGlobalStatus('Target price must be greater than current price', 'error');
+                                      setGlobalStatus({ type: 'error', message: 'Target price must be greater than current price' });
                                     } else {
                                       // Clear error if valid
-                                      setFormErrors(prev => ({
-                                        ...prev,
+                                      updateField('formErrors', {
+                                        ...(formErrors || {}),
                                         targetPrice: null
-                                      }));
+                                      });
                                     }
                                   }
                                 } else {
@@ -2151,11 +2147,7 @@ export default function CreatePostForm() {
                       <div className="form-group col-md-6 stop-loss-price-group">
                         <label htmlFor="stopLoss">Stop Loss</label>
                         <div className="price-input-with-percentage">
-                          {selectedStock && (
-                            <span className="currency-symbol-prefix currency-symbol-indicator" aria-hidden="true">
-                              {currencySymbolFor(selectedStock.country)}
-                            </span>
-                          )}
+                          
 
                           <input
                             type="number"
@@ -2173,18 +2165,18 @@ export default function CreatePostForm() {
                                 // Check if stop loss price is bigger than or equal to current price
                                 if (newStopLossPrice >= currentPrice) {
                                   // Set validation error
-                                  setFormErrors(prev => ({
-                                    ...prev,
+                                  updateField('formErrors', {
+                                    ...(formErrors || {}),
                                     stopLoss: 'Stop loss price must be less than current price'
-                                  }));
+                                  });
                                   // Show error message
-                                  updateGlobalStatus('Stop loss price must be less than current price', 'error');
+                                  setGlobalStatus({ type: 'error', message: 'Stop loss price must be less than current price' });
                                 } else {
                                   // Clear error if valid
-                                  setFormErrors(prev => ({
-                                    ...prev,
+                                  updateField('formErrors', {
+                                    ...(formErrors || {}),
                                     stopLoss: null
-                                  }));
+                                  });
                                 }
                                 
                                 // Calculate new percentage
@@ -2222,18 +2214,18 @@ export default function CreatePostForm() {
                                     // Validate the new stop loss price
                                     if (parseFloat(newStopLossPrice) >= currentPrice) {
                                       // Set validation error
-                                      setFormErrors(prev => ({
-                                        ...prev,
+                                      updateField('formErrors', {
+                                        ...(formErrors || {}),
                                         stopLoss: 'Stop loss price must be less than current price'
-                                      }));
+                                      });
                                       // Show error message
-                                      updateGlobalStatus('Stop loss price must be less than current price', 'error');
+                                      setGlobalStatus({ type: 'error', message: 'Stop loss price must be less than current price' });
                                     } else {
                                       // Clear error if valid
-                                      setFormErrors(prev => ({
-                                        ...prev,
+                                      updateField('formErrors', {
+                                        ...(formErrors || {}),
                                         stopLoss: null
-                                      }));
+                                      });
                                     }
                                   }
                                 } else {

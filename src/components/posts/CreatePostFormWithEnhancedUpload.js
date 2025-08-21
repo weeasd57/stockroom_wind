@@ -3,10 +3,10 @@
 import { useState, useCallback } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
-import { useImageUpload } from '@/hooks/useImageUpload';
 import ImageUploadEnhanced from './ImageUploadEnhanced';
 import RTLTextArea from './RTLTextArea';
 import { toast } from 'sonner';
+import { useBackgroundPostCreation } from '@/providers/BackgroundPostCreationProvider';
 
 /**
  * Enhanced CreatePostForm with improved image upload and RTL support
@@ -30,22 +30,12 @@ export default function CreatePostFormWithEnhancedUpload() {
 
   const [isFormSubmitting, setIsFormSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState({});
+  // Background post creation
+  const { startBackgroundPostCreation } = useBackgroundPostCreation();
 
-  // Enhanced image upload hook
-  const imageUpload = useImageUpload({
-    userId: user?.id,
-    maxSizeMB: 5,
-    allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
-    autoUpload: true, // Upload immediately when file is selected
-    onUploadSuccess: (result) => {
-      toast.success('Image uploaded successfully!');
-      console.log('Image uploaded:', result);
-    },
-    onUploadError: (error) => {
-      toast.error(`Upload failed: ${error.message}`);
-      console.error('Upload error:', error);
-    }
-  });
+  // Local image selection state for deferred/background upload
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState(null);
 
   // Handle form submission
   const handleSubmit = useCallback(async (e) => {
@@ -73,14 +63,6 @@ export default function CreatePostFormWithEnhancedUpload() {
     try {
       setIsFormSubmitting(true);
 
-      // Wait for image upload to complete if still uploading
-      if (imageUpload.isUploading) {
-        toast.info('Waiting for image upload to complete...');
-        // You could implement a polling mechanism here or use a promise
-        // For now, we'll just wait a bit
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-
       // Prepare post data
       const postData = {
         user_id: user.id,
@@ -94,26 +76,28 @@ export default function CreatePostFormWithEnhancedUpload() {
         stop_loss_price: parseFloat(stopLossPrice) || currentPrice || 0,
         company_name: selectedStock.name || selectedStock.symbol,
         exchange: selectedStock.exchange || '',
-        image_url: imageUpload.uploadedImageUrl || null, // Use uploaded image URL
+        // image_url will be set by the background provider if upload completes
         strategy: selectedStrategy || null,
         is_public: true,
         status: 'open',
         status_message: 'open'
       };
 
-      console.log('Submitting post with data:', postData);
+      // Start background task (imageFile or existingImageUrl)
+      const taskId = startBackgroundPostCreation({
+        postData,
+        imageFile: selectedImageFile || null,
+        existingImageUrl: uploadedImageUrl || null,
+        title: `Posting ${selectedStock.symbol}`
+      });
 
-      // Here you would call your createPost function
-      // const result = await createPost(postData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Background post creation started with taskId:', taskId);
+      toast.success('Creating post in background. You can continue browsing.');
 
-      toast.success('Post created successfully!');
-      
-      // Reset form and close dialog
+      // Reset form and close dialog immediately
       resetForm();
-      imageUpload.removeImage();
+      setSelectedImageFile(null);
+      setUploadedImageUrl(null);
       if (closeDialog) closeDialog();
 
     } catch (error) {
@@ -133,7 +117,6 @@ export default function CreatePostFormWithEnhancedUpload() {
     targetPrice, 
     stopLossPrice, 
     selectedStrategy, 
-    imageUpload, 
     resetForm, 
     closeDialog
   ]);
@@ -187,62 +170,25 @@ export default function CreatePostFormWithEnhancedUpload() {
             <span className="optional">(Optional)</span>
           </label>
           <ImageUploadEnhanced
+            autoUpload={false}
+            onFileSelected={(payload) => {
+              setSelectedImageFile(payload?.file || null);
+              // Clear any previously uploaded URL if user changed the file
+              if (payload?.file) setUploadedImageUrl(null);
+            }}
             onImageUploaded={(result) => {
-              console.log('Image uploaded in form:', result);
-              // The hook already handles this, but you can add additional logic here
+              // In case autoUpload is enabled in future, capture the URL
+              setUploadedImageUrl(result?.url || null);
             }}
             onImageRemoved={() => {
-              console.log('Image removed in form');
+              setSelectedImageFile(null);
+              setUploadedImageUrl(null);
             }}
             userId={user?.id}
             disabled={isFormSubmitting}
             maxSizeMB={5}
             allowedTypes={['image/jpeg', 'image/jpg', 'image/png', 'image/webp']}
           />
-          
-          {/* Upload Status Display */}
-          {imageUpload.isUploading && (
-            <div className="upload-status">
-              <div className="upload-progress">
-                <div className="progress-bar">
-                  <div 
-                    className="progress-fill" 
-                    style={{ width: `${imageUpload.uploadProgress}%` }}
-                  ></div>
-                </div>
-                <span>Uploading... {imageUpload.uploadProgress}%</span>
-              </div>
-            </div>
-          )}
-
-          {imageUpload.isSuccess && imageUpload.uploadedImageUrl && (
-            <div className="upload-success">
-              <span className="success-icon">✓</span>
-              <span>Image ready for post!</span>
-              <a 
-                href={imageUpload.uploadedImageUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="view-link"
-              >
-                View
-              </a>
-            </div>
-          )}
-
-          {imageUpload.error && (
-            <div className="upload-error">
-              <span className="error-icon">⚠️</span>
-              <span>{imageUpload.error}</span>
-              <button 
-                type="button"
-                onClick={imageUpload.retryUpload}
-                className="retry-button"
-              >
-                Retry
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Price Analysis Section */}
@@ -305,7 +251,8 @@ export default function CreatePostFormWithEnhancedUpload() {
             type="button"
             onClick={() => {
               resetForm();
-              imageUpload.removeImage();
+              setSelectedImageFile(null);
+              setUploadedImageUrl(null);
               if (closeDialog) closeDialog();
             }}
             className="cancel-button"
@@ -319,7 +266,6 @@ export default function CreatePostFormWithEnhancedUpload() {
             className="submit-button"
             disabled={
               isFormSubmitting || 
-              imageUpload.isUploading || 
               !selectedStock?.symbol || 
               !description?.trim()
             }
@@ -343,8 +289,8 @@ export default function CreatePostFormWithEnhancedUpload() {
             <pre>{JSON.stringify({
               hasStock: !!selectedStock,
               hasDescription: !!description?.trim(),
-              imageState: imageUpload.uploadState,
-              imageUrl: imageUpload.uploadedImageUrl,
+              hasSelectedImageFile: !!selectedImageFile,
+              uploadedImageUrl,
               isSubmitting: isFormSubmitting
             }, null, 2)}</pre>
           </div>

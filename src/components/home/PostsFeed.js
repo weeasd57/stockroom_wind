@@ -6,7 +6,20 @@ import { usePosts } from '@/providers/PostProvider'; // Add PostProvider for rea
 import PostCard from '@/components/posts/PostCard';
 import styles from '@/styles/home/PostsFeed.module.css';
 
-export function PostsFeed() {
+// Unified PostsFeed component reusable across Home/Profile/View-Profile
+// Props:
+// - mode: 'home' | 'profile' | 'view-profile' (affects title copy only)
+// - userId: when provided, feed will show posts for that user and hide controls
+// - title: optional override title
+// - hideControls: force hide header controls
+// - showFlagBackground: pass-through to PostCard for future styling
+export function PostsFeed({
+  mode = 'home',
+  userId,
+  title,
+  hideControls = false,
+  showFlagBackground = true,
+} = {}) {
   const { user, supabase } = useSupabase();
   
   // Get posts from PostProvider for real-time updates
@@ -48,12 +61,15 @@ export function PostsFeed() {
   // Fetch posts with the appropriate filter when filter changes
   useEffect(() => {
     console.log(`[PostsFeed] useEffect for fetching posts fired. Filter: ${filter}, FetchPosts changed: ${typeof fetchPosts === 'function'}`);
-    if (filter === 'following') {
+    if (userId) {
+      // For user-specific feeds, we can fetch all and then filter locally by userId
+      fetchPosts();
+    } else if (filter === 'following') {
       fetchPosts('following');
     } else {
       fetchPosts(); // Fetch all posts
     }
-  }, [filter, fetchPosts]);
+  }, [filter, fetchPosts, userId]);
 
   // Update loading and error states from PostProvider
   useEffect(() => {
@@ -65,8 +81,13 @@ export function PostsFeed() {
   const filteredAndSortedPosts = useMemo(() => {
     let filtered = [...providerPosts];
 
+    // Apply user-specific filter first when userId is provided
+    if (userId) {
+      filtered = filtered.filter(post => post.user_id === userId);
+    }
+
     // Apply main filter (following/all/trending)
-    if (filter === 'following') {
+    if (!userId && filter === 'following') {
       if (followingUsers.length > 0) {
         filtered = filtered.filter(post => followingUsers.includes(post.user_id));
       } else {
@@ -104,7 +125,7 @@ export function PostsFeed() {
     }
 
     // For trending filter, prioritize by engagement regardless of sort
-    if (filter === 'trending') {
+    if (!userId && filter === 'trending') {
       filtered.sort((a, b) => {
         const aEngagement = (a.comment_count || 0) + (a.buy_count || 0) + (a.sell_count || 0);
         const bEngagement = (b.comment_count || 0) + (b.buy_count || 0) + (b.sell_count || 0);
@@ -113,7 +134,7 @@ export function PostsFeed() {
     }
 
     return filtered.slice(0, 20); // Limit to 20 posts
-  }, [providerPosts, filter, sortBy, categoryFilter, followingUsers]);
+  }, [providerPosts, filter, sortBy, categoryFilter, followingUsers, userId]);
 
   // Use filtered posts instead of local posts state
   const posts = filteredAndSortedPosts;
@@ -127,7 +148,10 @@ export function PostsFeed() {
       <div className={styles.postsFeed}>
         <div className={styles.header}>
           <h2 className={styles.title}>
-            {filter === 'following' ? 'Following Posts' : 'Recent Posts'}
+            {title
+              || (userId
+                ? (mode === 'profile' || mode === 'view-profile' ? 'Recent Posts' : 'User Posts')
+                : (filter === 'following' ? 'Following Posts' : 'Recent Posts'))}
           </h2>
         </div>
         <div className={styles.loadingContainer}>
@@ -148,7 +172,10 @@ export function PostsFeed() {
       <div className={styles.postsFeed}>
         <div className={styles.header}>
           <h2 className={styles.title}>
-            {filter === 'following' ? 'Following Posts' : 'Recent Posts'}
+            {title
+              || (userId
+                ? (mode === 'profile' || mode === 'view-profile' ? 'Recent Posts' : 'User Posts')
+                : (filter === 'following' ? 'Following Posts' : 'Recent Posts'))}
           </h2>
         </div>
         <div className={styles.errorMessage}>
@@ -166,36 +193,43 @@ export function PostsFeed() {
       <div className={styles.postsFeed}>
         <div className={styles.header}>
           <h2 className={styles.title}>
-            {filter === 'following' ? 'Following Posts' : 'Recent Posts'}
+            {title
+              || (userId
+                ? (mode === 'profile' || mode === 'view-profile' ? 'Recent Posts' : 'User Posts')
+                : (filter === 'following' ? 'Following Posts' : 'Recent Posts'))}
           </h2>
-          <div className={styles.controls}>
-            <div className={styles.filters}>
-              <button 
-                className={`${styles.filterButton} ${filter === 'following' ? styles.active : ''}`}
-                onClick={() => setFilter('following')}
-              >
-                Following
-              </button>
-              <button 
-                className={`${styles.filterButton} ${filter === 'all' ? styles.active : ''}`}
-                onClick={() => setFilter('all')}
-              >
-                All
-              </button>
-              <button 
-                className={`${styles.filterButton} ${filter === 'trending' ? styles.active : ''}`}
-                onClick={() => setFilter('trending')}
-              >
-                Trending
-              </button>
+          {!(hideControls || userId) && (
+            <div className={styles.controls}>
+              <div className={styles.filters}>
+                <button 
+                  className={`${styles.filterButton} ${filter === 'following' ? styles.active : ''}`}
+                  onClick={() => setFilter('following')}
+                >
+                  Following
+                </button>
+                <button 
+                  className={`${styles.filterButton} ${filter === 'all' ? styles.active : ''}`}
+                  onClick={() => setFilter('all')}
+                >
+                  All
+                </button>
+                <button 
+                  className={`${styles.filterButton} ${filter === 'trending' ? styles.active : ''}`}
+                  onClick={() => setFilter('trending')}
+                >
+                  Trending
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
         <div className={styles.emptyState}>
           <p>
-            {filter === 'following' 
-              ? "No posts from users you follow yet. Follow some traders to see their insights!" 
-              : "No posts yet. Be the first to share your trading insights!"
+            {userId
+              ? "This user hasn't posted anything yet."
+              : (filter === 'following' 
+                  ? "No posts from users you follow yet. Follow some traders to see their insights!" 
+                  : "No posts yet. Be the first to share your trading insights!")
             }
           </p>
         </div>
@@ -207,35 +241,40 @@ export function PostsFeed() {
     <div className={styles.postsFeed}>
       <div className={styles.header}>
         <h2 className={styles.title}>
-          {filter === 'following' ? 'Following Posts' : 'Recent Posts'}
+          {title
+            || (userId
+              ? (mode === 'profile' || mode === 'view-profile' ? 'Recent Posts' : 'User Posts')
+              : (filter === 'following' ? 'Following Posts' : 'Recent Posts'))}
         </h2>
-        <div className={styles.controls}>
-          <div className={styles.filters}>
-            <button 
-              className={`${styles.filterButton} ${filter === 'following' ? styles.active : ''}`}
-              onClick={() => setFilter('following')}
-            >
-              Following
-            </button>
-            <button
-              className={`${styles.filterButton} ${filter === 'all' ? styles.active : ''}`}
-              onClick={() => setFilter('all')}
-            >
-              All
-            </button>
-            <button
-              className={`${styles.filterButton} ${filter === 'trending' ? styles.active : ''}`}
-              onClick={() => setFilter('trending')}
-            >
-              Trending
-            </button>
+        {!(hideControls || userId) && (
+          <div className={styles.controls}>
+            <div className={styles.filters}>
+              <button 
+                className={`${styles.filterButton} ${filter === 'following' ? styles.active : ''}`}
+                onClick={() => setFilter('following')}
+              >
+                Following
+              </button>
+              <button
+                className={`${styles.filterButton} ${filter === 'all' ? styles.active : ''}`}
+                onClick={() => setFilter('all')}
+              >
+                All
+              </button>
+              <button
+                className={`${styles.filterButton} ${filter === 'trending' ? styles.active : ''}`}
+                onClick={() => setFilter('trending')}
+              >
+                Trending
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className={styles.postsContainer}>
         {posts.map((post) => (
-          <PostCard key={post.id} post={post} />
+          <PostCard key={post.id} post={post} showFlagBackground={showFlagBackground} />
         ))}
       </div>
 
@@ -249,3 +288,5 @@ export function PostsFeed() {
     </div>
   );
 }
+
+export default PostsFeed;

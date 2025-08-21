@@ -1301,10 +1301,12 @@ export default function Profile() {
                   </button>
                 </div>
               ) : posts.length === 0 ? (
-                <div className={styles.emptyState}>
-                  <h3>No posts yet</h3>
-                  <p>Start sharing your stock analysis and predictions</p>
-                  <CreatePostButton />
+                <div className={styles.emptyStateContainer}>
+                  <div className={styles.emptyState}>
+                    <h3>No posts yet</h3>
+                    <p>Start sharing your stock analysis and predictions</p>
+                    <CreatePostButton />
+                  </div>
                 </div>
               ) : (
                 <>
@@ -1433,10 +1435,12 @@ export default function Profile() {
                   
                   if (sortedStrategies.length === 0) {
                     return (
-                      <div className={styles.emptyState}>
-                        <h3>No strategies used yet</h3>
-                        <p>Create posts with trading strategies to see them here</p>
-                        <CreatePostButton />
+                      <div className={styles.emptyStateContainer}>
+                        <div className={styles.emptyState}>
+                          <h3>No strategies used yet</h3>
+                          <p>Create posts with trading strategies to see them here</p>
+                          <CreatePostButton />
+                        </div>
                       </div>
                     );
                   }

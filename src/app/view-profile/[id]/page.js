@@ -7,6 +7,7 @@ import { useProfile } from '@/providers/ProfileProvider';
 import styles from '@/styles/view-profile.module.css';
 import { useFollow } from '@/providers/FollowProvider'; // Import useFollow
 import PostCard from '@/components/posts/PostCard';
+import { PostsFeed } from '@/components/home/PostsFeed';
 
 export default function ViewProfile({ params }) {
   const { supabase, isAuthenticated, user } = useSupabase();
@@ -30,10 +31,8 @@ export default function ViewProfile({ params }) {
   
   const [loading, setLoading] = useState(true);
   const [profileData, setProfileData] = useState(null);
-  const [profilePosts, setProfilePosts] = useState([]);
   const [avatarUrl, setAvatarUrl] = useState('/default-avatar.svg');
   const [backgroundUrl, setBackgroundUrl] = useState('https://images.unsplash.com/photo-1579546929662-711aa81148cf?q=80&w=1200&auto=format&fit=crop');
-  const [postCount, setPostCount] = useState(0);
   const [error, setError] = useState(null);
   const [avatarError, setAvatarError] = useState(false);
 
@@ -95,7 +94,7 @@ export default function ViewProfile({ params }) {
             () =>
               supabase
                 .from('profiles')
-                .select('id, username, avatar_url, background_url, bio, followers, following, created_at')
+                .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts')
                 .eq('id', userId)
                 .maybeSingle()
                 .abortSignal(controller.signal)
@@ -109,7 +108,7 @@ export default function ViewProfile({ params }) {
               () =>
                 supabase
                   .from('profiles')
-                  .select('id, username, avatar_url, background_url, bio, followers, following, created_at')
+                  .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts')
                   .eq('id', userId)
                   .maybeSingle()
                   .abortSignal(controller.signal),
@@ -133,46 +132,6 @@ export default function ViewProfile({ params }) {
         }
         
         safeSetState(() => setProfileData(profile));
-        
-        // Fetch user posts
-        const { data: posts, error: postsError } = await supabase
-          .from('posts')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(20)
-          .abortSignal(controller.signal);
-          
-        if (!postsError) {
-          const profileForPost = {
-            id: profile?.id || userId,
-            username: profile?.username || 'User',
-            avatar_url: profile?.avatar_url || '/default-avatar.svg'
-          };
-          const normalizedPosts = (posts || []).map(p => ({
-            ...p,
-            profile: profileForPost,
-            buy_count: p?.buy_count ?? 0,
-            sell_count: p?.sell_count ?? 0,
-            comment_count: p?.comment_count ?? 0
-          }));
-          safeSetState(() => setProfilePosts(normalizedPosts));
-          safeSetState(() => setPostCount(normalizedPosts.length));
-        }
-        
-        // Fetch followers (optional UI-managed)
-        await supabase
-          .from('user_followings')
-          .select('follower_id, profiles!user_followings_follower_id_fkey(id, username, avatar_url)')
-          .eq('following_id', userId)
-          .abortSignal(controller.signal);
-        
-        // Fetch following (optional UI-managed)
-        await supabase
-          .from('user_followings')
-          .select('following_id, profiles!user_followings_following_id_fkey(id, username, avatar_url)')
-          .eq('follower_id', userId)
-          .abortSignal(controller.signal);
         
         // Try to get avatar and background images
         if (profile.avatar_url) {
@@ -396,7 +355,7 @@ export default function ViewProfile({ params }) {
       
       <div className={styles.profileStats}>
         <div className={styles.statItem}>
-          <span className={styles.statValue}>{postCount}</span>
+          <span className={styles.statValue}>{profileData?.posts || 0}</span>
           <span className={styles.statLabel}>Posts</span>
         </div>
         <div className={styles.statItem}>
@@ -407,22 +366,25 @@ export default function ViewProfile({ params }) {
           <span className={styles.statValue}>{profileData?.following || 0}</span>{/* Use profileData.following */}
           <span className={styles.statLabel}>Following</span>
         </div>
+        <div className={styles.statItem}>
+          <span className={styles.statValue}>{profileData?.experience_score ?? 0}</span>
+          <span className={styles.statLabel}>Experience Score</span>
+        </div>
+        <div className={styles.statItem}>
+          <span className={styles.statValue}>{profileData?.success_posts ?? 0}</span>
+          <span className={styles.statLabel}>Success Posts</span>
+        </div>
+        <div className={styles.statItem}>
+          <span className={styles.statValue}>{profileData?.loss_posts ?? 0}</span>
+          <span className={styles.statLabel}>Loss Posts</span>
+        </div>
       </div>
       
       <div className={styles.postsSection}>
         <h2>Recent Posts</h2>
-        
-        {profilePosts.length > 0 ? (
-          <div className={styles.postsGrid}>
-            {profilePosts.map(post => (
-              <PostCard key={post.id} post={post} />
-            ))}
-          </div>
-        ) : (
-          <div className={styles.emptyPosts}>
-            <p>This user hasn't posted anything yet.</p>
-          </div>
-        )}
+        <div className={styles.postsGrid}>
+          <PostsFeed mode="view-profile" userId={userId} hideControls showFlagBackground />
+        </div>
       </div>
     </div>
   );

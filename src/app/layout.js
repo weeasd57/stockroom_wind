@@ -4,13 +4,15 @@ import 'flag-icons/css/flag-icons.min.css';
 import { ThemeProvider } from "@/providers/theme-provider";
 import { SupabaseProvider, UserProvider, CreatePostFormProvider } from '@/providers';
 import { ProfileProvider } from '@/providers/ProfileProvider';
-import { PostProvider } from '@/providers/PostProvider'; // Import PostProvider
 import { TradersProvider } from '@/providers/TradersProvider';
 import { AuthGuard } from '@/providers/AuthGuard';
 import { ClientSideLayout } from '@/providers/ClientSideLayout';
 import ClientImagePreloader from '@/providers/ClientImagePreloader';
 import Script from 'next/script';
 import { FollowProvider } from '@/providers/FollowProvider'; // Import FollowProvider
+import { PostProvider } from '@/providers';
+import { BackgroundPostCreationProvider } from '@/providers';
+import BackgroundPostCreationFloatingIndicator from '@/components/background/BackgroundPostCreationFloatingIndicator';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -147,24 +149,27 @@ export default function RootLayout({ children }) {
         </Script>
         <SupabaseProvider>
           <UserProvider>
-            <PostProvider> {/* Add PostProvider for real-time post updates */}
-              <ProfileProvider>
-                <TradersProvider>
-                  <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={true}>
-                    <CreatePostFormProvider>
-                      <ClientSideLayout>
-                        <AuthGuard>
-                          <ClientImagePreloader />
-                          <FollowProvider> {/* Wrap children with FollowProvider */}
-                            {children}
-                          </FollowProvider>
-                        </AuthGuard>
-                      </ClientSideLayout>
-                    </CreatePostFormProvider>
-                  </ThemeProvider>
-                </TradersProvider>
-              </ProfileProvider>
-            </PostProvider>
+            <ProfileProvider>
+              <TradersProvider>
+                <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={true}>
+                  <CreatePostFormProvider>
+                    <ClientSideLayout>
+                      <AuthGuard>
+                        <ClientImagePreloader />
+                        <PostProvider>
+                          <BackgroundPostCreationProvider>
+                            <FollowProvider> {/* Wrap children with FollowProvider */}
+                              {children}
+                              <BackgroundPostCreationFloatingIndicator />
+                            </FollowProvider>
+                          </BackgroundPostCreationProvider>
+                        </PostProvider>
+                      </AuthGuard>
+                    </ClientSideLayout>
+                  </CreatePostFormProvider>
+                </ThemeProvider>
+              </TradersProvider>
+            </ProfileProvider>
           </UserProvider>
         </SupabaseProvider>
       </body>

@@ -10,6 +10,28 @@ import imageCompression from 'browser-image-compression';
  */
 export async function uploadPostImageEnhanced(file, userId, options = {}) {
   const uploadStart = performance.now();
+  const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+  const signal = options.signal;
+  let progressTimer = null;
+  let aborted = false;
+  const cleanup = () => {
+    if (progressTimer) {
+      clearInterval(progressTimer);
+      progressTimer = null;
+    }
+    if (signal && abortHandler) {
+      try { signal.removeEventListener('abort', abortHandler); } catch {}
+    }
+  };
+  const abortHandler = () => {
+    aborted = true;
+  };
+  if (signal) {
+    if (signal.aborted) {
+      return { publicUrl: null, error: 'Upload aborted', metadata: null };
+    }
+    try { signal.addEventListener('abort', abortHandler, { once: true }); } catch {}
+  }
   
   // Validation
   if (!file || !userId) {
@@ -87,7 +109,18 @@ export async function uploadPostImageEnhanced(file, userId, options = {}) {
     for (const strategy of bucketStrategies) {
       try {
         console.log(`[uploadPostImageEnhanced] Trying bucket: ${strategy.bucket}, path: ${strategy.path}`);
-        
+        if (aborted) throw new DOMException('Aborted', 'AbortError');
+        // Simulated progress during upload
+        if (onProgress) {
+          let simulated = 5; // start after compression
+          try { onProgress(simulated); } catch {}
+          progressTimer = setInterval(() => {
+            if (aborted) return; // Don't update if aborted flag set
+            simulated = Math.min(90, simulated + Math.random() * 6 + 2);
+            try { onProgress(Math.round(simulated)); } catch {}
+          }, 250);
+        }
+
         const { data, error } = await supabase.storage
           .from(strategy.bucket)
           .upload(strategy.path, compressedFile, {
@@ -108,6 +141,9 @@ export async function uploadPostImageEnhanced(file, userId, options = {}) {
           .getPublicUrl(strategy.path);
 
         if (urlData?.publicUrl) {
+          if (onProgress) {
+            try { onProgress(100); } catch {}
+          }
           uploadResult = {
             publicUrl: urlData.publicUrl,
             bucket: strategy.bucket,
@@ -120,6 +156,8 @@ export async function uploadPostImageEnhanced(file, userId, options = {}) {
         lastError = strategyError;
         console.warn(`[uploadPostImageEnhanced] Strategy ${strategy.bucket} error:`, strategyError);
         continue;
+      } finally {
+        cleanup();
       }
     }
 
@@ -162,7 +200,7 @@ export async function uploadPostImageEnhanced(file, userId, options = {}) {
     console.error('[uploadPostImageEnhanced] Unexpected error:', error);
     return { 
       publicUrl: null, 
-      error: error.message || 'Unexpected upload error',
+      error: error?.name === 'AbortError' ? 'Upload aborted' : (error.message || 'Unexpected upload error'),
       metadata: null 
     };
   }

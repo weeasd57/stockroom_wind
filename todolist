@@ -1,0 +1,23 @@
+* need in src\app\view-profile\[id]\page.js
+show all user states like 
+Experience Score:
+Success Posts:
+Loss Posts:
+and be responsive 
+  
+
+*i need توحّد السلوك post feed in all pages @page.js @profile.js @view-profile.js 
+be all like src\app\view-profile\[id]\page.js
+be like home page feed and have the flag country as a background 
+and be dialog comments be center in all screen not in center post and should be black in dark theme and vote section too
+
+
+
+*  should when get data from check prices api saving in supabase and show the updated data by provider with out reload ( i have just NEXT_PUBLIC_SUPABASE_URL , NEXT_PUBLIC_SUPABASE_ANON_KEY , NEXT_PUBLIC_EOD_API_KEY) for dont use any key else they 
+
+
+-------------------
+
+* need the filters in profile page (country , sympols) be like "Strategy" filter not skow all options just show from founding and should be same drop list style
+
+
