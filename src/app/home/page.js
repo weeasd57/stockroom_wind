@@ -222,7 +222,7 @@ export default function HomePage() {
         </div>
 
         {/* Posts Feed Section */}
-        <PostsFeed />
+        <PostsFeed showFlagBackground />
       </div>
 
       {/* Portal for dialog */}
