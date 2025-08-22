@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 // Use environment variables for service role key (server-only)
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
+const serviceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 // Debug flag to reduce noisy logs in production
 const DEBUG = process.env.PRICE_CHECK_DEBUG === '1' || process.env.PRICE_CHECK_DEBUG === 'true';
 
@@ -101,7 +101,7 @@ export async function POST(request) {
 
     // Ensure service role key is available for admin operations
     if (!serviceRoleKey) {
-      console.error('[ERROR] Missing SUPABASE_SERVICE_ROLE_KEY environment variable');
+      console.error('[ERROR] Missing NEXT_PUBLIC_SUPABASE_URL environment variable');
       return NextResponse.json({
         success: false,
         message: 'Server misconfigured: missing service role key',

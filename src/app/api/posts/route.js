@@ -21,7 +21,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Server-side client that can bypass RLS when using the service role key
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
+const serviceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 // Define a service-role client if available (server-only). This fixes usage of an undefined supabaseServer.
 const supabaseServer = serviceRoleKey && supabaseUrl
   ? createClient(supabaseUrl, serviceRoleKey)
