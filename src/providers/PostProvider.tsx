@@ -27,6 +27,26 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     subscribersRef.current.forEach(cb => {
       try { cb(post); } catch {}
     });
+    // Also broadcast via a lightweight global bridge for other providers
+    try {
+      if (typeof window !== 'undefined') {
+        (window as any).postProviderCallbacks = (window as any).postProviderCallbacks || {
+          onPostCreatedCallbacks: [] as Array<(p: Post) => void>,
+          onPostCreated(fn: (p: Post) => void) {
+            this.onPostCreatedCallbacks.push(fn);
+            return () => {
+              this.onPostCreatedCallbacks = this.onPostCreatedCallbacks.filter((f: any) => f !== fn);
+            };
+          },
+          emit(postArg: Post) {
+            this.onPostCreatedCallbacks.forEach((fn: any) => {
+              try { fn(postArg); } catch {}
+            });
+          }
+        };
+        (window as any).postProviderCallbacks.emit(post);
+      }
+    } catch {}
   };
 
   const fetchPosts = useCallback<PostsContextType['fetchPosts']>(async (mode) => {

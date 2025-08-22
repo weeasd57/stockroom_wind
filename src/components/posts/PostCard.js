@@ -11,7 +11,7 @@ import styles from '@/styles/home/PostsFeed.module.css';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 
 // Reusable PostCard component used across Home feed and Traders page
-export default function PostCard({ post }) {
+export default function PostCard({ post, showFlagBackground = false }) {
   if (!post) return null;
 
   const formatPrice = (price) => {
@@ -44,19 +44,36 @@ export default function PostCard({ post }) {
   const avatarUrl = post?.profile?.avatar_url;
   const profileId = post?.profile?.id;
 
-  // Derive 2-letter ISO country code (lowercase) from either a code or a country name
-  const getCountryCode = (country) => {
-    if (!country) return null;
-    const v = String(country).trim();
-    if (v.length === 2) return v.toLowerCase();
-    const match = Object.entries(COUNTRY_CODE_TO_NAME).find(([, name]) => String(name).toLowerCase() === v.toLowerCase());
-    return match ? match[0] : null;
+  // Derive 2-letter ISO country code (lowercase) from country name/code or from symbol suffix
+  const getCountryCode = (post) => {
+    // Try explicit country
+    if (post?.country) {
+      const v = String(post.country).trim();
+      if (v.length === 2) return v.toLowerCase();
+      const match = Object.entries(COUNTRY_CODE_TO_NAME).find(([, name]) => String(name).toLowerCase() === v.toLowerCase());
+      if (match) return match[0];
+    }
+    // Try from symbol like AAPL.US -> us
+    if (post?.symbol && String(post.symbol).includes('.')) {
+      try {
+        const parts = String(post.symbol).split('.');
+        if (parts.length > 1 && parts[1].length === 2) {
+          return parts[1].toLowerCase();
+        }
+      } catch (_) {}
+    }
+    return null;
   };
-  const countryCode = getCountryCode(post?.country);
+  const countryCode = getCountryCode(post);
 
   return (
     <CommentProvider>
       <div className={styles.postCard}>
+        {showFlagBackground && countryCode && (
+          <div className={styles.flagBackground} aria-hidden="true">
+            <span className={`fi fi-${countryCode}`}></span>
+          </div>
+        )}
         {/* Post Header */}
         <div className={styles.postHeader}>
           {profileId ? (
@@ -114,12 +131,12 @@ export default function PostCard({ post }) {
           {post?.company_name && (
             <p className={styles.companyName}>{post.company_name}</p>
           )}
-          {post?.country && (
+          {(post?.country || countryCode) && (
             <p className={styles.country}>
               {countryCode && (
                 <span className={`fi fi-${countryCode} country-flag`} style={{ marginRight: 6 }} />
               )}
-              {post.country}
+              {post.country || countryCode}
             </p>
           )}
         </div>

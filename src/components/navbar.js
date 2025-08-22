@@ -183,12 +183,12 @@ export default function Navbar() {
             <img 
               src="/favicon_io/android-chrome-192x192.png" 
               alt="FireStocks Logo" 
-              width={32}
-              height={32}
+              width={40}
+              height={40}
               className={styles.logoImage}
             />
             <span className={styles.logoText}>
-              <span className="gradient-text">Fire</span>Stocks
+              <span className="gradient-text" style={{ fontSize: '1.75rem' }}>Fire</span>Stocks
             </span>
           </div>
         </Link>

@@ -362,7 +362,7 @@ export default function CreatePostForm() {
               .from('user_strategies')
               .insert({
                 user_id: user.id,
-                name: strategyName,
+                strategy_name: strategyName,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
               })
@@ -2547,23 +2547,6 @@ export default function CreatePostForm() {
               </button>
             </div>
           )}
-          <button 
-            className="btn btn-secondary" 
-            onClick={(e) => {
-              // If posting is in progress, confirm cancellation
-              if (isSubmitting) {
-                if (window.confirm('Posting in progress. Are you sure you want to cancel?')) {
-                  cancelPosting();
-                }
-                return;
-              }
-              // Otherwise just close the dialog
-              closeDialog();
-            }}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </button>
         </div>
       </div>
 

@@ -7,7 +7,7 @@ import styles from '../../styles/PostActions.module.css';
 
 export default function PostActions({ postId, initialBuyCount = 0, initialSellCount = 0, onVoteChange }) {
   const { user, supabase } = useSupabase();
-  const { getPostStats, toggleBuyVote, toggleSellVote, fetchCommentsForPost } = useComments();
+  const { getPostStats, fetchCommentsForPost } = useComments();
   const [userAction, setUserAction] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
@@ -30,32 +30,15 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
       if (!user || !supabase) return;
 
       try {
-        const [buyVoteResponse, sellVoteResponse] = await Promise.all([
-          supabase
-            .from('post_actions')
-            .select('id')
-            .eq('post_id', postId)
-            .eq('user_id', user.id)
-            .eq('action_type', 'buy') // Filter for buy actions
-            .maybeSingle(),
-          supabase
-            .from('post_actions')
-            .select('id')
-            .eq('post_id', postId)
-            .eq('user_id', user.id)
-            .eq('action_type', 'sell') // Filter for sell actions
-            .maybeSingle()
-        ]);
-
-        if (buyVoteResponse.data) {
-          setUserAction('buy');
-        } else if (sellVoteResponse.data) {
-          setUserAction('sell');
+        const { data, error } = await supabase
+          .rpc('get_user_post_action', { p_post_id: postId, p_user_id: user.id });
+        if (!error && data) {
+          setUserAction(data === 'none' ? null : data);
         } else {
           setUserAction(null);
         }
-      } catch (error) {
-        console.error('Error checking user vote:', error);
+      } catch (e) {
+        console.error('Error checking user vote:', e);
       }
     }
 
@@ -63,7 +46,7 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
   }, [user, supabase, postId]);
 
   // Utility: enforce a maximum wait to avoid infinite spinner on network stalls
-  const withTimeout = (promise, ms = 15000) => {
+  const withTimeout = (promise, ms = 12000) => {
     return Promise.race([
       promise,
       new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), ms))
@@ -71,18 +54,27 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
   };
 
   const handleAction = async (actionType) => {
-    if (!user) return;
+    if (!user || !supabase) return;
 
     setIsLoading(true);
     setPendingAction(actionType);
     setError(null);
 
     try {
+      // Toggle via RPC in a single round trip
+      const { data, error: rpcError } = await withTimeout(
+        supabase.rpc('toggle_post_action', {
+          p_post_id: postId,
+          p_user_id: user.id,
+          p_action_type: actionType
+        })
+      );
+      if (rpcError) throw rpcError;
+
+      // Update UI immediately (server updates will sync via realtime)
       if (actionType === 'buy') {
-        await withTimeout(toggleBuyVote(postId, userAction));
         setUserAction(userAction === 'buy' ? null : 'buy');
-      } else if (actionType === 'sell') {
-        await withTimeout(toggleSellVote(postId, userAction));
+      } else {
         setUserAction(userAction === 'sell' ? null : 'sell');
       }
 

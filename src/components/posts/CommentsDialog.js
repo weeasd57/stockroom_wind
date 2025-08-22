@@ -6,6 +6,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { getPostComments, createComment, getPostCommentCount } from '@/utils/comments';
 import { detectTextDirection, applyTextDirection } from '@/utils/textDirection';
 import styles from '@/styles/CommentsDialog.module.css';
+import { useComments } from '@/providers/CommentProvider';
 
 // Child component for a single comment/reply to keep hooks at top level
 function CommentItem({
@@ -152,6 +153,7 @@ function CommentItem({
 
 export default function CommentsDialog({ postId, isOpen, onClose, initialCommentCount = 0 }) {
   const { user } = useSupabase();
+  const { fetchCommentsForPost } = useComments();
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -251,6 +253,8 @@ export default function CommentsDialog({ postId, isOpen, onClose, initialComment
       if (error) throw error;
 
       setNewComment('');
+      // Pull fresh comments via provider to broadcast updates across the app
+      try { await fetchCommentsForPost(postId); } catch {}
       await fetchComments(); // Refresh comments
     } catch (error) {
       console.error('Error submitting comment:', error);
@@ -271,6 +275,8 @@ export default function CommentsDialog({ postId, isOpen, onClose, initialComment
 
       setReplyText('');
       setReplyingTo(null);
+      // Pull fresh comments via provider to broadcast updates across the app
+      try { await fetchCommentsForPost(postId); } catch {}
       await fetchComments(); // Refresh comments
     } catch (error) {
       console.error('Error submitting reply:', error);
