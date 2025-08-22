@@ -7,7 +7,7 @@ import { CreatePostButton } from '@/components/posts/CreatePostButton';
 import { CreatePostForm } from '@/components/posts/CreatePostForm';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
 import { DashboardSection } from '@/components/home/DashboardSection';
-import { PostsFeed } from '@/components/home/PostsFeed';
+import PostsFeed from '@/components/home/PostsFeed';
 import { createPortal } from 'react-dom';
 import styles from '@/styles/home.module.css';
 import '@/styles/create-post-page.css'; 

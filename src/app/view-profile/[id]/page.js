@@ -7,7 +7,7 @@ import { useProfile } from '@/providers/ProfileProvider';
 import styles from '@/styles/view-profile.module.css';
 import { useFollow } from '@/providers/FollowProvider'; // Import useFollow
 import PostCard from '@/components/posts/PostCard';
-import { PostsFeed } from '@/components/home/PostsFeed';
+import PostsFeed from '@/components/home/PostsFeed';
 
 export default function ViewProfile({ params }) {
   const { supabase, isAuthenticated, user } = useSupabase();

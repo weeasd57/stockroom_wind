@@ -32,8 +32,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   const isProd = process.env.NODE_ENV === 'production';
   return (
-    <html lang="en" className={`scroll-smooth ${inter.variable} ${robotoMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`scroll-smooth ${inter.variable} ${robotoMono.variable}`} suppressHydrationWarning translate="no">
       <head>
+        <meta name="google" content="notranslate" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
         <link rel="icon" href="/favicon_io/favicon.ico" />
         <link rel="apple-touch-icon" sizes="180x180" href="/favicon_io/apple-touch-icon.png" />
@@ -44,7 +45,7 @@ export default function RootLayout({ children }) {
         <link rel="preload" as="image" href="/profile-bg.jpg" />
         <link rel="preload" as="image" href="/default-avatar.svg" />
       </head>
-      <body>
+      <body translate="no">
         <Script id="global-abort-init" strategy="beforeInteractive">
           {`
             window.abortPostsFetch = function() {
