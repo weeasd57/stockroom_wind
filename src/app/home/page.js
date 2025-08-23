@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
 import { CreatePostButton } from '@/components/posts/CreatePostButton';
-import CreatePostFormWithEnhancedUpload from '@/components/posts/CreatePostFormWithEnhancedUpload';
+import CreatePostForm from '@/components/posts/CreatePostForm';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
 import { DashboardSection } from '@/components/home/DashboardSection';
 import PostsFeed from '@/components/home/PostsFeed';
@@ -199,7 +199,7 @@ export default function HomePage() {
             </button>
           </div>
           <div className="dialog-body">
-            <CreatePostFormWithEnhancedUpload />
+            <CreatePostForm />
           </div>
         </div>
       </div>

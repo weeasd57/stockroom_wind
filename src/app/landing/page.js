@@ -42,12 +42,12 @@ export default function LandingPage() {
   }, []);
   
   const features = [
-    { id: 1, title: 'Real‑time Market Data', description: 'Live quotes, performance, and price history to power your analysis.', icon: '⚡' },
-    { id: 2, title: 'Social Signals', description: 'Buy/Sell sentiment, comments, and community insights on every post.', icon: '📣' },
-    { id: 3, title: 'Portfolio Tracking', description: 'Monitor returns, risk, and allocations across your holdings.', icon: '📊' },
-    { id: 4, title: 'Price Alerts', description: 'Instant notifications when targets or stop losses are hit.', icon: '🔔' },
-    { id: 5, title: 'Smart Stock Search', description: 'Fast search with country, exchange, and metadata context.', icon: '🔎' },
-    { id: 6, title: 'Secure & Fast', description: 'Built on Next.js + Supabase with RLS and optimized caching.', icon: '🛡️' },
+    { id: 1, title: 'Multi-Language Support', description: 'Full RTL support for Arabic and other languages with automatic text direction detection.', icon: '🌐' },
+    { id: 2, title: 'Smart Stock Search', description: 'Advanced search across 50+ countries with real-time symbol data and exchange information.', icon: '🔎' },
+    { id: 3, title: 'Image Upload & Storage', description: 'Secure image uploads to Supabase storage with automatic compression and optimization.', icon: '📸' },
+    { id: 4, title: 'Trading Strategy Management', description: 'Create, save, and manage custom trading strategies with your posts.', icon: '📈' },
+    { id: 5, title: 'Real-time Social Feed', description: 'Live posts feed with comments, likes, and community engagement features.', icon: '💬' },
+    { id: 6, title: 'Performance Analytics', description: 'Track post success rates, follower growth, and trading performance metrics.', icon: '📊' },
   ];
 
   const login = () => {
