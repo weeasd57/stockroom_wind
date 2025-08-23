@@ -17,7 +17,7 @@ interface ThemeContextType {
   resolvedTheme: "light" | "dark";
 }
 
-const THEME_STORAGE_KEY = "firestocks-theme";
+const THEME_STORAGE_KEY = "sharkszone-theme";
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({
@@ -33,6 +33,14 @@ export function ThemeProvider({
   useEffect(() => {
     setMounted(true);
     try {
+      // Migrate old key if exists to preserve user preference
+      const legacyKey = "firestocks-theme";
+      const legacy = localStorage.getItem(legacyKey) as Theme | null;
+      if (legacy && !localStorage.getItem(THEME_STORAGE_KEY)) {
+        localStorage.setItem(THEME_STORAGE_KEY, legacy);
+        try { localStorage.removeItem(legacyKey); } catch {}
+      }
+
       const storedTheme = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
       if (storedTheme) {
         setTheme(storedTheme);

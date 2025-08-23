@@ -25,8 +25,8 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata = {
-  title: 'FireStocks - Stock Analysis Platform',
-  description: 'Powerful tools for investors to track, analyze, and optimize their portfolios',
+  title: 'SharksZone - Stock Analysis Platform',
+  description: 'SharksZone helps you analyze stocks, track performance, and act with confidence using real-time insights.',
 };
 
 export default function RootLayout({ children }) {
@@ -45,7 +45,13 @@ export default function RootLayout({ children }) {
         <link rel="preload" as="image" href="/profile-bg.jpg" />
         <link rel="preload" as="image" href="/default-avatar.svg" />
       </head>
-      <body translate="no" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}>
+      <body
+        translate="no"
+        style={{
+          paddingTop: 'var(--navbar-height)',
+          paddingBottom: 'env(safe-area-inset-bottom)'
+        }}
+      >
         <Script id="global-abort-init" strategy="beforeInteractive">
           {`
             window.abortPostsFetch = function() {

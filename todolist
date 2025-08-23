@@ -1,30 +1,19 @@
 
-(role) -  in []be [-]when prosseces and when complete [✔]
-
-[] i need توحّد السلوك post feed in all pages @page.js @profile.js @view-profile.js 
-be all like src\app\view-profile\[id]\page.js
-be like home page feed and have the flag country as a background 
-
-[] be dialog comments be center in all screen not in center post and should be black in dark theme and vote section too
-
-[]should when add comment show this in same time by provider
-
-[] need when add buy or sell show this in same time too by provider be this fast  and fix this (Vote action error: Error: Request timed out)
 
 [] should when get data from check prices api saving in supabase and show the updated data by provider with out reload ( i have just NEXT_PUBLIC_SUPABASE_URL , NEXT_PUBLIC_SUPABASE_ANON_KEY , NEXT_PUBLIC_EOD_API_KEY) for dont use any key else they 
 
 
--------------------
-
-[] need the filters in profile page (country , sympols) be like "Strategy" filter not skow all options just show from founding and should be same drop list style
-
-[] should when add post show theis post in my dashboard and my profile in same time with out reload bu provider
 
 
-[] need when create post by image save this image in my storge supabase and in my posts table and when add url image too  
 
-[] need when add Strategy in post when create post should save this in my post table (strategy) and in  my strategies and  in my profile page and ofcource saving in my supabase table (user_strategies)
+* need when create post by image save this image in my storge supabase and in my posts table and when add url image too  
 
-[] should can hide the form create post for runnong in background be show the indecatour loading states 
 
-[]need all pages app in mobile screen start from end navbar 
+* when save strategy is dont work in taps my profile
+
+* delete CreatePostFormWithEnhancedUpload and use this "src\components\posts\CreatePostForm.js" and use this too for when user write arabic "src\components\posts\CreatePostFormRTL.js"
+
+
+* should can hide the form create post for running in background be show the indecatour loading states 
+
+---

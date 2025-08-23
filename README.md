@@ -1,7 +1,7 @@
-# FireStocks - Social Stock Analysis Platform
+# SharksZone - Social Stock Analysis Platform
 
 ## Overview
-FireStocks is a modern web application that combines social networking with stock market analysis. It allows users to share insights, post trading ideas, track stocks, and interact with other traders in a community-focused environment.
+SharksZone is a modern web application that combines social networking with stock market analysis. It allows users to share insights, post trading ideas, track stocks, and interact with other traders in a community-focused environment.
 
 ## Key Features
 
@@ -209,7 +209,7 @@ Post Creation Process
         └── Attempt auto-recovery from failures
 ```
 
-This mind map outlines the complete flow of the post creation process in FireStocks, from initial form preparation to successful submission. Each major stage aligns with the Supabase database schema, ensuring all required and optional fields are properly collected, validated, and stored.
+This mind map outlines the complete flow of the post creation process in SharksZone, from initial form preparation to successful submission. Each major stage aligns with the Supabase database schema, ensuring all required and optional fields are properly collected, validated, and stored.
 
 ## Data Flow for Post Creation
 
@@ -306,7 +306,7 @@ src/
 
 ## Adding the Logo
 
-To add the FireStocks logo to the landing page:
+To add the SharksZone logo to the landing page:
 
 1. Save the logo image you provided (@lo.png) to the following location:
    ```

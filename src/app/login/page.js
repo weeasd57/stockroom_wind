@@ -168,6 +168,8 @@ export default function Login() {
       const isLocalhost = window.location.hostname === 'localhost' || 
                          window.location.hostname === '127.0.0.1';
 
+      // NOTE: Production redirect domain should match your deployed domain
+      // Update when SharksZone is deployed under its final hostname
       const redirectTo = isLocalhost 
         ? 'http://localhost:3000/auth/callback' 
         : 'https://firestocks.vercel.app/auth/callback';
@@ -208,13 +210,13 @@ export default function Login() {
         <div className={styles.logoContainer}>
           <div className={styles.logo}>
             <Image 
-              src="/favicon_io/android-chrome-192x192.png" 
-              alt="FireStocks Logo" 
+              src="/logo.svg" 
+              alt="SharksZone Logo" 
               width={50} 
               height={50}
               className={styles.logoImage}
             />
-            <h1 className={styles.title}>FireStocks</h1>
+            <h1 className={styles.title}>SharksZone</h1>
           </div>
           <p className={styles.subtitle}>
             {isResetPassword ? 'Reset your password' : isSignUp ? 'Join the trading community' : 'Welcome back, trader'}

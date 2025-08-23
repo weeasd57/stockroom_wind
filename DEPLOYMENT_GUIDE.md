@@ -1,4 +1,4 @@
-# FireStocks - Deployment Guide
+# SharksZone - Deployment Guide
 
 ## 🚀 Environment Variables Setup
 

@@ -70,13 +70,13 @@ export default function ResetPassword() {
         <div className={styles.logoContainer}>
           <div className={styles.logo}>
             <Image 
-              src="/favicon_io/android-chrome-192x192.png" 
-              alt="FireStocks Logo" 
+              src="/logo.svg" 
+              alt="SharksZone Logo" 
               width={50} 
               height={50}
               className={styles.logoImage}
             />
-            <h1 className={styles.title}>FireStocks</h1>
+            <h1 className={styles.title}>SharksZone</h1>
           </div>
           <p className={styles.subtitle}>Set your new password</p>
         </div>

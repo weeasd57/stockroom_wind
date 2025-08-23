@@ -19,6 +19,11 @@ export function PostsFeed({
   title,
   hideControls = false,
   showFlagBackground = true,
+  // Optional external filters (used by profile/view-profile)
+  selectedStrategy = '',
+  selectedStatus = '',
+  selectedCountry = '',
+  selectedSymbol = '',
 } = {}) {
   const { user, supabase } = useSupabase();
   
@@ -31,6 +36,45 @@ export function PostsFeed({
   const [sortBy, setSortBy] = useState('date_desc'); // date_desc, date_asc, engagement, price_change
   const [categoryFilter, setCategoryFilter] = useState('all'); // all, buy, sell, analysis
   const [followingUsers, setFollowingUsers] = useState([]);
+
+  // Helpers for external filters
+  const matchesStatus = (post, statusFilter) => {
+    if (!statusFilter) return true;
+    if (statusFilter === 'success') return post.status === 'success' || post.target_reached === true;
+    if (statusFilter === 'loss') return post.status === 'loss' || post.stop_loss_triggered === true;
+    if (statusFilter === 'open') {
+      return post.status === 'open' || (!post.status && !post.target_reached && !post.stop_loss_triggered);
+    }
+    return true;
+  };
+
+  const getPostCountry = (post) => {
+    if (post.country) return String(post.country);
+    if (post.symbol) {
+      const parts = String(post.symbol).split('.');
+      if (parts.length > 1) return parts[1];
+    }
+    return '';
+  };
+
+  const normalizeCountryCode = (val) => {
+    if (!val) return '';
+    const v = String(val).trim();
+    if (v.length === 2) return v.toLowerCase();
+    // if value is a name, we can't map here without a dict; fallback to lowercased value
+    return v.toLowerCase();
+  };
+
+  const matchesCountry = (post, countryFilter) => {
+    if (!countryFilter) return true;
+    return normalizeCountryCode(getPostCountry(post)) === normalizeCountryCode(countryFilter);
+  };
+
+  const normalizeBaseSymbol = (s) => String(s || '').toUpperCase().split('.')[0];
+  const matchesSymbol = (post, symbolFilter) => {
+    if (!symbolFilter) return true;
+    return normalizeBaseSymbol(post.symbol) === normalizeBaseSymbol(symbolFilter);
+  };
 
   // Get following users list
   useEffect(() => {
@@ -105,6 +149,20 @@ export function PostsFeed({
       filtered = filtered.filter(post => post.sentiment === 'bearish');
     }
 
+    // Apply external filters when provided (profile/view-profile)
+    if (selectedStrategy) {
+      filtered = filtered.filter(post => String(post.strategy || '') === String(selectedStrategy));
+    }
+    if (selectedStatus) {
+      filtered = filtered.filter(post => matchesStatus(post, selectedStatus));
+    }
+    if (selectedCountry) {
+      filtered = filtered.filter(post => matchesCountry(post, selectedCountry));
+    }
+    if (selectedSymbol) {
+      filtered = filtered.filter(post => matchesSymbol(post, selectedSymbol));
+    }
+
     // Apply sorting
     switch (sortBy) {
       case 'date_asc':
@@ -134,7 +192,7 @@ export function PostsFeed({
     }
 
     return filtered.slice(0, 20); // Limit to 20 posts
-  }, [providerPosts, filter, sortBy, categoryFilter, followingUsers, userId]);
+  }, [providerPosts, filter, sortBy, categoryFilter, followingUsers, userId, selectedStrategy, selectedStatus, selectedCountry, selectedSymbol]);
 
   // Use filtered posts instead of local posts state
   const posts = filteredAndSortedPosts;

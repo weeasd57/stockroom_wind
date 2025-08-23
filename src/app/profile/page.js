@@ -17,10 +17,8 @@ import '@/styles/create-post-page.css';
 import { PostsFeed } from '@/components/home/PostsFeed';
 import CheckPostPricesButton from '@/components/profile/CheckPostPricesButton';
 import StrategyDetailsModal from '@/components/profile/StrategyDetailsModal';
-import CountrySelectDialog from '@/components/ui/CountrySelectDialog';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
-import SymbolSearchDialog from '@/components/ui/SymbolSearchDialog';
-import { getCountrySymbolCounts } from '@/utils/symbolSearch';
+ 
 
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useSupabase();
@@ -103,12 +101,8 @@ export default function Profile() {
   const [isStrategyModalOpen, setIsStrategyModalOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedCountry, setSelectedCountry] = useState('');
-  const [isCountryDialogOpen, setIsCountryDialogOpen] = useState(false);
   const [filterLoading, setFilterLoading] = useState(false);
-  const [isSymbolDialogOpen, setIsSymbolDialogOpen] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState('');
-  const [selectedSymbolLabel, setSelectedSymbolLabel] = useState('');
-  const [countryCounts, setCountryCounts] = useState(null);
   const [discoveredCountries, setDiscoveredCountries] = useState([]);
   const [discoveredSymbols, setDiscoveredSymbols] = useState([]);
 
@@ -327,21 +321,7 @@ export default function Profile() {
     }
   }, [showEditModal]);
 
-  // Load country symbol counts for CountrySelectDialog (used to display counts next to countries)
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const counts = await getCountrySymbolCounts();
-        if (mounted) setCountryCounts(counts);
-      } catch (e) {
-        console.error('Error loading country symbol counts:', e);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  // Removed CountrySelectDialog counts loader (dialog replaced by select)
 
   // Add a useEffect to update the local state when the store's selectedStrategy changes
   useEffect(() => {
@@ -1202,22 +1182,27 @@ export default function Profile() {
               <div className={styles.filterItem}>
                 <label htmlFor="countryFilter" className={styles.filterLabel}>Country:</label>
                 <div className={styles.filterSelectContainer}>
-                  <button
+                  <select
                     id="countryFilter"
                     className={`${styles.filterSelect} ${selectedCountry ? styles.activeFilter : ''}`}
-                    onClick={() => setIsCountryDialogOpen(true)}
+                    value={selectedCountry}
+                    onChange={(e) => {
+                      setSelectedCountry(e.target.value);
+                      setFilterLoading(true);
+                      setTimeout(() => setFilterLoading(false), 300);
+                    }}
                     disabled={filterLoading}
-                    aria-haspopup="dialog"
-                    aria-expanded={isCountryDialogOpen}
-                    type="button"
                   >
-                    {selectedCountry ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        <span className={`fi fi-${String(selectedCountry).toLowerCase()} country-flag`}></span>
-                        {COUNTRY_CODE_TO_NAME[String(selectedCountry).toLowerCase()] || selectedCountry}
-                      </span>
-                    ) : 'All Countries'}
-                  </button>
+                    <option value="">All Countries</option>
+                    {discoveredCountries
+                      .slice()
+                      .sort()
+                      .map((code) => (
+                        <option key={code} value={code}>
+                          {COUNTRY_CODE_TO_NAME[String(code).toLowerCase()] || String(code).toUpperCase()}
+                        </option>
+                      ))}
+                  </select>
 
                   {selectedCountry && !filterLoading && (
                     <button 
@@ -1234,45 +1219,37 @@ export default function Profile() {
                     </button>
                   )}
                 </div>
-
-                <CountrySelectDialog
-                  isOpen={isCountryDialogOpen}
-                  onClose={() => setIsCountryDialogOpen(false)}
-                  onSelectCountry={(code) => {
-                    setSelectedCountry(code);
-                    setIsCountryDialogOpen(false);
-                    // Auto-open symbol search dialog after selecting a country
-                    setIsSymbolDialogOpen(true);
-                    setFilterLoading(true);
-                    setTimeout(() => setFilterLoading(false), 300);
-                  }}
-                  selectedCountry={selectedCountry || 'all'}
-                  countryCounts={countryCounts}
-                  discoveredCountries={discoveredCountries}
-                />
               </div>
 
               <div className={styles.filterItem}>
                 <label htmlFor="symbolFilter" className={styles.filterLabel}>Symbol:</label>
                 <div className={styles.filterSelectContainer}>
-                  <button
+                  <select
                     id="symbolFilter"
                     className={`${styles.filterSelect} ${selectedSymbol ? styles.activeFilter : ''}`}
-                    onClick={() => setIsSymbolDialogOpen(true)}
+                    value={selectedSymbol}
+                    onChange={(e) => {
+                      setSelectedSymbol(e.target.value);
+                      setFilterLoading(true);
+                      setTimeout(() => setFilterLoading(false), 300);
+                    }}
                     disabled={filterLoading}
-                    aria-haspopup="dialog"
-                    aria-expanded={isSymbolDialogOpen}
-                    type="button"
                   >
-                    {selectedSymbolLabel || selectedSymbol || 'All Symbols'}
-                  </button>
+                    <option value="">All Symbols</option>
+                    {discoveredSymbols
+                      .filter((s) => !selectedCountry || String(s.Country || '').toLowerCase() === String(selectedCountry).toLowerCase())
+                      .map((s) => (
+                        <option key={s.uniqueId || s.Symbol} value={s.Symbol}>
+                          {`${s.Symbol} ${s.Name ? `— ${s.Name}` : ''}`}
+                        </option>
+                      ))}
+                  </select>
 
                   {selectedSymbol && !filterLoading && (
                     <button
                       className={styles.clearFilterButton}
                       onClick={() => {
                         setSelectedSymbol('');
-                        setSelectedSymbolLabel('');
                         setFilterLoading(true);
                         setTimeout(() => setFilterLoading(false), 300);
                       }}
@@ -1283,21 +1260,6 @@ export default function Profile() {
                     </button>
                   )}
                 </div>
-
-                <SymbolSearchDialog
-                  isOpen={isSymbolDialogOpen}
-                  onClose={() => setIsSymbolDialogOpen(false)}
-                  onSelectStock={(stock) => {
-                    setSelectedSymbol(stock.Symbol);
-                    setSelectedSymbolLabel(`${stock.Symbol} — ${stock.Name || ''}`.trim());
-                    setIsSymbolDialogOpen(false);
-                    setFilterLoading(true);
-                    setTimeout(() => setFilterLoading(false), 300);
-                  }}
-                  initialStockSearch=""
-                  selectedCountry={selectedCountry || 'all'}
-                  discoveredSymbols={discoveredSymbols}
-                />
               </div>
               
               {(localSelectedStrategy || selectedStatus || selectedCountry || selectedSymbol) && !filterLoading && (
@@ -1309,7 +1271,6 @@ export default function Profile() {
                     setSelectedStatus('');
                     setSelectedCountry('');
                     setSelectedSymbol('');
-                    setSelectedSymbolLabel('');
                     setFilterLoading(true);
                     
                     // If we're not on the posts tab, switch to it to show all posts
@@ -1338,6 +1299,10 @@ export default function Profile() {
                 userId={profile?.id || user?.id}
                 hideControls={true}
                 showFlagBackground={true}
+                selectedStrategy={localSelectedStrategy || ''}
+                selectedStatus={selectedStatus}
+                selectedCountry={selectedCountry}
+                selectedSymbol={selectedSymbol}
               />
             </div>
           </>

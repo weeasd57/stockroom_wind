@@ -22,6 +22,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
+  position: relative; /* for .appname absolute positioning */
 }
 
 .content {
@@ -132,7 +133,7 @@
   width: 100%;
   display: flex;
   justify-content: center;
-  z-index: 2;
+  z-index: 1;
 }
 
 .copyright {
@@ -142,17 +143,18 @@
 }
 
 .appname{
-  position: relative;
-  bottom: -30px;
-  width: 100%;
-  border: 4px solid ;
-  background-color: red;
-  color: hsl(var(--foreground));
-  height: 11vw;
-  font-size:15vw;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none; /* prevent interactions */
+  color: hsl(var(--foreground)/0.06); /* very subtle */
+  font-weight: 800;
   line-height: 1;
-  font-weight: 700;
-  z-index: 1;
+  letter-spacing: 0.02em;
+  font-size: clamp(48px, 12vw, 180px);
+  z-index: 0; /* behind content */
 }
 
 :global(.dark) .copyright {

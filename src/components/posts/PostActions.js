@@ -46,6 +46,25 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
     checkUserVote();
   }, [user, supabase, postId]);
 
+  // Ensure any async op cannot hang the UI forever
+  const withTimeout = (promise, ms = 12000, context = 'operation') => {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`Request timed out while performing ${context}`));
+      }, ms);
+      promise.then(
+        (val) => {
+          clearTimeout(timer);
+          resolve(val);
+        },
+        (err) => {
+          clearTimeout(timer);
+          reject(err);
+        }
+      );
+    });
+  };
+
   const handleAction = async (actionType) => {
     if (!user || !supabase) return;
 
@@ -58,10 +77,18 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
       // Optimistic local toggle for per-user action
       if (actionType === 'buy') {
         setUserAction(prevAction === 'buy' ? null : 'buy');
-        await toggleBuyVote(postId, prevAction);
+        await withTimeout(
+          toggleBuyVote(postId, prevAction),
+          12000,
+          'buy vote'
+        );
       } else {
         setUserAction(prevAction === 'sell' ? null : 'sell');
-        await toggleSellVote(postId, prevAction);
+        await withTimeout(
+          toggleSellVote(postId, prevAction),
+          12000,
+          'sell vote'
+        );
       }
 
       // Notify parent component when vote counts change

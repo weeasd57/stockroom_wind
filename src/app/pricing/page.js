@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'Pricing - FireStocks',
+  title: 'Pricing - SharksZone',
   description: 'Choose the plan that fits your trading workflow. Free and Pro plans available.'
 };
 
@@ -28,7 +28,7 @@ export default function PricingPage() {
             </span>
           </div>
           <h2 className="text-xl font-semibold">Starter</h2>
-          <p className="text-muted-foreground mt-1">Best for trying FireStocks</p>
+          <p className="text-muted-foreground mt-1">Best for trying SharksZone</p>
           <div className="mt-5 flex items-baseline gap-1">
             <span className="text-3xl font-bold">$0</span>
             <span className="text-sm text-muted-foreground">/ forever</span>

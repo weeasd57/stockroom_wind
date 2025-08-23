@@ -6,6 +6,12 @@ import { getCountryForExchange, EXCHANGE_COUNTRIES } from '@/models/ExchangeData
 import 'flag-icons/css/flag-icons.min.css';
 import { useRouter } from 'next/navigation';
 
+/**
+ * @deprecated Use PostsFeed + PostCard instead. This component is not used by
+ * profile or view-profile pages anymore. Kept only for historical reference.
+ * Prefer rendering posts via PostsFeed (which internally uses PostCard) for
+ * consistent UI/UX and feature parity across feeds.
+ */
 // Function to format date
 function formatDate(dateString) {
   if (!dateString) return '';

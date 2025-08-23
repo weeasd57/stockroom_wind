@@ -8,7 +8,6 @@ import { useProfile } from '@/providers/ProfileProvider';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import styles from '@/styles/navbar.module.css';
-import { CreatePostButton } from '@/components/posts/CreatePostButton';
 
 // Navigation configuration
 const navigationConfig = {
@@ -182,14 +181,14 @@ export default function Navbar() {
         >
           <div className={styles.logoWrapper}>
             <img 
-              src="/favicon_io/android-chrome-192x192.png" 
-              alt="FireStocks Logo" 
+              src="/logo.svg" 
+              alt="SharksZone Logo" 
               width={40}
               height={40}
               className={styles.logoImage}
             />
             <span className={styles.logoText}>
-              <span className="gradient-text" style={{ fontSize: '1.75rem' }}>Fire</span>Stocks
+              <span className="gradient-text" style={{ fontSize: '1.75rem' }}>Sharks</span>Zone
             </span>
           </div>
         </Link>
@@ -380,55 +379,6 @@ export default function Navbar() {
           </nav>
         </div>
       </div>
-
-      {/* Bottom Mobile Navbar */}
-      <nav className={styles.bottomNavbar} aria-label="Bottom navigation">
-        <ul className={styles.bottomNavList}>
-          <li>
-            <button
-              className={`${styles.bottomNavLink} ${pathname === (isAuthenticated ? '/home' : '/landing') ? styles.active : ''}`}
-              onClick={() => handleNavigation(isAuthenticated ? '/home' : '/landing')}
-              aria-label="Home"
-            >
-              <span className={styles.bottomNavIcon}>🏠</span>
-              <span className={styles.bottomNavLabel}>Home</span>
-            </button>
-          </li>
-          <li>
-            <button
-              className={`${styles.bottomNavLink} ${pathname.startsWith('/traders') ? styles.active : ''}`}
-              onClick={() => handleNavigation('/traders')}
-              aria-label="Traders"
-            >
-              <span className={styles.bottomNavIcon}>👥</span>
-              <span className={styles.bottomNavLabel}>Traders</span>
-            </button>
-          </li>
-          <li>
-            <CreatePostButton className={styles.bottomNavCreateBtn} iconOnly />
-          </li>
-          <li>
-            <button
-              className={`${styles.bottomNavLink} ${pathname.startsWith('/pricing') ? styles.active : ''}`}
-              onClick={() => handleNavigation('/pricing')}
-              aria-label="Pricing"
-            >
-              <span className={styles.bottomNavIcon}>💳</span>
-              <span className={styles.bottomNavLabel}>Pricing</span>
-            </button>
-          </li>
-          <li>
-            <button
-              className={`${styles.bottomNavLink} ${pathname.startsWith('/profile') ? styles.active : ''}`}
-              onClick={() => handleNavigation('/profile')}
-              aria-label="Profile"
-            >
-              <span className={styles.bottomNavIcon}>👤</span>
-              <span className={styles.bottomNavLabel}>Profile</span>
-            </button>
-          </li>
-        </ul>
-      </nav>
 
       {/* Mobile Menu Overlay */}
       {/* {isMenuOpen && (
