@@ -138,7 +138,7 @@ function createPostFormReducer(state: CreatePostFormState, action: any): CreateP
 export function CreatePostFormProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(createPostFormReducer, initialState);
   const { user } = useSupabase();
-  const [submissionTimeout, setSubmissionTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [submissionTimeout, setSubmissionTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   
   const openDialog = useCallback(() => {
     dispatch({

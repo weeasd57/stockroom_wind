@@ -9,7 +9,7 @@ interface ErrorBoundaryState {
 }
 
 interface ErrorBoundaryProps {
-  children: ReactNode;
+  children?: ReactNode;
   fallback?: ReactNode;
   onError?: (error: Error, errorInfo: any) => void;
   maxRetries?: number;
@@ -18,16 +18,18 @@ interface ErrorBoundaryProps {
 }
 
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  private retryTimeoutId: NodeJS.Timeout | null = null;
+  state: ErrorBoundaryState = {
+    hasError: false,
+    error: null,
+    errorInfo: null,
+    retryCount: 0,
+  };
+  private retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  declare setState: (state: Partial<ErrorBoundaryState> | ((prevState: ErrorBoundaryState, props: ErrorBoundaryProps) => Partial<ErrorBoundaryState>)) => void;
+  declare props: Readonly<ErrorBoundaryProps>;
 
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = {
-      hasError: false,
-      error: null,
-      errorInfo: null,
-      retryCount: 0,
-    };
   }
 
   static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
@@ -214,7 +216,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       return fallback || this.renderErrorUI();
     }
 
-    return children;
+    return children || null;
   }
 }
 

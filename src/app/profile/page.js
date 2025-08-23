@@ -10,7 +10,7 @@ import styles from '@/styles/profile.module.css';
 import editStyles from '@/styles/editProfile.module.css';
 import { CreatePostButton } from '@/components/posts/CreatePostButton';
 import { uploadImage } from '@/utils/supabase';
-import { CreatePostForm } from '@/components/posts/CreatePostForm';
+import CreatePostFormWithEnhancedUpload from '@/components/posts/CreatePostFormWithEnhancedUpload';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
 import { createPortal } from 'react-dom';
 import '@/styles/create-post-page.css';
@@ -109,6 +109,8 @@ export default function Profile() {
   const [selectedSymbol, setSelectedSymbol] = useState('');
   const [selectedSymbolLabel, setSelectedSymbolLabel] = useState('');
   const [countryCounts, setCountryCounts] = useState(null);
+  const [discoveredCountries, setDiscoveredCountries] = useState([]);
+  const [discoveredSymbols, setDiscoveredSymbols] = useState([]);
 
   // Initialize data once when authenticated
   useEffect(() => {
@@ -159,6 +161,54 @@ export default function Profile() {
       });
     }
   }, [user?.id, isAuthenticated, isInitialized, lastFetched, refreshData, profile, profileLoading, contextAvatarUrl, contextBackgroundUrl]);
+
+  // Derive discovered countries and symbols from posts when posts update
+  useEffect(() => {
+    try {
+      const postsList = Array.isArray(posts) ? posts : [];
+      const countrySet = new Set();
+      const symbolMap = new Map();
+
+      postsList.forEach((p) => {
+        const symbol = p?.symbol || '';
+        const company = p?.company_name || '';
+        // Country derivation consistent with PostCard logic
+        let code = '';
+        if (p?.country) {
+          const v = String(p.country).trim();
+          if (v.length === 2) code = v.toLowerCase();
+          else {
+            const entry = Object.entries(COUNTRY_CODE_TO_NAME).find(([, name]) => String(name).toLowerCase() === v.toLowerCase());
+            if (entry) code = entry[0];
+          }
+        } else if (symbol && String(symbol).includes('.')) {
+          const parts = String(symbol).split('.');
+          if (parts.length > 1 && parts[1].length === 2) code = parts[1].toLowerCase();
+        }
+        if (code) countrySet.add(code);
+
+        if (symbol) {
+          const key = symbol;
+          if (!symbolMap.has(key)) {
+            symbolMap.set(key, {
+              Symbol: symbol,
+              Name: company,
+              Exchange: p?.exchange || '',
+              Country: code || (p?.country || ''),
+              uniqueId: `${symbol}-${code || 'xx'}`
+            });
+          }
+        }
+      });
+
+      setDiscoveredCountries(Array.from(countrySet));
+      setDiscoveredSymbols(Array.from(symbolMap.values()));
+    } catch (e) {
+      console.error('Error deriving discovered filters:', e);
+      setDiscoveredCountries([]);
+      setDiscoveredSymbols([]);
+    }
+  }, [posts]);
 
   // Set up background refresh interval with reduced frequency
   useEffect(() => {
@@ -1198,6 +1248,7 @@ export default function Profile() {
                   }}
                   selectedCountry={selectedCountry || 'all'}
                   countryCounts={countryCounts}
+                  discoveredCountries={discoveredCountries}
                 />
               </div>
 
@@ -1237,18 +1288,15 @@ export default function Profile() {
                   isOpen={isSymbolDialogOpen}
                   onClose={() => setIsSymbolDialogOpen(false)}
                   onSelectStock={(stock) => {
-                    const sym = stock?.Symbol || stock?.symbol || '';
-                    const name = stock?.Name || stock?.name || '';
-                    if (sym) {
-                      setSelectedSymbol(sym);
-                      setSelectedSymbolLabel(name ? `${sym} - ${name}` : sym);
-                    }
+                    setSelectedSymbol(stock.Symbol);
+                    setSelectedSymbolLabel(`${stock.Symbol} — ${stock.Name || ''}`.trim());
                     setIsSymbolDialogOpen(false);
                     setFilterLoading(true);
                     setTimeout(() => setFilterLoading(false), 300);
                   }}
                   initialStockSearch=""
                   selectedCountry={selectedCountry || 'all'}
+                  discoveredSymbols={discoveredSymbols}
                 />
               </div>
               
@@ -1670,7 +1718,7 @@ export default function Profile() {
               </button>
             </div>
             <div className="dialog-body">
-              <CreatePostForm />
+              <CreatePostFormWithEnhancedUpload />
             </div>
           </div>
         </div>

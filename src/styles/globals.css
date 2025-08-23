@@ -35,6 +35,8 @@
   --navbar-border: rgba(0, 0, 0, 0.08);
   --navbar-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   --navbar-blur: 20px;
+  /* Bottom Navbar */
+  --bottom-navbar-height: 60px;
   
   /* Animation Variables */
   --animation-fast: 150ms;
@@ -108,6 +110,8 @@
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Provide base safe-area padding for devices with home indicators and room for bottom nav */
+    padding-bottom: calc(env(safe-area-inset-bottom) + var(--bottom-navbar-height));
   }
 
   /* Better Selection */
