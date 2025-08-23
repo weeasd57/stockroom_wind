@@ -14,7 +14,7 @@ import { CreatePostForm } from '@/components/posts/CreatePostForm';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
 import { createPortal } from 'react-dom';
 import '@/styles/create-post-page.css';
-import PostCard from '@/components/posts/PostCard';
+import { PostsFeed } from '@/components/home/PostsFeed';
 import CheckPostPricesButton from '@/components/profile/CheckPostPricesButton';
 import StrategyDetailsModal from '@/components/profile/StrategyDetailsModal';
 import CountrySelectDialog from '@/components/ui/CountrySelectDialog';
@@ -1285,54 +1285,12 @@ export default function Profile() {
             </div>
 
             <div className={styles.postsGrid}>
-              {isLoading ? (
-                <div className={styles.loadingContainer}>
-                  <div className={styles.loadingSpinner} />
-                  <p>Loading posts...</p>
-                </div>
-              ) : error ? (
-                <div className={styles.errorMessage}>
-                  <p>Error loading posts. Please try again later.</p>
-                  <button 
-                    className={styles.retryButton}
-                    onClick={() => refreshData(user.id)}
-                  >
-                    Retry
-                  </button>
-                </div>
-              ) : posts.length === 0 ? (
-                <div className={styles.emptyStateContainer}>
-                  <div className={styles.emptyState}>
-                    <h3>No posts yet</h3>
-                    <p>Start sharing your stock analysis and predictions</p>
-                    <CreatePostButton />
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {/* Display posts */}
-                  {posts
-                    .filter(post => {
-                      // Strategy filter
-                      const strategyMatch = !localSelectedStrategy || post.strategy === localSelectedStrategy;
-                      
-                      // Status filter - use the helper function
-                      const statusMatch = matchesStatus(post, selectedStatus);
-                      
-                      // Country filter - use the helper function
-                      const countryMatch = matchesCountry(post, selectedCountry);
-                      
-                      // Symbol filter - use the helper function
-                      const symbolMatch = matchesSymbol(post, selectedSymbol);
-                      
-                      // All filters must match
-                      return strategyMatch && statusMatch && countryMatch && symbolMatch;
-                    })
-                    .map(post => (
-                      <PostCard key={post.id} post={post} showFlagBackground />
-                    ))}
-                </>
-              )}
+              <PostsFeed
+                mode="profile"
+                userId={profile?.id || user?.id}
+                hideControls={true}
+                showFlagBackground={true}
+              />
             </div>
           </>
         )}
