@@ -18,6 +18,7 @@ import CountrySelectDialog from '@/components/ui/CountrySelectDialog'; // Import
 import { format } from 'date-fns';
 import SymbolSearchDialog from '@/components/ui/SymbolSearchDialog'; // Import the new dialog component
 import { calculateTargetPrice, calculateStopLoss, calculatePricePercentage } from '@/utils/priceCalculations';
+import RTLTextArea from './RTLTextArea';
 // Create reusable Supabase client
 // const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 // const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -1628,6 +1629,50 @@ export default function CreatePostForm() {
       <div className="create-post-form-container" ref={formWrapperRef}>
         {/* Form content starts here */}
         <div className="form-wrapper">
+          {/* Loading Overlay */}
+          {isSubmitting && (
+            <div className="form-loading-overlay" style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              borderRadius: '16px'
+            }}>
+              <div className="loading-spinner" style={{
+                width: '48px',
+                height: '48px',
+                border: '4px solid #e2e8f0',
+                borderTop: '4px solid #3b82f6',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                marginBottom: '16px'
+              }}></div>
+              <div className="loading-text" style={{
+                fontSize: '16px',
+                fontWeight: '600',
+                color: '#374151',
+                textAlign: 'center'
+              }}>
+                Creating your post...
+              </div>
+              <div className="loading-subtext" style={{
+                fontSize: '14px',
+                color: '#6b7280',
+                textAlign: 'center',
+                marginTop: '8px'
+              }}>
+                You can continue browsing while this runs in the background
+              </div>
+            </div>
+          )}
           {/* Modern Image Preview Section */}
           {(imagePreview || selectedImageFile || imageFile) && (
             <div className="form-group image-preview-section">
@@ -2315,22 +2360,18 @@ export default function CreatePostForm() {
 
           <div className="form-group">
             <label htmlFor="description" className="form-label">What's on your mind?</label>
-            <textarea
+            <RTLTextArea
               id="description"
               value={contextDescription}
               onChange={(e) => updateField('description', e.target.value)}
               placeholder="Share your thoughts..."
               className={`form-control ${formErrors.content ? 'is-invalid' : ''}`}
-              autoFocus
-            ></textarea>
+              rows={4}
+              maxLength={1000}
+            />
             <div className="focus-ring"></div>
             {formErrors.content && (
               <div className="invalid-feedback">{formErrors.content}</div>
-            )}
-            {contextDescription && (
-              <div className={`char-counter ${contextDescription.length > 500 ? 'warning' : ''} ${contextDescription.length > 1000 ? 'danger' : ''}`}>
-                {contextDescription.length} / 1000
-              </div>
             )}
           </div>
 
@@ -2515,38 +2556,35 @@ export default function CreatePostForm() {
         )}
         
         {!isSubmitting ? (
-        <button
-        onClick={handleSubmit}
-        disabled={!selectedStock || !selectedStock.symbol ||
-        formErrors.targetPrice || formErrors.stopLoss ||
-        (currentPrice && targetPrice && parseFloat(targetPrice) <= parseFloat(currentPrice)) ||
-        (currentPrice && stopLoss && parseFloat(stopLoss) >= parseFloat(currentPrice))}
-        className="btn btn-primary"
-        title={
-        formErrors.targetPrice || formErrors.stopLoss ? 'Please fix validation errors before posting' :
-        (currentPrice && targetPrice && parseFloat(targetPrice) <= parseFloat(currentPrice)) ? 'Target price must be greater than current price' :
-        (currentPrice && stopLoss && parseFloat(stopLoss) >= parseFloat(currentPrice)) ? 'Stop loss price must be less than current price' :
-        priceLoading ? 'You can create your post while the price is loading' :
-        ''}
-        >
-              {isSubmitting ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Posting...</>
-              ) : (
-                "Post"
-              )}
+          <button
+            onClick={handleSubmit}
+            disabled={!selectedStock || !selectedStock.symbol ||
+            formErrors.targetPrice || formErrors.stopLoss ||
+            (currentPrice && targetPrice && parseFloat(targetPrice) <= parseFloat(currentPrice)) ||
+            (currentPrice && stopLoss && parseFloat(stopLoss) >= parseFloat(currentPrice))}
+            className="btn btn-primary"
+            title={
+              formErrors.targetPrice || formErrors.stopLoss ? 'Please fix validation errors before posting' :
+              (currentPrice && targetPrice && parseFloat(targetPrice) <= parseFloat(currentPrice)) ? 'Target price must be greater than current price' :
+              (currentPrice && stopLoss && parseFloat(stopLoss) >= parseFloat(currentPrice)) ? 'Stop loss price must be less than current price' :
+              priceLoading ? 'You can create your post while the price is loading' :
+              ''
+            }
+          >
+            Post
+          </button>
+        ) : (
+          <div className="posting-status">
+            <div className="posting-spinner"></div>
+            <span className="posting-text">Posting...</span>
+            <button 
+              className="btn btn-cancel" 
+              onClick={cancelPosting}
+            >
+              Cancel
             </button>
-          ) : (
-            <div className="posting-status">
-              <div className="posting-spinner"></div>
-              <span className="posting-text">Posting...</span>
-              <button 
-                className="btn btn-cancel" 
-                onClick={cancelPosting}
-              >
-                Cancel
-              </button>
-            </div>
-          )}
+          </div>
+        )}
         </div>
       </div>
 
