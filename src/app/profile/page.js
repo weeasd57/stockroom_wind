@@ -14,7 +14,7 @@ import { CreatePostForm } from '@/components/posts/CreatePostForm';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
 import { createPortal } from 'react-dom';
 import '@/styles/create-post-page.css';
-import ProfilePostCard from '@/components/profile/ProfilePostCard';
+import PostCard from '@/components/posts/PostCard';
 import CheckPostPricesButton from '@/components/profile/CheckPostPricesButton';
 import StrategyDetailsModal from '@/components/profile/StrategyDetailsModal';
 import CountrySelectDialog from '@/components/ui/CountrySelectDialog';
@@ -1329,7 +1329,7 @@ export default function Profile() {
                       return strategyMatch && statusMatch && countryMatch && symbolMatch;
                     })
                     .map(post => (
-                      <ProfilePostCard key={post.id} post={post} />
+                      <PostCard key={post.id} post={post} showFlagBackground />
                     ))}
                 </>
               )}
