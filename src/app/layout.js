@@ -45,7 +45,7 @@ export default function RootLayout({ children }) {
         <link rel="preload" as="image" href="/profile-bg.jpg" />
         <link rel="preload" as="image" href="/default-avatar.svg" />
       </head>
-      <body translate="no">
+      <body translate="no" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}>
         <Script id="global-abort-init" strategy="beforeInteractive">
           {`
             window.abortPostsFetch = function() {

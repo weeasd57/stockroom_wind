@@ -21,6 +21,7 @@ interface SymbolSearchDialogProps {
   onSelectStock: (stock: Stock) => void;
   initialStockSearch?: string;
   selectedCountry: string;
+  discoveredSymbols?: Array<{ Symbol: string; Name?: string; Exchange?: string; Country: string; uniqueId?: string; }>; // optional
 }
 
 // Constants
@@ -43,6 +44,7 @@ const SymbolSearchDialog: React.FC<SymbolSearchDialogProps> = ({
   onSelectStock,
   initialStockSearch = '',
   selectedCountry,
+  discoveredSymbols,
 }) => {
   // State management
   const [searchTerm, setSearchTerm] = useState(initialStockSearch);
@@ -65,6 +67,23 @@ const SymbolSearchDialog: React.FC<SymbolSearchDialogProps> = ({
 
   // Memoized search function to prevent unnecessary re-creations
   const performSearch = useCallback(async (term: string, country: string | null) => {
+    // If discovered symbols are provided, filter locally
+    if (Array.isArray(discoveredSymbols) && discoveredSymbols.length > 0) {
+      const normalized = term.toLowerCase();
+      const filtered = discoveredSymbols.filter(s => {
+        const inCountry = country ? String(s.Country).toLowerCase() === String(country).toLowerCase() : true;
+        if (!normalized) return inCountry;
+        return inCountry && (
+          String(s.Symbol).toLowerCase().includes(normalized) ||
+          String(s.Name || '').toLowerCase().includes(normalized)
+        );
+      });
+      setSearchResults(filtered as any);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     // If no term but a country is selected, load all symbols for that country
     if (term.length === 0 && country) {
       setLoading(true);
@@ -105,7 +124,7 @@ const SymbolSearchDialog: React.FC<SymbolSearchDialogProps> = ({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [discoveredSymbols]);
 
   // Debounced search effect
   useEffect(() => {

@@ -10,6 +10,7 @@ interface CountrySelectDialogProps {
   onSelectCountry: (countryCode: string) => void;
   selectedCountry: string;
   countryCounts?: Record<string, number>; // keyed by lowercase ISO code; includes optional 'all' or 'total'
+  discoveredCountries?: string[]; // optional: limit to these ISO codes (lowercase)
 }
 
 const CountrySelectDialog: React.FC<CountrySelectDialogProps> = ({
@@ -18,6 +19,7 @@ const CountrySelectDialog: React.FC<CountrySelectDialogProps> = ({
   onSelectCountry,
   selectedCountry,
   countryCounts,
+  discoveredCountries,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -29,10 +31,15 @@ const CountrySelectDialog: React.FC<CountrySelectDialogProps> = ({
 
   // Memoize filtered countries for performance
   const filteredCountries = useMemo(() => {
-    const allCountries = COUNTRY_CODES.map(code => ({
+    let allCountries = COUNTRY_CODES.map(code => ({
       code,
       name: COUNTRY_CODE_TO_NAME[code] || code,
     }));
+
+    if (Array.isArray(discoveredCountries) && discoveredCountries.length > 0) {
+      const set = new Set(discoveredCountries.map(c => String(c).toLowerCase()));
+      allCountries = allCountries.filter(c => set.has(String(c.code).toLowerCase()));
+    }
 
     if (!searchTerm) {
       return allCountries;
@@ -43,7 +50,7 @@ const CountrySelectDialog: React.FC<CountrySelectDialogProps> = ({
       (country.name as string).toLowerCase().includes(lowerCaseSearchTerm) ||
       (country.code as string).toLowerCase().includes(lowerCaseSearchTerm)
     );
-  }, [searchTerm]);
+  }, [searchTerm, discoveredCountries]);
 
   const handleSelect = useCallback((countryCode: string) => {
     onSelectCountry(countryCode);
