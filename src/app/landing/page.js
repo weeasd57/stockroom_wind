@@ -42,12 +42,48 @@ export default function LandingPage() {
   }, []);
   
   const features = [
-    { id: 1, title: 'Multi-Language Support', description: 'Full RTL support for Arabic and other languages with automatic text direction detection.', icon: '🌐' },
-    { id: 2, title: 'Smart Stock Search', description: 'Advanced search across 50+ countries with real-time symbol data and exchange information.', icon: '🔎' },
-    { id: 3, title: 'Image Upload & Storage', description: 'Secure image uploads to Supabase storage with automatic compression and optimization.', icon: '📸' },
-    { id: 4, title: 'Trading Strategy Management', description: 'Create, save, and manage custom trading strategies with your posts.', icon: '📈' },
-    { id: 5, title: 'Real-time Social Feed', description: 'Live posts feed with comments, likes, and community engagement features.', icon: '💬' },
-    { id: 6, title: 'Performance Analytics', description: 'Track post success rates, follower growth, and trading performance metrics.', icon: '📊' },
+    {
+      id: 1,
+      title: 'Broker Ranking Engine',
+      description:
+        'Continuously ranks brokers by execution quality, fees, reliability, and slippage to route actions to the best option.',
+      icon: '🏆',
+    },
+    {
+      id: 2,
+      title: 'Auto Buy Bot (Signals)',
+      description:
+        'Automation-ready buy signals on successful posts, with safe guardrails for losing signals to minimize risk.',
+      icon: '🤖',
+    },
+    {
+      id: 3,
+      title: 'Signal Trust Score',
+      description:
+        'Weights author track record and post performance to prioritize higher-confidence ideas for the bot.',
+      icon: '⭐',
+    },
+    {
+      id: 4,
+      title: 'Risk Controls & Limits',
+      description:
+        'Configurable max allocation, cool-downs, and stop-loss/take-profit presets to protect capital.',
+      icon: '🛡️',
+    },
+    {
+      id: 5,
+      title: 'Multi‑Broker Fallback',
+      description:
+        'Supports multiple brokers with health checks and automatic failover when a provider is degraded.',
+      icon: '🔗',
+    },
+    {
+      id: 6,
+      title: 'Transparent Logs & Alerts',
+      description:
+        'Full audit trail with notifications for executed actions, rejects, and risk breaches.',
+      icon: '📜',
+    },
   ];
 
   const login = () => {
@@ -94,14 +130,14 @@ export default function LandingPage() {
           
           {/* Hero Section */}
           <div className={styles.heroContent}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
               <img
                 src="/favicon_io/android-chrome-512x512.png"
                 alt="SharksZone Logo"
                 className={styles.heroLogo}
-                style={{ borderRadius: 8 }}
+                style={{ borderRadius: 16 }}
               />
-              <h1 className={styles.title} style={{ margin: 0 }}>
+              <h1 className={styles.title} style={{ margin: '0.75rem 0 0' }}>
                 <span className={styles.brandSharks}>Sharks</span>Zone — Stock Analysis & Social Trading
               </h1>
             </div>

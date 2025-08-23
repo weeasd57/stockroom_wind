@@ -460,7 +460,7 @@
 
 /* Hero logo responsive size */
 .heroLogo {
-  width: clamp(56px, 8vw, 96px);
+  width: clamp(96px, 14vw, 160px);
   height: auto;
   object-fit: contain;
 }

@@ -181,7 +181,7 @@ export default function Navbar() {
         >
           <div className={styles.logoWrapper}>
             <img 
-              src="/logo.svg" 
+              src="/favicon_io/android-chrome-192x192.png" 
               alt="SharksZone Logo" 
               width={40}
               height={40}

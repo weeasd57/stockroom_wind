@@ -9,8 +9,8 @@ import Link from 'next/link';
 import styles from '@/styles/profile.module.css';
 import editStyles from '@/styles/editProfile.module.css';
 import { CreatePostButton } from '@/components/posts/CreatePostButton';
+import CreatePostForm from '@/components/posts/CreatePostForm';
 import { uploadImage } from '@/utils/supabase';
-import CreatePostFormWithEnhancedUpload from '@/components/posts/CreatePostFormWithEnhancedUpload';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
 import { createPortal } from 'react-dom';
 import '@/styles/create-post-page.css';
@@ -1683,7 +1683,7 @@ export default function Profile() {
               </button>
             </div>
             <div className="dialog-body">
-              <CreatePostFormWithEnhancedUpload />
+              <CreatePostForm />
             </div>
           </div>
         </div>
