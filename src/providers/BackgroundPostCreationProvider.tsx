@@ -110,7 +110,21 @@ export function BackgroundPostCreationProvider({ children }: { children: React.R
           throw new Error("Not authenticated");
         }
 
-        let imageUrl: string | null = input.existingImageUrl || null;
+        // Accept only http/https URLs from UI (ignore blob:/data: previews)
+        const isValidHttpUrl = (u: any) => {
+          try {
+            if (!u || typeof u !== 'string') return false;
+            const parsed = new URL(u);
+            return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+          } catch {
+            return false;
+          }
+        };
+
+        let imageUrl: string | null = isValidHttpUrl(input.existingImageUrl) ? (input.existingImageUrl as string) : null;
+        if (input.existingImageUrl && !imageUrl) {
+          console.warn('[BackgroundPostCreation] existingImageUrl rejected (non-http/https):', input.existingImageUrl);
+        }
 
         if (!imageUrl && input.imageFile) {
           // Upload flow
@@ -145,12 +159,36 @@ export function BackgroundPostCreationProvider({ children }: { children: React.R
         setStatus("creating", "Creating post");
         setProgress(90);
 
+        // Ensure image_url is explicitly set (use sanitized existing/uploaded URL)
         const postPayload = {
           ...input.postData,
-          image_url: imageUrl ?? input.postData?.image_url ?? null,
+          image_url: imageUrl || input.postData?.image_url || null,
         };
 
+        // Remove any duplicate image property if exists
+        if ('image' in postPayload) {
+          delete postPayload.image;
+        }
+        if ('images' in postPayload) {
+          delete postPayload.images;
+        }
+
+        console.log('[BackgroundPostCreation] CRITICAL - Post payload:', {
+          hasImageUrl: !!postPayload.image_url,
+          imageUrl: postPayload.image_url,
+          imageUrlType: typeof postPayload.image_url,
+          imageUrlLength: postPayload.image_url?.length,
+          allKeys: Object.keys(postPayload),
+          fullPayload: JSON.stringify(postPayload)
+        });
+
         const saved = await createPost(postPayload);
+        
+        console.log('[BackgroundPostCreation] Post saved:', {
+          savedId: saved?.id,
+          savedImageUrl: saved?.image_url,
+          hasImageUrl: !!saved?.image_url
+        });
         if (canceledRef.current.has(id)) return; // finished but cancelled, keep as cancelled
 
         // Success

@@ -4,12 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
 import { CreatePostButton } from '@/components/posts/CreatePostButton';
-import CreatePostForm from '@/components/posts/CreatePostForm';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
+import { DashboardSection } from '@/components/home/DashboardSection';
 import PostsFeed from '@/components/home/PostsFeed';
 import { createPortal } from 'react-dom';
 import styles from '@/styles/home.module.css';
 import '@/styles/create-post-page.css'; 
+import CreatePostForm from '@/components/posts/CreatePostForm';
 
 export default function HomePage() {
   const { user } = useSupabase();
@@ -208,6 +209,9 @@ export default function HomePage() {
   return (
     <div className={`${styles.homePage} ${visible ? styles.visible : ''}`}>
       <div className={styles.homeContent}>
+        {/* Dashboard Section */}
+        <DashboardSection />
+
         {/* Create Post Section */}
         <div className={styles.createPostSection}>
           <div className={styles.createPostContainer}>

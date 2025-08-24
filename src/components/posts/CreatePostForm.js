@@ -4,27 +4,22 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useSupabase } from '@/providers/SupabaseProvider'; // Updated from useAuth
 import { useProfile } from '@/providers/ProfileProvider'; // Updated from contexts/ProfileContext
 import { getCountrySymbolCounts, searchStocks } from '@/utils/symbolSearch';
+// Background post creation handles image compression/upload and post insert
+import { useBackgroundPostCreation } from '@/providers/BackgroundPostCreationProvider';
 import { uploadPostImage } from '@/utils/supabase';
+import RTLTextArea from '@/components/posts/RTLTextArea';
+import { toast } from 'sonner';
+
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider'; // Updated from contexts/CreatePostFormContext
-import { createPost } from '@/utils/supabase'; // Adjust this import based on your actual supabase client
+// createPost is invoked internally by BackgroundPostCreationProvider via PostProvider
+
 import styles from '@/styles/create-post-page.css'; // Assuming you have a CSS module for this page
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { usePosts } from '@/providers/PostProvider'; // Use PostProvider's usePosts hook
 import { COUNTRY_ISO_CODES, CURRENCY_SYMBOLS } from '@/models/CurrencyData.js';
-import { COUNTRY_CODE_TO_NAME, COUNTRY_CODES } from "../../models/CountryData";
-import { toast } from 'sonner';
-import CountrySelectDialog from '@/components/ui/CountrySelectDialog'; // Import the new dialog component
-import { format } from 'date-fns';
-import SymbolSearchDialog from '@/components/ui/SymbolSearchDialog'; // Import the new dialog component
-import { calculateTargetPrice, calculateStopLoss, calculatePricePercentage } from '@/utils/priceCalculations';
-import RTLTextArea from './RTLTextArea';
-// Create reusable Supabase client
-// const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-// const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-// const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
-
-// removed local parser; use getCountrySymbolCounts() from utils/symbolSearch instead
+import CountrySelectDialog from '@/components/ui/CountrySelectDialog';
+import SymbolSearchDialog from '@/components/ui/SymbolSearchDialog';
+import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 
 // Format symbol for API use
 const formatSymbolForApi = (symbol, country) => {
@@ -62,7 +57,7 @@ export default function CreatePostForm() {
   const { user, supabase } = useSupabase(); // Get the supabase client from the provider
   const { profile, getEffectiveAvatarUrl } = useProfile();
   const router = useRouter();
-  const { createPost: createPostViaProvider } = usePosts(); // Use PostProvider's createPost for optimistic updates
+  const { tasks, startBackgroundPostCreation, cancelTask } = useBackgroundPostCreation();
   const [initialPrice, setInitialPrice] = useState(null); // Added initialPrice state
   
   // Since there's no formState, directly destructure values from context with defaults
@@ -143,6 +138,8 @@ export default function CreatePostForm() {
   const [imageUploadError, setImageUploadError] = useState('');
   const [priceLoading, setPriceLoading] = useState(false);
   const [debugLogs, setDebugLogs] = useState([]);
+  // Abort controller for price fetch to avoid race conditions on rapid symbol changes
+  const priceAbortRef = useRef(null);
   const pushDebug = useCallback((msg) => {
     try {
       console.debug('[CreatePostForm DEBUG]', msg);
@@ -166,6 +163,10 @@ export default function CreatePostForm() {
   const [strategiesLoading, setStrategiesLoading] = useState(true);
   const [isCountrySelectOpen, setIsCountrySelectOpen] = useState(false);
   const [isSymbolSearchOpen, setIsSymbolSearchOpen] = useState(false); // State to control SymbolSearchDialog
+  // Track current background creation task for in-form cancel/progress UI
+  const [currentTaskId, setCurrentTaskId] = useState(null);
+  // Find current background task
+  const currentTask = (tasks || []).find((t) => t.id === currentTaskId) || null;
 
   const handleOpenCountrySelect = () => {
     setIsCountrySelectOpen(true);
@@ -664,7 +665,7 @@ export default function CreatePostForm() {
         
         if (hasImageExtension) {
           // Create a virtual image object to get metadata
-          const img = new Image();
+          const img = new window.Image();
           img.crossOrigin = 'anonymous'; // Try to handle CORS
           
           const imageLoadPromise = new Promise((resolve, reject) => {
@@ -969,13 +970,17 @@ export default function CreatePostForm() {
   // Fetch current price via internal Next.js API proxy to avoid CORS and hide API keys
   const fetchCurrentPrice = async (symbol, country) => {
     if (!symbol) return;
+    // Abort any in-flight request
+    try { priceAbortRef.current?.abort(); } catch (_) {}
+    const controller = new AbortController();
+    priceAbortRef.current = controller;
     setPriceLoading(true);
     try {
       const qs = new URLSearchParams({ symbol: String(symbol) });
       if (country) qs.set('country', String(country));
       const apiUrl = `/api/stocks/price?${qs.toString()}`;
       
-      const response = await fetch(apiUrl, { method: 'GET' });
+      const response = await fetch(apiUrl, { method: 'GET', signal: controller.signal });
       if (!response.ok) {
         let errMsg = `Failed to fetch price data: ${response.status}`;
         try {
@@ -991,6 +996,8 @@ export default function CreatePostForm() {
         throw new Error('Invalid price in API response');
       }
       
+      // Ensure this response is still the latest (not aborted/replaced)
+      if (priceAbortRef.current !== controller) return;
       updateField('currentPrice', priceNum);
       updateField('initialPrice', priceNum);
       
@@ -1005,11 +1012,18 @@ export default function CreatePostForm() {
       updateField('targetPricePercentage', targetPercentage);
       updateField('stopLossPercentage', stopLossPercentage);
     } catch (error) {
+      if (error?.name === 'AbortError') {
+        // Swallow aborts silently
+        return;
+      }
       console.error('Error fetching current price:', error);
       updateField('currentPrice', null);
       setPriceError?.(error.message || 'Failed to fetch price');
     } finally {
-      setPriceLoading(false);
+      // Only clear loading if this is the latest request
+      if (priceAbortRef.current === controller) {
+        setPriceLoading(false);
+      }
     }
   };
 
@@ -1026,6 +1040,13 @@ export default function CreatePostForm() {
       fetchCurrentPrice(selectedStock.symbol, selectedCountry);
     }
   }, [selectedCountry, selectedStock]);
+
+  // Abort any pending price request on unmount
+  useEffect(() => {
+    return () => {
+      try { priceAbortRef.current?.abort(); } catch (_) {}
+    };
+  }, []);
 
   // Function to open the strategy dialog
   const openStrategyDialog = () => {
@@ -1134,11 +1155,12 @@ export default function CreatePostForm() {
     }
   }, [setGlobalStatus]);
 
-  // New improved handleSubmit function with better timeout handling
+  // New improved handleSubmit function: delegates to BackgroundPostCreationProvider
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (isSubmitting) return; // Prevent multiple submissions
     setIsSubmitting(true); // Set submitting state to true
+
     setErrors({}); // Reset errors
 
     // Simple validation checks
@@ -1149,42 +1171,8 @@ export default function CreatePostForm() {
     }
 
     try {
-      console.debug('[handleSubmit] building post, selectedStock:', selectedStock && selectedStock.symbol, 'selectedImageFile:', !!selectedImageFile);
+      console.debug('[handleSubmit] building post for background task, selectedStock:', selectedStock && selectedStock.symbol, 'selectedImageFile:', !!selectedImageFile);
       console.debug('[handleSubmit] formErrors:', formErrors, 'isSubmitting:', isSubmitting);
-      // Try upload if a local file was selected; otherwise use the image URL input
-      let uploadedImageUrl = null;
-      if (selectedImageFile) {
-        console.debug('[handleSubmit] selectedImageFile present, preparing to upload', { name: selectedImageFile.name, size: selectedImageFile.size, type: selectedImageFile.type, userId: user?.id });
-        setImageUploading(true);
-        setImageUploadError('');
-        try {
-          const { publicUrl, error: uploadError } = await uploadPostImage(
-            selectedImageFile,
-            user.id
-          );
-          console.debug('[handleSubmit] uploadPostImage returned', { publicUrl, uploadError });
-          if (uploadError) {
-            console.error("Error uploading image:", uploadError);
-            setImageUploadError(uploadError.message || 'Upload failed');
-            setErrors({ image: `Error uploading image: ${uploadError.message}` });
-            setIsSubmitting(false); // Reset submitting state on error
-            setImageUploading(false);
-            return;
-          }
-          uploadedImageUrl = publicUrl;
-          console.debug('[handleSubmit] uploadedImageUrl set to', uploadedImageUrl);
-        } catch (uploadErr) {
-          console.error('uploadPostImage threw:', uploadErr);
-          setImageUploadError(uploadErr?.message || String(uploadErr));
-          setErrors({ image: `Error uploading image: ${uploadErr?.message || 'Upload failed'}` });
-          setIsSubmitting(false);
-          setImageUploading(false);
-          return;
-        } finally {
-          setImageUploading(false);
-        }
-      }
-
       // Use currentPrice from context that was set when stock was selected
       console.debug('[handleSubmit] currentPrice from context:', currentPrice, 'targetPrice:', targetPrice, 'stopLoss:', stopLoss);
       
@@ -1197,6 +1185,17 @@ export default function CreatePostForm() {
       const numericStopLoss = stopLoss && !isNaN(parseFloat(stopLoss)) ? parseFloat(stopLoss) : numericInitial;
       
       console.debug('[handleSubmit] calculated prices:', { numericInitial, numericTarget, numericStopLoss });
+
+      // Only accept http/https URLs for image sources (avoid blob:/data:)
+      const isValidHttpUrl = (u) => {
+        try {
+          if (!u || typeof u !== 'string') return false;
+          const parsed = new URL(u);
+          return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+        } catch { return false; }
+      };
+      const candidateUrlDirect = isValidHttpUrl(imageUrl) ? imageUrl : null;
+      const candidateUrlFromPreview = isValidHttpUrl(imagePreview) ? imagePreview : null;
 
       const postData = {
         user_id: user.id,
@@ -1214,8 +1213,8 @@ export default function CreatePostForm() {
         // Stock/company metadata required by schema
         company_name: selectedStock?.name || selectedStock?.company_name || selectedStock?.symbol || '',
         exchange: selectedStock?.exchange || '',
-        // Prefer uploaded image URL, fall back to image URL input from context
-        image_url: uploadedImageUrl || imageUrl || null,
+        // Prefer valid URL input from context (http/https only)
+        image_url: candidateUrlDirect || null,
         strategy: selectedStrategy || null,
         is_public: isPublic,
         status: 'open',
@@ -1223,58 +1222,78 @@ export default function CreatePostForm() {
         status_message: 'open',
       };
 
-      // Log the postData before sending to Supabase for debugging
-      console.log('[handleSubmit DEBUG] Post data being sent:', postData);
+      // Log the postData before sending to background worker for debugging
+      console.log('[handleSubmit DEBUG] Post data being queued:', postData);
 
-      // Use PostProvider's createPost for optimistic updates
-      console.debug('[handleSubmit] calling PostProvider createPost with postData keys:', Object.keys(postData));
-      const startCreate = performance.now();
-      try {
-        await createPostViaProvider(postData);
-      } catch (err) {
-        console.error('Error creating post via PostProvider:', err);
-        setErrors({ general: `Error creating post: ${err?.message || err}` });
-        setIsSubmitting(false);
-        return;
-      }
-      const createDuration = performance.now() - startCreate;
-      console.debug('[handleSubmit] PostProvider createPost completed', { createDuration });
+      // Determine image source for background task
+      const isUrlBased = selectedImageFile?.isFromUrl === true;
+      // Decide which file to upload: prefer selectedImageFile, fallback to context imageFile
+      const fileToUpload = isUrlBased ? null : (selectedImageFile || imageFile || null);
+      // Use only sanitized candidates; ignore blob:/data: previews
+      const existingUrlFromFile = isUrlBased ? (candidateUrlFromPreview || candidateUrlDirect) : null;
+      const existingUrlDirect = !(selectedImageFile || imageFile) ? candidateUrlDirect : null;
+      const resolvedExistingUrl = existingUrlFromFile || existingUrlDirect || null;
+      console.debug('[handleSubmit] image resolution', {
+        isUrlBased,
+        hasSelectedImageFile: !!selectedImageFile,
+        hasContextImageFile: !!imageFile,
+        willUploadFile: !!fileToUpload,
+        candidateUrlDirect,
+        candidateUrlFromPreview,
+        resolvedExistingUrl,
+      });
 
-      // Post creation successful - optimistic updates already handled by PostProvider
-      toast.success("Post created successfully!");
+      // Start background task: it handles compression, upload, progress, cancellation, and optimistic create
+      const taskId = startBackgroundPostCreation({
+        postData,
+        imageFile: fileToUpload,
+        existingImageUrl: resolvedExistingUrl,
+        title: title || selectedStock?.symbol || 'New post',
+      });
+
+      console.debug('[handleSubmit] background task started', { taskId });
+      toast.success('Creating post in background...');
+      // Track task in form state for cancel/progress UI
+      setCurrentTaskId(taskId);
+      
 
       // No need to manually refresh - PostProvider handles real-time updates
 
+      // Reset form right after queuing the task (optimistic UI handled in provider)
       resetForm();
-      // Use context-provided dialog closer
+      setSubmitSuccess(true);
+      setIsSubmitting(false);
+      // Hide the form/dialog after successful submit
       if (typeof closeDialog === 'function') {
-        closeDialog();
+        try { closeDialog(); } catch (_) {}
       }
+      return;
     } catch (error) {
-      console.error("Unhandled error during post creation:", error);
-      setErrors({ general: 'An unexpected error occurred during post creation.' });
-      setIsSubmitting(false); // Always reset submitting state on unhandled error
+      console.error("Error creating post:", error);
+      setGlobalStatus({ type: 'error', message: error.message || 'Error creating post. Please try again.' });
+      setIsSubmitting(false);
+ // Always reset submitting state on unhandled error
     } finally {
       setIsSubmitting(false); // Ensure submitting state is reset
     }
   };
 
-  // Cancel ongoing post submission
+  // Cancel ongoing post submission or background task
   const cancelPosting = () => {
+    // Prefer canceling the background task if exists
+    if (currentTaskId && typeof cancelTask === 'function') {
+      try { cancelTask(currentTaskId); } catch (e) { console.debug('cancelTask failed', e); }
+      updateGlobalStatus('Posting cancelled', 'info');
+      setCurrentTaskId(null);
+      return;
+    }
+    // Fallback to legacy UI state cancel
     if (isSubmitting) {
       updateGlobalStatus('Posting cancelled', 'info');
       setIsSubmitting(false);
       setStatus('idle');
-      
-      // Also update the context state if available
-      if (setSubmitState) {
-        setSubmitState('idle');
-      }
-      
-      // Close dialog if in dialog mode
-      if (closeDialog) {
-        closeDialog();
-      }
+      if (setSubmitState) setSubmitState('idle');
+      if (closeDialog) closeDialog();
     }
   };
 
@@ -2551,28 +2570,51 @@ export default function CreatePostForm() {
         borderRadius: '4px',
         border: '1px solid #e5e7eb'
         }}>
-        💡 You can create your post while the price is loading
+        ⏳ Fetching latest price...
         </div>
         )}
         
         {!isSubmitting ? (
-          <button
-            onClick={handleSubmit}
-            disabled={!selectedStock || !selectedStock.symbol ||
-            formErrors.targetPrice || formErrors.stopLoss ||
-            (currentPrice && targetPrice && parseFloat(targetPrice) <= parseFloat(currentPrice)) ||
-            (currentPrice && stopLoss && parseFloat(stopLoss) >= parseFloat(currentPrice))}
-            className="btn btn-primary"
-            title={
-              formErrors.targetPrice || formErrors.stopLoss ? 'Please fix validation errors before posting' :
-              (currentPrice && targetPrice && parseFloat(targetPrice) <= parseFloat(currentPrice)) ? 'Target price must be greater than current price' :
-              (currentPrice && stopLoss && parseFloat(stopLoss) >= parseFloat(currentPrice)) ? 'Stop loss price must be less than current price' :
-              priceLoading ? 'You can create your post while the price is loading' :
-              ''
-            }
-          >
-            Post
-          </button>
+          <>
+            <button
+              onClick={handleSubmit}
+              disabled={!selectedStock || !selectedStock.symbol ||
+              formErrors.targetPrice || formErrors.stopLoss ||
+              // Gate until price fetch resolves or fails
+              priceLoading ||
+              (selectedStock && (currentPrice == null && !priceError)) ||
+              // Keep existing validations when price is present
+              (currentPrice && targetPrice && parseFloat(targetPrice) <= parseFloat(currentPrice)) ||
+              (currentPrice && stopLoss && parseFloat(stopLoss) >= parseFloat(currentPrice)) ||
+              !!currentTask}
+              className="btn btn-primary"
+              title={
+                formErrors.targetPrice || formErrors.stopLoss ? 'Please fix validation errors before posting' :
+                (currentPrice && targetPrice && parseFloat(targetPrice) <= parseFloat(currentPrice)) ? 'Target price must be greater than current price' :
+                (currentPrice && stopLoss && parseFloat(stopLoss) >= parseFloat(currentPrice)) ? 'Stop loss price must be less than current price' :
+                priceLoading ? 'Fetching latest price...' :
+                (selectedStock && (currentPrice == null && !priceError)) ? 'Waiting for latest price' :
+                ''
+              }
+            >
+              {currentTask ? 'Posting...' : 'Post'}
+            </button>
+            {currentTask && (
+              <div className="bg-task-status" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="bg-task-progress" style={{ flex: '0 0 120px', height: 6, background: '#eee', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ width: `${currentTask.progress || 0}%`, height: '100%', background: '#3b82f6', transition: 'width 150ms ease' }} />
+                </div>
+                <span className="bg-task-text" style={{ fontSize: 12, color: '#6b7280' }}>
+                  {currentTask.status === 'uploading' ? 'Uploading image' : currentTask.status === 'creating' ? 'Creating post' : currentTask.status}
+                </span>
+                {currentTask.canCancel && (
+                  <button className="btn btn-cancel" onClick={cancelPosting} style={{ fontSize: 12 }}>
+                    Cancel
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         ) : (
           <div className="posting-status">
             <div className="posting-spinner"></div>
@@ -2585,6 +2627,7 @@ export default function CreatePostForm() {
             </button>
           </div>
         )}
+        
         </div>
       </div>
 

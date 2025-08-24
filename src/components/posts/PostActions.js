@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useComments } from '@/providers/CommentProvider';
+import { isValidUUID, isTempId } from '@/lib/utils';
 import styles from '../../styles/PostActions.module.css';
 
 export default function PostActions({ postId, initialBuyCount = 0, initialSellCount = 0, onVoteChange }) {
@@ -12,6 +13,7 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
   const [isLoading, setIsLoading] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
   const [error, setError] = useState(null);
+  const isRealId = isValidUUID(postId) && !isTempId(postId);
 
   const postStats = getPostStats(postId);
   const buyCount = postStats.buyCount || initialBuyCount;
@@ -19,7 +21,7 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
 
   // Bootstrap real-time subscriptions for this post even if comments are not opened
   useEffect(() => {
-    if (postId) {
+    if (postId && isRealId) {
       fetchCommentsForPost(postId);
     }
   }, [postId, fetchCommentsForPost]);
@@ -28,6 +30,10 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
   useEffect(() => {
     async function checkUserVote() {
       if (!user || !supabase) return;
+      if (!isRealId) {
+        setUserAction(null);
+        return;
+      }
 
       try {
         const { data, error } = await supabase
@@ -44,7 +50,7 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
     }
 
     checkUserVote();
-  }, [user, supabase, postId]);
+  }, [user, supabase, postId, isRealId]);
 
   // Ensure any async op cannot hang the UI forever
   const withTimeout = (promise, ms = 12000, context = 'operation') => {
@@ -67,6 +73,10 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
 
   const handleAction = async (actionType) => {
     if (!user || !supabase) return;
+    if (!isRealId) {
+      setError('Post is not yet saved');
+      return;
+    }
 
     setIsLoading(true);
     setPendingAction(actionType);
@@ -145,7 +155,7 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
         <button
           className={`${styles.actionButton} ${userAction === 'buy' ? styles.active : ''}`}
           onClick={() => handleAction('buy')}
-          disabled={isLoading}
+          disabled={isLoading || !isRealId}
           title={userAction === 'buy' ? 'Remove Buy Vote' : 'Vote Buy'}
         >
           <span className={styles.iconEmoji}>👍</span>
@@ -161,7 +171,7 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
         <button
           className={`${styles.actionButton} ${userAction === 'sell' ? styles.active : ''}`}
           onClick={() => handleAction('sell')}
-          disabled={isLoading}
+          disabled={isLoading || !isRealId}
           title={userAction === 'sell' ? 'Remove Sell Vote' : 'Vote Sell'}
         >
           <span className={styles.iconEmoji}>👎</span>

@@ -119,7 +119,28 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     };
     setPosts(prev => [optimisticPost, ...prev]);
     try {
-      const saved = await supaCreatePost(postData);
+      console.log('[PostProvider] CRITICAL - Creating post with data:', {
+        hasImageUrl: !!postData.image_url,
+        imageUrl: postData.image_url,
+        imageUrlLength: postData.image_url?.length,
+        allKeys: Object.keys(postData),
+        fullData: JSON.stringify(postData)
+      });
+      
+      // Ensure image_url is passed correctly
+      const dataToSave = {
+        ...postData,
+        image_url: postData.image_url || null
+      };
+      
+      const saved = await supaCreatePost(dataToSave);
+      
+      console.log('[PostProvider] Post created:', {
+        savedId: saved?.id,
+        savedImageUrl: saved?.image_url,
+        hasImageUrl: !!saved?.image_url
+      });
+      
       setPosts(prev => {
         const withoutTemp = prev.filter(p => p.id !== tempId);
         return [saved, ...withoutTemp];

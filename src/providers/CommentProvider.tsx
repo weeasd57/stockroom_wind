@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Comment } from '../models/Comment';
 import { useSupabase } from './SupabaseProvider';
+import { isValidUUID, isTempId } from '@/lib/utils';
 
 interface PostStats {
   commentCount: number;
@@ -37,6 +38,7 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
   // Subscribe to real-time updates for a specific post
   const subscribeToPost = useCallback((postId: string) => {
     if (subscriptions[postId] || !supabase) return;
+    if (!isValidUUID(postId) || isTempId(postId)) return;
 
     // Subscribe to comments changes
     const commentsSubscription = supabase
@@ -93,7 +95,7 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
 
   // Update post statistics
   const updatePostStats = useCallback(async (postId: string) => {
-    if (!supabase) return;
+    if (!supabase || !isValidUUID(postId) || isTempId(postId)) return;
 
     try {
       const [commentsResponse, buyVotesResponse, sellVotesResponse] = await Promise.all([
@@ -130,7 +132,7 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch comments for a specific post
   const fetchCommentsForPost = useCallback(async (postId: string) => {
-    if (!supabase) return;
+    if (!supabase || !isValidUUID(postId) || isTempId(postId)) return;
 
     try {
       const { data, error } = await supabase
@@ -171,6 +173,7 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
 
   const addComment = async (postId: string, content: string): Promise<Comment> => {
     if (!supabase || !user) throw new Error('Not authenticated');
+    if (!isValidUUID(postId) || isTempId(postId)) throw new Error('Post is not yet saved');
 
     setLoading(true);
     setError(null);
@@ -256,6 +259,10 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
 
   const toggleBuyVote = async (postId: string, currentAction: 'buy' | 'sell' | null = null): Promise<void> => {
     if (!supabase || !user) throw new Error('Not authenticated');
+    if (!isValidUUID(postId) || isTempId(postId)) {
+      setError('Post is not yet saved');
+      return;
+    }
 
     // Ensure subscription is active for real-time confirmations
     subscribeToPost(postId);
@@ -325,6 +332,10 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
 
   const toggleSellVote = async (postId: string, currentAction: 'buy' | 'sell' | null = null): Promise<void> => {
     if (!supabase || !user) throw new Error('Not authenticated');
+    if (!isValidUUID(postId) || isTempId(postId)) {
+      setError('Post is not yet saved');
+      return;
+    }
 
     // Ensure subscription is active for real-time confirmations
     subscribeToPost(postId);

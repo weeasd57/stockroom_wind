@@ -13,6 +13,7 @@ import { FollowProvider } from '@/providers/FollowProvider'; // Import FollowPro
 import { PostProvider } from '@/providers';
 import { BackgroundPostCreationProvider } from '@/providers';
 import BackgroundPostCreationFloatingIndicator from '@/components/background/BackgroundPostCreationFloatingIndicator';
+import { Toaster } from 'sonner';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -168,6 +169,7 @@ export default function RootLayout({ children }) {
                             <FollowProvider> {/* Wrap children with FollowProvider */}
                               {children}
                               <BackgroundPostCreationFloatingIndicator />
+                              <Toaster richColors position="top-right" />
                             </FollowProvider>
                           </BackgroundPostCreationProvider>
                         </PostProvider>

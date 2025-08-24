@@ -408,4 +408,118 @@ The enhanced image upload system ensures that:
 5. **Errors are handled gracefully** with fallbacks and retries
 6. **Security is maintained** with proper validation and access control
 
-This system provides a production-ready solution for handling image uploads in your stock trading application! 🚀
+This system provides a production-ready solution for handling image uploads in your stock trading application! 
+
+---
+
+# Operational Runbook: Image Saving Errors
+
+Use this runbook when images appear in Storage but are not saved to the database, or when uploads fail intermittently.
+
+## Symptoms
+
+- Images upload succeeds (visible in Storage) but `posts.image_url` is `NULL`.
+- Upload fails with policy or bucket errors.
+- UI shows a preview but the created post has no image.
+- Network tab shows successful upload but missing insert payload.
+
+## Common Root Causes
+
+- Missing/incorrect `posts.image_url` column or type.
+- Client saved `blob:`/`data:` preview URL instead of public URL.
+- Using wrong bucket or path convention.
+- Storage policies not allowing INSERT/SELECT for authenticated users.
+- Background task fails silently and form resets too early.
+
+## Quick Triage (5 min)
+
+1. Check Post payload in console:
+   - Look for `[handleSubmit DEBUG] Post data being queued:` and ensure `image_url` is a public http(s) URL.
+2. Check Background worker logs:
+   - Provider: `BackgroundPostCreationProvider` should log upload result/public URL.
+3. Verify DB column:
+   - Confirm `posts.image_url` exists and is TEXT.
+4. Verify bucket + policies:
+   - Bucket `post_images` exists and is Public. Policies allow authenticated INSERT/SELECT.
+
+## Step-by-Step Fix
+
+1) Database schema validation
+
+```sql
+-- Ensure column exists and is correct type
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'posts' AND column_name = 'image_url';
+
+-- Optional: backfill or sanitize invalid URLs
+SELECT id, image_url FROM posts WHERE image_url IS NOT NULL AND image_url NOT LIKE 'http%';
+```
+
+If missing, apply the migration in `SQL_CODE/schema.sql` or add the column:
+
+```sql
+ALTER TABLE posts ADD COLUMN image_url TEXT;
+```
+
+2) Storage bucket and policies
+
+- Bucket name: `post_images` (Public)
+- Path convention: `post_images/{userId}/{timestamp}_{filename}`
+- Apply policies from `SQL_CODE/storage_policies.sql` or verify in Dashboard:
+
+```sql
+-- Minimal examples (adjust to your org)
+-- SELECT (public read)
+-- bucket_id = 'post_images'
+
+-- INSERT/UPDATE/DELETE (authenticated)
+-- (bucket_id = 'post_images') AND auth.role() = 'authenticated'
+```
+
+3) Client-side integration checks
+
+- Ensure the saved field is `image_url` (exact name) on `posts` payload.
+- Never persist `blob:`/`data:` previews. Only save the final public URL.
+- Source of truth should be the result of the upload utility:
+
+```ts
+// Background worker hands off either:
+// 1) uploaded file -> returns public URL
+// 2) existing, already-public URL (http/https)
+
+postData.image_url = uploadResult.publicUrl ?? existingImageUrl ?? null;
+```
+
+- Components/hooks involved: `uploadPostImageEnhanced`, `useImageUpload`, `BackgroundPostCreationProvider`, `SupabaseProvider`.
+
+4) Network/console verification
+
+- Network: confirm a Storage PUT (or multipart) succeeded, then DB insert called with `image_url`.
+- Console should show, in order:
+  - `[uploadPostImageEnhanced] Upload successful`
+  - `[handleSubmit DEBUG] Post data being queued:` with `image_url`
+  - `[SupabaseProvider] Inserting post with data`
+
+5) Recovery and re-run
+
+- If a post was created without `image_url`, you can update it:
+
+```sql
+UPDATE posts
+SET image_url = 'https://.../post_images/<userId>/<file>'
+WHERE id = '<post_id>';
+```
+
+## Verification Checklist
+
+- [ ] New post with image results in a non-null `posts.image_url`.
+- [ ] The URL begins with `http` and points to your Supabase Storage domain.
+- [ ] The image is accessible publicly via browser.
+- [ ] Background creation task reports success without errors.
+
+## References
+
+- DB/Schema: `SQL_CODE/schema.sql`
+- Storage Policies: `SQL_CODE/storage_policies.sql`
+- Upload flow: this document (sections Implementation Guide + Database Flow)

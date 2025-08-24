@@ -1,8 +1,19 @@
 
 
-[] should when get data from check prices api saving in supabase and show the updated data by provider with out reload ( i have just NEXT_PUBLIC_SUPABASE_URL , NEXT_PUBLIC_SUPABASE_ANON_KEY , NEXT_PUBLIC_EOD_API_KEY) for dont use any key else they 
+[] should when get data from check prices and update data (read the post schema for get all coulmne for the check post ) and  saving in supabase and show the updated data by provider with out reload ( i have just NEXT_PUBLIC_SUPABASE_URL , NEXT_PUBLIC_SUPABASE_ANON_KEY , NEXT_PUBLIC_EOD_API_KEY) for dont use any key else they 
 
-
+and fix this "Error updating user experience score: {
+  message: 'Invalid API key',
+  hint: 'Double check your Supabase `anon` or `service_role` API key.'
+}
+Error updating posts batch: {
+  message: 'Invalid API key',
+  hint: 'Double check your Supabase `anon` or `service_role` API key.'
+}
+Error updating posts: {
+  message: 'Invalid API key',
+  hint: 'Double check your Supabase `anon` or `service_role` API key.'
+}"
 
 
 
@@ -17,3 +28,7 @@
 * should can hide the form create post for running in background be show the indecatour loading states 
 
 ---
+* need when click user name in comment goto him profile 
+
+* and fix the user info from post card (PostsFeed_userInfo)in all pages (user view , home , profile)
+

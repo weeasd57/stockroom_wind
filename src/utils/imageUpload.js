@@ -94,10 +94,11 @@ export async function uploadPostImageEnhanced(file, userId, options = {}) {
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substring(2, 8);
     const fileExt = compressedFile.name.split('.').pop().toLowerCase();
-    const fileName = `${userId}-post-${timestamp}-${randomId}.${fileExt}`;
+    const fileName = `${timestamp}-${randomId}.${fileExt}`;
 
-    // Try multiple bucket strategies
+    // Try multiple bucket strategies with proper paths
     const bucketStrategies = [
+      { bucket: 'post_images', path: `${userId}/${fileName}` },
       { bucket: 'post_images', path: fileName },
       { bucket: 'avatars', path: `posts/${fileName}` },
       { bucket: 'public', path: `posts/${fileName}` }
@@ -136,22 +137,24 @@ export async function uploadPostImageEnhanced(file, userId, options = {}) {
         }
 
         // Get public URL
-        const { data: urlData } = supabase.storage
+        const publicUrl = supabase.storage
           .from(strategy.bucket)
-          .getPublicUrl(strategy.path);
+          .getPublicUrl(strategy.path).data.publicUrl;
 
-        if (urlData?.publicUrl) {
-          if (onProgress) {
-            try { onProgress(100); } catch {}
-          }
-          uploadResult = {
-            publicUrl: urlData.publicUrl,
-            bucket: strategy.bucket,
-            path: strategy.path,
-            data
-          };
-          break;
-        }
+        console.log('[uploadPostImageEnhanced] Upload successful:', {
+          bucket: strategy.bucket,
+          filePath: strategy.path,
+          publicUrl,
+          hasUrl: !!publicUrl
+        });
+
+        uploadResult = {
+          publicUrl,
+          bucket: strategy.bucket,
+          path: strategy.path,
+          data
+        };
+        break;
       } catch (strategyError) {
         lastError = strategyError;
         console.warn(`[uploadPostImageEnhanced] Strategy ${strategy.bucket} error:`, strategyError);

@@ -131,12 +131,14 @@ export default function LandingPage() {
           {/* Hero Section */}
           <div className={styles.heroContent}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-              <img
+              <div className={styles.logobackground}>
+                <img
                 src="/favicon_io/android-chrome-512x512.png"
                 alt="SharksZone Logo"
                 className={styles.heroLogo}
                 style={{ borderRadius: 16 }}
               />
+              </div>
               <h1 className={styles.title} style={{ margin: '0.75rem 0 0' }}>
                 <span className={styles.brandSharks}>Sharks</span>Zone — Stock Analysis & Social Trading
               </h1>

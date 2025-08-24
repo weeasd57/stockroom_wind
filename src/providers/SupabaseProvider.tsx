@@ -369,18 +369,127 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
 
   const createPost = useCallback(async (postData: any) => {
     try {
-      const { data, error } = await supabase
+      console.log('[SupabaseProvider] Full post data before insert:', postData);
+      console.log('[SupabaseProvider] Inserting post with data:', {
+        hasImageUrl: !!postData.image_url,
+        imageUrl: postData.image_url,
+        allKeys: Object.keys(postData),
+        user_id: postData.user_id
+      });
+      
+      // Build base object and normalize image_url
+      const postToInsert = {
+        ...postData,
+        user_id: postData.user_id || user?.id,
+        created_at: postData.created_at || new Date().toISOString()
+      } as any;
+
+      const isValidHttpUrl = (u: any) => {
+        try {
+          if (!u || typeof u !== 'string') return false;
+          const parsed = new URL(u);
+          return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+        } catch { return false; }
+      };
+
+      const rawImageUrl = (typeof postToInsert.image_url === 'string' && postToInsert.image_url)
+        ? postToInsert.image_url
+        : (typeof postToInsert.imageUrl === 'string' ? postToInsert.imageUrl : null);
+      const normalizedImageUrl = isValidHttpUrl(rawImageUrl) ? rawImageUrl : null;
+      postToInsert.image_url = normalizedImageUrl;
+
+      console.log('[SupabaseProvider] Normalized image_url:', {
+        rawImageUrl,
+        normalizedImageUrl,
+        fromCamelCase: typeof postToInsert.imageUrl === 'string'
+      });
+
+      // Create clean object with only valid fields that exist in database
+      const cleanPost = {
+        user_id: postToInsert.user_id,
+        content: postToInsert.content || '',
+        image_url: postToInsert.image_url || null,
+        symbol: postToInsert.symbol || '',
+        company_name: postToInsert.company_name || '',
+        country: postToInsert.country || '',
+        exchange: postToInsert.exchange || '',
+        current_price: (postToInsert.current_price ?? postToInsert.price) ?? 0,
+        target_price: postToInsert.target_price ?? 0,
+        stop_loss_price: (postToInsert.stop_loss_price ?? postToInsert.stop_loss) ?? 0,
+        strategy: postToInsert.strategy ?? 'BUY',
+        description: postToInsert.description ?? null,
+        initial_price: (postToInsert.initial_price ?? postToInsert.current_price ?? postToInsert.price) ?? null,
+        high_price: postToInsert.high_price ?? null,
+        target_high_price: postToInsert.target_high_price ?? null,
+        status_message: postToInsert.status_message ?? 'Active', // Required field
+        created_at: postToInsert.created_at,
+        // Optional flags if provided
+        is_public: typeof postToInsert.is_public === 'boolean' ? postToInsert.is_public : true,
+        status: postToInsert.status || 'open'
+      } as any;
+      
+      console.log('[SupabaseProvider] Clean post object:', cleanPost);
+      console.log('[SupabaseProvider] image_url in clean object:', cleanPost.image_url);
+      
+      // Perform insert with array payload (more compatible across PostgREST versions)
+      // Also guard with a timeout to avoid potential hangs
+      console.log('[SupabaseProvider] Performing insert into posts...');
+      const insertPromise = supabase
         .from('posts')
-        .insert(postData)
+        .insert([cleanPost])
         .select()
         .single();
+
+      const timeoutMs = 10000; // 10s safety timeout
+      let data: any = null;
+      let error: any = null;
+      try {
+        const res: any = await Promise.race([
+          insertPromise,
+          new Promise((resolve) => setTimeout(() => resolve({ data: null, error: new Error('Insert timeout') }), timeoutMs))
+        ]);
+        data = res?.data ?? null;
+        error = res?.error ?? null;
+      } catch (e: any) {
+        error = e;
+      }
+
+      // If timed out, attempt a best-effort fallback fetch by unique tuple
+      if (error && error.message === 'Insert timeout') {
+        console.warn('[SupabaseProvider] Insert timed out, attempting fallback fetch by created_at/content/user_id');
+        const { data: fallback, error: fallbackErr } = await supabase
+          .from('posts')
+          .select('*')
+          .eq('user_id', (cleanPost as any).user_id)
+          .eq('created_at', (cleanPost as any).created_at)
+          .eq('content', (cleanPost as any).content)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (fallback) {
+          console.warn('[SupabaseProvider] Fallback fetch succeeded. Proceeding with returned row.');
+          data = fallback;
+          error = null;
+        } else if (fallbackErr) {
+          console.warn('[SupabaseProvider] Fallback fetch failed:', fallbackErr?.message);
+        }
+      }
+      
+      console.log('[SupabaseProvider] Insert result:', {
+        success: !error,
+        dataId: data?.id,
+        dataImageUrl: data?.image_url,
+        hasImageUrl: !!data?.image_url,
+        error: error?.message
+      });
+      
       if (error) throw error;
       return data;
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to create post'));
       throw err;
     }
-  }, [supabase]);
+  }, [supabase, user?.id]);
 
   const updatePost = useCallback(async (id: string, updates: any) => {
     try {
