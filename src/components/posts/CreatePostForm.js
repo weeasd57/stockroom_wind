@@ -1194,8 +1194,10 @@ export default function CreatePostForm() {
           return parsed.protocol === 'http:' || parsed.protocol === 'https:';
         } catch { return false; }
       };
-      const candidateUrlDirect = isValidHttpUrl(imageUrl) ? imageUrl : null;
-      const candidateUrlFromPreview = isValidHttpUrl(imagePreview) ? imagePreview : null;
+      const rawUrl = typeof imageUrl === 'string' ? imageUrl.trim() : '';
+      const rawPreview = typeof imagePreview === 'string' ? imagePreview.trim() : '';
+      const candidateUrlDirect = isValidHttpUrl(rawUrl) ? rawUrl : null;
+      const candidateUrlFromPreview = isValidHttpUrl(rawPreview) ? rawPreview : null;
 
       const postData = {
         user_id: user.id,
@@ -1255,18 +1257,11 @@ export default function CreatePostForm() {
       toast.success('Creating post in background...');
       // Track task in form state for cancel/progress UI
       setCurrentTaskId(taskId);
-      
+      setSubmitState('submitting');
 
       // No need to manually refresh - PostProvider handles real-time updates
 
-      // Reset form right after queuing the task (optimistic UI handled in provider)
-      resetForm();
-      setSubmitSuccess(true);
-      setIsSubmitting(false);
-      // Hide the form/dialog after successful submit
-      if (typeof closeDialog === 'function') {
-        try { closeDialog(); } catch (_) {}
-      }
+      // Defer form reset/close until task completion (handled by useEffect on currentTask)
       return;
     } catch (error) {
       console.error("Error creating post:", error);
@@ -1274,7 +1269,7 @@ export default function CreatePostForm() {
       setIsSubmitting(false);
  // Always reset submitting state on unhandled error
     } finally {
-      setIsSubmitting(false); // Ensure submitting state is reset
+      // Keep submitting state until background task completes; no-op here
     }
   };
 

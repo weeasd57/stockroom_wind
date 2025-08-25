@@ -1,31 +1,11 @@
 
 
-[] should when get data from check prices and update data (read the post schema for get all coulmne for the check post ) and  saving in supabase and show the updated data by provider with out reload ( i have just NEXT_PUBLIC_SUPABASE_URL , NEXT_PUBLIC_SUPABASE_ANON_KEY , NEXT_PUBLIC_EOD_API_KEY) for dont use any key else they 
+[] should when get data from check prices and update data (read the post schema for get all coulmne for the check post ) and  saving in supabase and show the updated data by provider with out reload 
 
-and fix this "Error updating user experience score: {
-  message: 'Invalid API key',
-  hint: 'Double check your Supabase `anon` or `service_role` API key.'
-}
-Error updating posts batch: {
-  message: 'Invalid API key',
-  hint: 'Double check your Supabase `anon` or `service_role` API key.'
-}
-Error updating posts: {
-  message: 'Invalid API key',
-  hint: 'Double check your Supabase `anon` or `service_role` API key.'
-}"
-
-
-
-* need when create post by image save this image in my storge supabase and in my posts table and when add url image too  
 
 
 * when save strategy is dont work in taps my profile
 
-* delete CreatePostFormWithEnhancedUpload and use this "src\components\posts\CreatePostForm.js" and use this too for when user write arabic "src\components\posts\CreatePostFormRTL.js"
-
-
-* should can hide the form create post for running in background be show the indecatour loading states 
 
 ---
 * need when click user name in comment goto him profile 

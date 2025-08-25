@@ -395,11 +395,13 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       const rawImageUrl = (typeof postToInsert.image_url === 'string' && postToInsert.image_url)
         ? postToInsert.image_url
         : (typeof postToInsert.imageUrl === 'string' ? postToInsert.imageUrl : null);
-      const normalizedImageUrl = isValidHttpUrl(rawImageUrl) ? rawImageUrl : null;
+      const trimmedImageUrl = typeof rawImageUrl === 'string' ? rawImageUrl.trim() : null;
+      const normalizedImageUrl = isValidHttpUrl(trimmedImageUrl) ? trimmedImageUrl : null;
       postToInsert.image_url = normalizedImageUrl;
 
       console.log('[SupabaseProvider] Normalized image_url:', {
         rawImageUrl,
+        trimmedImageUrl,
         normalizedImageUrl,
         fromCamelCase: typeof postToInsert.imageUrl === 'string'
       });
