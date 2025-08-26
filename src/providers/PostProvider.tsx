@@ -79,7 +79,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
         // Fetch posts only from followed users
         const { data: postsData, error: postsErr } = await supabase
           .from('posts')
-          .select('*, profiles(username, avatar_url)')
+          .select('*, profile:profiles(id, username, avatar_url)')
           .in('user_id', followingIds)
           .order('created_at', { ascending: false });
         if (postsErr) throw postsErr;
@@ -105,6 +105,35 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }
   }, [supabase, getPosts, user?.id]);
+
+  // Subscribe to realtime updates for posts (price checks, status changes)
+  useEffect(() => {
+    if (!supabase) return;
+    const channel = supabase
+      .channel('posts-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload: any) => {
+        setPosts(prev => {
+          const next = [...prev];
+          const idx = next.findIndex(p => p.id === payload.new?.id || p.id === payload.old?.id);
+          if (payload.eventType === 'INSERT' && payload.new) {
+            // Avoid duplicates
+            if (idx === -1) next.unshift(payload.new);
+          } else if (payload.eventType === 'UPDATE' && payload.new) {
+            if (idx !== -1) {
+              next[idx] = { ...next[idx], ...payload.new };
+            }
+          } else if (payload.eventType === 'DELETE' && payload.old) {
+            if (idx !== -1) next.splice(idx, 1);
+          }
+          return next;
+        });
+      })
+      .subscribe();
+
+    return () => {
+      try { channel.unsubscribe(); } catch {}
+    };
+  }, [supabase]);
 
   const createPost: PostsContextType['createPost'] = async (postData: any) => {
     const tempId = `temp-${Date.now()}`;

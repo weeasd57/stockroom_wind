@@ -89,94 +89,21 @@ export default function StrategyDetailsModal({ strategy, isOpen, onClose, onSave
         throw new Error('Missing required data');
       }
 
-      // First, let's check if the user_strategies table exists and what columns it has
-      const { data: tableExists, error: tableError } = await supabase
+      // Use upsert with unique (user_id, strategy_name)
+      const { error: upsertError } = await supabase
         .from('user_strategies')
-        .select('id')
-        .limit(1);
-      
-      // If the table doesn't exist, we need to create it
-      if (tableError && tableError.code === '42P01') { // Table doesn't exist error code
-        try {
-          // Create the table with a minimal structure
-          await supabase.rpc('exec_sql', {
-            sql: `
-              CREATE TABLE IF NOT EXISTS user_strategies (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                user_id UUID NOT NULL REFERENCES auth.users(id),
-                strategy_name TEXT NOT NULL,
-                description TEXT,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-              );
-              
-              -- Enable RLS on the table
-              ALTER TABLE user_strategies ENABLE ROW LEVEL SECURITY;
-              
-              -- Create basic RLS policies
-              CREATE POLICY "Users can view their own strategies" 
-                ON user_strategies FOR SELECT 
-                USING (auth.uid() = user_id);
-                
-              CREATE POLICY "Users can insert their own strategies" 
-                ON user_strategies FOR INSERT 
-                WITH CHECK (auth.uid() = user_id);
-                
-              CREATE POLICY "Users can update their own strategies" 
-                ON user_strategies FOR UPDATE 
-                USING (auth.uid() = user_id);
-            `
-          });
-          
-          console.log('Created user_strategies table');
-        } catch (createError) {
-          console.error('Error creating table:', createError);
-          throw new Error(`Could not create database table: ${createError.message}`);
-        }
+        .upsert({
+          user_id: user.id,
+          strategy_name: strategy,
+          description,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,strategy_name' });
+
+      if (upsertError) {
+        throw new Error(`Failed to save strategy: ${upsertError.message}`);
       }
-      
-      // Try to find if this strategy already exists
-      const { data: existingRecord, error: findError } = await supabase
-        .from('user_strategies')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('strategy_name', strategy)
-        .maybeSingle();
-      
-      if (findError) {
-        console.error('Error finding strategy:', findError);
-      }
-      
-      if (existingRecord) {
-        // Update existing record
-        const { error: updateError } = await supabase
-          .from('user_strategies')
-          .update({
-            description
-          })
-          .eq('id', existingRecord.id);
-          
-        if (updateError) {
-          throw new Error(`Failed to update strategy: ${updateError.message}`);
-        }
-      } else {
-        // Insert new record - use the 'strategy_name' column to match the database schema
-        const { error: insertError } = await supabase
-          .from('user_strategies')
-          .insert({
-            user_id: user.id,
-            strategy_name: strategy,
-            description,
-            created_at: new Date().toISOString()
-          });
-          
-        if (insertError) {
-          throw new Error(`Failed to save strategy: ${insertError.message}`);
-        }
-      }
-      
-      // Call the onSave callback
+
       if (onSave) onSave(strategy, description);
-      
       setIsEditing(false);
     } catch (err) {
       console.error('Error saving strategy documentation:', err);
