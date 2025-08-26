@@ -1,12 +1,16 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useBackgroundPostCreation } from '@/providers/BackgroundPostCreationProvider';
+import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
+import { toast } from 'sonner';
 import { X } from 'lucide-react';
 
 export default function BackgroundPostCreationFloatingIndicator() {
   const { tasks, cancelTask, clearAllCompleted, clearTask } = useBackgroundPostCreation();
   const [collapsed, setCollapsed] = useState(false);
+  const { setSubmitState, resetForm, openDialog, closeDialog, setGlobalStatus, setIsSubmitting } = useCreatePostForm();
+  const processedRef = useRef<Set<string>>(new Set());
 
   const visibleTasks = tasks.slice(0, 5); // show latest 5
   const hasItems = tasks.length > 0;
@@ -16,6 +20,33 @@ export default function BackgroundPostCreationFloatingIndicator() {
     const sum = tasks.reduce((acc, t) => acc + (t.progress ?? 0), 0);
     return Math.round(sum / tasks.length);
   }, [tasks]);
+
+  // React to terminal task statuses globally so behavior works even if the form dialog is closed
+  useEffect(() => {
+    for (const t of tasks) {
+      if (!processedRef.current.has(t.id) && (t.status === 'success' || t.status === 'error' || t.status === 'canceled')) {
+        processedRef.current.add(t.id);
+        if (t.status === 'success') {
+          try { setSubmitState('success'); } catch {}
+          try { setIsSubmitting(false); } catch {}
+          try { resetForm(); } catch {}
+          try { closeDialog(); } catch {}
+          toast.success(t.message || 'Post created successfully');
+        } else if (t.status === 'error') {
+          try { setSubmitState('error'); } catch {}
+          try { setIsSubmitting(false); } catch {}
+          try { setGlobalStatus({ type: 'error', message: t.error || t.message || 'Failed to create post. Please review and try again.' }); } catch {}
+          try { openDialog(); } catch {}
+          toast.error(t.error || t.message || 'Failed to create post');
+        } else if (t.status === 'canceled') {
+          try { setSubmitState('idle'); } catch {}
+          try { setIsSubmitting(false); } catch {}
+          try { openDialog(); } catch {}
+          toast.info(t.message || 'Posting cancelled');
+        }
+      }
+    }
+  }, [tasks, setSubmitState, setIsSubmitting, resetForm, closeDialog, setGlobalStatus, openDialog]);
 
   if (!hasItems) return null;
 

@@ -1258,6 +1258,8 @@ export default function CreatePostForm() {
       // Track task in form state for cancel/progress UI
       setCurrentTaskId(taskId);
       setSubmitState('submitting');
+      // Immediately hide the form dialog while the background task runs
+      if (closeDialog) closeDialog();
 
       // No need to manually refresh - PostProvider handles real-time updates
 
@@ -1291,6 +1293,35 @@ export default function CreatePostForm() {
       if (closeDialog) closeDialog();
     }
   };
+
+  // Watch background task status to finalize UI behavior
+  useEffect(() => {
+    if (!currentTask) return;
+    const s = currentTask.status;
+    if (s === 'success') {
+      // Background creation succeeded: reset form and keep dialog closed
+      try { if (setSubmitState) setSubmitState('success'); } catch {}
+      try { setIsSubmitting(false); } catch {}
+      try { if (resetForm) resetForm(); } catch {}
+      try { setCurrentTaskId(null); } catch {}
+      toast.success('Post created successfully');
+    } else if (s === 'error') {
+      // Failed: reopen dialog for user correction and show error
+      try { if (setSubmitState) setSubmitState('error'); } catch {}
+      try { setIsSubmitting(false); } catch {}
+      try { if (setGlobalStatus) setGlobalStatus({ type: 'error', message: currentTask.error || 'Failed to create post. Please review and try again.' }); } catch {}
+      try { if (openDialog) openDialog(); } catch {}
+      try { setCurrentTaskId(null); } catch {}
+      toast.error(currentTask.error || 'Failed to create post');
+    } else if (s === 'canceled') {
+      // Canceled: reopen dialog so user can adjust and resubmit
+      try { if (setSubmitState) setSubmitState('idle'); } catch {}
+      try { setIsSubmitting(false); } catch {}
+      try { if (openDialog) openDialog(); } catch {}
+      try { setCurrentTaskId(null); } catch {}
+      toast.info('Posting cancelled');
+    }
+  }, [currentTask]);
 
   // Handle scroll in stock search results to maintain focus
   const handleStockResultsScroll = useCallback((e) => {
