@@ -357,7 +357,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('posts')
-        .select('*, profiles(username, avatar_url)')
+        .select('*, profile:profiles(id, username, avatar_url)')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;

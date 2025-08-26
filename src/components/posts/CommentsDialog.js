@@ -7,6 +7,7 @@ import { getPostComments, createComment, getPostCommentCount } from '@/utils/com
 import { detectTextDirection, applyTextDirection } from '@/utils/textDirection';
 import styles from '@/styles/CommentsDialog.module.css';
 import { useComments } from '@/providers/CommentProvider';
+import Link from 'next/link';
 
 // Child component for a single comment/reply to keep hooks at top level
 function CommentItem({
@@ -41,7 +42,13 @@ function CommentItem({
           <div className={styles.commentBubble}>
             <div className={styles.commentHeader}>
               <span className={styles.username}>
-                {comment.username || comment.full_name || 'Unknown User'}
+                {comment.user_id ? (
+                  <Link href={`/view-profile/${comment.user_id}`} className={styles.username} prefetch>
+                    {comment.username || comment.full_name || 'Unknown User'}
+                  </Link>
+                ) : (
+                  comment.username || comment.full_name || 'Unknown User'
+                )}
               </span>
             </div>
             <div className={styles.commentText}>
