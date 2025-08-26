@@ -112,6 +112,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     const channel = supabase
       .channel('posts-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload: any) => {
+        console.log('Real-time post update:', payload);
         setPosts(prev => {
           const next = [...prev];
           const idx = next.findIndex(p => p.id === payload.new?.id || p.id === payload.old?.id);
@@ -120,7 +121,26 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
             if (idx === -1) next.unshift(payload.new);
           } else if (payload.eventType === 'UPDATE' && payload.new) {
             if (idx !== -1) {
-              next[idx] = { ...next[idx], ...payload.new };
+              // Merge the new data with existing data, prioritizing new data
+              const updatedPost = { ...next[idx], ...payload.new };
+              
+              // Special handling for price_checks field
+              if (payload.new.price_checks) {
+                try {
+                  // Ensure price_checks is properly parsed
+                  updatedPost.price_checks = typeof payload.new.price_checks === 'string' 
+                    ? JSON.parse(payload.new.price_checks) 
+                    : payload.new.price_checks;
+                } catch (e) {
+                  console.warn('Failed to parse price_checks:', e);
+                }
+              }
+              
+              next[idx] = updatedPost;
+              console.log(`Updated post ${payload.new.id} with real-time data`);
+            } else {
+              // Post not found in current list, add it
+              next.unshift(payload.new);
             }
           } else if (payload.eventType === 'DELETE' && payload.old) {
             if (idx !== -1) next.splice(idx, 1);
