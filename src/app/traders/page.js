@@ -261,7 +261,7 @@ export default function TradersPage() {
                 <p className={styles.traderBio}>{trader.bio || 'No bio available'}</p>
                 
                 <div className={styles.cardActions}>
-                  {isAuthenticated && (
+                  {isAuthenticated && user?.id !== trader.id && (
                     <button 
                       className={followings[trader.id] ? styles.unfollowButton : styles.followButton}
                       onClick={(e) => handleFollowClick(e, trader.id)}

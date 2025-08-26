@@ -19,6 +19,7 @@ export function PostsFeed({
   title,
   hideControls = false,
   showFlagBackground = true,
+  hideUserInfo = false,
   // Optional external filters (used by profile/view-profile)
   selectedStrategy = '',
   selectedStatus = '',
@@ -332,7 +333,7 @@ export function PostsFeed({
 
       <div className={styles.postsContainer}>
         {posts.map((post) => (
-          <PostCard key={post.id} post={post} showFlagBackground={showFlagBackground} />
+          <PostCard key={post.id} post={post} showFlagBackground={showFlagBackground} hideUserInfo={hideUserInfo} />
         ))}
       </div>
 
