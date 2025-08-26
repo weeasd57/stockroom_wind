@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import styles from '@/styles/profile.module.css';
 import { useProfile } from '@/providers/ProfileProvider';
+import { useSupabase } from '@/providers/SupabaseProvider';
 import dialogStyles from '@/styles/ProfilePostCard.module.css';
 
 export default function CheckPostPricesButton({ userId }) {
@@ -10,12 +11,59 @@ export default function CheckPostPricesButton({ userId }) {
   const [checkStats, setCheckStats] = useState(null);
   const [error, setError] = useState(null);
   const { refreshData } = useProfile();
+  const { supabase } = useSupabase();
   const [abortController, setAbortController] = useState(null);
   const [isCancelled, setIsCancelled] = useState(false);
   const [showStatsDialog, setShowStatsDialog] = useState(false);
+  const [realTimeUpdates, setRealTimeUpdates] = useState(new Map());
   const [detailedResults, setDetailedResults] = useState([]);
   const [apiResponses, setApiResponses] = useState([]);
   const [showInfoDialog, setShowInfoDialog] = useState(false);
+  
+  // Real-time subscription for price updates
+  useEffect(() => {
+    if (!supabase || !userId) return;
+    
+    const channel = supabase
+      .channel('price-check-updates')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'posts',
+        filter: `user_id=eq.${userId}`
+      }, (payload) => {
+        console.log('Real-time price update received:', payload);
+        
+        // Check if this is a price-related update
+        const updatedFields = Object.keys(payload.new || {});
+        const priceFields = ['current_price', 'last_price_check', 'target_reached', 'stop_loss_triggered', 'price_checks', 'status_message'];
+        
+        if (updatedFields.some(field => priceFields.includes(field))) {
+          setRealTimeUpdates(prev => {
+            const newMap = new Map(prev);
+            newMap.set(payload.new.id, {
+              ...payload.new,
+              timestamp: new Date().toISOString()
+            });
+            return newMap;
+          });
+          
+          // Refresh profile data to update the UI
+          if (refreshData) {
+            refreshData(userId);
+          }
+        }
+      })
+      .subscribe();
+    
+    return () => {
+      try { 
+        channel.unsubscribe(); 
+      } catch (e) {
+        console.log('Error unsubscribing from price updates:', e);
+      }
+    };
+  }, [supabase, userId, refreshData]);
   
   const cancelCheck = () => {
     if (abortController) {
@@ -222,7 +270,21 @@ export default function CheckPostPricesButton({ userId }) {
           className={styles.checkPricesButton}
           aria-label="Check post prices"
         >
-          {isChecking ? 'Checking...' : '📈 Check Post Prices'}
+          {isChecking ? (
+            <>
+              <span className={styles.spinner}>⟳</span>
+              Checking...
+            </>
+          ) : (
+            <>
+              📈 Check Post Prices
+              {realTimeUpdates.size > 0 && (
+                <span className={styles.updateBadge}>
+                  {realTimeUpdates.size}
+                </span>
+              )}
+            </>
+          )}
         </button>
         
         <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>

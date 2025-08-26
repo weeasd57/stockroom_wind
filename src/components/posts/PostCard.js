@@ -6,6 +6,7 @@ import { CommentProvider } from '@/providers/CommentProvider';
 import PostActions from '@/components/posts/PostActions';
 import PostSentiment from '@/components/posts/PostSentiment';
 import Comments from '@/components/posts/Comments';
+import PriceUpdateIndicator from '@/components/PriceUpdateIndicator';
 import Link from 'next/link';
 import styles from '@/styles/home/PostsFeed.module.css';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
@@ -146,7 +147,17 @@ export default function PostCard({ post, showFlagBackground = false }) {
           <div className={styles.priceGrid}>
             <div className={styles.priceItem}>
               <span className={styles.priceLabel}>Current</span>
-              <span className={styles.priceValue}>{formatPrice(post?.current_price)}</span>
+              <span className={styles.priceValue}>
+                {formatPrice(post?.current_price)}
+                {post?.last_price_check && (
+                  <PriceUpdateIndicator
+                    isUpdating={false}
+                    lastUpdate={post.last_price_check}
+                    currentPrice={post.current_price}
+                    previousPrice={post.initial_price}
+                  />
+                )}
+              </span>
             </div>
             <div className={styles.priceItem}>
               <span className={styles.priceLabel}>Target</span>

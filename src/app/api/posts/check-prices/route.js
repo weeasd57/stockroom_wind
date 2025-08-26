@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 // Use environment variables for service role key (server-only)
-const serviceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 // Debug flag to reduce noisy logs in production
 const DEBUG = process.env.PRICE_CHECK_DEBUG === '1' || process.env.PRICE_CHECK_DEBUG === 'true';
 
@@ -13,22 +13,27 @@ const DEBUG = process.env.PRICE_CHECK_DEBUG === '1' || process.env.PRICE_CHECK_D
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing required Supabase environment variables:', {
     supabaseUrl: !!supabaseUrl,
-    supabaseAnonKey: !!supabaseAnonKey
+    supabaseAnonKey: !!supabaseAnonKey,
+    serviceRoleKey: !!serviceRoleKey
   });
 }
 
 // Create admin client function to be called when needed
 const createAdminClient = () => {
-  return createClient(supabaseUrl || '', serviceRoleKey, {
+  // Use service role key if available, otherwise fall back to anon key
+  const keyToUse = serviceRoleKey || supabaseAnonKey;
+  const isServiceRole = !!serviceRoleKey && serviceRoleKey !== supabaseAnonKey;
+  
+  return createClient(supabaseUrl || '', keyToUse, {
     auth: {
       autoRefreshToken: false,
       persistSession: false
     },
     global: {
-      headers: {
+      headers: isServiceRole ? {
         'x-supabase-role': 'service_role',
-        'Authorization': `Bearer ${serviceRoleKey}`
-      },
+        'Authorization': `Bearer ${keyToUse}`
+      } : {}
     }
   });
 };

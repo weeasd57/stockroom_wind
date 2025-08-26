@@ -1179,6 +1179,33 @@
   box-shadow: none;
 }
 
+.spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+  margin-right: 0.5rem;
+}
+
+.updateBadge {
+  background: #ef4444;
+  color: white;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: 1rem;
+  margin-left: 0.5rem;
+  font-weight: 600;
+  animation: pulse 2s infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
 .cancelCheckButton {
   background-color: hsl(var(--destructive));
   color: hsl(var(--destructive-foreground));
