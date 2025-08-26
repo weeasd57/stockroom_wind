@@ -170,6 +170,21 @@ export default function CheckPostPricesButton({ userId }) {
       
       if (userId && !isCancelled) {
         refreshData(userId);
+        
+        // Emit custom event for real-time updates component
+        window.dispatchEvent(new CustomEvent('priceCheckCompleted', {
+          detail: {
+            userId,
+            results: data.results,
+            stats: {
+              usageCount: data.usageCount,
+              remainingChecks: data.remainingChecks,
+              checkedPosts: data.checkedPosts,
+              updatedPosts: data.updatedPosts,
+              closedPostsSkipped: data.closedPostsSkipped
+            }
+          }
+        }));
       }
       
       // Show the stats dialog

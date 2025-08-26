@@ -1,0 +1,338 @@
+.dashboard {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.headerContent h1 {
+  margin: 0 0 8px 0;
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.headerContent p {
+  margin: 0;
+  font-size: 16px;
+  opacity: 0.9;
+}
+
+.priceCheckSection {
+  display: flex;
+  align-items: center;
+}
+
+.tabNavigation {
+  background: white;
+  display: flex;
+  border-bottom: 2px solid #e0e6ed;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.tab {
+  background: none;
+  border: none;
+  padding: 16px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 3px solid transparent;
+  color: #6c757d;
+}
+
+.tab:hover {
+  background: #f8f9fa;
+  color: #495057;
+}
+
+.activeTab {
+  color: #667eea !important;
+  border-bottom-color: #667eea !important;
+  background: #f8f9fa;
+}
+
+.tabContent {
+  padding: 32px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+.loader {
+  font-size: 18px;
+  color: #667eea;
+  font-weight: 500;
+}
+
+.errorContainer {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  text-align: center;
+  color: #495057;
+}
+
+.errorContainer h2 {
+  color: #dc3545;
+  margin-bottom: 16px;
+}
+
+/* Dashboard Content */
+.dashboardContent {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.welcomeSection {
+  text-align: center;
+  margin-bottom: 48px;
+  padding: 32px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.welcomeSection h2 {
+  color: #2c3e50;
+  margin-bottom: 16px;
+  font-size: 28px;
+}
+
+.welcomeSection p {
+  color: #6c757d;
+  font-size: 18px;
+  margin: 0;
+}
+
+.featuresGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+  margin-bottom: 48px;
+}
+
+.featureCard {
+  background: white;
+  padding: 32px 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  transition: transform 0.2s ease;
+}
+
+.featureCard:hover {
+  transform: translateY(-4px);
+}
+
+.featureIcon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.featureCard h3 {
+  color: #2c3e50;
+  margin-bottom: 12px;
+  font-size: 20px;
+}
+
+.featureCard p {
+  color: #6c757d;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.quickActions {
+  background: white;
+  padding: 32px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.quickActions h3 {
+  color: #2c3e50;
+  margin-bottom: 24px;
+  font-size: 24px;
+}
+
+.actionButtons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.actionButton {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.actionButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+/* Real-time Content */
+.realtimeContent {
+  padding: 0;
+}
+
+/* Help Content */
+.helpContent {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.helpContent h2 {
+  color: #2c3e50;
+  text-align: center;
+  margin-bottom: 32px;
+  font-size: 28px;
+}
+
+.helpSection {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 24px;
+}
+
+.helpSection h3 {
+  color: #667eea;
+  margin-bottom: 16px;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.helpSection ol,
+.helpSection ul {
+  color: #495057;
+  line-height: 1.8;
+  margin: 0;
+  padding-left: 24px;
+}
+
+.helpSection li {
+  margin-bottom: 8px;
+}
+
+.helpSection li strong {
+  color: #2c3e50;
+}
+
+.troubleshootingGrid {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.troubleshootingItem {
+  background: #f8f9fa;
+  padding: 16px;
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
+}
+
+.troubleshootingItem strong {
+  display: block;
+  color: #2c3e50;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+.troubleshootingItem p {
+  color: #6c757d;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+  }
+
+  .headerContent h1 {
+    font-size: 24px;
+  }
+
+  .tabNavigation {
+    overflow-x: auto;
+  }
+
+  .tab {
+    white-space: nowrap;
+    min-width: 120px;
+  }
+
+  .tabContent {
+    padding: 16px;
+  }
+
+  .featuresGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .actionButtons {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .actionButton {
+    width: 100%;
+    max-width: 280px;
+  }
+
+  .troubleshootingGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Animation for smooth transitions */
+.tabContent > div {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
