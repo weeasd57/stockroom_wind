@@ -1,6 +1,6 @@
 
 
-[] should when get data from check prices and update data (read the post schema for get all coulmne for the check post ) and  saving in supabase and show the updated data by provider with out reload 
+* should when get data from check prices and update data (read the post schema for get all coulmne for the check post ) and  saving in supabase and show the updated data by provider with out reload 
 
 
 
@@ -12,3 +12,4 @@
 
 * and fix the user info from post card (PostsFeed_userInfo)in all pages (user view , home , profile)
 
+-- post feed should have the provider for not reload every begin page and better profremances and this lost connection or late for get data posting 
