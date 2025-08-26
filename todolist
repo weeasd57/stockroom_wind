@@ -1,21 +1,10 @@
 
-
-* should when get data from check prices and update data (read the post schema for get all coulmne for the check post ) and  saving in supabase and show the updated data by provider with out reload i just have this supabase keys use from them  (
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
-fix "[ERROR] Error creating new usage record: {
-  message: 'Invalid API key',
-  hint: 'Double check your Supabase `anon` or `service_role` API key.'
-}"
-
-
-* when save strategy is dont work in taps my profile
-
-
----
 * need when click user name in comment goto him profile 
 
 * and the user info from post card (PostsFeed_userInfo)in profile page should dont show this section 
 
--- post feed should have the provider for not reload every begin page and better profremances and this lost connection or late for get data posting 
+* when add post should be show this in my dashboard state and my profile state too by provider and "view-profile_profileStats" should get real data from supabase 
+
+* in traders page should dont show "follow" button in my account
+
+* hide price page from all app but keep the code in project just hide from navbar 
