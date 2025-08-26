@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 // Use environment variables for service role key (server-only)
-const serviceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 // Debug flag to reduce noisy logs in production
 const DEBUG = process.env.PRICE_CHECK_DEBUG === '1' || process.env.PRICE_CHECK_DEBUG === 'true';
 
@@ -19,16 +19,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 // Create admin client function to be called when needed
 const createAdminClient = () => {
+  if (!serviceRoleKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is required for admin operations');
+  }
   return createClient(supabaseUrl || '', serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false
-    },
-    global: {
-      headers: {
-        'x-supabase-role': 'service_role',
-        'Authorization': `Bearer ${serviceRoleKey}`
-      },
     }
   });
 };
