@@ -221,25 +221,39 @@ export const getUserProfile = async (userId) => {
     // First, get the user profile data
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, username, full_name, email, avatar_url, background_url, bio, success_posts, loss_posts, experience_score')
+      .select('id, username, full_name, email, avatar_url, background_url, bio, success_posts, loss_posts, experience_score, followers, following, created_at')
       .eq('id', userId);
 
     if (error) throw error;
     
-    // Count successful and lost posts for this user
-    const { data: postsData, error: postsError } = await supabase
+    // Count posts for this user
+    const { data: allPostsData, error: allPostsError } = await supabase
       .from('posts')
-      .select('target_reached, stop_loss_triggered')
-      .eq('user_id', userId)
-      .eq('closed', true);
+      .select('id, target_reached, stop_loss_triggered, closed')
+      .eq('user_id', userId);
       
-    if (!postsError && postsData) {
-      // Count successful and lost posts
-      const successPosts = postsData.filter(post => post.target_reached).length;
-      const lossPosts = postsData.filter(post => post.stop_loss_triggered).length;
+    // Count followers and following for this user
+    const { data: followersData, error: followersError } = await supabase
+      .from('user_followings')
+      .select('follower_id')
+      .eq('following_id', userId);
+      
+    const { data: followingData, error: followingError } = await supabase
+      .from('user_followings')
+      .select('following_id')
+      .eq('follower_id', userId);
+      
+    if (!allPostsError && allPostsData) {
+      const totalPosts = allPostsData.length;
+      const closedPosts = allPostsData.filter(post => post.closed);
+      const successPosts = closedPosts.filter(post => post.target_reached).length;
+      const lossPosts = closedPosts.filter(post => post.stop_loss_triggered).length;
       
       // Calculate experience score (success - loss)
       const experienceScore = successPosts - lossPosts;
+      
+      const followersCount = followersData ? followersData.length : 0;
+      const followingCount = followingData ? followingData.length : 0;
       
       // If we have profile data, update the counts
       if (data && data.length > 0) {
@@ -247,17 +261,23 @@ export const getUserProfile = async (userId) => {
         const { error: updateError } = await supabase
           .from('profiles')
           .update({
+            posts_count: totalPosts,
             success_posts: successPosts,
             loss_posts: lossPosts,
-            experience_score: experienceScore
+            experience_score: experienceScore,
+            followers: followersCount,
+            following: followingCount
           })
           .eq('id', userId);
           
         if (!updateError) {
           // Update the data object with the new counts
+          data[0].posts_count = totalPosts;
           data[0].success_posts = successPosts;
           data[0].loss_posts = lossPosts;
           data[0].experience_score = experienceScore;
+          data[0].followers = followersCount;
+          data[0].following = followingCount;
         }
       }
     }
@@ -285,21 +305,42 @@ export const getUserProfile = async (userId) => {
         background_url: '/profile-bg.jpg',
         experience_score: 0,
         followers: 0,
-        following: 0
+        following: 0,
+        posts_count: 0
       };
       
-      // Count successful and lost posts for this user (in case they exist before profile creation)
-      const { data: postsData, error: postsError } = await supabase
+      // Count posts for this user (in case they exist before profile creation)
+      const { data: allPostsData, error: allPostsError } = await supabase
         .from('posts')
-        .select('target_reached, stop_loss_triggered')
-        .eq('user_id', userId)
-        .eq('closed', true);
+        .select('id, target_reached, stop_loss_triggered, closed')
+        .eq('user_id', userId);
         
-      if (!postsError && postsData && postsData.length > 0) {
-        // Count successful and lost posts
-        defaultProfile.success_posts = postsData.filter(post => post.target_reached).length;
-        defaultProfile.loss_posts = postsData.filter(post => post.stop_loss_triggered).length;
+      // Count followers and following for this user
+      const { data: followersData, error: followersError } = await supabase
+        .from('user_followings')
+        .select('follower_id')
+        .eq('following_id', userId);
+        
+      const { data: followingData, error: followingError } = await supabase
+        .from('user_followings')
+        .select('following_id')
+        .eq('follower_id', userId);
+        
+      if (!allPostsError && allPostsData) {
+        const totalPosts = allPostsData.length;
+        const closedPosts = allPostsData.filter(post => post.closed);
+        defaultProfile.posts_count = totalPosts;
+        defaultProfile.success_posts = closedPosts.filter(post => post.target_reached).length;
+        defaultProfile.loss_posts = closedPosts.filter(post => post.stop_loss_triggered).length;
         defaultProfile.experience_score = defaultProfile.success_posts - defaultProfile.loss_posts;
+      }
+      
+      if (!followersError && followersData) {
+        defaultProfile.followers = followersData.length;
+      }
+      
+      if (!followingError && followingData) {
+        defaultProfile.following = followingData.length;
       }
       
       const { error: insertError } = await supabase

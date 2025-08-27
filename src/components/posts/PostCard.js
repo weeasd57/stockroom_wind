@@ -12,7 +12,7 @@ import styles from '@/styles/home/PostsFeed.module.css';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 
 // Reusable PostCard component used across Home feed and Traders page
-export default function PostCard({ post, showFlagBackground = false }) {
+export default function PostCard({ post, showFlagBackground = false, hideUserInfo = false }) {
   if (!post) return null;
 
   const formatPrice = (price) => {
@@ -77,46 +77,48 @@ export default function PostCard({ post, showFlagBackground = false }) {
         )}
         {/* Post Header */}
         <div className={styles.postHeader}>
-          {profileId ? (
-            <Link href={`/view-profile/${profileId}`} className={styles.userInfo} prefetch>
-              <div className={styles.avatar}>
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt={username} className={styles.avatarImage} />
-                ) : (
-                  <div className={styles.avatarPlaceholder}>
-                    {username.charAt(0).toUpperCase()}
-                  </div>
-                )}
+          {!hideUserInfo && (
+            profileId ? (
+              <Link href={`/view-profile/${profileId}`} className={styles.userInfo} prefetch>
+                <div className={styles.avatar}>
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={username} className={styles.avatarImage} />
+                  ) : (
+                    <div className={styles.avatarPlaceholder}>
+                      {username.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className={styles.userDetails}>
+                  <h4 className={styles.username}>{username}</h4>
+                  {post?.created_at && (
+                    <p className={styles.timestamp}>
+                      {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                    </p>
+                  )}
+                </div>
+              </Link>
+            ) : (
+              <div className={styles.userInfo}>
+                <div className={styles.avatar}>
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={username} className={styles.avatarImage} />
+                  ) : (
+                    <div className={styles.avatarPlaceholder}>
+                      {username.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className={styles.userDetails}>
+                  <h4 className={styles.username}>{username}</h4>
+                  {post?.created_at && (
+                    <p className={styles.timestamp}>
+                      {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className={styles.userDetails}>
-                <h4 className={styles.username}>{username}</h4>
-                {post?.created_at && (
-                  <p className={styles.timestamp}>
-                    {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                  </p>
-                )}
-              </div>
-            </Link>
-          ) : (
-            <div className={styles.userInfo}>
-              <div className={styles.avatar}>
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt={username} className={styles.avatarImage} />
-                ) : (
-                  <div className={styles.avatarPlaceholder}>
-                    {username.charAt(0).toUpperCase()}
-                  </div>
-                )}
-              </div>
-              <div className={styles.userDetails}>
-                <h4 className={styles.username}>{username}</h4>
-                {post?.created_at && (
-                  <p className={styles.timestamp}>
-                    {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                  </p>
-                )}
-              </div>
-            </div>
+            )
           )}
           <div className={`${styles.status} ${getStatusColor(post)}`}>
             {getStatusText(post)}

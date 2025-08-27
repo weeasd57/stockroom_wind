@@ -1051,15 +1051,15 @@ export default function Profile() {
       {/* Profile Stats */}
       <div className={styles.profileStats}>
         <div className={styles.statItem} onClick={() => handleTabChange('posts')}>
-          <span className={styles.statValue}>{posts.length}</span>
+          <span className={styles.statValue}>{profile?.posts_count ?? posts.length}</span>
           <span className={styles.statLabel}>Posts</span>
         </div>
         <div className={styles.statItem} onClick={() => handleTabChange('followers')}>
-          <span className={styles.statValue}>{followers.length}</span>
+          <span className={styles.statValue}>{profile?.followers ?? followers.length}</span>
           <span className={styles.statLabel}>Followers</span>
         </div>
         <div className={styles.statItem} onClick={() => handleTabChange('following')}>
-          <span className={styles.statValue}>{following.length}</span>
+          <span className={styles.statValue}>{profile?.following ?? following.length}</span>
           <span className={styles.statLabel}>Following</span>
         </div>
       </div>
@@ -1299,6 +1299,7 @@ export default function Profile() {
                 userId={profile?.id || user?.id}
                 hideControls={true}
                 showFlagBackground={true}
+                hideUserInfo={true}
                 selectedStrategy={localSelectedStrategy || ''}
                 selectedStatus={selectedStatus}
                 selectedCountry={selectedCountry}
