@@ -1,10 +1,49 @@
+* fix this "jquery-3.4.1.min.js:2 Error: <path> attribute d: Expected number, "…               tc0.2,0,0.4-0.2,0…".
+xe @ jquery-3.4.1.min.js:2
+He @ jquery-3.4.1.min.js:2
+append @ jquery-3.4.1.min.js:2
+(anonymous) @ translateContent.js:1
+e @ jquery-3.4.1.min.js:2
+t @ jquery-3.4.1.min.js:2
+setTimeout
+(anonymous) @ jquery-3.4.1.min.js:2
+c @ jquery-3.4.1.min.js:2
+fireWith @ jquery-3.4.1.min.js:2
+fire @ jquery-3.4.1.min.js:2
+c @ jquery-3.4.1.min.js:2
+fireWith @ jquery-3.4.1.min.js:2
+ready @ jquery-3.4.1.min.js:2
+setTimeout
+(anonymous) @ jquery-3.4.1.min.js:2
+(anonymous) @ jquery-3.4.1.min.js:2
+(anonymous) @ jquery-3.4.1.min.js:2
+1409-42d047484c43a08e.js:1  GET https://jyoeecprvhpqfirxmpkx.supabase.co/rest/v1/profiles?select=id%2Cusername%2Cavatar_url%2Cbackground_url%2Cbio%2Cfollowers%2Cfollowing%2Ccreated_at%2Cexperience_score%2Csuccess_posts%2Closs_posts%2Cposts_count&id=eq.833a1180-1cb2-4916-9db0-d7e293f7105f 400 (Bad Request)
+(anonymous) @ 1409-42d047484c43a08e.js:1
+(anonymous) @ 7415-7ba940b96abd3e8f.js:21
+h @ 7415-7ba940b96abd3e8f.js:21
+i @ 7415-7ba940b96abd3e8f.js:21
+Promise.then
+s @ 7415-7ba940b96abd3e8f.js:21
+(anonymous) @ 7415-7ba940b96abd3e8f.js:21
+(anonymous) @ 7415-7ba940b96abd3e8f.js:21
+then @ 7415-7ba940b96abd3e8f.js:1
+4282-5687961ec0a2cf7b.js:1 [VIEW-PROFILE] Error fetching profile: {code: '42703', details: null, hint: null, message: 'column profiles.posts_count does not exist'}code: "42703"details: nullhint: nullmessage: "column profiles.posts_count does not exist"[[Prototype]]: Object
+push.3023.window.console.error @ 4282-5687961ec0a2cf7b.js:1
+(anonymous) @ page-b51b725d6f55a1d5.js:1
+await in (anonymous)
+(anonymous) @ page-b51b725d6f55a1d5.js:1
+T @ 4282-5687961ec0a2cf7b.js:1
+"
 
-* need when click user name in comment goto him profile 
 
-* and the user info from post card (PostsFeed_userInfo)in profile page should dont show this section 
 
-* when add post should be show this in my dashboard state and my profile state too by provider and "view-profile_profileStats" should get real data from supabase 
+* need show the exprince score for user in traders page replace "Joined" in "traders_traderCard" and add row to quick info too (suscess , lose , joined)
 
-* in traders page should dont show "follow" button in my account
 
-* hide price page from all app but keep the code in project just hide from navbar 
+* need can show the traders by rows too add option to toglle between grid and rows in traders page
+
+* need add option to sort the traders by success , lose , experience score in traders page
+
+* need add option to filter the traders by success , lose , experience score in traders page , and add option to filter the traders by country in traders page
+
+* need fix option to search the traders by name in traders page
