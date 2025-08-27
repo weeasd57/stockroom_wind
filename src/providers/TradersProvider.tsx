@@ -13,6 +13,10 @@ interface Trader {
   post_count: number;
   followers: number;
   following: number;
+  experience_score?: number;
+  success_posts?: number;
+  loss_posts?: number;
+  country?: string;
   latestPost?: {
     id: string;
     symbol: string;
@@ -89,7 +93,7 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
       // Fetch failed profiles with retries
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, username, full_name, bio, avatar_url, created_at, followers, following')
+        .select('id, username, full_name, bio, avatar_url, created_at, followers, following, experience_score, success_posts, loss_posts')
         .in('id', failedIds);
 
       if (profilesError) throw profilesError;
@@ -145,6 +149,9 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
             post_count: postCount,
             followers: profile.followers || 0,
             following: profile.following || 0,
+            experience_score: profile.experience_score || 0,
+            success_posts: profile.success_posts || 0,
+            loss_posts: profile.loss_posts || 0,
             latestPost: latestPost,
             isLoading: false,
             hasError: false
@@ -161,6 +168,9 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
             post_count: 0,
             followers: profile.followers || 0,
             following: profile.following || 0,
+            experience_score: profile.experience_score || 0,
+            success_posts: profile.success_posts || 0,
+            loss_posts: profile.loss_posts || 0,
             latestPost: null,
             isLoading: false,
             hasError: true
@@ -212,7 +222,7 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
       // Build query with filters
       let query = supabase
         .from('profiles')
-        .select('id, username, full_name, bio, avatar_url, created_at, followers, following')
+        .select('id, username, full_name, bio, avatar_url, created_at, followers, following, experience_score, success_posts, loss_posts')
         .order('created_at', { ascending: false });
 
       // Apply search filter
