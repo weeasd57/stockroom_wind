@@ -26,6 +26,18 @@ export default function TradersPage() {
   const [visible, setVisible] = useState(false);
   const [followings, setFollowings] = useState({});
   const [loadingMore, setLoadingMore] = useState(false);
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'rows'
+  const [sortBy, setSortBy] = useState('created_at'); // 'created_at', 'experience_score', 'success_posts', 'loss_posts', 'followers'
+  const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc'
+  const [filters, setFilters] = useState({
+    minExperience: '',
+    maxExperience: '',
+    minSuccess: '',
+    maxSuccess: '',
+    minLoss: '',
+    maxLoss: '',
+    country: ''
+  });
   const router = useRouter();
 
   // Animation effect
@@ -140,6 +152,77 @@ export default function TradersPage() {
     }
   };
 
+  // Apply local sorting and filtering
+  const sortedAndFilteredTraders = [...traders]
+    .filter(trader => {
+      // Apply numeric filters
+      if (filters.minExperience && (trader.experience_score || 0) < parseInt(filters.minExperience)) return false;
+      if (filters.maxExperience && (trader.experience_score || 0) > parseInt(filters.maxExperience)) return false;
+      if (filters.minSuccess && (trader.success_posts || 0) < parseInt(filters.minSuccess)) return false;
+      if (filters.maxSuccess && (trader.success_posts || 0) > parseInt(filters.maxSuccess)) return false;
+      if (filters.minLoss && (trader.loss_posts || 0) < parseInt(filters.minLoss)) return false;
+      if (filters.maxLoss && (trader.loss_posts || 0) > parseInt(filters.maxLoss)) return false;
+      
+      // Apply country filter
+      if (filters.country && trader.country && !trader.country.toLowerCase().includes(filters.country.toLowerCase())) return false;
+      
+      return true;
+    })
+    .sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (sortBy) {
+        case 'experience_score':
+          aValue = a.experience_score || 0;
+          bValue = b.experience_score || 0;
+          break;
+        case 'success_posts':
+          aValue = a.success_posts || 0;
+          bValue = b.success_posts || 0;
+          break;
+        case 'loss_posts':
+          aValue = a.loss_posts || 0;
+          bValue = b.loss_posts || 0;
+          break;
+        case 'followers':
+          aValue = a.followers || 0;
+          bValue = b.followers || 0;
+          break;
+        case 'created_at':
+        default:
+          aValue = new Date(a.created_at).getTime();
+          bValue = new Date(b.created_at).getTime();
+          break;
+      }
+      
+      if (sortOrder === 'asc') {
+        return aValue - bValue;
+      } else {
+        return bValue - aValue;
+      }
+    });
+
+  // Handle filter changes
+  const handleFilterChange = (field, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilters({
+      minExperience: '',
+      maxExperience: '',
+      minSuccess: '',
+      maxSuccess: '',
+      minLoss: '',
+      maxLoss: '',
+      country: ''
+    });
+  };
+
   // Lazy Image Component
   const LazyImage = ({ src, alt, profileId, onError }) => {
     return (
@@ -181,13 +264,127 @@ export default function TradersPage() {
         <div className={styles.searchBar}>
           <input
             type="text"
-            placeholder="Search traders..."
+            placeholder="Search traders by name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
           <svg className={styles.searchIcon} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
+        </div>
+
+        <div className={styles.controlsRow}>
+          <div className={styles.viewToggle}>
+            <button 
+              className={`${styles.viewButton} ${viewMode === 'grid' ? styles.active : ''}`}
+              onClick={() => setViewMode('grid')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/>
+              </svg>
+              Grid
+            </button>
+            <button 
+              className={`${styles.viewButton} ${viewMode === 'rows' ? styles.active : ''}`}
+              onClick={() => setViewMode('rows')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/>
+              </svg>
+              Rows
+            </button>
+          </div>
+
+          <div className={styles.sortControls}>
+            <select 
+              value={sortBy} 
+              onChange={(e) => setSortBy(e.target.value)}
+              className={styles.sortSelect}
+            >
+              <option value="created_at">Sort by Date</option>
+              <option value="experience_score">Sort by Experience</option>
+              <option value="success_posts">Sort by Success</option>
+              <option value="loss_posts">Sort by Loss</option>
+              <option value="followers">Sort by Followers</option>
+            </select>
+            <button 
+              className={`${styles.sortOrderButton} ${sortOrder === 'desc' ? styles.active : ''}`}
+              onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+            >
+              {sortOrder === 'desc' ? '↓' : '↑'}
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.filterInputsContainer}>
+          <div className={styles.filterInputGroup}>
+            <label>Experience:</label>
+            <input
+              type="number"
+              placeholder="Min"
+              value={filters.minExperience}
+              onChange={(e) => handleFilterChange('minExperience', e.target.value)}
+              className={styles.filterInput}
+            />
+            <input
+              type="number"
+              placeholder="Max"
+              value={filters.maxExperience}
+              onChange={(e) => handleFilterChange('maxExperience', e.target.value)}
+              className={styles.filterInput}
+            />
+          </div>
+          
+          <div className={styles.filterInputGroup}>
+            <label>Success:</label>
+            <input
+              type="number"
+              placeholder="Min"
+              value={filters.minSuccess}
+              onChange={(e) => handleFilterChange('minSuccess', e.target.value)}
+              className={styles.filterInput}
+            />
+            <input
+              type="number"
+              placeholder="Max"
+              value={filters.maxSuccess}
+              onChange={(e) => handleFilterChange('maxSuccess', e.target.value)}
+              className={styles.filterInput}
+            />
+          </div>
+
+          <div className={styles.filterInputGroup}>
+            <label>Loss:</label>
+            <input
+              type="number"
+              placeholder="Min"
+              value={filters.minLoss}
+              onChange={(e) => handleFilterChange('minLoss', e.target.value)}
+              className={styles.filterInput}
+            />
+            <input
+              type="number"
+              placeholder="Max"
+              value={filters.maxLoss}
+              onChange={(e) => handleFilterChange('maxLoss', e.target.value)}
+              className={styles.filterInput}
+            />
+          </div>
+
+          <div className={styles.filterInputGroup}>
+            <label>Country:</label>
+            <input
+              type="text"
+              placeholder="Country"
+              value={filters.country}
+              onChange={(e) => handleFilterChange('country', e.target.value)}
+              className={styles.filterInput}
+            />
+          </div>
+
+          <button onClick={clearFilters} className={styles.clearFiltersButton}>
+            Clear Filters
+          </button>
         </div>
         
         <div className={styles.filterButtons}>
@@ -218,9 +415,9 @@ export default function TradersPage() {
           <p>Loading traders...</p>
         </div>
       ) : (
-        <div className={styles.tradersGrid}>
-          {traders.length > 0 ? (
-            traders.map(trader => (
+        <div className={viewMode === 'grid' ? styles.tradersGrid : styles.tradersRows}>
+          {sortedAndFilteredTraders.length > 0 ? (
+            sortedAndFilteredTraders.map(trader => (
               <div key={trader.id} className={styles.traderCard}>
                 <div 
                   className={styles.traderHeader}
@@ -245,8 +442,8 @@ export default function TradersPage() {
                 
                 <div className={styles.traderStats}>
                   <div className={styles.statItem}>
-                    <span className={styles.statLabel}>Joined</span>
-                    <span className={styles.statValue}>{new Date(trader.created_at).toLocaleDateString()}</span>
+                    <span className={styles.statLabel}>Experience</span>
+                    <span className={styles.statValue}>{trader.experience_score || 0}</span>
                   </div>
                   <div className={styles.statItem}>
                     <span className={styles.statLabel}>Posts</span>
@@ -255,6 +452,21 @@ export default function TradersPage() {
                   <div className={styles.statItem}>
                     <span className={styles.statLabel}>Followers</span>
                     <span className={styles.statValue}>{trader.followers || 0}</span>
+                  </div>
+                </div>
+                
+                <div className={styles.quickInfo}>
+                  <div className={styles.quickInfoItem}>
+                    <span className={styles.quickInfoLabel}>Success:</span>
+                    <span className={styles.quickInfoValue}>{trader.success_posts || 0}</span>
+                  </div>
+                  <div className={styles.quickInfoItem}>
+                    <span className={styles.quickInfoLabel}>Loss:</span>
+                    <span className={styles.quickInfoValue}>{trader.loss_posts || 0}</span>
+                  </div>
+                  <div className={styles.quickInfoItem}>
+                    <span className={styles.quickInfoLabel}>Joined:</span>
+                    <span className={styles.quickInfoValue}>{new Date(trader.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
                 

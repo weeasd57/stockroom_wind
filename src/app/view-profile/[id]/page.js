@@ -94,7 +94,7 @@ export default function ViewProfile({ params }) {
             () =>
               supabase
                 .from('profiles')
-                .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts, posts_count')
+                .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts')
                 .eq('id', userId)
                 .maybeSingle()
                 .abortSignal(controller.signal)
@@ -355,7 +355,7 @@ export default function ViewProfile({ params }) {
       
       <div className={styles.profileStats}>
         <div className={styles.statItem}>
-          <span className={styles.statValue}>{profileData?.posts_count || 0}</span>
+          <span className={styles.statValue}>{0}</span>
           <span className={styles.statLabel}>Posts</span>
         </div>
         <div className={styles.statItem}>
