@@ -62,8 +62,7 @@ export class WhatsAppService {
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
     this.supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // إعداد WhatsApp Business API
-    // يمكن استخدام خدمات مثل Twilio, Meta WhatsApp Business API, أو خدمات أخرى
+    // إعداد WhatsApp API - يدعم Meta و Twilio
     this.whatsappApiUrl = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v18.0';
     this.whatsappApiToken = process.env.WHATSAPP_API_TOKEN || '';
   }
@@ -233,25 +232,56 @@ export class WhatsAppService {
   }
 
   /**
-   * إرسال رسالة واتساب (يمكن تخصيصها حسب مزود الخدمة)
+   * إرسال رسالة واتساب (يدعم Meta WhatsApp Business API و Twilio)
    */
   private async sendWhatsAppMessage(phoneNumber: string, message: string): Promise<{success: boolean, messageId?: string, error?: string}> {
     try {
-      // هذا مثال لاستخدام Meta WhatsApp Business API
-      // يمكن تغييره لاستخدام Twilio أو أي مزود آخر
-      
       if (!this.whatsappApiToken) {
         console.log('[WhatsApp Service] API token not configured, skipping actual send');
         return { success: true, messageId: 'test_' + Date.now() };
       }
 
-      // تنسيق رقم الهاتف (إزالة الرموز والمسافات)
-      const cleanPhoneNumber = phoneNumber.replace(/[^\d]/g, '');
+      // تنسيق رقم الهاتف (إزالة الرموز والمسافات وإضافة +)
+      let cleanPhoneNumber = phoneNumber.replace(/[^\d]/g, '');
+      if (!cleanPhoneNumber.startsWith('966')) { // إضافة كود السعودية إذا لم يكن موجوداً
+        cleanPhoneNumber = '966' + cleanPhoneNumber;
+      }
+
+      // تحديد نوع API المستخدم
+      const apiProvider = process.env.WHATSAPP_PROVIDER || 'meta'; // 'meta' أو 'twilio'
+
+      if (apiProvider === 'twilio') {
+        return await this.sendViaTwilio(cleanPhoneNumber, message);
+      } else {
+        return await this.sendViaMeta(cleanPhoneNumber, message);
+      }
+
+    } catch (error) {
+      console.error('[WhatsApp Service] Error sending WhatsApp message:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * إرسال رسالة عبر Meta WhatsApp Business API
+   */
+  private async sendViaMeta(phoneNumber: string, message: string): Promise<{success: boolean, messageId?: string, error?: string}> {
+    try {
+      const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
       
-      // إعداد البيانات للإرسال
+      if (!phoneNumberId) {
+        return {
+          success: false,
+          error: 'WHATSAPP_PHONE_NUMBER_ID not configured'
+        };
+      }
+
       const requestData = {
         messaging_product: "whatsapp",
-        to: cleanPhoneNumber,
+        to: phoneNumber,
         type: "text",
         text: {
           preview_url: false,
@@ -259,8 +289,7 @@ export class WhatsAppService {
         }
       };
 
-      // إرسال الطلب
-      const response = await fetch(`${this.whatsappApiUrl}/YOUR_PHONE_NUMBER_ID/messages`, {
+      const response = await fetch(`${this.whatsappApiUrl}/${phoneNumberId}/messages`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.whatsappApiToken}`,
@@ -277,18 +306,70 @@ export class WhatsAppService {
           messageId: responseData.messages[0].id
         };
       } else {
-        console.error('[WhatsApp Service] API Error:', responseData);
+        console.error('[WhatsApp Service] Meta API Error:', responseData);
         return {
           success: false,
-          error: responseData.error?.message || 'Unknown API error'
+          error: responseData.error?.message || 'Meta API error'
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Meta API error'
+      };
+    }
+  }
+
+  /**
+   * إرسال رسالة عبر Twilio WhatsApp API
+   */
+  private async sendViaTwilio(phoneNumber: string, message: string): Promise<{success: boolean, messageId?: string, error?: string}> {
+    try {
+      const accountSid = process.env.TWILIO_ACCOUNT_SID;
+      const authToken = this.whatsappApiToken; // أو TWILIO_AUTH_TOKEN
+      const fromNumber = process.env.TWILIO_WHATSAPP_NUMBER; // مثل: whatsapp:+14155238886
+
+      if (!accountSid || !authToken || !fromNumber) {
+        return {
+          success: false,
+          error: 'Twilio credentials not configured'
         };
       }
 
+      const credentials = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+
+      const formData = new URLSearchParams();
+      formData.append('From', fromNumber);
+      formData.append('To', `whatsapp:+${phoneNumber}`);
+      formData.append('Body', message);
+
+      const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${credentials}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData
+      });
+
+      const responseData = await response.json();
+
+      if (response.ok && responseData.sid) {
+        return {
+          success: true,
+          messageId: responseData.sid
+        };
+      } else {
+        console.error('[WhatsApp Service] Twilio API Error:', responseData);
+        return {
+          success: false,
+          error: responseData.message || 'Twilio API error'
+        };
+      }
     } catch (error) {
-      console.error('[WhatsApp Service] Error sending WhatsApp message:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Twilio API error'
       };
     }
   }
