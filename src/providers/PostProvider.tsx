@@ -10,6 +10,9 @@ type PostsContextType = {
   loading: boolean;
   error: string | null;
   fetchPosts: (mode?: 'following' | 'all' | 'trending') => Promise<void>;
+  loadMore: () => Promise<void>;
+  hasMore: boolean;
+  loadingMore: boolean;
   createPost: (postData: any) => Promise<Post>;
   onPostCreated: (cb: (post: Post) => void) => () => void;
 };
@@ -17,11 +20,44 @@ type PostsContextType = {
 const PostsContext = createContext<PostsContextType | undefined>(undefined);
 
 export function PostProvider({ children }: { children: React.ReactNode }) {
-  const { supabase, getPosts, createPost: supaCreatePost, user } = useSupabase();
+  const { supabase, getPostsPage, createPost: supaCreatePost, user } = useSupabase();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const subscribersRef = useRef<Array<(post: Post) => void>>([]);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [hasMore, setHasMore] = useState<boolean>(false);
+  const nextCursorRef = useRef<string | null>(null); // created_at cursor for keyset pagination
+  const modeRef = useRef<'following' | 'all' | 'trending' | undefined>(undefined);
+  const followingIdsRef = useRef<string[] | null>(null);
+  const PAGE_SIZE = 20;
+
+  // Fetch a single post from the view with stats and attach profile
+  const fetchPostWithStats = useCallback(async (postId: string) => {
+    try {
+      const { data: rows, error } = await supabase
+        .from('posts_with_stats')
+        .select('*')
+        .eq('id', postId)
+        .limit(1);
+      if (error) throw error;
+      if (!rows || rows.length === 0) return null;
+      const row: any = rows[0];
+      if (row?.user_id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .eq('id', row.user_id)
+          .single();
+        (row as any).profile = profile || null;
+      } else {
+        (row as any).profile = null;
+      }
+      return row;
+    } catch (e) {
+      return null;
+    }
+  }, [supabase]);
 
   const notifyCreated = (post: Post) => {
     subscribersRef.current.forEach(cb => {
@@ -54,11 +90,15 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       let data: any[] | null = null;
+      modeRef.current = mode;
+      followingIdsRef.current = null;
 
       if (mode === 'following') {
         if (!user?.id) {
           setPosts([]);
           setLoading(false);
+          setHasMore(false);
+          nextCursorRef.current = null;
           return;
         }
 
@@ -70,23 +110,20 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
         if (followErr) throw followErr;
 
         const followingIds = (followingRows || []).map((r: any) => r.following_id).filter(Boolean);
+        followingIdsRef.current = followingIds;
         if (followingIds.length === 0) {
           setPosts([]);
           setLoading(false);
+          setHasMore(false);
+          nextCursorRef.current = null;
           return;
         }
 
-        // Fetch posts only from followed users
-        const { data: postsData, error: postsErr } = await supabase
-          .from('posts')
-          .select('*, profile:profiles(id, username, avatar_url)')
-          .in('user_id', followingIds)
-          .order('created_at', { ascending: false });
-        if (postsErr) throw postsErr;
-        data = postsData as any[];
+        // First page from followed users via paginated API
+        data = await getPostsPage({ limit: PAGE_SIZE, before: null, userIds: followingIds });
       } else {
-        // 'all' or default
-        data = await getPosts();
+        // 'all' or 'trending' -> fetch first page ordered by created_at desc
+        data = await getPostsPage({ limit: PAGE_SIZE, before: null });
       }
 
       // If trending, sort by engagement descending
@@ -98,13 +135,57 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
         });
       }
 
-      setPosts(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setPosts(list);
+      // Setup cursor and hasMore
+      nextCursorRef.current = list.length > 0 ? String(list[list.length - 1].created_at) : null;
+      setHasMore(list.length === PAGE_SIZE);
     } catch (e: any) {
       setError(e?.message || 'Failed to fetch posts');
     } finally {
       setLoading(false);
     }
-  }, [supabase, getPosts, user?.id]);
+  }, [supabase, getPostsPage, user?.id]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore) return;
+    const before = nextCursorRef.current;
+    if (!before) { setHasMore(false); return; }
+    setLoadingMore(true);
+    try {
+      const mode = modeRef.current;
+      let page: any[] = [];
+      if (mode === 'following') {
+        const ids = followingIdsRef.current || [];
+        if (ids.length === 0) { setHasMore(false); return; }
+        page = await getPostsPage({ limit: PAGE_SIZE, before, userIds: ids });
+      } else {
+        page = await getPostsPage({ limit: PAGE_SIZE, before });
+      }
+
+      setPosts(prev => {
+        const combined = [...prev, ...page];
+        if (mode === 'trending') {
+          combined.sort((a: any, b: any) => {
+            const aEng = (a.comment_count || 0) + (a.buy_count || 0) + (a.sell_count || 0);
+            const bEng = (b.comment_count || 0) + (b.buy_count || 0) + (b.sell_count || 0);
+            return bEng - aEng;
+          });
+        }
+        return combined;
+      });
+
+      // Update cursor
+      if (page.length > 0) {
+        nextCursorRef.current = String(page[page.length - 1].created_at);
+      }
+      setHasMore(page.length === PAGE_SIZE);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load more posts');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [getPostsPage, loadingMore]);
 
   // Subscribe to realtime updates for posts (price checks, status changes)
   useEffect(() => {
@@ -113,47 +194,70 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       .channel('posts-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload: any) => {
         console.log('Real-time post update:', payload);
-        setPosts(prev => {
-          const next = [...prev];
-          const idx = next.findIndex(p => p.id === payload.new?.id || p.id === payload.old?.id);
-          if (payload.eventType === 'INSERT' && payload.new) {
-            // Avoid duplicates
-            if (idx === -1) next.unshift(payload.new);
-          } else if (payload.eventType === 'UPDATE' && payload.new) {
+        const evt = payload.eventType;
+        const newRow = payload.new;
+        const oldRow = payload.old;
+
+        if (evt === 'INSERT' && newRow) {
+          // Respect mode: in 'following' only include posts by followed users
+          const mode = modeRef.current;
+          if (mode === 'following') {
+            const ids = followingIdsRef.current || [];
+            if (!ids.includes(newRow.user_id)) return;
+          }
+
+          // Fetch enriched row from posts_with_stats + profile then prepend if not exists
+          fetchPostWithStats(newRow.id).then((full) => {
+            if (!full) return;
+            setPosts(prev => {
+              if (prev.some(p => p.id === full.id)) return prev;
+              const combined = [full, ...prev];
+              if (modeRef.current === 'trending') {
+                combined.sort((a: any, b: any) => {
+                  const aEng = (a.comment_count || 0) + (a.buy_count || 0) + (a.sell_count || 0);
+                  const bEng = (b.comment_count || 0) + (b.buy_count || 0) + (b.sell_count || 0);
+                  return bEng - aEng;
+                });
+              }
+              return combined;
+            });
+          }).catch(() => {});
+        } else if (evt === 'UPDATE' && newRow) {
+          setPosts(prev => {
+            const next = [...prev];
+            const idx = next.findIndex(p => p.id === newRow.id);
             if (idx !== -1) {
-              // Merge the new data with existing data, prioritizing new data
-              const updatedPost = { ...next[idx], ...payload.new };
-              
-              // Special handling for price_checks field
-              if (payload.new.price_checks) {
+              const updatedPost: any = { ...next[idx], ...newRow };
+              if (newRow.price_checks) {
                 try {
-                  // Ensure price_checks is properly parsed
-                  updatedPost.price_checks = typeof payload.new.price_checks === 'string' 
-                    ? JSON.parse(payload.new.price_checks) 
-                    : payload.new.price_checks;
+                  updatedPost.price_checks = typeof newRow.price_checks === 'string'
+                    ? JSON.parse(newRow.price_checks)
+                    : newRow.price_checks;
                 } catch (e) {
                   console.warn('Failed to parse price_checks:', e);
                 }
               }
-              
               next[idx] = updatedPost;
-              console.log(`Updated post ${payload.new.id} with real-time data`);
-            } else {
-              // Post not found in current list, add it
-              next.unshift(payload.new);
+              if (modeRef.current === 'trending') {
+                next.sort((a: any, b: any) => {
+                  const aEng = (a.comment_count || 0) + (a.buy_count || 0) + (a.sell_count || 0);
+                  const bEng = (b.comment_count || 0) + (b.buy_count || 0) + (b.sell_count || 0);
+                  return bEng - aEng;
+                });
+              }
             }
-          } else if (payload.eventType === 'DELETE' && payload.old) {
-            if (idx !== -1) next.splice(idx, 1);
-          }
-          return next;
-        });
+            return next;
+          });
+        } else if (evt === 'DELETE' && oldRow) {
+          setPosts(prev => prev.filter(p => p.id !== oldRow.id));
+        }
       })
       .subscribe();
 
     return () => {
       try { channel.unsubscribe(); } catch {}
     };
-  }, [supabase]);
+  }, [supabase, fetchPostWithStats]);
 
   const createPost: PostsContextType['createPost'] = async (postData: any) => {
     const tempId = `temp-${Date.now()}`;
@@ -219,6 +323,9 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     loading,
     error,
     fetchPosts,
+    loadMore,
+    hasMore,
+    loadingMore,
     createPost,
     onPostCreated,
   };

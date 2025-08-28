@@ -6,6 +6,7 @@ import { useProfile } from '@/providers/ProfileProvider';
 import { usePosts } from '@/providers/PostProvider'; // Add PostProvider for real-time updates
 import { getUserPosts } from '@/utils/supabase';
 import styles from '@/styles/home/DashboardSection.module.css';
+import { calculatePostStats } from '@/lib/utils';
 
 export function DashboardSection() {
   const { user } = useSupabase();
@@ -30,28 +31,6 @@ export function DashboardSection() {
   });
   const [loading, setLoading] = useState(true);
 
-  // Function to calculate stats from posts
-  const calculateStats = (posts) => {
-    if (!posts || !Array.isArray(posts)) return {
-      totalPosts: 0,
-      successfulPosts: 0,
-      lossPosts: 0,
-      successRate: 0
-    };
-
-    const totalPosts = posts.length;
-    const successfulPosts = posts.filter(post => post.target_reached).length;
-    const lossPosts = posts.filter(post => post.stop_loss_triggered).length;
-    const successRate = totalPosts > 0 ? Math.round((successfulPosts / totalPosts) * 100) : 0;
-
-    return {
-      totalPosts,
-      successfulPosts,
-      lossPosts,
-      successRate
-    };
-  };
-
   // Update stats whenever posts change
   useEffect(() => {
     if (!user?.id || !profileData?.id) return;
@@ -60,7 +39,7 @@ export function DashboardSection() {
     const userPosts = allPosts.filter(post => post.user_id === user.id);
     
     // Calculate post statistics
-    const postStats = calculateStats(userPosts);
+    const postStats = calculatePostStats(userPosts);
     
     // Calculate follower/following counts
     const followersCount = Array.isArray(followersList)
@@ -91,7 +70,7 @@ export function DashboardSection() {
         
         // Get updated user posts including the new one
         const userPosts = allPosts.filter(post => post.user_id === user.id);
-        const postStats = calculateStats(userPosts);
+        const postStats = calculatePostStats(userPosts);
         
         setStats(prev => ({
           ...prev,
@@ -120,7 +99,7 @@ export function DashboardSection() {
         const { posts } = await getUserPosts(user.id, 1, 100);
         
         // Calculate statistics
-        const postStats = calculateStats(posts);
+        const postStats = calculatePostStats(posts);
 
         const followersCount = Array.isArray(followersList)
           ? followersList.length

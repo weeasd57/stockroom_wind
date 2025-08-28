@@ -18,7 +18,7 @@ import { PostsFeed } from '@/components/home/PostsFeed';
 import CheckPostPricesButton from '@/components/profile/CheckPostPricesButton';
 import StrategyDetailsModal from '@/components/profile/StrategyDetailsModal';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
- 
+import { DashboardSection } from '@/components/home/DashboardSection';
 
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useSupabase();
@@ -1029,6 +1029,8 @@ export default function Profile() {
           </div>
         </div>
       </div>
+      {/* Unified Dashboard Section */}
+      <DashboardSection />
       
       {/* Trading Statistics */}
       <div className={styles.tradingInfo}>

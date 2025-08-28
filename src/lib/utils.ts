@@ -387,3 +387,30 @@ export function isValidUUID(id: string): boolean {
 export function isTempId(id: string): boolean {
   return typeof id === 'string' && id.startsWith('temp-');
 }
+
+// Calculate success rate from success and loss counts
+export function calculateSuccessRate(successPosts: number, lossPosts: number): number {
+  const s = Number(successPosts) || 0;
+  const l = Number(lossPosts) || 0;
+  const total = s + l;
+  if (total <= 0) return 0;
+  const pct = Math.round((s / total) * 100);
+  return Math.min(100, Math.max(0, pct));
+}
+
+// Calculate basic post statistics from an array of posts
+// A post is considered success if status === 'success' OR target_reached === true
+// A post is considered loss if status === 'loss' OR stop_loss_triggered === true
+export function calculatePostStats(posts: Array<Record<string, any>>) {
+  const list = Array.isArray(posts) ? posts : [];
+  const totalPosts = list.length;
+  const successfulPosts = list.filter(
+    (p) => p?.status === 'success' || p?.target_reached === true
+  ).length;
+  const lossPosts = list.filter(
+    (p) => p?.status === 'loss' || p?.stop_loss_triggered === true
+  ).length;
+  const successRate = calculateSuccessRate(successfulPosts, lossPosts);
+
+  return { totalPosts, successfulPosts, lossPosts, successRate };
+}

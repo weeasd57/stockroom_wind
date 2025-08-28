@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useTraders } from '@/providers/TradersProvider';
 import styles from '@/styles/traders.module.css';
+import { calculateSuccessRate } from '@/lib/utils';
 
 // Removed unused imports for cleaner code
 
@@ -155,12 +156,14 @@ export default function TradersPage() {
     );
   };
 
-  // Build unique countries from latestPost.country
+  // Build unique countries aggregated from all users' countryCounts
   const countries = useMemo(() => {
     const set = new Set();
     (traders || []).forEach(t => {
-      const c = t?.latestPost?.country;
-      if (c && typeof c === 'string' && c.trim()) set.add(c.trim());
+      const cc = t?.countryCounts || {};
+      Object.keys(cc).forEach(code => {
+        if (code && typeof code === 'string' && code.trim()) set.add(code.toUpperCase());
+      });
     });
     return Array.from(set).sort();
   }, [traders]);
@@ -170,7 +173,8 @@ export default function TradersPage() {
     let list = Array.isArray(traders) ? [...traders] : [];
 
     if (country !== 'all') {
-      list = list.filter(t => (t?.latestPost?.country || '').trim() === country);
+      const target = (country || '').toLowerCase();
+      list = list.filter(t => (t?.countryCounts?.[target] || 0) > 0);
     }
 
     const key = sortKey;
@@ -321,6 +325,7 @@ export default function TradersPage() {
                   </div>
                 </div>
                 
+                {/* Stats section (top) */}
                 <div className={styles.traderStats}>
                   <div className={styles.statItem}>
                     <span className={styles.statLabel}>Experience</span>
@@ -334,13 +339,33 @@ export default function TradersPage() {
                     <span className={styles.statLabel}>Followers</span>
                     <span className={styles.statValue}>{trader.followers || 0}</span>
                   </div>
+                  <div className={styles.statItem}>
+                    <span className={styles.statLabel}>Success Rate</span>
+                    <span className={styles.statValue}>
+                      {`${calculateSuccessRate(trader.success_posts || 0, trader.loss_posts || 0)}%`}
+                    </span>
+                  </div>
                 </div>
                 
                 <p className={styles.traderBio}>{trader.bio || 'No bio available'}</p>
                 
+                {/* Country flags with counts (top 6 by count) */
+                <div className={styles.countriesRow}>
+                  {Object.entries(trader.countryCounts || {})
+                    .sort((a, b) => (b[1] || 0) - (a[1] || 0))
+                    .slice(0, 6)
+                    .map(([code, count]) => (
+                      <div key={code} className={styles.countryBadge} title={`${code.toUpperCase()}: ${count}`}>
+                        <span className={`fi fi-${String(code).toLowerCase()}`}></span>
+                        <span className={styles.countryCount}>{count}</span>
+                      </div>
+                    ))}
+                </div>
+          }
+                {/* Actions at bottom of the card */}
                 <div className={styles.cardActions}>
                   {isAuthenticated && user?.id !== trader.id && (
-                    <button 
+                    <button
                       className={followings[trader.id] ? styles.unfollowButton : styles.followButton}
                       onClick={(e) => handleFollowClick(e, trader.id)}
                     >

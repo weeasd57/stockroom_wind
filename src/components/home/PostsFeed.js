@@ -29,7 +29,7 @@ export function PostsFeed({
   const { user, supabase } = useSupabase();
   
   // Get posts from PostProvider for real-time updates
-  const { posts: providerPosts, fetchPosts, loading: providerLoading, error: providerError } = usePosts();
+  const { posts: providerPosts, fetchPosts, loadMore, hasMore, loadingMore, loading: providerLoading, error: providerError } = usePosts();
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -192,7 +192,7 @@ export function PostsFeed({
       });
     }
 
-    return filtered.slice(0, 20); // Limit to 20 posts
+    return filtered; // No client-side limit; pagination handled via PostProvider + Load More
   }, [providerPosts, filter, sortBy, categoryFilter, followingUsers, userId, selectedStrategy, selectedStatus, selectedCountry, selectedSymbol]);
 
   // Use filtered posts instead of local posts state
@@ -337,10 +337,14 @@ export function PostsFeed({
         ))}
       </div>
 
-      {posts.length >= 10 && (
+      {!userId && hasMore && (
         <div className={styles.loadMore}>
-          <button className={styles.loadMoreButton}>
-            Load More Posts
+          <button
+            onClick={loadMore}
+            disabled={loadingMore}
+            className={styles.loadMoreButton}
+          >
+            {loadingMore ? 'Loading…' : 'Load More Posts'}
           </button>
         </div>
       )}

@@ -26,6 +26,7 @@ interface Trader {
   } | null;
   isLoading?: boolean;
   hasError?: boolean;
+  countryCounts?: Record<string, number>;
 }
 
 interface TradersContextType {
@@ -119,7 +120,7 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
       profiles.map(async (profile) => {
         try {
           // Use Promise.allSettled for better error handling
-          const [postCountResult, latestPostResult] = await Promise.allSettled([
+          const [postCountResult, latestPostResult, countriesResult] = await Promise.allSettled([
             supabase
               .from('posts')
               .select('*', { count: 'exact', head: true })
@@ -129,7 +130,14 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
               .select('id, symbol, country, image_url, created_at, description')
               .eq('user_id', profile.id)
               .order('created_at', { ascending: false })
-              .limit(1)
+              .limit(1),
+            // Fetch countries for this user's posts (client-side aggregate to counts)
+            supabase
+              .from('posts')
+              .select('country')
+              .eq('user_id', profile.id)
+              .not('country', 'is', null)
+              .limit(500)
           ]);
 
           const postCount = postCountResult.status === 'fulfilled' 
@@ -139,6 +147,16 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
           const latestPost = latestPostResult.status === 'fulfilled' 
             ? (latestPostResult.value.data?.[0] || null)
             : null;
+
+          // Build country counts map
+          const countryCounts: Record<string, number> = countriesResult.status === 'fulfilled'
+            ? (countriesResult.value.data || []).reduce((acc: Record<string, number>, row: any) => {
+                const code = String(row?.country || '').toLowerCase().trim();
+                if (!code) return acc;
+                acc[code] = (acc[code] || 0) + 1;
+                return acc;
+              }, {})
+            : {};
 
           return {
             ...profile,
@@ -152,6 +170,7 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
             success_posts: profile.success_posts ?? 0,
             loss_posts: profile.loss_posts ?? 0,
             latestPost: latestPost,
+            countryCounts,
             isLoading: false,
             hasError: false
           };
@@ -171,6 +190,7 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
             success_posts: profile.success_posts ?? 0,
             loss_posts: profile.loss_posts ?? 0,
             latestPost: null,
+            countryCounts: {},
             isLoading: false,
             hasError: true
           };

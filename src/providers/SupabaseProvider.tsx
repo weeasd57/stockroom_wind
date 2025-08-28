@@ -26,6 +26,7 @@ interface SupabaseContextType {
   getPublicUrl: (bucket: string, path: string) => string;
   // Posts functions
   getPosts: () => Promise<any[]>;
+  getPostsPage: (params: { limit?: number; before?: string | null; userIds?: string[] }) => Promise<any[]>;
   createPost: (postData: any) => Promise<any>;
   updatePost: (id: string, updates: any) => Promise<any>;
   deletePost: (id: string) => Promise<void>;
@@ -367,6 +368,50 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     }
   }, [supabase]);
 
+  const getPostsPage = useCallback(async (params: { limit?: number; before?: string | null; userIds?: string[] } = {}) => {
+    const { limit = 20, before = null, userIds } = params;
+    try {
+      let query = supabase
+        .from('posts_with_stats')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (before) {
+        query = query.lt('created_at', before);
+      }
+      if (userIds && userIds.length > 0) {
+        query = query.in('user_id', userIds);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const rows = Array.isArray(data) ? data : [];
+      if (rows.length === 0) return [];
+
+      // Batch fetch profiles and attach as `profile` to each post
+      const uniqueUserIds = Array.from(new Set(rows.map((r: any) => r.user_id).filter(Boolean)));
+      if (uniqueUserIds.length > 0) {
+        const { data: profiles, error: pError } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .in('id', uniqueUserIds);
+        if (!pError && Array.isArray(profiles)) {
+          const pmap = new Map((profiles as any[]).map(p => [p.id, p]));
+          rows.forEach((r: any) => {
+            (r as any).profile = pmap.get(r.user_id) || null;
+          });
+        }
+      }
+
+      return rows;
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Failed to get posts page'));
+      throw err;
+    }
+  }, [supabase]);
+
   const createPost = useCallback(async (postData: any) => {
     try {
       console.log('[SupabaseProvider] Full post data before insert:', postData);
@@ -622,6 +667,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       deleteFile,
       getPublicUrl,
       getPosts,
+      getPostsPage,
       createPost,
       updatePost,
       deletePost,

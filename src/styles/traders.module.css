@@ -10,6 +10,35 @@
   color: hsl(var(--foreground));
 }
 
+/* Countries flags row */
+.countriesRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.countryBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  padding: 0.25rem 0.5rem;
+}
+
+.countryBadge .fi {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.countryCount {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
 .visible {
   opacity: 1;
   transform: translateY(0);
@@ -243,6 +272,23 @@
   background-color: hsl(var(--muted));
   border-radius: 8px;
   padding: 0.75rem;
+}
+
+/* Row: stats on the left and follow button on the right */
+.statsAndActionsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.cardActionsRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  min-width: 160px;
 }
 
 .statItem {
@@ -539,6 +585,20 @@
     padding: 0.5rem;
   }
   
+  .statsAndActionsRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .cardActionsRow {
+    width: 100%;
+  }
+  
+  .cardActionsRow .followButton,
+  .cardActionsRow .unfollowButton {
+    width: 100%;
+  }
+  
   .tradersGrid {
     grid-template-columns: 1fr;
   }
@@ -554,4 +614,4 @@
     width: 100%;
     padding: 0.5rem;
   }
-} 
+}

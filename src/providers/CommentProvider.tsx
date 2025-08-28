@@ -220,6 +220,54 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Call the database function to toggle a post action with bounded retries and per-attempt timeout
+  const callTogglePostAction = async (
+    postId: string,
+    action: 'buy' | 'sell',
+    maxAttempts: number = 3,
+    perAttemptTimeoutMs: number = 3500
+  ): Promise<void> => {
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        // Per-attempt timeout to avoid hanging; overall kept under PostActions 12s guard
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(() => {
+            reject(new Error('RPC timeout'));
+          }, perAttemptTimeoutMs);
+
+          supabase!
+            .rpc('toggle_post_action', {
+              p_post_id: postId,
+              p_user_id: user!.id,
+              p_action_type: action,
+            })
+            .then(({ error }) => {
+              clearTimeout(timer);
+              if (error) {
+                reject(error);
+              } else {
+                resolve();
+              }
+            }, (err) => {
+              clearTimeout(timer);
+              reject(err);
+            });
+        });
+        return; // success
+      } catch (err) {
+        lastError = err;
+        // Short backoff before retrying (200ms, 400ms)
+        if (attempt < maxAttempts) {
+          const backoff = Math.min(200 * Math.pow(2, attempt - 1), 800);
+          await new Promise((r) => setTimeout(r, backoff));
+          continue;
+        }
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error('Failed to toggle action');
+  };
+
   const deleteComment = async (id: string): Promise<void> => {
     if (!supabase || !user) throw new Error('Not authenticated');
 
@@ -283,41 +331,9 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
     setPostStats(prev => ({ ...prev, [postId]: nextStats }));
 
     try {
-      // Check if user already has a buy vote
-      const { data: existingVote } = await supabase
-        .from('post_actions')
-        .select('id')
-        .eq('post_id', postId)
-        .eq('user_id', user.id)
-        .eq('action_type', 'buy')
-        .maybeSingle();
-
-      if (existingVote) {
-        // Remove buy vote
-        await supabase
-          .from('post_actions')
-          .delete()
-          .eq('id', existingVote.id);
-      } else {
-        // Remove any existing sell vote first
-        await supabase
-          .from('post_actions')
-          .delete()
-          .eq('post_id', postId)
-          .eq('user_id', user.id)
-          .eq('action_type', 'sell');
-
-        // Add buy vote
-        await supabase
-          .from('post_actions')
-          .insert({
-            post_id: postId,
-            user_id: user.id,
-            action_type: 'buy'
-          });
-      }
-
-      // Update stats will be triggered by subscription
+      // Single-roundtrip RPC handles toggle and opposite-action removal atomically
+      await callTogglePostAction(postId, 'buy');
+      // Realtime subscription will reconcile counts; optimistic UI already applied
     } catch (err) {
       console.error('Error toggling buy vote:', err);
       setError(err instanceof Error ? err.message : 'Failed to update vote');
@@ -356,41 +372,9 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
     setPostStats(prev => ({ ...prev, [postId]: nextStats }));
 
     try {
-      // Check if user already has a sell vote
-      const { data: existingVote } = await supabase
-        .from('post_actions')
-        .select('id')
-        .eq('post_id', postId)
-        .eq('user_id', user.id)
-        .eq('action_type', 'sell')
-        .maybeSingle();
-
-      if (existingVote) {
-        // Remove sell vote
-        await supabase
-          .from('post_actions')
-          .delete()
-          .eq('id', existingVote.id);
-      } else {
-        // Remove any existing buy vote first
-        await supabase
-          .from('post_actions')
-          .delete()
-          .eq('post_id', postId)
-          .eq('user_id', user.id)
-          .eq('action_type', 'buy');
-
-        // Add sell vote
-        await supabase
-          .from('post_actions')
-          .insert({
-            post_id: postId,
-            user_id: user.id,
-            action_type: 'sell'
-          });
-      }
-
-      // Update stats will be triggered by subscription
+      // Single-roundtrip RPC handles toggle and opposite-action removal atomically
+      await callTogglePostAction(postId, 'sell');
+      // Realtime subscription will reconcile counts; optimistic UI already applied
     } catch (err) {
       console.error('Error toggling sell vote:', err);
       setError(err instanceof Error ? err.message : 'Failed to update vote');

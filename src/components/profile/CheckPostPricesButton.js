@@ -17,7 +17,6 @@ export default function CheckPostPricesButton({ userId }) {
   const [showStatsDialog, setShowStatsDialog] = useState(false);
   const [realTimeUpdates, setRealTimeUpdates] = useState(new Map());
   const [detailedResults, setDetailedResults] = useState([]);
-  const [apiResponses, setApiResponses] = useState([]);
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   
   // Real-time subscription for price updates
@@ -102,23 +101,21 @@ export default function CheckPostPricesButton({ userId }) {
     setError(null);
     setIsCancelled(false);
     setDetailedResults([]);
-    setApiResponses([]);
     
     // Create a new AbortController for this request
     const controller = new AbortController();
     setAbortController(controller);
     
-    console.log('Checking post prices for user:', userId);
-    console.log('Including API details in request:', true);
+    // Start checking prices for user
     
     try {
-      console.log('Making API request to: /api/posts/check-prices');
+      // Request the price check API
       const response = await fetch('/api/posts/check-prices', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ userId, includeApiDetails: true }), 
+        body: JSON.stringify({ userId }), 
         credentials: 'include',
         signal: controller.signal // Add the abort signal to the fetch request
       });
@@ -146,8 +143,7 @@ export default function CheckPostPricesButton({ userId }) {
         }
       }
       
-      console.log('Received API response:', data);
-      console.log('API details:', data.apiDetails || 'No API details available');
+      // Received API response
       
       setCheckStats({
         usageCount: data.usageCount,
@@ -160,60 +156,6 @@ export default function CheckPostPricesButton({ userId }) {
       // Store detailed results for display in the dialog
       if (data.results && Array.isArray(data.results)) {
         setDetailedResults(data.results);
-        
-        // Extract API response details if available
-        if (data.apiDetails && Array.isArray(data.apiDetails)) {
-          console.log(`Processing ${data.apiDetails.length} API response details`);
-          setApiResponses(data.apiDetails);
-          
-          // Log each URL for debugging
-          data.apiDetails.forEach((detail, index) => {
-            console.log(`API URL ${index + 1} (${detail.symbol}): ${detail.requestUrl || 'No URL available'}`);
-          });
-        } else {
-          // Create mock API response details if none provided by the server
-          console.log('No API details provided by server, creating mock data');
-          const mockApiData = data.results.map(post => {
-            // Determine the type of response based on available data
-            let responseType = 'No price data';
-            
-            if (post.last_price) {
-              if (post.last_price_check) {
-                // Check if price is up or down compared to initial
-                const initial = parseFloat(post.current_price || 0);
-                const current = parseFloat(post.last_price || 0);
-                const priceDiff = initial !== 0 ? ((current - initial) / initial * 100).toFixed(1) : 0;
-                
-                if (current > initial) {
-                  responseType = `Historical prices (↑${priceDiff}%)`;
-                } else if (current < initial) {
-                  responseType = `Historical prices (↓${Math.abs(priceDiff)}%)`;
-                } else {
-                  responseType = 'Historical prices (0%)';
-                }
-              } else {
-                responseType = 'Last price only';
-              }
-            }
-            
-            // Construct a mock API URL for display purposes
-            const mockRequestUrl = post.symbol ? 
-              `https://eodhd.com/api/eod/${post.symbol}${post.exchange ? `.${post.exchange}` : ''}?from=YYYY-MM-DD&to=YYYY-MM-DD&period=d&api_token=***&fmt=json` : 
-              'N/A';
-            
-            console.log(`Creating mock URL for ${post.symbol}: ${mockRequestUrl}`);
-            
-            return {
-              symbol: post.symbol,
-              exchange: post.exchange || 'N/A',
-              requestType: 'Price data request',
-              responseType: responseType,
-              timestamp: post.last_price_check || new Date().toISOString(),
-              requestUrl: mockRequestUrl // Add mock URL for display
-            };
-          });
-          setApiResponses(mockApiData);
-        }
       }
       
       if (userId && !isCancelled) {
@@ -336,8 +278,6 @@ export default function CheckPostPricesButton({ userId }) {
                   <li>Updates your experience score when targets are reached or stop losses are triggered</li>
                 </ul>
                 
-                <h4>Usage Limits:</h4>
-                <p>You can perform up to 100 price checks per day. This limit resets daily.</p>
                 
                 <h4>Tips:</h4>
                 <ul>
@@ -365,16 +305,22 @@ export default function CheckPostPricesButton({ userId }) {
         <div className={dialogStyles.dialogOverlay} onClick={() => setShowStatsDialog(false)} style={{ zIndex: 9999 }}>
           <div className={dialogStyles.statusDialog} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
             <div className={dialogStyles.dialogHeader}>
-              <h3>API Response Details</h3>
-              <button className={dialogStyles.closeButton} onClick={() => setShowStatsDialog(false)}>Cancel</button>
+              <h3>Price Check Results</h3>
+              <button className={dialogStyles.closeButton} onClick={() => setShowStatsDialog(false)}>Close</button>
             </div>
             <div className={dialogStyles.dialogContent}>
               {/* Summary Section */}
               <div className={styles.resultsSummary}>
                 <div className={dialogStyles.dialogItem}>
                   <span className={dialogStyles.dialogLabel}>Checks Today:</span>
-                  <span className={dialogStyles.dialogValue}>{checkStats.usageCount} of 100</span>
+                  <span className={dialogStyles.dialogValue}>{checkStats.usageCount}</span>
                 </div>
+                {typeof checkStats.remainingChecks !== 'undefined' && checkStats.remainingChecks !== null && (
+                  <div className={dialogStyles.dialogItem}>
+                    <span className={dialogStyles.dialogLabel}>Remaining:</span>
+                    <span className={dialogStyles.dialogValue}>{checkStats.remainingChecks}</span>
+                  </div>
+                )}
                 
                 <div className={dialogStyles.dialogItem}>
                   <span className={dialogStyles.dialogLabel}>Checked Posts:</span>
@@ -387,71 +333,48 @@ export default function CheckPostPricesButton({ userId }) {
                 </div>
               </div>
               
-              {/* API Response Details - Always visible */}
-              <div className={styles.resultsList}>                  
-                {/* API Response rows */}
-                {apiResponses && apiResponses.length > 0 ? (
-                  apiResponses.map((response, index) => (
-                    <div key={index} className={styles.simpleResultRow}>
-                      <div className={styles.symbolWithTag}>
-                        <span className={styles.symbolText}>{response.symbol || 'N/A'}</span>
-                        {response.exchange && <span className={styles.exchangeTag}>{response.exchange}</span>}
-                      </div>
-                      
-                      <span className={`${styles.responseTypeTag} 
-                        ${response.responseType?.includes('↑') ? styles.priceUpTag : 
-                          response.responseType?.includes('↓') ? styles.priceDownTag :
-                          response.responseType?.includes('Historical') ? styles.historyTag : 
-                          response.responseType?.includes('No price') ? styles.errorTag :
-                          styles.lastPriceTag}`}
-                      >
-                        {response.responseType || 'N/A'}
-                      </span>
-
-                      {/* Display API URL if available */}
-                      {response.requestUrl && (
-                        <div className={styles.apiUrlContainer}>
-                          <input 
-                            type="text" 
-                            readOnly
-                            value={response.requestUrl} 
-                            className={styles.apiUrlInput}
-                            onClick={(e) => e.target.select()}
-                          />
-                          <button 
-                            className={styles.copyUrlButton}
-                            onClick={() => {
-                              console.log(`Copying URL to clipboard: ${response.requestUrl}`);
-                              navigator.clipboard.writeText(response.requestUrl)
-                                .then(() => {
-                                  console.log('URL successfully copied to clipboard');
-                                  // Show copied notification
-                                  const button = document.getElementById(`copy-btn-${index}`);
-                                  if (button) {
-                                    const originalText = button.innerText;
-                                    button.innerText = 'Copied!';
-                                    setTimeout(() => {
-                                      button.innerText = originalText;
-                                      console.log('Reset button text after copy');
-                                    }, 2000);
-                                  } else {
-                                    console.warn(`Copy button element not found: copy-btn-${index}`);
-                                  }
-                                })
-                                .catch(err => {
-                                  console.error('Error copying URL to clipboard:', err);
-                                });
-                            }}
-                            id={`copy-btn-${index}`}
-                          >
-                            Copy URL
-                          </button>
+              {/* Results - Show updated posts data, hide API URLs */}
+              <div className={styles.resultsList}>
+                {detailedResults && detailedResults.length > 0 ? (
+                  detailedResults.map((res, index) => {
+                    const statusLabel = res.targetReached
+                      ? 'Target Reached'
+                      : res.stopLossTriggered
+                        ? 'Stop Loss Triggered'
+                        : res.message
+                          ? res.message
+                          : 'Checked';
+                    const tagClass = res.targetReached
+                      ? styles.priceUpTag
+                      : res.stopLossTriggered
+                        ? styles.priceDownTag
+                        : res.message && (res.noDataAvailable || res.postAfterMarketClose || res.postDateAfterPriceDate)
+                          ? styles.errorTag
+                          : styles.lastPriceTag;
+                    return (
+                      <div key={index} className={styles.simpleResultRow}>
+                        <div className={styles.symbolWithTag}>
+                          <span className={styles.symbolText}>{res.symbol || 'N/A'}</span>
+                          {res.companyName && (
+                            <span className={styles.exchangeTag}>{res.companyName}</span>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  ))
+
+                        <span className={`${styles.responseTypeTag} ${tagClass}`}>
+                          {statusLabel}
+                          {res.closed ? ' (Closed)' : ''}
+                        </span>
+
+                        <div className={styles.apiUrlContainer}>
+                          <div className={styles.apiUrlInput} style={{ pointerEvents: 'none' }}>
+                            Price: {formatPrice(res.currentPrice)} | Target: {formatPrice(res.targetPrice)} | SL: {formatPrice(res.stopLossPrice)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
                 ) : (
-                  <div className={styles.noDataMessage}>No API response details available</div>
+                  <div className={styles.noDataMessage}>No results available</div>
                 )}
               </div>
 

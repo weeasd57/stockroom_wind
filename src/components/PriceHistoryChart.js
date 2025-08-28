@@ -19,24 +19,52 @@ export default function PriceHistoryChart({ priceChecks, targetPrice, stopLossPr
     // Determine if we're dealing with the new format (with open, high, low, close) or old format
     const isNewFormat = priceChecks[0] && ('close' in priceChecks[0]);
     
+    // Helpers to validate inputs and prevent invalid numbers from reaching the chart
+    const toUnixSeconds = (dateStr) => {
+      const ts = Date.parse(dateStr);
+      return Number.isFinite(ts) ? Math.floor(ts / 1000) : NaN;
+    };
+    const toFinite = (val) => {
+      const n = typeof val === 'number' ? val : parseFloat(val);
+      return Number.isFinite(n) ? n : NaN;
+    };
+    
     // Sort price checks by date
     const sortedChecks = [...priceChecks].sort((a, b) => {
       return new Date(a.date) - new Date(b.date);
     });
     
-    // Prepare data for the chart
-    const candleData = isNewFormat 
-      ? sortedChecks.map(check => ({
-          time: new Date(check.date).getTime() / 1000,
-          open: parseFloat(check.open),
-          high: parseFloat(check.high),
-          low: parseFloat(check.low),
-          close: parseFloat(check.close)
-        }))
-      : sortedChecks.map(check => ({
-          time: new Date(check.date).getTime() / 1000,
-          value: parseFloat(check.price)
-        }));
+    // Prepare and sanitize data for the chart
+    const candleData = isNewFormat
+      ? sortedChecks
+          .map((check) => {
+            const time = toUnixSeconds(check.date);
+            const open = toFinite(check.open);
+            const high = toFinite(check.high);
+            const low = toFinite(check.low);
+            const close = toFinite(check.close);
+            return { time, open, high, low, close };
+          })
+          .filter((c) =>
+            Number.isFinite(c.time) &&
+            Number.isFinite(c.open) &&
+            Number.isFinite(c.high) &&
+            Number.isFinite(c.low) &&
+            Number.isFinite(c.close)
+          )
+      : sortedChecks
+          .map((check) => {
+            const time = toUnixSeconds(check.date);
+            const value = toFinite(check.price);
+            return { time, value };
+          })
+          .filter((c) => Number.isFinite(c.time) && Number.isFinite(c.value));
+
+    // If sanitized dataset is too small, skip chart creation to avoid invalid SVG/path
+    if (!candleData || candleData.length < 2) {
+      setChartCreated(false);
+      return;
+    }
     
     // Format dates for x-axis
     const firstDate = new Date(sortedChecks[0].date);
@@ -116,7 +144,8 @@ export default function PriceHistoryChart({ priceChecks, targetPrice, stopLossPr
     
     // Add horizontal lines for target, stop loss, and initial price with improved styling
     if (targetPrice) {
-      const targetValue = parseFloat(targetPrice);
+      const targetValue = toFinite(targetPrice);
+      if (Number.isFinite(targetValue)) {
       const targetLine = chart.addLineSeries({
         color: '#4ADE80', // Bright green for target
         lineWidth: 1,
@@ -150,10 +179,12 @@ export default function PriceHistoryChart({ priceChecks, targetPrice, stopLossPr
           size: 1,
         }
       ]);
+      }
     }
     
     if (stopLossPrice) {
-      const stopValue = parseFloat(stopLossPrice);
+      const stopValue = toFinite(stopLossPrice);
+      if (Number.isFinite(stopValue)) {
       const stopLine = chart.addLineSeries({
         color: '#F87171', // Bright red for stop loss
         lineWidth: 1,
@@ -187,10 +218,12 @@ export default function PriceHistoryChart({ priceChecks, targetPrice, stopLossPr
           size: 1,
         }
       ]);
+      }
     }
     
     if (initialPrice) {
-      const initialValue = parseFloat(initialPrice);
+      const initialValue = toFinite(initialPrice);
+      if (Number.isFinite(initialValue)) {
       const initialLine = chart.addLineSeries({
         color: '#94A3B8', // Gray for initial price
         lineWidth: 1,
@@ -224,6 +257,7 @@ export default function PriceHistoryChart({ priceChecks, targetPrice, stopLossPr
           size: 1,
         }
       ]);
+      }
     }
     
     // Format dates for x-axis labels and ensure they're visible
