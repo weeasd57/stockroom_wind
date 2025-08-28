@@ -34,64 +34,53 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [subscriptions, setSubscriptions] = useState<Record<string, any>>({});
+  const [loadedCommentsPosts, setLoadedCommentsPosts] = useState<Set<string>>(new Set());
 
   // Subscribe to real-time updates for a specific post
   const subscribeToPost = useCallback((postId: string) => {
     if (subscriptions[postId] || !supabase) return;
     if (!isValidUUID(postId) || isTempId(postId)) return;
 
-    // Subscribe to comments changes
-    const commentsSubscription = supabase
-      .channel(`comments-${postId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'comments',
-        filter: `post_id=eq.${postId}`
-      }, async (payload) => {
-        console.log('Comments change:', payload);
-        await fetchCommentsForPost(postId);
-        await updatePostStats(postId);
-      })
-      .subscribe();
-
-    // Subscribe to buy votes changes
-    const buyVotesSubscription = supabase
-      .channel(`buy-votes-${postId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'post_actions',
-        filter: `post_id=eq.${postId}`
-      }, async (payload) => {
-        console.log('Buy votes change:', payload);
-        await updatePostStats(postId);
-      })
-      .subscribe();
-
-    // Subscribe to sell votes changes
-    const sellVotesSubscription = supabase
-      .channel(`sell-votes-${postId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'post_actions',
-        filter: `post_id=eq.${postId}`
-      }, async (payload) => {
-        console.log('Sell votes change:', payload);
-        await updatePostStats(postId);
-      })
+    // Use a single channel per post for both comments and votes
+    const channel = supabase
+      .channel(`post-${postId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'comments',
+          filter: `post_id=eq.${postId}`
+        },
+        async (payload) => {
+          console.log('Comments change:', payload);
+          // Always refresh counts; refresh comment list only if already loaded to avoid heavy fetches in feeds
+          await updatePostStats(postId);
+          if (loadedCommentsPosts.has(postId)) {
+            await fetchCommentsForPost(postId);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'post_actions',
+          filter: `post_id=eq.${postId}`
+        },
+        async (payload) => {
+          console.log('Post actions change:', payload);
+          await updatePostStats(postId);
+        }
+      )
       .subscribe();
 
     setSubscriptions(prev => ({
       ...prev,
-      [postId]: {
-        comments: commentsSubscription,
-        buyVotes: buyVotesSubscription,
-        sellVotes: sellVotesSubscription
-      }
+      [postId]: { channel }
     }));
-  }, [supabase, subscriptions]);
+  }, [supabase, subscriptions, loadedCommentsPosts]);
 
   // Update post statistics
   const updatePostStats = useCallback(async (postId: string) => {
@@ -101,24 +90,24 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
       const [commentsResponse, buyVotesResponse, sellVotesResponse] = await Promise.all([
         supabase
           .from('comments')
-          .select('id')
+          .select('id', { count: 'exact', head: true })
           .eq('post_id', postId),
         supabase
           .from('post_actions')
-          .select('id')
+          .select('id', { count: 'exact', head: true })
           .eq('post_id', postId)
           .eq('action_type', 'buy'),
         supabase
           .from('post_actions')
-          .select('id')
+          .select('id', { count: 'exact', head: true })
           .eq('post_id', postId)
           .eq('action_type', 'sell')
       ]);
 
       const stats: PostStats = {
-        commentCount: commentsResponse.data?.length || 0,
-        buyCount: buyVotesResponse.data?.length || 0,
-        sellCount: sellVotesResponse.data?.length || 0
+        commentCount: (commentsResponse.count as number) || 0,
+        buyCount: (buyVotesResponse.count as number) || 0,
+        sellCount: (sellVotesResponse.count as number) || 0
       };
 
       setPostStats(prev => ({
@@ -160,16 +149,23 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
         return [...filtered, ...formattedComments];
       });
 
-      // Subscribe to this post if not already subscribed
+      // Ensure realtime subscription is active for this post
       subscribeToPost(postId);
-      
+
+      // Mark this post's comments as loaded to allow realtime refreshes
+      setLoadedCommentsPosts(prev => {
+        const next = new Set(prev);
+        next.add(postId);
+        return next;
+      });
+
       // Update stats
       await updatePostStats(postId);
     } catch (err) {
       console.error('Error fetching comments:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch comments');
     }
-  }, [supabase, subscribeToPost, updatePostStats]);
+  }, [supabase, updatePostStats, subscribeToPost]);
 
   const addComment = async (postId: string, content: string): Promise<Comment> => {
     if (!supabase || !user) throw new Error('Not authenticated');
@@ -415,9 +411,7 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     return () => {
       Object.values(subscriptions).forEach((subs: any) => {
-        if (subs.comments) subs.comments.unsubscribe();
-        if (subs.buyVotes) subs.buyVotes.unsubscribe();
-        if (subs.sellVotes) subs.sellVotes.unsubscribe();
+        if (subs.channel) subs.channel.unsubscribe();
       });
     };
   }, []);

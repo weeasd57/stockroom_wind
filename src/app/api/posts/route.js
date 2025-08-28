@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { whatsappService } from '@/services/whatsappService';
 
 // Initialize Supabase clients
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -222,29 +221,7 @@ export async function POST(request) {
 
     const newPost = data[0];
     
-    // إرسال إشعارات WhatsApp للمتابعين (بشكل غير متزامن)
-    if (newPost && newPost.user) {
-      const postData = {
-        id: newPost.id,
-        user_id: newPost.user_id,
-        content: newPost.content,
-        symbol: newPost.symbol,
-        company_name: newPost.company_name,
-        current_price: newPost.current_price,
-        target_price: newPost.target_price,
-        stop_loss_price: newPost.stop_loss_price,
-        strategy: newPost.strategy,
-        author_name: newPost.user.full_name || newPost.user.username
-      };
-
-      // إرسال الإشعارات في الخلفية (لا ننتظر النتيجة)
-      whatsappService.notifyFollowersOfNewPost(postData).catch(error => {
-        console.error('[API /posts] WhatsApp notification error:', error);
-        // لا نوقف إنشاء المنشور بسبب خطأ في الإشعارات
-      });
-      
-      console.log('[API /posts] WhatsApp notifications triggered for post:', newPost.id);
-    }
+    // WhatsApp notifications removed
 
     return NextResponse.json({ data: newPost, success: true }, { status: 201 });
   } catch (error) {

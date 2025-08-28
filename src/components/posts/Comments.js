@@ -6,7 +6,7 @@ import CommentsDialog from './CommentsDialog';
 import styles from '@/styles/Comments.module.css';
 import { createPortal } from 'react-dom';
 
-export default function Comments({ postId, initialCommentCount = 0 }) {
+export default function Comments({ postId, initialCommentCount = 0, autoFetchOnMount = false }) {
   const { getPostStats, fetchCommentsForPost } = useComments();
   const [showDialog, setShowDialog] = useState(false);
   const [portalContainer, setPortalContainer] = useState(null);
@@ -16,10 +16,11 @@ export default function Comments({ postId, initialCommentCount = 0 }) {
 
   // Fetch comments for this post when component mounts
   useEffect(() => {
+    if (!autoFetchOnMount) return;
     if (postId) {
       fetchCommentsForPost(postId);
     }
-  }, [postId, fetchCommentsForPost]);
+  }, [postId, fetchCommentsForPost, autoFetchOnMount]);
 
   // Setup a shared fixed portal container on the document body
   useEffect(() => {

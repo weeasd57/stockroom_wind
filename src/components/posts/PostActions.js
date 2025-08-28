@@ -6,7 +6,7 @@ import { useComments } from '@/providers/CommentProvider';
 import { isValidUUID, isTempId } from '@/lib/utils';
 import styles from '../../styles/PostActions.module.css';
 
-export default function PostActions({ postId, initialBuyCount = 0, initialSellCount = 0, onVoteChange }) {
+export default function PostActions({ postId, initialBuyCount = 0, initialSellCount = 0, onVoteChange, autoSubscribe = false }) {
   const { user, supabase } = useSupabase();
   const { getPostStats, fetchCommentsForPost, toggleBuyVote, toggleSellVote } = useComments();
   const [userAction, setUserAction] = useState(null);
@@ -21,10 +21,11 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
 
   // Bootstrap real-time subscriptions for this post even if comments are not opened
   useEffect(() => {
+    if (!autoSubscribe) return;
     if (postId && isRealId) {
       fetchCommentsForPost(postId);
     }
-  }, [postId, fetchCommentsForPost]);
+  }, [postId, fetchCommentsForPost, isRealId, autoSubscribe]);
 
   // Check user's current vote status
   useEffect(() => {

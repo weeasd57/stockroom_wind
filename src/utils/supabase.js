@@ -255,13 +255,20 @@ export const getUserProfile = async (userId) => {
       const followersCount = followersData ? followersData.length : 0;
       const followingCount = followingData ? followingData.length : 0;
       
-      // If we have profile data, update the counts
+      // If we have profile data, set computed values on the returned object
       if (data && data.length > 0) {
-        // Update the profile with the latest counts
-        const { error: updateError } = await supabase
+        // Always set on the return payload regardless of DB update success
+        data[0].posts_count = totalPosts;
+        data[0].success_posts = successPosts;
+        data[0].loss_posts = lossPosts;
+        data[0].experience_score = experienceScore;
+        data[0].followers = followersCount;
+        data[0].following = followingCount;
+
+        // Try to update the profile with the latest counts (ignore failures)
+        await supabase
           .from('profiles')
           .update({
-            posts_count: totalPosts,
             success_posts: successPosts,
             loss_posts: lossPosts,
             experience_score: experienceScore,
@@ -269,16 +276,6 @@ export const getUserProfile = async (userId) => {
             following: followingCount
           })
           .eq('id', userId);
-          
-        if (!updateError) {
-          // Update the data object with the new counts
-          data[0].posts_count = totalPosts;
-          data[0].success_posts = successPosts;
-          data[0].loss_posts = lossPosts;
-          data[0].experience_score = experienceScore;
-          data[0].followers = followersCount;
-          data[0].following = followingCount;
-        }
       }
     }
     
@@ -305,8 +302,7 @@ export const getUserProfile = async (userId) => {
         background_url: '/profile-bg.jpg',
         experience_score: 0,
         followers: 0,
-        following: 0,
-        posts_count: 0
+        following: 0
       };
       
       // Count posts for this user (in case they exist before profile creation)
@@ -343,9 +339,11 @@ export const getUserProfile = async (userId) => {
         defaultProfile.following = followingData.length;
       }
       
+      // Exclude posts_count from DB insert (not a DB column)
+      const { posts_count, ...insertProfile } = defaultProfile;
       const { error: insertError } = await supabase
         .from('profiles')
-        .insert([defaultProfile]);
+        .insert([insertProfile]);
       
       if (insertError) {
         return { data: null, error: insertError };
@@ -354,6 +352,10 @@ export const getUserProfile = async (userId) => {
       return { data: [defaultProfile], error: null };
     }
     
+    // Ensure posts_count exists on the returned object even if counting failed
+    if (data && data.length > 0 && typeof data[0].posts_count === 'undefined') {
+      data[0].posts_count = 0;
+    }
     return { data: data, error: null };
   } catch (error) {
     return { data: null, error };

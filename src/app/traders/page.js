@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useTraders } from '@/providers/TradersProvider';
@@ -24,6 +24,10 @@ export default function TradersPage() {
   } = useTraders();
   
   const [visible, setVisible] = useState(false);
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
+  const [sortKey, setSortKey] = useState('experience_score');
+  const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
+  const [country, setCountry] = useState('all');
   const [followings, setFollowings] = useState({});
   const [loadingMore, setLoadingMore] = useState(false);
   const router = useRouter();
@@ -151,6 +155,35 @@ export default function TradersPage() {
     );
   };
 
+  // Build unique countries from latestPost.country
+  const countries = useMemo(() => {
+    const set = new Set();
+    (traders || []).forEach(t => {
+      const c = t?.latestPost?.country;
+      if (c && typeof c === 'string' && c.trim()) set.add(c.trim());
+    });
+    return Array.from(set).sort();
+  }, [traders]);
+
+  // Derived list: filter by country and sort by selected key/order
+  const displayedTraders = useMemo(() => {
+    let list = Array.isArray(traders) ? [...traders] : [];
+
+    if (country !== 'all') {
+      list = list.filter(t => (t?.latestPost?.country || '').trim() === country);
+    }
+
+    const key = sortKey;
+    const dir = sortOrder === 'asc' ? 1 : -1;
+    list.sort((a, b) => {
+      const av = (a?.[key] ?? 0) || 0;
+      const bv = (b?.[key] ?? 0) || 0;
+      if (av === bv) return 0;
+      return av > bv ? dir : -dir;
+    });
+    return list;
+  }, [traders, country, sortKey, sortOrder]);
+
   // Show error state
   if (error) {
     return (
@@ -210,6 +243,51 @@ export default function TradersPage() {
             Trending
           </button>
         </div>
+
+        {/* Controls: view toggle, sort, order, country */}
+        <div className={styles.controlsRow}>
+          <div className={styles.viewToggle}>
+            <button
+              className={`${styles.toggleButton} ${viewMode === 'grid' ? styles.active : ''}`}
+              onClick={() => setViewMode('grid')}
+            >
+              Grid
+            </button>
+            <button
+              className={`${styles.toggleButton} ${viewMode === 'list' ? styles.active : ''}`}
+              onClick={() => setViewMode('list')}
+            >
+              List
+            </button>
+          </div>
+          <select
+            className={styles.select}
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value)}
+          >
+            <option value="experience_score">Experience</option>
+            <option value="success_posts">Success</option>
+            <option value="loss_posts">Loss</option>
+            <option value="followers">Followers</option>
+            <option value="post_count">Posts</option>
+          </select>
+          <button
+            className={styles.toggleButton}
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+          >
+            {sortOrder === 'asc' ? 'Asc' : 'Desc'}
+          </button>
+          <select
+            className={styles.select}
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+          >
+            <option value="all">All countries</option>
+            {countries.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
       </div>
       
       {loading ? (
@@ -218,10 +296,10 @@ export default function TradersPage() {
           <p>Loading traders...</p>
         </div>
       ) : (
-        <div className={styles.tradersGrid}>
-          {traders.length > 0 ? (
-            traders.map(trader => (
-              <div key={trader.id} className={styles.traderCard}>
+        <div className={viewMode === 'grid' ? styles.tradersGrid : styles.tradersList}>
+          {displayedTraders.length > 0 ? (
+            displayedTraders.map(trader => (
+              <div key={trader.id} className={`${styles.traderCard} ${viewMode === 'list' ? styles.traderCardRow : ''}`}>
                 <div 
                   className={styles.traderHeader}
                   onClick={() => navigateToProfile(trader.id)}
@@ -245,8 +323,8 @@ export default function TradersPage() {
                 
                 <div className={styles.traderStats}>
                   <div className={styles.statItem}>
-                    <span className={styles.statLabel}>Joined</span>
-                    <span className={styles.statValue}>{new Date(trader.created_at).toLocaleDateString()}</span>
+                    <span className={styles.statLabel}>Experience</span>
+                    <span className={styles.statValue}>{Math.round(trader.experience_score || 0)}</span>
                   </div>
                   <div className={styles.statItem}>
                     <span className={styles.statLabel}>Posts</span>

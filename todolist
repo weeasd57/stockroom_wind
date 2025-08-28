@@ -1,11 +1,3 @@
-* fix this when need show page  view profile  "{
-    "code": "42703",
-    "details": null,
-    "hint": null,
-    "message": "column profiles.posts_count does not exist"
-}
-"
-
 
 
 * need show the exprince score for user in traders page replace "Joined" in "traders_traderCard" and add row to quick info too (suscess , lose , joined)
@@ -19,6 +11,8 @@
 * need fix option to search the traders by name in traders page
 
 ********
-** need remove all code for "Twilio WhatsApp" 
+** fix the style users cards in traders page in row style should the user states and follow button be row style not coulmn and add "Success Rate" in users card 
+** need remove limit (100) calls for api checks posts from info dialog in profile page 
+
 ** need add in profile page tap for settings whatsapp
  (messages template and handle the list posts in one massege)

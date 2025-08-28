@@ -560,6 +560,7 @@ export default function PostDetailsPage() {
               postId={post.id}
               initialBuyCount={post.buy_count || 0}
               initialSellCount={post.sell_count || 0}
+              autoSubscribe={true}
             />
             <PostSentiment 
               postId={post.id}
@@ -569,6 +570,7 @@ export default function PostDetailsPage() {
             <Comments 
               postId={post.id}
               initialCommentCount={post.comment_count || 0}
+              autoFetchOnMount={true}
             />
           </CommentProvider>
         </div>

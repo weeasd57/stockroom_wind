@@ -94,7 +94,7 @@ export default function ViewProfile({ params }) {
             () =>
               supabase
                 .from('profiles')
-                .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts, posts_count')
+                .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts')
                 .eq('id', userId)
                 .maybeSingle()
                 .abortSignal(controller.signal)
@@ -132,6 +132,18 @@ export default function ViewProfile({ params }) {
         }
         
         safeSetState(() => setProfileData(profile));
+
+        // Compute posts_count dynamically since it's not a DB column
+        try {
+          const { count: postsCount } = await supabase
+            .from('posts')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId);
+          safeSetState(() => setProfileData(prev => prev ? { ...prev, posts_count: postsCount || 0 } : prev));
+        } catch (e) {
+          // If counting fails, leave posts_count as 0
+          safeSetState(() => setProfileData(prev => prev ? { ...prev, posts_count: prev.posts_count || 0 } : prev));
+        }
         
         // Try to get avatar and background images
         if (profile.avatar_url) {
