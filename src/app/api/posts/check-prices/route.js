@@ -59,6 +59,7 @@ async function logStatusUpdate(supabaseClient, postId, symbol, message, updateRe
 // Helper: restrict upsert payload to allowed columns only
 const ALLOWED_UPDATE_FIELDS = new Set([
   'id',
+  'user_id',  // Added to prevent null user_id error during upsert
   'current_price',
   'high_price',
   'target_high_price',
@@ -676,6 +677,7 @@ export async function POST(request) {
           // Only include fields that must change; avoid overwriting other columns
           updatedPosts.push({
             id: post.id,
+            user_id: userId,  // Include user_id to prevent null constraint violation
             current_price: lastPrice,
             high_price: highestPrice,
             target_high_price: highPrice,

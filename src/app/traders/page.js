@@ -304,75 +304,159 @@ export default function TradersPage() {
           {displayedTraders.length > 0 ? (
             displayedTraders.map(trader => (
               <div key={trader.id} className={`${styles.traderCard} ${viewMode === 'list' ? styles.traderCardRow : ''}`}>
-                <div 
-                  className={styles.traderHeader}
-                  onClick={() => navigateToProfile(trader.id)}
-                >
-                  <div className={styles.traderAvatar}>
-                    <LazyImage
-                      src={trader.avatar_url || '/default-avatar.svg'}
-                      alt={trader.username}
-                      profileId={trader.id}
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = '/default-avatar.svg';
-                      }}
-                    />
-                  </div>
-                  <div className={styles.traderInfo}>
-                    <h3>{trader.full_name || trader.username || 'Trader'}</h3>
-                    <p className={styles.username}>@{trader.username || 'username'}</p>
-                  </div>
-                </div>
-                
-                {/* Stats section (top) */}
-                <div className={styles.traderStats}>
-                  <div className={styles.statItem}>
-                    <span className={styles.statLabel}>Experience</span>
-                    <span className={styles.statValue}>{Math.round(trader.experience_score || 0)}</span>
-                  </div>
-                  <div className={styles.statItem}>
-                    <span className={styles.statLabel}>Posts</span>
-                    <span className={styles.statValue}>{trader.post_count || 0}</span>
-                  </div>
-                  <div className={styles.statItem}>
-                    <span className={styles.statLabel}>Followers</span>
-                    <span className={styles.statValue}>{trader.followers || 0}</span>
-                  </div>
-                  <div className={styles.statItem}>
-                    <span className={styles.statLabel}>Success Rate</span>
-                    <span className={styles.statValue}>
-                      {`${calculateSuccessRate(trader.success_posts || 0, trader.loss_posts || 0)}%`}
-                    </span>
-                  </div>
-                </div>
-                
-                <p className={styles.traderBio}>{trader.bio || 'No bio available'}</p>
-                
-                {/* Country flags with counts (top 6 by count) */
-                <div className={styles.countriesRow}>
-                  {Object.entries(trader.countryCounts || {})
-                    .sort((a, b) => (b[1] || 0) - (a[1] || 0))
-                    .slice(0, 6)
-                    .map(([code, count]) => (
-                      <div key={code} className={styles.countryBadge} title={`${code.toUpperCase()}: ${count}`}>
-                        <span className={`fi fi-${String(code).toLowerCase()}`}></span>
-                        <span className={styles.countryCount}>{count}</span>
+                {/* Conditional layout based on view mode */}
+                {viewMode === 'list' ? (
+                  <>
+                    {/* Two column layout for list view */}
+                    {/* Column 1: User info, bio, and flags */}
+                    <div className={styles.leftColumn}>
+                      <div 
+                        className={styles.traderHeader}
+                        onClick={() => navigateToProfile(trader.id)}
+                      >
+                        <div className={styles.traderAvatar}>
+                          <LazyImage
+                            src={trader.avatar_url || '/default-avatar.svg'}
+                            alt={trader.username}
+                            profileId={trader.id}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = '/default-avatar.svg';
+                            }}
+                          />
+                        </div>
+                        <div className={styles.traderInfo}>
+                          <h3>{trader.full_name || trader.username || 'Trader'}</h3>
+                          <p className={styles.username}>@{trader.username || 'username'}</p>
+                        </div>
                       </div>
-                    ))}
-                </div>
-          }
-                {/* Actions at bottom of the card */}
-                <div className={styles.cardActions}>
-                  {isAuthenticated && user?.id !== trader.id && (
-                    <button
-                      className={followings[trader.id] ? styles.unfollowButton : styles.followButton}
-                      onClick={(e) => handleFollowClick(e, trader.id)}
+                      
+                      <p className={styles.traderBio}>{trader.bio || 'No bio available'}</p>
+                      
+                      {/* Country flags with counts (top 6 by count) */}
+                      <div className={styles.countriesRow}>
+                        {Object.entries(trader.countryCounts || {})
+                          .sort((a, b) => (b[1] || 0) - (a[1] || 0))
+                          .slice(0, 6)
+                          .map(([code, count]) => (
+                            <div key={code} className={styles.countryBadge} title={`${code.toUpperCase()}: ${count}`}>
+                              <span className={`fi fi-${String(code).toLowerCase()}`}></span>
+                              <span className={styles.countryCount}>{count}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                    
+                    {/* Column 2: Stats and follow button */}
+                    <div className={styles.rightColumn}>
+                      {/* Stats section */}
+                      <div className={styles.traderStats}>
+                        <div className={styles.statItem}>
+                          <span className={styles.statLabel}>Experience</span>
+                          <span className={styles.statValue}>{Math.round(trader.experience_score || 0)}</span>
+                        </div>
+                        <div className={styles.statItem}>
+                          <span className={styles.statLabel}>Posts</span>
+                          <span className={styles.statValue}>{trader.post_count || 0}</span>
+                        </div>
+                        <div className={styles.statItem}>
+                          <span className={styles.statLabel}>Followers</span>
+                          <span className={styles.statValue}>{trader.followers || 0}</span>
+                        </div>
+                        <div className={styles.statItem}>
+                          <span className={styles.statLabel}>Success Rate</span>
+                          <span className={styles.statValue}>
+                            {`${calculateSuccessRate(trader.success_posts || 0, trader.loss_posts || 0)}%`}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Follow button */}
+                      <div className={styles.cardActions}>
+                        {isAuthenticated && user?.id !== trader.id && (
+                          <button
+                            className={followings[trader.id] ? styles.unfollowButton : styles.followButton}
+                            onClick={(e) => handleFollowClick(e, trader.id)}
+                          >
+                            {followings[trader.id] ? 'Unfollow' : 'Follow'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Grid layout: Keep original structure */}
+                    <div 
+                      className={styles.traderHeader}
+                      onClick={() => navigateToProfile(trader.id)}
                     >
-                      {followings[trader.id] ? 'Unfollow' : 'Follow'}
-                    </button>
-                  )}
-                </div>
+                      <div className={styles.traderAvatar}>
+                        <LazyImage
+                          src={trader.avatar_url || '/default-avatar.svg'}
+                          alt={trader.username}
+                          profileId={trader.id}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = '/default-avatar.svg';
+                          }}
+                        />
+                      </div>
+                      <div className={styles.traderInfo}>
+                        <h3>{trader.full_name || trader.username || 'Trader'}</h3>
+                        <p className={styles.username}>@{trader.username || 'username'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className={styles.traderStats}>
+                      <div className={styles.statItem}>
+                        <span className={styles.statLabel}>Experience</span>
+                        <span className={styles.statValue}>{Math.round(trader.experience_score || 0)}</span>
+                      </div>
+                      <div className={styles.statItem}>
+                        <span className={styles.statLabel}>Posts</span>
+                        <span className={styles.statValue}>{trader.post_count || 0}</span>
+                      </div>
+                      <div className={styles.statItem}>
+                        <span className={styles.statLabel}>Followers</span>
+                        <span className={styles.statValue}>{trader.followers || 0}</span>
+                      </div>
+                      <div className={styles.statItem}>
+                        <span className={styles.statLabel}>Success Rate</span>
+                        <span className={styles.statValue}>
+                          {`${calculateSuccessRate(trader.success_posts || 0, trader.loss_posts || 0)}%`}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <p className={styles.traderBio}>{trader.bio || 'No bio available'}</p>
+                    
+                    {/* Country flags with counts (top 6 by count) */}
+                    <div className={styles.countriesRow}>
+                      {Object.entries(trader.countryCounts || {})
+                        .sort((a, b) => (b[1] || 0) - (a[1] || 0))
+                        .slice(0, 6)
+                        .map(([code, count]) => (
+                          <div key={code} className={styles.countryBadge} title={`${code.toUpperCase()}: ${count}`}>
+                            <span className={`fi fi-${String(code).toLowerCase()}`}></span>
+                            <span className={styles.countryCount}>{count}</span>
+                          </div>
+                        ))}
+                    </div>
+                    
+                    {/* Actions at bottom of the card */}
+                    <div className={styles.cardActions}>
+                      {isAuthenticated && user?.id !== trader.id && (
+                        <button
+                          className={followings[trader.id] ? styles.unfollowButton : styles.followButton}
+                          onClick={(e) => handleFollowClick(e, trader.id)}
+                        >
+                          {followings[trader.id] ? 'Unfollow' : 'Follow'}
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             ))
           ) : (

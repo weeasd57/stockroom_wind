@@ -1031,24 +1031,6 @@ export default function Profile() {
       </div>
       {/* Unified Dashboard Section */}
       <DashboardSection />
-      
-      {/* Trading Statistics */}
-      <div className={styles.tradingInfo}>
-        <div className={styles.tradingInfoItem}>
-          <span className={styles.tradingInfoLabel}>Experience Score:</span>
-          <span className={`${styles.tradingInfoValue} ${(profile?.experience_score || 0) > 0 ? styles.positiveScore : (profile?.experience_score || 0) < 0 ? styles.negativeScore : ''}`}>
-            {profile?.experience_score !== undefined ? profile.experience_score : 0}
-          </span>
-        </div>
-        <div className={styles.tradingInfoItem}>
-          <span className={styles.tradingInfoLabel}>Success Posts:</span>
-          <span className={`${styles.tradingInfoValue} ${styles.positiveScore}`}>{profile?.success_posts || 0}</span>
-        </div>
-        <div className={styles.tradingInfoItem}>
-          <span className={styles.tradingInfoLabel}>Loss Posts:</span>
-          <span className={`${styles.tradingInfoValue} ${styles.negativeScore}`}>{profile?.loss_posts || 0}</span>
-        </div>
-      </div>
 
       {/* Profile Stats */}
       <div className={styles.profileStats}>

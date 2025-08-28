@@ -1,10 +1,11 @@
 
 
-********
-* need in row style in traders page show the follow button in buttom card and states be above like gride 
-* need show my all data dashborad states in my profile page states
-* should "Success Rate" in cards users in traders page get ny same calculation in all app (my dashbard . my profile , users card ) should all get from sme component for same resulte 
+** should the check posts prossecs be when get respone json for each from start date posting to 
+date has target peice or lose price then close this post or sussces or lose should not have poth
+ and should save all data in supabase posts table can show the schema table from sql code folder and 
+ should when get respone show this update in realtime by provider too 
 
 
+ 
 ** need add in profile page tap for settings whatsapp
  (messages template and handle the list posts in one massege)

@@ -314,9 +314,11 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
+  // Initial fetch only on mount
   useEffect(() => {
     fetchPosts();
-  }, [fetchPosts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   const value: PostsContextType = {
     posts,
