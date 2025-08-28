@@ -82,7 +82,78 @@ export function ProfileProvider({ children }) {
       console.log('[PROFILE] PostProvider callbacks not available:', error);
     }
   }, [user?.id]);
-  
+
+  // Realtime: keep my posts in sync with DB updates (price checks, status changes, etc.)
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const channel = supabase
+        .channel(`profile-posts-${user.id}`)
+        // INSERT new post by me
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'posts',
+          filter: `user_id=eq.${user.id}`
+        }, (payload) => {
+          const newPost = payload.new;
+          setPosts(prev => {
+            // Avoid duplicates
+            if (prev.some(p => p.id === newPost.id)) return prev;
+            // Prepend newest
+            return [newPost, ...prev];
+          });
+          // Optimistically bump posts_count on profile
+          setProfile(prev => prev ? { ...prev, posts_count: (prev.posts_count || 0) + 1 } : prev);
+        })
+        // UPDATE existing post (price fields, status, etc.)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'posts',
+          filter: `user_id=eq.${user.id}`
+        }, (payload) => {
+          const updated = payload.new || {};
+          const priceFields = ['current_price','last_price_check','price_checks','target_reached','stop_loss_triggered','status_message','status','closed_date'];
+          setPosts(prev => {
+            const idx = prev.findIndex(p => p.id === updated.id);
+            if (idx === -1) return prev;
+            const next = [...prev];
+            let merged = { ...next[idx], ...updated };
+            // Normalize price_checks if it arrives as string
+            if (typeof merged.price_checks === 'string') {
+              try { merged.price_checks = JSON.parse(merged.price_checks); } catch {}
+            }
+            next[idx] = merged;
+            return next;
+          });
+          // If price-related fields changed, refresh profile stats with throttling inside refreshData
+          const updatedKeys = Object.keys(updated);
+          if (updatedKeys.some(k => priceFields.includes(k))) {
+            refreshData(user.id);
+          }
+        })
+        // DELETE my post
+        .on('postgres_changes', {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'posts',
+          filter: `user_id=eq.${user.id}`
+        }, (payload) => {
+          const deleted = payload.old;
+          setPosts(prev => prev.filter(p => p.id !== deleted.id));
+          setProfile(prev => prev ? { ...prev, posts_count: Math.max(0, (prev.posts_count || 0) - 1) } : prev);
+        })
+        .subscribe();
+
+      return () => {
+        try { channel.unsubscribe(); } catch {}
+      };
+    } catch (e) {
+      console.warn('[PROFILE] Failed to subscribe to realtime posts updates:', e);
+    }
+  }, [user?.id, refreshData]);
+
   // Update global state when local state changes
   useEffect(() => {
     globalProfileState.lastFetched = lastFetched;

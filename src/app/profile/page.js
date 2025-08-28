@@ -20,6 +20,9 @@ import StrategyDetailsModal from '@/components/profile/StrategyDetailsModal';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 import { DashboardSection } from '@/components/home/DashboardSection';
 
+// Feature flag: toggle WhatsApp tab visibility without removing code
+const WHATSAPP_ENABLED = false;
+
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useSupabase();
   const { 
@@ -258,6 +261,11 @@ export default function Profile() {
 
   // Memoized handlers
   const handleTabChange = useCallback((tab) => {
+    // Guard: prevent switching to WhatsApp when feature is disabled
+    if (!WHATSAPP_ENABLED && tab === 'whatsapp') {
+      console.log('WhatsApp tab is disabled');
+      return;
+    }
     // If we're coming from strategies tab to posts tab,
     // and there's a selectedStrategyForDetails, use that as the strategy filter
     if (tab === 'posts' && activeTab === 'strategies' && selectedStrategyForDetails) {
@@ -272,6 +280,13 @@ export default function Profile() {
     // If switching to a tab other than posts, we don't need to do anything with filters
     // as they'll only apply when we come back to the posts tab
   }, [activeTab, selectedStrategyForDetails]);
+
+  // Redirect away from WhatsApp tab if disabled
+  useEffect(() => {
+    if (!WHATSAPP_ENABLED && activeTab === 'whatsapp') {
+      setActiveTab('posts');
+    }
+  }, [activeTab, setActiveTab]);
 
   const handleWhatsAppTabChange = useCallback((tab) => {
     setActiveWhatsAppTab(tab);
@@ -1073,12 +1088,14 @@ export default function Profile() {
         >
           Following
         </button>
-        <button 
-          className={`${styles.tabButton} ${activeTab === 'whatsapp' ? styles.activeTab : ''}`}
-          onClick={() => handleTabChange('whatsapp')}
-        >
-          WhatsApp
-        </button>
+        {WHATSAPP_ENABLED && (
+          <button 
+            className={`${styles.tabButton} ${activeTab === 'whatsapp' ? styles.activeTab : ''}`}
+            onClick={() => handleTabChange('whatsapp')}
+          >
+            WhatsApp
+          </button>
+        )}
       </div>
 
       {/* Content Section */}
@@ -1362,7 +1379,7 @@ export default function Profile() {
           </div>
         )}
 
-        {activeTab === 'whatsapp' && (
+        {WHATSAPP_ENABLED && activeTab === 'whatsapp' && (
           <div className={styles.whatsappTabContent}>
             <div className={styles.whatsappSubTabs}>
               <button
