@@ -231,100 +231,11 @@ export async function POST(request) {
 }
 
 export async function PATCH(request) {
-  try {
-    // Check if Supabase is properly configured
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return NextResponse.json({
-        error: 'Database configuration not available',
-        success: false
-      }, { status: 503 });
-    }
-    
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-    const { id, updates } = await request.json();
-
-    if (!id) {
-      return NextResponse.json({ error: 'Post ID is required for PATCH' }, { status: 400 });
-    }
-
-    // Sanitize updates to strip any non-existent DB fields
-    const safeUpdates = stripInvalidPostFields(updates);
-
-    // Choose the right client (service role > user token client > anon)
-    let dbClient = supabase;
-    if (supabaseServer) {
-      dbClient = supabaseServer;
-    } else {
-      const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        try {
-          dbClient = createClient(supabaseUrl || '', supabaseAnonKey || '', {
-            global: { headers: { Authorization: authHeader } },
-          });
-        } catch (e) {
-          console.debug('[API /posts] PATCH: failed to create per-request client with token', e);
-          dbClient = supabase;
-        }
-      }
-    }
-
-    const { data, error } = await dbClient
-      .from('posts')
-      .update(safeUpdates)
-      .eq('id', id)
-      .select(`
-        *,
-        user:user_id(username, full_name, avatar_url)
-      `);
-
-    if (error) {
-      console.error('Error updating post:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    if (!data || data.length === 0) {
-      return NextResponse.json({ error: 'Post not found or no changes made' }, { status: 404 });
-    }
-
-    return NextResponse.json({ data: data[0], success: true }, { status: 200 });
-  } catch (error) {
-    console.error('Unhandled error in PATCH /api/posts:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-  }
+  // Editing posts is disabled by product rules
+  return NextResponse.json({ error: 'Editing posts is disabled.' }, { status: 403 });
 }
 
 export async function DELETE(request) {
-  try {
-    // Check if Supabase is properly configured
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return NextResponse.json({
-        error: 'Database configuration not available',
-        success: false
-      }, { status: 503 });
-    }
-    
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-    const { id } = await request.json();
-
-    if (!id) {
-      return NextResponse.json({ error: 'Post ID is required for DELETE' }, { status: 400 });
-    }
-
-    const { error } = await supabase
-      .from('posts')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error deleting post:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true, message: 'Post deleted successfully' }, { status: 200 });
-  } catch (error) {
-    console.error('Unhandled error in DELETE /api/posts:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-  }
+  // Deleting posts is disabled by product rules
+  return NextResponse.json({ error: 'Deleting posts is disabled.' }, { status: 403 });
 }

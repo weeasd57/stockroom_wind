@@ -1,11 +1,8 @@
 
 
-** should the check posts prossecs be when get respone json for each from start date posting to 
-date has target peice or lose price then close this post or sussces or lose should not have poth
- and should save all data in supabase posts table can show the schema table from sql code folder and 
- should when get respone show this update in realtime by provider too 
-
-
  
+
+
+** customize post details page
 ** need add in profile page tap for settings whatsapp
  (messages template and handle the list posts in one massege)

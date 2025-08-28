@@ -81,6 +81,23 @@
   font-weight: 500;
 }
 
+/* Small inline info icon next to labels */
+.infoIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85em; /* slightly smaller than text */
+  margin-left: 6px;
+  cursor: help;
+  user-select: none;
+  vertical-align: middle;
+  opacity: 0.85;
+}
+
+.infoIcon:hover {
+  opacity: 1;
+}
+
 .skeleton {
   height: 60px;
   background: linear-gradient(90deg, hsl(var(--secondary)) 25%, hsl(var(--border)) 50%, hsl(var(--secondary)) 75%);
@@ -133,4 +150,59 @@
   .statLabel {
     font-size: 0.75rem;
   }
+}
+
+/* Following section */
+.followingSection {
+  margin-top: 20px;
+}
+
+.followingTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: hsl(var(--foreground));
+}
+
+.followingList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.followingItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  background: hsl(var(--secondary));
+  transition: transform 0.15s ease, border-color 0.2s ease;
+}
+
+.followingItem:hover {
+  transform: translateY(-2px);
+  border-color: hsl(var(--primary));
+}
+
+.userAvatarSmall {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: hsl(var(--muted));
+}
+
+.userNameSmall {
+  font-size: 0.9rem;
+  color: hsl(var(--foreground));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.emptyFollowing {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.9rem;
 }

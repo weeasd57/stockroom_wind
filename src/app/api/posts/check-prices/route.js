@@ -70,6 +70,8 @@ const ALLOWED_UPDATE_FIELDS = new Set([
   'stop_loss_triggered_date',
   'last_price_check',
   'closed',
+  'closed_date',
+  'status',
   'postdateafterpricedate',
   'postaftermarketclose',
   'nodataavailable',
@@ -90,7 +92,56 @@ function mapPostForDb(post) {
   return out;
 }
 
-const MAX_DAILY_CHECKS = 100;
+const MAX_DAILY_CHECKS = 2;
+
+export async function GET(request) {
+  try {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json({ success: false, message: 'Database configuration not available', error: 'missing_database_config' }, { status: 503 });
+    }
+    if (!serviceRoleKey) {
+      return NextResponse.json({ success: false, message: 'Server misconfigured: missing service role key', error: 'missing_service_role_key' }, { status: 503 });
+    }
+
+    const adminSupabase = createAdminClient();
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+    const { searchParams } = new URL(request.url);
+    let userId = searchParams.get('userId') || '';
+    const cookieHeader = request.headers.get('cookie');
+
+    if (!userId) {
+      const { data: { session }, error: authError } = await supabase.auth.getSession({ cookieHeader });
+      if (authError) {
+        return NextResponse.json({ success: false, message: 'Authentication error', details: authError.message }, { status: 401 });
+      }
+      if (!session || !session.user) {
+        return NextResponse.json({ success: false, message: 'Unauthorized', details: 'No active session' }, { status: 401 });
+      }
+      userId = session.user.id;
+    }
+
+    if (!userId) {
+      return NextResponse.json({ success: false, message: 'User ID not available' }, { status: 401 });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const { data: usageData, error: usageError } = await adminSupabase
+      .from('price_check_usage')
+      .select('count')
+      .eq('user_id', userId)
+      .eq('check_date', today)
+      .single();
+
+    const usageCount = (!usageError && usageData) ? (usageData.count || 0) : 0;
+    const remainingChecks = Math.max(MAX_DAILY_CHECKS - usageCount, 0);
+
+    return NextResponse.json({ success: true, usageCount, remainingChecks, maxDailyChecks: MAX_DAILY_CHECKS });
+  } catch (error) {
+    console.error('Error in GET /api/posts/check-prices:', error);
+    return NextResponse.json({ success: false, message: 'Internal Server Error' }, { status: 500 });
+  }
+}
 
 export async function POST(request) {
   if (DEBUG) console.log(`[DEBUG] Check-prices API route called at ${new Date().toISOString()}`);
@@ -669,8 +720,21 @@ export async function POST(request) {
         
         
         const shouldClosePost = targetReached || stopLossTriggered;
-        
-        
+
+        // Determine status and closed_date if closing
+        const statusValue = shouldClosePost
+          ? (targetReached ? 'success' : 'loss')
+          : undefined;
+        let closedDateValue = undefined;
+        if (shouldClosePost) {
+          const rawDate = targetReached ? targetReachedDate : stopLossTriggeredDate;
+          try {
+            closedDateValue = rawDate ? new Date(rawDate).toISOString() : new Date().toISOString();
+          } catch {
+            closedDateValue = new Date().toISOString();
+          }
+        }
+
         const shouldUpdate = targetReached || stopLossTriggered || (post.current_price !== lastPrice) || shouldClosePost;
         
         if (shouldUpdate) {
@@ -688,6 +752,8 @@ export async function POST(request) {
             stop_loss_triggered_date: stopLossTriggeredDate,
             last_price_check: new Date().toISOString(),
             closed: shouldClosePost ? true : undefined,
+            closed_date: closedDateValue,
+            status: statusValue,
             postdateafterpricedate: false,
             postaftermarketclose: false,
             nodataavailable: false,
@@ -965,6 +1031,8 @@ export async function POST(request) {
                 stop_loss_triggered_date: post.stop_loss_triggered_date,
                 last_price_check: post.last_price_check,
                 closed: post.closed,
+                closed_date: post.closed_date,
+                status: post.status,
                 postdateafterpricedate: post.postdateafterpricedate,
                 postaftermarketclose: post.postaftermarketclose,
                 nodataavailable: post.nodataavailable,

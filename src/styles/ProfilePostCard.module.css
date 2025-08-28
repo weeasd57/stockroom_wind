@@ -543,6 +543,14 @@
   padding: 1.5rem;
 }
 
+/* Message paragraph inside generic dialogs (e.g., ConfirmActionDialog) */
+.dialogMessage {
+  margin: 0 0 1rem 0; /* space below message before actions */
+  color: hsl(var(--foreground));
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
 .dialogItem {
   display: flex;
   margin-bottom: 1rem;

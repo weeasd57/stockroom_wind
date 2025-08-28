@@ -55,21 +55,23 @@ export class PostsService {
   }
 
   // Update existing post
+  /**
+   * DEPRECATED: Editing posts is disabled at both API and UI levels.
+   * This method now always throws to prevent accidental usage.
+   */
   async updatePost(postId: string, updates: Partial<CreatePostFormData>): Promise<ApiResponse<PostWithUser>> {
-    if (!postId) {
-      throw new Error('Post ID is required');
-    }
-
-    return apiService.patch<PostWithUser>(`/posts/${postId}`, updates);
+    // Align with API behavior which returns 403 Forbidden
+    throw new Error('Editing posts is currently disabled.');
   }
 
   // Delete post
+  /**
+   * DEPRECATED: Deleting posts is disabled at both API and UI levels.
+   * This method now always throws to prevent accidental usage.
+   */
   async deletePost(postId: string): Promise<ApiResponse<void>> {
-    if (!postId) {
-      throw new Error('Post ID is required');
-    }
-
-    return apiService.delete<void>(`/posts/${postId}`);
+    // Align with API behavior which returns 403 Forbidden
+    throw new Error('Deleting posts is currently disabled.');
   }
 
   // Like a post

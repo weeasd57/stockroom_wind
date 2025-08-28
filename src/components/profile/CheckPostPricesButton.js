@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import styles from '@/styles/profile.module.css';
 import { useProfile } from '@/providers/ProfileProvider';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import dialogStyles from '@/styles/ProfilePostCard.module.css';
+import ConfirmActionDialog from '@/components/common/ConfirmActionDialog'; // Import the new dialog
 
 export default function CheckPostPricesButton({ userId }) {
   const [isChecking, setIsChecking] = useState(false);
@@ -18,6 +19,9 @@ export default function CheckPostPricesButton({ userId }) {
   const [realTimeUpdates, setRealTimeUpdates] = useState(new Map());
   const [detailedResults, setDetailedResults] = useState([]);
   const [showInfoDialog, setShowInfoDialog] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false); // New state for confirm dialog
+  const [confirmDialogContent, setConfirmDialogContent] = useState({ title: '', message: '', confirmAction: () => {}, confirmText: 'Confirm', cancelText: 'Cancel', showCancelButton: true });
+  const [isPreflight, setIsPreflight] = useState(false);
   
   // Real-time subscription for price updates
   useEffect(() => {
@@ -95,19 +99,15 @@ export default function CheckPostPricesButton({ userId }) {
     });
   };
   
-  const checkPostPrices = async () => {
+  // Function to actually perform the POST request after confirmation - using useCallback
+  const handleProceedCheck = useCallback(async () => {
+    setShowConfirmDialog(false); // Close any open confirmation dialog
     setIsChecking(true);
-    setCheckStats(null);
-    setError(null);
-    setIsCancelled(false);
-    setDetailedResults([]);
-    
+
     // Create a new AbortController for this request
     const controller = new AbortController();
     setAbortController(controller);
-    
-    // Start checking prices for user
-    
+
     try {
       // Request the price check API
       const response = await fetch('/api/posts/check-prices', {
@@ -136,7 +136,9 @@ export default function CheckPostPricesButton({ userId }) {
       
       if (!response.ok) {
         // Special handling for API key errors
-        if (data.error === 'missing_api_key') {
+        if (response.status === 429) {
+          setError(data.message || 'You have reached the maximum checks for today. Try again tomorrow.');
+        } else if (data.error === 'missing_api_key') {
           throw new Error('API key not configured. Please contact the administrator to set up the stock data API.');
         } else {
           throw new Error(data.message || 'An error occurred while checking prices');
@@ -177,6 +179,8 @@ export default function CheckPostPricesButton({ userId }) {
         setError(err.message || 'An error occurred while checking prices');
       }
     } finally {
+      // Ensure loading state is shown for at least 500ms to improve UX
+      await new Promise(resolve => setTimeout(resolve, 500)); 
       setIsChecking(false);
       setAbortController(null);
       // Reset cancelled state if it was an error other than abort
@@ -184,6 +188,58 @@ export default function CheckPostPricesButton({ userId }) {
         setIsCancelled(false);
       }
     }
+  }, [userId, isCancelled, refreshData]); // Add all dependencies to useCallback
+  
+  const checkPostPrices = async () => {
+    setCheckStats(null);
+    setError(null);
+    setIsCancelled(false);
+    setDetailedResults([]);
+
+    // Start preflight phase and show loading on the button
+    setIsPreflight(true);
+
+    let remaining = null;
+    try {
+      const preflightRes = await fetch(`/api/posts/check-prices?userId=${encodeURIComponent(userId || '')}`, {
+        method: 'GET',
+        credentials: 'include'
+      });
+      const preflight = await preflightRes.json().catch(() => ({}));
+      if (preflightRes.ok && preflight && typeof preflight.remainingChecks !== 'undefined') {
+        remaining = preflight.remainingChecks;
+      }
+    } catch (e) {
+      console.warn('Preflight check failed, will still ask for confirmation:', e);
+      // Proceed to confirmation even if preflight fails
+    } finally {
+      // Stop preflight loading before showing dialog
+      setIsPreflight(false);
+    }
+
+    // If limit reached, show info-only dialog
+    if (typeof remaining === 'number' && remaining <= 0) {
+      setConfirmDialogContent({
+        title: 'Daily Check Limit Reached',
+        message: 'You have reached the maximum price checks for today. Please upgrade your plan or try again tomorrow.',
+        confirmAction: () => setShowConfirmDialog(false),
+        confirmText: 'Got it',
+        showCancelButton: false
+      });
+      setShowConfirmDialog(true);
+      return;
+    }
+
+    const remainingText = typeof remaining === 'number' ? ` You have ${remaining} checks left for today.` : '';
+    setConfirmDialogContent({
+      title: 'Confirm Price Check',
+      message: `This will check the latest prices for your posts and update their statuses accordingly.${remainingText}`,
+      confirmAction: handleProceedCheck,
+      confirmText: 'Proceed',
+      cancelText: 'Cancel',
+      showCancelButton: true
+    });
+    setShowConfirmDialog(true);
   };
   
   // Calculate price change percentage and direction between initial and last price
@@ -208,14 +264,14 @@ export default function CheckPostPricesButton({ userId }) {
         
         <button 
           onClick={checkPostPrices}
-          disabled={isChecking}
+          disabled={isChecking || isPreflight}
           className={styles.checkPricesButton}
           aria-label="Check post prices"
         >
-          {isChecking ? (
+          {(isChecking || isPreflight) ? (
             <>
               <span className={styles.spinner}>⟳</span>
-              Checking...
+              {isChecking ? 'Checking...' : 'Preparing...'}
             </>
           ) : (
             <>
@@ -385,12 +441,7 @@ export default function CheckPostPricesButton({ userId }) {
                 >
                   Cancel
                 </button>
-                <button 
-                  className={styles.closeStatsButton}
-                  onClick={() => setShowStatsDialog(false)}
-                >
-                  Close
-                </button>
+                
               </div>
             </div>
           </div>
@@ -422,6 +473,18 @@ export default function CheckPostPricesButton({ userId }) {
           </div>
         </div>
       )}
+
+      {/* Confirmation Dialog for limit checks */}
+      <ConfirmActionDialog
+        isOpen={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        onConfirm={confirmDialogContent.confirmAction}
+        title={confirmDialogContent.title}
+        message={confirmDialogContent.message}
+        confirmText={confirmDialogContent.confirmText}
+        cancelText={confirmDialogContent.cancelText}
+        showCancelButton={confirmDialogContent.showCancelButton}
+      />
     </div>
   );
 }

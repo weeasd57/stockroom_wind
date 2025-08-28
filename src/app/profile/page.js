@@ -105,6 +105,7 @@ export default function Profile() {
   const [selectedSymbol, setSelectedSymbol] = useState('');
   const [discoveredCountries, setDiscoveredCountries] = useState([]);
   const [discoveredSymbols, setDiscoveredSymbols] = useState([]);
+  const [activeWhatsAppTab, setActiveWhatsAppTab] = useState('subscriptionUsers'); // New state for nested WhatsApp tabs
 
   // Initialize data once when authenticated
   useEffect(() => {
@@ -271,6 +272,10 @@ export default function Profile() {
     // If switching to a tab other than posts, we don't need to do anything with filters
     // as they'll only apply when we come back to the posts tab
   }, [activeTab, selectedStrategyForDetails]);
+
+  const handleWhatsAppTabChange = useCallback((tab) => {
+    setActiveWhatsAppTab(tab);
+  }, []);
 
   const handleEditProfile = useCallback(() => {
     setShowEditModal(true);
@@ -1032,21 +1037,7 @@ export default function Profile() {
       {/* Unified Dashboard Section */}
       <DashboardSection />
 
-      {/* Profile Stats */}
-      <div className={styles.profileStats}>
-        <div className={styles.statItem} onClick={() => handleTabChange('posts')}>
-          <span className={styles.statValue}>{profile?.posts_count ?? posts.length}</span>
-          <span className={styles.statLabel}>Posts</span>
-        </div>
-        <div className={styles.statItem} onClick={() => handleTabChange('followers')}>
-          <span className={styles.statValue}>{profile?.followers ?? followers.length}</span>
-          <span className={styles.statLabel}>Followers</span>
-        </div>
-        <div className={styles.statItem} onClick={() => handleTabChange('following')}>
-          <span className={styles.statValue}>{profile?.following ?? following.length}</span>
-          <span className={styles.statLabel}>Following</span>
-        </div>
-      </div>
+      {/* Profile Stats removed intentionally to declutter profile header */}
             {/* createPostContainer */}
 
       <div className={styles.emptyHomeContainer}>
@@ -1081,6 +1072,12 @@ export default function Profile() {
           onClick={() => handleTabChange('following')}
         >
           Following
+        </button>
+        <button 
+          className={`${styles.tabButton} ${activeTab === 'whatsapp' ? styles.activeTab : ''}`}
+          onClick={() => handleTabChange('whatsapp')}
+        >
+          WhatsApp
         </button>
       </div>
 
@@ -1365,6 +1362,47 @@ export default function Profile() {
           </div>
         )}
 
+        {activeTab === 'whatsapp' && (
+          <div className={styles.whatsappTabContent}>
+            <div className={styles.whatsappSubTabs}>
+              <button
+                className={`${styles.tabButton} ${activeWhatsAppTab === 'subscriptionUsers' ? styles.activeTab : ''}`}
+                onClick={() => handleWhatsAppTabChange('subscriptionUsers')}
+              >
+                Subscription Users
+              </button>
+              <button
+                className={`${styles.tabButton} ${activeWhatsAppTab === 'settingsMessages' ? styles.activeTab : ''}`}
+                onClick={() => handleWhatsAppTabChange('settingsMessages')}
+              >
+                Settings Messages
+              </button>
+            </div>
+
+            <div className={styles.whatsappSubTabContent}>
+              {activeWhatsAppTab === 'subscriptionUsers' && (
+                <div className={styles.emptyStateContainer}>
+                  <div className={styles.emptyState}>
+                    <h3>WhatsApp Subscription Users</h3>
+                    <p>Manage users subscribed to WhatsApp notifications here.</p>
+                    {/* Placeholder for subscription users content */}
+                  </div>
+                </div>
+              )}
+
+              {activeWhatsAppTab === 'settingsMessages' && (
+                <div className={styles.emptyStateContainer}>
+                  <div className={styles.emptyState}>
+                    <h3>WhatsApp Message Settings</h3>
+                    <p>Configure the types of messages you receive on WhatsApp.</p>
+                    {/* Placeholder for message settings content */}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
         {activeTab === 'strategies' && (
           <div className={styles.strategiesContainer}>
             {isLoading ? (

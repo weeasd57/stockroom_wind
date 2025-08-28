@@ -2584,6 +2584,14 @@ export default function CreatePostForm() {
 
         {/* Submit Buttons - Fixed at bottom */}
         <div className="form-actions form-actions-bottom">
+        {/* Posting rules notice: posts are immutable */}
+        <div
+          className="form-note"
+          style={{ fontSize: '12px', color: '#6b7280', textAlign: 'center', marginBottom: '8px' }}
+          aria-live="polite"
+        >
+          Note: Posts cannot be edited or deleted after publishing.
+        </div>
         {/* Price loading hint */}
         {priceLoading && selectedStock && (
         <div className="price-loading-hint" style={{

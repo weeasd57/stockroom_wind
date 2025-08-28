@@ -1,15 +1,18 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 
 type Post = any;
 
 type PostsContextType = {
   posts: Post[];
+  // feedPosts respects provider-level flags like excludeCurrentUser
+  feedPosts: Post[];
+  myPosts: Post[];
   loading: boolean;
   error: string | null;
-  fetchPosts: (mode?: 'following' | 'all' | 'trending') => Promise<void>;
+  fetchPosts: (mode?: 'following' | 'all' | 'trending', opts?: { excludeCurrentUser?: boolean }) => Promise<void>;
   loadMore: () => Promise<void>;
   hasMore: boolean;
   loadingMore: boolean;
@@ -31,6 +34,8 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
   const modeRef = useRef<'following' | 'all' | 'trending' | undefined>(undefined);
   const followingIdsRef = useRef<string[] | null>(null);
   const PAGE_SIZE = 20;
+  // Whether to exclude current user's posts for the consumer feed (Home)
+  const [excludeSelf, setExcludeSelf] = useState<boolean>(false);
 
   // Fetch a single post from the view with stats and attach profile
   const fetchPostWithStats = useCallback(async (postId: string) => {
@@ -85,13 +90,15 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   };
 
-  const fetchPosts = useCallback<PostsContextType['fetchPosts']>(async (mode) => {
+  const fetchPosts = useCallback<PostsContextType['fetchPosts']>(async (mode, opts) => {
     setLoading(true);
     setError(null);
     try {
       let data: any[] | null = null;
       modeRef.current = mode;
       followingIdsRef.current = null;
+      // Store consumer preference for excluding current user's posts in the feed
+      setExcludeSelf(Boolean(opts?.excludeCurrentUser));
 
       if (mode === 'following') {
         if (!user?.id) {
@@ -322,6 +329,17 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
 
   const value: PostsContextType = {
     posts,
+    feedPosts: useMemo(() => {
+      if (excludeSelf && user?.id) {
+        return posts.filter((p: any) => p?.user_id !== user.id);
+      }
+      return posts;
+    }, [posts, excludeSelf, user?.id]),
+    myPosts: useMemo(() => {
+      const uid = user?.id;
+      if (!uid) return [] as Post[];
+      return posts.filter((p: any) => p?.user_id === uid);
+    }, [posts, user?.id]),
     loading,
     error,
     fetchPosts,

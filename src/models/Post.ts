@@ -26,6 +26,7 @@ export interface Post {
   last_price_check?: Date;
   last_price?: number;
   closed: boolean;
+  closed_date?: Date;
   initial_price: number;
   high_price: number;
   target_high_price: number;
@@ -66,6 +67,7 @@ export class PostModel implements Post {
   last_price_check?: Date;
   last_price?: number;
   closed: boolean;
+  closed_date?: Date;
   initial_price: number;
   high_price: number;
   target_high_price: number;
@@ -105,6 +107,7 @@ export class PostModel implements Post {
     this.last_price_check = data.last_price_check;
     this.last_price = data.last_price;
     this.closed = data.closed || false;
+    this.closed_date = data.closed_date;
     this.initial_price = data.initial_price || 0;
     this.high_price = data.high_price || 0;
     this.target_high_price = data.target_high_price || 0;

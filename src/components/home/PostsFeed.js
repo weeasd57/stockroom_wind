@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useSupabase } from '@/providers/SupabaseProvider';
 import { usePosts } from '@/providers/PostProvider'; // Add PostProvider for real-time updates
 import PostCard from '@/components/posts/PostCard';
 import styles from '@/styles/home/PostsFeed.module.css';
@@ -26,17 +25,16 @@ export function PostsFeed({
   selectedCountry = '',
   selectedSymbol = '',
 } = {}) {
-  const { user, supabase } = useSupabase();
   
   // Get posts from PostProvider for real-time updates
-  const { posts: providerPosts, fetchPosts, loadMore, hasMore, loadingMore, loading: providerLoading, error: providerError } = usePosts();
+  const { feedPosts: providerPosts, fetchPosts, loadMore, hasMore, loadingMore, loading: providerLoading, error: providerError } = usePosts();
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('following'); // following, all, trending
   const [sortBy, setSortBy] = useState('date_desc'); // date_desc, date_asc, engagement, price_change
   const [categoryFilter, setCategoryFilter] = useState('all'); // all, buy, sell, analysis
-  const [followingUsers, setFollowingUsers] = useState([]);
+  // Removed local following cache; PostProvider handles 'following' filtering
 
   // Helpers for external filters
   const matchesStatus = (post, statusFilter) => {
@@ -77,50 +75,33 @@ export function PostsFeed({
     return normalizeBaseSymbol(post.symbol) === normalizeBaseSymbol(symbolFilter);
   };
 
-  // Get following users list
-  useEffect(() => {
-    console.log(`[PostsFeed] useEffect for fetching following users fired. User: ${!!user}`);
-    async function getFollowingUsers() {
-      if (!user) {
-        console.log('[PostsFeed] No user, skipping fetching following users.');
-        return;
-      }
-      
-      try {
-        const { data, error } = await supabase
-          .from('user_followings')
-          .select('following_id')
-          .eq('follower_id', user.id);
-          
-        if (error) throw error;
-        setFollowingUsers(data.map(f => f.following_id));
-        console.log(`[PostsFeed] Fetched ${data.length} following users.`);
-      } catch (error) {
-        console.error('[PostsFeed] Error fetching following users:', error);
-      }
-    }
-    
-    getFollowingUsers();
-  }, [user, supabase]);
+  // Local following list removed to prevent double-filtering and races
 
   // Fetch posts with the appropriate filter when filter changes
   useEffect(() => {
     console.log(`[PostsFeed] useEffect for fetching posts fired. Filter: ${filter}, FetchPosts changed: ${typeof fetchPosts === 'function'}`);
     if (userId) {
-      // For user-specific feeds, we can fetch all and then filter locally by userId
+      // Profile/View-Profile: do not exclude current user's posts
       fetchPosts();
     } else if (filter === 'following') {
-      fetchPosts('following');
+      // Following feed: normally won't include self; keep explicit mode
+      fetchPosts('following', { excludeCurrentUser: false });
+    } else if (filter === 'trending') {
+      // Home Trending: exclude current user's posts
+      fetchPosts('trending', { excludeCurrentUser: true });
     } else {
-      fetchPosts(); // Fetch all posts
+      // Home All: exclude current user's posts
+      fetchPosts('all', { excludeCurrentUser: true });
     }
   }, [filter, fetchPosts, userId]);
 
   // Update loading and error states from PostProvider
+  // Show skeleton only if we have no posts yet; otherwise keep rendering while background refreshes
   useEffect(() => {
-    setLoading(providerLoading);
+    const derivedLoading = providerLoading && (Array.isArray(providerPosts) ? providerPosts.length === 0 : true);
+    setLoading(derivedLoading);
     setError(providerError);
-  }, [providerLoading, providerError]);
+  }, [providerLoading, providerError, providerPosts]);
 
   // Filter and sort posts based on current settings
   const filteredAndSortedPosts = useMemo(() => {
@@ -131,15 +112,9 @@ export function PostsFeed({
       filtered = filtered.filter(post => post.user_id === userId);
     }
 
-    // Apply main filter (following/all/trending)
-    if (!userId && filter === 'following') {
-      if (followingUsers.length > 0) {
-        filtered = filtered.filter(post => followingUsers.includes(post.user_id));
-      } else {
-        // If not following anyone, show empty
-        filtered = [];
-      }
-    }
+    // Apply main filter
+    // Note: When filter === 'following', PostProvider already fetched posts for followed users.
+    // Avoid client-side re-filtering here to prevent timing issues.
     // For 'all' filter, we show all posts (no additional filtering)
     // For 'trending' filter, we'll sort by engagement later
 
@@ -193,7 +168,7 @@ export function PostsFeed({
     }
 
     return filtered; // No client-side limit; pagination handled via PostProvider + Load More
-  }, [providerPosts, filter, sortBy, categoryFilter, followingUsers, userId, selectedStrategy, selectedStatus, selectedCountry, selectedSymbol]);
+  }, [providerPosts, filter, sortBy, categoryFilter, userId, selectedStrategy, selectedStatus, selectedCountry, selectedSymbol]);
 
   // Use filtered posts instead of local posts state
   const posts = filteredAndSortedPosts;

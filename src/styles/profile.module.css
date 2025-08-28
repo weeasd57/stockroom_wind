@@ -2152,3 +2152,27 @@
   margin-bottom: 0.5rem;
   color: hsl(var(--foreground));
 }
+
+/* New WhatsApp Tab Styles */
+.whatsappTabContent {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem 0;
+}
+
+.whatsappSubTabs {
+  display: flex;
+  border-bottom: 1px solid hsl(var(--border));
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.whatsappSubTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.whatsappSubTabContent {
+  padding: 1rem 0;
+}
