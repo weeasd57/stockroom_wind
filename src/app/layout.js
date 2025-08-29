@@ -2,7 +2,9 @@ import { Inter, Roboto_Mono } from 'next/font/google';
 import '@/styles/globals.css';
 import 'flag-icons/css/flag-icons.min.css';
 import { ThemeProvider } from "@/providers/theme-provider";
-import { SupabaseProvider, UserProvider, CreatePostFormProvider } from '@/providers';
+import { SupabaseProvider } from '@/providers/SupabaseProvider';
+import { UserProvider } from '@/providers/UserProvider';
+import { CreatePostFormProvider } from '@/providers/CreatePostFormProvider';
 import { ProfileProvider } from '@/providers/ProfileProvider';
 import { TradersProvider } from '@/providers/TradersProvider';
 import { AuthGuard } from '@/providers/AuthGuard';
@@ -10,8 +12,8 @@ import { ClientSideLayout } from '@/providers/ClientSideLayout';
 import ClientImagePreloader from '@/providers/ClientImagePreloader';
 import Script from 'next/script';
 import { FollowProvider } from '@/providers/FollowProvider'; // Import FollowProvider
-import { PostProvider } from '@/providers';
-import { BackgroundPostCreationProvider } from '@/providers';
+import { PostProvider } from '@/providers/PostProvider';
+import { BackgroundPostCreationProvider } from '@/providers/BackgroundPostCreationProvider';
 import BackgroundPostCreationFloatingIndicator from '@/components/background/BackgroundPostCreationFloatingIndicator';
 import { Toaster } from 'sonner';
 

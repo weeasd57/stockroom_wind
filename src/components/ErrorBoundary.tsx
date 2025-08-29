@@ -25,8 +25,6 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     retryCount: 0,
   };
   private retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
-  declare setState: (state: Partial<ErrorBoundaryState> | ((prevState: ErrorBoundaryState, props: ErrorBoundaryProps) => Partial<ErrorBoundaryState>)) => void;
-  declare props: Readonly<ErrorBoundaryProps>;
 
   constructor(props: ErrorBoundaryProps) {
     super(props);
