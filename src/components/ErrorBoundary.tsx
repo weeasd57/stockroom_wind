@@ -26,10 +26,6 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   };
   private retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-  }
-
   static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     return {
       hasError: true,
