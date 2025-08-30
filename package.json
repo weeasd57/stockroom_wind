@@ -8,8 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "setup-db": "node setup.js",
-    "clean": "rimraf .next && next clean",
-    "webhook:paypal": "node paypal-webhook-server.js"
+    "clean": "rimraf .next && next clean"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.3",
@@ -23,7 +22,6 @@
     "clsx": "^2.1.1",
     "country-flag-icons": "^1.5.18",
     "date-fns": "^3.6.0",
-    "dotenv": "^16.4.7",
     "flag-icons": "^7.3.2",
     "lightweight-charts": "^4.1.2",
     "lucide-react": "^0.479.0",
@@ -38,7 +36,6 @@
     "tailwind-merge": "^3.1.0",
     "uuid": "^9.0.1",
     "zustand": "^5.0.3",
-    "express": "^4.19.2",
     "paypal-rest-sdk": "^1.8.1"
   },
   "devDependencies": {
