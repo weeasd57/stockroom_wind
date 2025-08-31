@@ -138,6 +138,50 @@ async function verifyPaypalWebhook(request, body) {
   return json;
 }
 
+// --- Diagnostics helpers (called only on failures) ---
+async function listWebhooks(targetMode) {
+  const base = paypalBaseUrl(targetMode || mode);
+  const accessToken = await getAccessToken(targetMode || mode);
+  const res = await fetch(`${base}/v1/notifications/webhooks`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to list webhooks (${res.status}): ${text}`);
+  }
+  const data = await res.json();
+  return Array.isArray(data?.webhooks) ? data.webhooks : [];
+}
+
+async function diagnoseWebhookConfigFromRequest(request) {
+  const certUrl = request.headers.get('paypal-cert-url');
+  let eventEnv = 'sandbox';
+  try {
+    const host = new URL(certUrl).hostname || '';
+    eventEnv = host.includes('sandbox') ? 'sandbox' : 'live';
+  } catch (_) {}
+
+  try {
+    const hooks = await listWebhooks(eventEnv);
+    const configuredId = PAYPAL_WEBHOOK_ID;
+    const found = hooks.find((h) => h?.id === configuredId);
+    const summary = {
+      eventEnv,
+      configuredIdSuffix: configuredId ? configuredId.slice(-6) : 'none',
+      totalHooks: hooks.length,
+      foundConfiguredId: !!found,
+      matchedHookUrl: found?.url || null,
+    };
+    console.warn('[PayPal] Webhook config diagnostic', summary);
+  } catch (e) {
+    console.warn('[PayPal] Webhook config diagnostic failed:', e?.message || e);
+  }
+}
+
 function handleEvent(event) {
   try {
     const type = event?.event_type;
@@ -249,6 +293,8 @@ export async function POST(request) {
   } catch (err) {
     const code = err?.statusCode || 400;
     console.error('[PayPal] Webhook verification failed:', err?.message || err);
+    // Extra diagnostics to help identify config mismatches (non-fatal for response)
+    try { await diagnoseWebhookConfigFromRequest(request); } catch (_) {}
     return new Response('Invalid webhook', { status: code });
   }
 }
