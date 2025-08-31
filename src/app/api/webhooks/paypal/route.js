@@ -197,13 +197,31 @@ export async function POST(request) {
   try {
     // Validate env at request time (avoid build-time failures)
     ensureEnv();
-    const body = await request.json();
+    // Read raw body first (best practice for webhook handlers)
+    const raw = await request.text();
+    let body;
+    try {
+      body = JSON.parse(raw);
+    } catch (e) {
+      console.error('[PayPal] Invalid JSON body');
+      return new Response('Invalid JSON', { status: 400 });
+    }
     // Diagnostic log (safe): print selected mode and a masked webhook id suffix
     console.log('[PayPal] Diagnostic', {
       mode,
       nodeEnv: NODE_ENV,
       webhookIdSuffix: PAYPAL_WEBHOOK_ID ? PAYPAL_WEBHOOK_ID.slice(-6) : 'none',
     });
+
+    // Light diagnostics for headers presence (no secrets)
+    const diagHeaders = {
+      hasTransmissionId: !!request.headers.get('paypal-transmission-id'),
+      hasTransmissionTime: !!request.headers.get('paypal-transmission-time'),
+      hasCertUrl: !!request.headers.get('paypal-cert-url'),
+      hasAuthAlgo: !!request.headers.get('paypal-auth-algo'),
+      hasTransmissionSig: !!request.headers.get('paypal-transmission-sig'),
+    };
+    console.log('[PayPal] Header presence', diagHeaders);
 
     // Verify signature
     await verifyPaypalWebhook(request, body);
