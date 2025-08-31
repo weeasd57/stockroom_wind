@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic'; // ensure no caching
 
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const { PayPalHttpClient, core } = require('@paypal/paypal-server-sdk');
+const paypal = require('@paypal/paypal-server-sdk');
 
 // ---- Configuration & Env Validation ----
 const {
@@ -50,9 +50,9 @@ if (!PAYPAL_MODE) {
   console.warn('[PayPal] PAYPAL_MODE is not set. Falling back to "sandbox".');
 }
 
-const environment = mode === 'live' ? core.LiveEnvironment : core.SandboxEnvironment;
-const client = new PayPalHttpClient({
-  environment: new environment(PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET),
+const Environment = mode === 'live' ? paypal.core.LiveEnvironment : paypal.core.SandboxEnvironment;
+const client = new paypal.core.PayPalHttpClient({
+  environment: new Environment(PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET),
 });
 
 // ---- Verification Helper ----
@@ -69,7 +69,7 @@ async function verifyPaypalWebhook(request, body) {
     throw err;
   }
 
-  const verifyRequest = new core.WebhooksVerifyRequest();
+  const verifyRequest = new paypal.core.WebhooksVerifyRequest();
   verifyRequest.webhookId = PAYPAL_WEBHOOK_ID;
   verifyRequest.requestBody = JSON.stringify(body);
   verifyRequest.headers = {
@@ -80,7 +80,7 @@ async function verifyPaypalWebhook(request, body) {
     'paypal-auth-algo': authAlgo,
   };
 
-  const webhooksVerifyApi = new core.WebhooksVerifyApi(client);
+  const webhooksVerifyApi = new paypal.core.WebhooksVerifyApi(client);
   const response = await webhooksVerifyApi.verify(verifyRequest);
   if (response.verificationStatus !== 'SUCCESS') {
     const err = new Error('Invalid webhook signature');
