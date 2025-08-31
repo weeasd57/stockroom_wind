@@ -2,7 +2,7 @@
  * PayPal Webhook Route (Next.js App Router)
  *
  * Security:
- * - Verifies webhook signatures using the official paypal-rest-sdk.
+ * - Verifies webhook signatures using the official @paypal/paypal-server-sdk.
  *
  * Environment variables:
  * - PAYPAL_CLIENT_ID
@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic'; // ensure no caching
 
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const paypal = require('paypal-rest-sdk');
+const { PayPalHttpClient, core } = require('@paypal/paypal-server-sdk');
 
 // ---- Configuration & Env Validation ----
 const {
@@ -50,50 +50,44 @@ if (!PAYPAL_MODE) {
   console.warn('[PayPal] PAYPAL_MODE is not set. Falling back to "sandbox".');
 }
 
-paypal.configure({
-  mode, // 'live' or 'sandbox'
-  client_id: PAYPAL_CLIENT_ID,
-  client_secret: PAYPAL_CLIENT_SECRET,
+const environment = mode === 'live' ? core.LiveEnvironment : core.SandboxEnvironment;
+const client = new PayPalHttpClient({
+  environment: new environment(PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET),
 });
 
 // ---- Verification Helper ----
 async function verifyPaypalWebhook(request, body) {
-  return new Promise((resolve, reject) => {
-    const transmissionId = request.headers.get('paypal-transmission-id');
-    const transmissionTime = request.headers.get('paypal-transmission-time');
-    const certUrl = request.headers.get('paypal-cert-url');
-    const authAlgo = request.headers.get('paypal-auth-algo');
-    const transmissionSig = request.headers.get('paypal-transmission-sig');
+  const transmissionId = request.headers.get('paypal-transmission-id');
+  const transmissionTime = request.headers.get('paypal-transmission-time');
+  const certUrl = request.headers.get('paypal-cert-url');
+  const authAlgo = request.headers.get('paypal-auth-algo');
+  const transmissionSig = request.headers.get('paypal-transmission-sig');
 
-    if (!transmissionId || !transmissionTime || !certUrl || !authAlgo || !transmissionSig) {
-      const err = new Error('Missing PayPal verification headers');
-      err.statusCode = 400;
-      return reject(err);
-    }
+  if (!transmissionId || !transmissionTime || !certUrl || !authAlgo || !transmissionSig) {
+    const err = new Error('Missing PayPal verification headers');
+    err.statusCode = 400;
+    throw err;
+  }
 
-    const verificationHeaders = {
-      'paypal-transmission-id': transmissionId,
-      'paypal-transmission-time': transmissionTime,
-      'paypal-transmission-sig': transmissionSig,
-      'paypal-cert-url': certUrl,
-      'paypal-auth-algo': authAlgo,
-    };
+  const verifyRequest = new core.WebhooksVerifyRequest();
+  verifyRequest.webhookId = PAYPAL_WEBHOOK_ID;
+  verifyRequest.requestBody = JSON.stringify(body);
+  verifyRequest.headers = {
+    'paypal-transmission-id': transmissionId,
+    'paypal-transmission-time': transmissionTime,
+    'paypal-transmission-sig': transmissionSig,
+    'paypal-cert-url': certUrl,
+    'paypal-auth-algo': authAlgo,
+  };
 
-    paypal.notification.webhookEvent.verify(
-      verificationHeaders,
-      body, // JSON object
-      PAYPAL_WEBHOOK_ID,
-      (error, response) => {
-        if (error) return reject(error);
-        if (response && response.verification_status === 'SUCCESS') {
-          return resolve(response);
-        }
-        const err = new Error('Invalid webhook signature');
-        err.statusCode = 400;
-        return reject(err);
-      }
-    );
-  });
+  const webhooksVerifyApi = new core.WebhooksVerifyApi(client);
+  const response = await webhooksVerifyApi.verify(verifyRequest);
+  if (response.verificationStatus !== 'SUCCESS') {
+    const err = new Error('Invalid webhook signature');
+    err.statusCode = 400;
+    throw err;
+  }
+  return response;
 }
 
 function handleEvent(event) {
