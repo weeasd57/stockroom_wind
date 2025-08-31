@@ -48,11 +48,12 @@ if (!PAYPAL_MODE) {
 
 // ---- PayPal REST Helpers (manual, since SDK doesn't expose webhooks verify) ----
 function paypalBaseUrl(mode) {
-  return mode === 'live' ? 'https://api.paypal.com' : 'https://api.sandbox.paypal.com';
+  // Use modern api-m domains per PayPal docs
+  return mode === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
 }
 
-async function getAccessToken() {
-  const base = paypalBaseUrl(mode);
+async function getAccessToken(targetMode) {
+  const base = paypalBaseUrl(targetMode || mode);
   const basic = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64');
   const res = await fetch(`${base}/v1/oauth2/token`, {
     method: 'POST',
@@ -85,8 +86,20 @@ async function verifyPaypalWebhook(request, body) {
     throw err;
   }
 
-  const accessToken = await getAccessToken();
-  const base = paypalBaseUrl(mode);
+  // Detect event environment from cert_url host to avoid env mismatches
+  let eventEnv = 'sandbox';
+  try {
+    const host = new URL(certUrl).hostname || '';
+    eventEnv = host.includes('sandbox') ? 'sandbox' : 'live';
+  } catch (_) {
+    // keep default sandbox if parsing fails
+  }
+  if (eventEnv !== mode) {
+    console.warn('[PayPal] Environment mismatch', { configuredMode: mode, eventEnv });
+  }
+
+  const accessToken = await getAccessToken(eventEnv);
+  const base = paypalBaseUrl(eventEnv);
 
   const payload = {
     auth_algo: authAlgo,
@@ -114,6 +127,9 @@ async function verifyPaypalWebhook(request, body) {
     throw err;
   }
   const json = await res.json();
+  console.log('[PayPal] verify-webhook-signature result', {
+    verification_status: json?.verification_status,
+  });
   if (json.verification_status !== 'SUCCESS') {
     const err = new Error('Invalid webhook signature');
     err.statusCode = 400;
