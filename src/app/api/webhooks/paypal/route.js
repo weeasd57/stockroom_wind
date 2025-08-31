@@ -42,15 +42,13 @@ function ensureEnv() {
 }
 ensureEnv();
 
-const normalizedMode = (PAYPAL_MODE || '').toLowerCase();
-const mode =
-  normalizedMode === 'live'
-    ? 'live'
-    : normalizedMode === 'sandbox'
-    ? 'sandbox'
-    : NODE_ENV === 'production'
-    ? 'live'
-    : 'sandbox';
+const normalizedMode = (PAYPAL_MODE || 'sandbox').toLowerCase();
+// Default to 'sandbox' if PAYPAL_MODE is not provided, regardless of NODE_ENV.
+// This prevents accidental 'live' verification during testing on production infra.
+const mode = normalizedMode === 'live' ? 'live' : 'sandbox';
+if (!PAYPAL_MODE) {
+  console.warn('[PayPal] PAYPAL_MODE is not set. Falling back to "sandbox".');
+}
 
 paypal.configure({
   mode, // 'live' or 'sandbox'
@@ -172,6 +170,12 @@ function handleEvent(event) {
 export async function POST(request) {
   try {
     const body = await request.json();
+    // Diagnostic log (safe): print selected mode and a masked webhook id suffix
+    console.log('[PayPal] Diagnostic', {
+      mode,
+      nodeEnv: NODE_ENV,
+      webhookIdSuffix: PAYPAL_WEBHOOK_ID ? PAYPAL_WEBHOOK_ID.slice(-6) : 'none',
+    });
 
     // Verify signature
     await verifyPaypalWebhook(request, body);
