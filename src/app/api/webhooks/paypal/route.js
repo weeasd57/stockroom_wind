@@ -18,9 +18,6 @@
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic'; // ensure no caching
 
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const paypal = require('@paypal/paypal-server-sdk');
 
 // ---- Configuration & Env Validation ----
 const {
@@ -40,7 +37,6 @@ function ensureEnv() {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
 }
-ensureEnv();
 
 const normalizedMode = (PAYPAL_MODE || 'sandbox').toLowerCase();
 // Default to 'sandbox' if PAYPAL_MODE is not provided, regardless of NODE_ENV.
@@ -50,13 +46,33 @@ if (!PAYPAL_MODE) {
   console.warn('[PayPal] PAYPAL_MODE is not set. Falling back to "sandbox".');
 }
 
-const Environment = mode === 'live' ? paypal.core.LiveEnvironment : paypal.core.SandboxEnvironment;
-const client = new paypal.core.PayPalHttpClient({
-  environment: new Environment(PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET),
-});
+// ---- PayPal REST Helpers (manual, since SDK doesn't expose webhooks verify) ----
+function paypalBaseUrl(mode) {
+  return mode === 'live' ? 'https://api.paypal.com' : 'https://api.sandbox.paypal.com';
+}
+
+async function getAccessToken() {
+  const base = paypalBaseUrl(mode);
+  const basic = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64');
+  const res = await fetch(`${base}/v1/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${basic}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'grant_type=client_credentials',
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to obtain PayPal access token (${res.status}): ${text}`);
+  }
+  const data = await res.json();
+  return data.access_token;
+}
 
 // ---- Verification Helper ----
 async function verifyPaypalWebhook(request, body) {
+  // Required headers from PayPal
   const transmissionId = request.headers.get('paypal-transmission-id');
   const transmissionTime = request.headers.get('paypal-transmission-time');
   const certUrl = request.headers.get('paypal-cert-url');
@@ -69,25 +85,41 @@ async function verifyPaypalWebhook(request, body) {
     throw err;
   }
 
-  const verifyRequest = new paypal.core.WebhooksVerifyRequest();
-  verifyRequest.webhookId = PAYPAL_WEBHOOK_ID;
-  verifyRequest.requestBody = JSON.stringify(body);
-  verifyRequest.headers = {
-    'paypal-transmission-id': transmissionId,
-    'paypal-transmission-time': transmissionTime,
-    'paypal-transmission-sig': transmissionSig,
-    'paypal-cert-url': certUrl,
-    'paypal-auth-algo': authAlgo,
+  const accessToken = await getAccessToken();
+  const base = paypalBaseUrl(mode);
+
+  const payload = {
+    auth_algo: authAlgo,
+    cert_url: certUrl,
+    transmission_id: transmissionId,
+    transmission_sig: transmissionSig,
+    transmission_time: transmissionTime,
+    webhook_id: PAYPAL_WEBHOOK_ID,
+    webhook_event: body,
   };
 
-  const webhooksVerifyApi = new paypal.core.WebhooksVerifyApi(client);
-  const response = await webhooksVerifyApi.verify(verifyRequest);
-  if (response.verificationStatus !== 'SUCCESS') {
+  const res = await fetch(`${base}/v1/notifications/verify-webhook-signature`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    const err = new Error(`PayPal verify-webhook-signature HTTP ${res.status}: ${text}`);
+    err.statusCode = 400;
+    throw err;
+  }
+  const json = await res.json();
+  if (json.verification_status !== 'SUCCESS') {
     const err = new Error('Invalid webhook signature');
     err.statusCode = 400;
     throw err;
   }
-  return response;
+  return json;
 }
 
 function handleEvent(event) {
@@ -163,6 +195,8 @@ function handleEvent(event) {
 
 export async function POST(request) {
   try {
+    // Validate env at request time (avoid build-time failures)
+    ensureEnv();
     const body = await request.json();
     // Diagnostic log (safe): print selected mode and a masked webhook id suffix
     console.log('[PayPal] Diagnostic', {
