@@ -728,3 +728,45 @@
   transform: translateY(-1px);
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
 }
+
+/* Dark mode styles */
+:global(.dark) .progressBar {
+  background-color: #444;
+}
+:global(.dark) .priceHistoryContainer {
+  border-color: #555;
+}
+:global(.dark) .priceHistoryHeader {
+  background-color: #222;
+}
+:global(.dark) .priceHistoryItem {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-left-color: #66a3ff;
+}
+:global(.dark) .priceHistoryItem:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+:global(.dark) .priceHistoryDate {
+  color: #ccc;
+}
+:global(.dark) .priceHistoryValue {
+  color: #ccc;
+}
+:global(.dark) .priceHistoryTitle {
+  color: #ccc;
+}
+:global(.dark) .priceHistoryMore {
+  color: #aaa;
+}
+:global(.dark) .webCheckHint {
+  color: #aaa;
+}
+:global(.dark) .statusText {
+  color: #ccc;
+}
+:global(.dark) .priceHistoryOHLC .priceHistoryValue {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+:global(.dark) .priceHistoryOHLC .priceHistoryValue:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
