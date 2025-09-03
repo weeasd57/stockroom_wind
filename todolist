@@ -1,6 +1,15 @@
 
 ** add tow section in pricing page (investor , brokers) posting , check pricing for brokers
     masseges for investor
+    brokers palne (
+        [free : limit posting 50 post, limit check posts  2 ] 
+        [probrokers : unlimit posting , limit check posts prices 100] for 4
+    )
+    investor(
+        [free : no massege ]
+        [proinvestor : masseges 100 ] for 2
+    )
+
     * and show dialog when begin into pricing page for select investor or brokers
 
 ** set sandbox apis paypal and try webhocks tests

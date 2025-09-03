@@ -13,10 +13,7 @@ export default function CheckoutPage() {
   const { upgradeToProSubscription, refreshSubscription, isPro } = useSubscription();
   
   // Support both Sandbox and Production modes
-  const isProduction = process.env.NODE_ENV === 'production';
-  const paypalClientId = isProduction 
-    ? process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID_LIVE 
-    : process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID_SANDBOX || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+  const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID 
   
   // Normalize and encode client id to avoid accidental whitespace/encoding issues
   const encodedClientId = encodeURIComponent((paypalClientId || '').trim());
