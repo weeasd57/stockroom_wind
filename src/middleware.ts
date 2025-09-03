@@ -33,7 +33,7 @@ export function middleware(req: NextRequest) {
     `style-src 'self' 'nonce-${nonce}' 'unsafe-inline' ${paypal}`,
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https:",
-    `connect-src 'self' https:${isDev ? ' ws:' : ''} ${paypal}`,
+    `connect-src 'self' https: wss:${isDev ? ' ws:' : ''} ${paypal}`,
     `frame-src 'self' ${paypal}`,
     "object-src 'none'",
     "base-uri 'self'",
