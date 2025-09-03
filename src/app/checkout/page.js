@@ -10,13 +10,21 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { user } = useAuth();
   const { supabase } = useSupabase();
-  const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+  
+  // Support both Sandbox and Production modes
+  const isProduction = process.env.NODE_ENV === 'production';
+  const paypalClientId = isProduction 
+    ? process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID_LIVE 
+    : process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID_SANDBOX || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+  
   // Normalize and encode client id to avoid accidental whitespace/encoding issues
   const encodedClientId = encodeURIComponent((paypalClientId || '').trim());
   const buttonsRenderedRef = useRef(false);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [paypalLoaded, setPaypalLoaded] = useState(false);
+  const [scriptRetryKey, setScriptRetryKey] = useState(0);
   const [subscriptionInfo, setSubscriptionInfo] = useState(null);
   const [cspNonce, setCspNonce] = useState('');
 
@@ -206,19 +214,21 @@ export default function CheckoutPage() {
       {paypalClientId ? (
         <Script
           strategy="afterInteractive"
-          src={`https://www.paypal.com/sdk/js?client-id=${encodedClientId}&currency=USD&components=buttons&intent=CAPTURE&commit=true`}
+          src={`https://www.paypal.com/sdk/js?client-id=${encodedClientId}&currency=EUR&components=buttons&intent=authorize&commit=true&debug=true`}
           // Provide nonce attributes so SDK can tag injected <style> with the same nonce
           nonce={cspNonce}
           data-csp-nonce={cspNonce}
           onError={(e) => {
             console.error('[PayPal SDK] Script load error:', e?.message || e);
-            setError('Failed to load PayPal SDK (network/400). Please retry or disable blockers.');
+            // This often indicates a network block from adblock/privacy extensions
+            setError('Failed to load PayPal SDK. Please disable adblocker or privacy extensions and retry.');
           }}
           onLoad={() => {
             try {
               const container = document.getElementById('paypal-button-container');
+              setPaypalLoaded(true);
               if (!window?.paypal || !container) {
-                setError('Failed to load PayPal SDK. Please refresh the page.');
+                setError('PayPal SDK loaded but `window.paypal` is not available. This can happen when requests are blocked by browser extensions. Please disable blockers and retry.');
                 return;
               }
               // Prevent duplicate renders during Fast Refresh / StrictMode double-invoke
@@ -233,7 +243,7 @@ export default function CheckoutPage() {
                       {
                         amount: {
                           value: '4.00',
-                          currency_code: 'USD',
+                          currency_code: 'EUR',
                         },
                         description: 'SharksZone Pro Plan - Monthly Subscription',
                       },
@@ -242,6 +252,7 @@ export default function CheckoutPage() {
                       brand_name: 'SharksZone',
                       landing_page: 'NO_PREFERENCE',
                       user_action: 'PAY_NOW',
+                      intent: 'AUTHORIZE'
                     },
                   });
                 },
@@ -262,10 +273,39 @@ export default function CheckoutPage() {
               setError('Failed to initialize PayPal. Please refresh the page.');
             }
           }}
+          key={scriptRetryKey}
         />
       ) : (
         <div className="mt-4 text-sm text-destructive bg-destructive/10 p-3 rounded">
           PayPal client ID is missing. Please set NEXT_PUBLIC_PAYPAL_CLIENT_ID.
+        </div>
+      )}
+      {/* Retry / Troubleshooting UI */}
+      {error && (
+        <div className="mt-4 text-sm">
+          <div className="flex gap-2 items-center">
+            <button
+              onClick={() => {
+                // Try reloading the SDK with a cache-busting param
+                setError('');
+                buttonsRenderedRef.current = false;
+                setPaypalLoaded(false);
+                setScriptRetryKey((k) => k + 1);
+              }}
+              className="px-3 py-1 bg-primary text-white rounded"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => {
+                // Open a short help hint
+                window.open('https://stackoverflow.com/questions/44149696/paypal-button-for-react-js?rq=4', '_blank');
+              }}
+              className="px-3 py-1 border rounded"
+            >
+              Troubleshoot
+            </button>
+          </div>
         </div>
       )}
     </div>

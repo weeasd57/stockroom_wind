@@ -27,10 +27,21 @@ export function middleware(req: NextRequest) {
 
   const paypal = "https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com"
 
+  // For maximum compatibility with third-party SDKs that inject inline scripts (PayPal,
+  // some toasters, etc.) we avoid requiring a script nonce in the CSP header. We still
+  // expose a per-request `x-nonce` header so server-rendered inline scripts that you control
+  // can include a matching nonce attribute if desired, but we do not require it here so that
+  // SDK-injected inline code is not blocked by the browser.
+  const scriptSrc = `script-src 'self' ${paypal} 'unsafe-inline' 'unsafe-eval' blob:`;
+
   const directives = [
     "default-src 'self' https: data: blob:",
-    `script-src 'self' 'nonce-${nonce}' ${paypal}${isDev ? " 'unsafe-eval' blob:" : ''}`,
-    `style-src 'self' 'nonce-${nonce}' 'unsafe-inline' ${paypal}`,
+    scriptSrc,
+    // Keep style-src permissive to allow runtime-inserted styles from libraries (e.g., sonner, PayPal SDK).
+    // We intentionally do NOT include a style nonce here because many third-party libs insert
+    // <style> tags without a nonce at runtime which would otherwise be blocked when a nonce
+    // is present in the directive. This is a pragmatic tradeoff for development convenience.
+    `style-src 'self' 'unsafe-inline' ${paypal}`,
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https:",
     `connect-src 'self' https: wss:${isDev ? ' ws:' : ''} ${paypal}`,
