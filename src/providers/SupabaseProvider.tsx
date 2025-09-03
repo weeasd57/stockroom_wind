@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { SupabaseClient, User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { supabase as globalSupabase } from '@/utils/supabase'; // Import the shared instance
@@ -38,7 +38,11 @@ interface SupabaseContextType {
 
 const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined);
 
-export function SupabaseProvider({ children }: { children: React.ReactNode }) {
+interface SupabaseProviderProps {
+  children: React.ReactNode;
+}
+
+export function SupabaseProvider({ children }: SupabaseProviderProps) {
   // Use the globally imported Supabase client instance
   const supabase = globalSupabase;
   const [user, setUser] = useState<User | null>(null);
@@ -611,21 +615,16 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   }, [supabase]);
 
   const handleLogout = async () => {
-    console.log('[SupabaseProvider] handleLogout: Started');
     if (isLoggingOut) {
-      console.log('[SupabaseProvider] handleLogout: Already logging out, returning.');
       return;
     }
     
     try {
       setIsLoggingOut(true);
-      console.log('[SupabaseProvider] handleLogout: Calling signOut function...');
       await signOut();
-      console.log('[SupabaseProvider] handleLogout: signOut completed. User logged out successfully.');
       
       // Get the current path
       const currentPath = window.location.pathname;
-      console.log('[SupabaseProvider] handleLogout: Current path:', currentPath);
       
       // Check if we're on a view-profile page or other public page
       if (currentPath.startsWith('/view-profile/') || 
@@ -633,18 +632,19 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
           currentPath === '/landing') {
         // Don't redirect - stay on the current page
         // Just refresh the component by setting isAuthenticated to false
-        console.log('[SupabaseProvider] handleLogout: Staying on public page, updating auth state.');
         setIsAuthenticated(false);
         setUser(null);
       } else {
         // Redirect to landing page for non-public pages
-        console.log('[SupabaseProvider] handleLogout: Redirecting to /landing.');
-        router.push('/landing');
+        // Clear state before redirect
+        setIsAuthenticated(false);
+        setUser(null);
+        // Force page reload to ensure clean state
+        window.location.href = '/landing';
       }
     } catch (error) {
-      console.error('[SupabaseProvider] handleLogout: Error during logout:', error);
+      // Silent error handling - no console messages
     } finally {
-      console.log('[SupabaseProvider] handleLogout: Finished. Setting isLoggingOut to false.');
       setIsLoggingOut(false);
     }
   };

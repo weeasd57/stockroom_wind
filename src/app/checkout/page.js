@@ -4,12 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useSupabase } from '@/providers/SupabaseProvider';
+import { useSubscription } from '@/providers/SubscriptionProvider';
 import Script from 'next/script';
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { user } = useAuth();
-  const { supabase } = useSupabase();
+  const { user, loading: authLoading, isAuthenticated } = useSupabase();
+  const { upgradeToProSubscription, refreshSubscription, isPro } = useSubscription();
   
   // Support both Sandbox and Production modes
   const isProduction = process.env.NODE_ENV === 'production';
@@ -25,8 +26,11 @@ export default function CheckoutPage() {
   const [error, setError] = useState('');
   const [paypalLoaded, setPaypalLoaded] = useState(false);
   const [scriptRetryKey, setScriptRetryKey] = useState(0);
-  const [subscriptionInfo, setSubscriptionInfo] = useState(null);
   const [cspNonce, setCspNonce] = useState('');
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [errorDetails, setErrorDetails] = useState('');
 
   // Obtain CSP nonce exposed by RootLayout to allow PayPal SDK to inject styles with the same nonce
   useEffect(() => {
@@ -37,40 +41,46 @@ export default function CheckoutPage() {
     } catch (_) {}
   }, []);
 
+  // Helper to set error and suppress global auth redirects temporarily so user stays on page
+  const setErrorAndSuppressRedirect = (msg) => {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('suppressAuthRedirect', '1');
+      }
+    } catch (e) {}
+    setError(msg);
+  };
+
   useEffect(() => {
-    if (!user) {
+    // Clear any stale post-auth redirect so we don't get redirected away
+    try {
+      if (typeof window !== 'undefined') localStorage.removeItem('postAuthRedirect');
+    } catch (e) {}
+
+    // Don't redirect while auth is still loading
+    if (authLoading) {
+      console.log('Auth still loading, waiting...');
+      return;
+    }
+
+    if (!isAuthenticated) {
+      // If not authenticated, send user to login and request returning to checkout
+      console.log('User not authenticated, redirecting to login');
+      try { if (typeof window !== 'undefined') localStorage.setItem('postAuthRedirect', '/checkout'); } catch (e) {}
       router.push('/login?redirect=/checkout');
       return;
     }
-    fetchSubscriptionInfo();
-  }, [user]);
 
-  const fetchSubscriptionInfo = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      const response = await (token
-        ? fetch('/api/subscription/info', {
-            headers: { Authorization: `Bearer ${token}` },
-            cache: 'no-store',
-          })
-        : fetch('/api/subscription/info', {
-            credentials: 'include',
-            cache: 'no-store',
-          }));
-      const result = await response.json();
-      
-      if (result.success && result.data) {
-        setSubscriptionInfo(result.data);
-        // If already pro, redirect to pricing
-        if (result.data.plan_name === 'pro') {
-          router.push('/pricing');
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching subscription:', error);
+    console.log('User authenticated, checkout page ready');
+    
+    // Check if user is already Pro
+    if (isPro()) {
+      console.log('User already has Pro subscription, redirecting to profile');
+      router.push('/profile');
+      return;
     }
-  };
+  }, [user, authLoading, router, isPro]);
+
 
   const handlePayPalApprove = async (data, actions) => {
     setLoading(true);
@@ -78,12 +88,36 @@ export default function CheckoutPage() {
 
     try {
       // Capture the order
+      console.log('Starting PayPal approval process...');
       const details = await actions.order.capture();
-      console.log('Payment captured:', details);
+      console.log('Payment captured successfully:', details);
 
-      // Send order details to backend
+      // Upgrade to Pro using subscription provider
+      const upgradeResult = await upgradeToProSubscription({
+        paypal_order_id: details.id,
+        payer_id: details.payer.payer_id,
+        amount: details.purchase_units[0].amount.value,
+        currency: details.purchase_units[0].amount.currency_code,
+        captured_at: new Date().toISOString()
+      });
+
+      if (upgradeResult.success) {
+        console.log('Subscription upgraded successfully');
+        setShowSuccessDialog(true);
+      } else {
+        console.error('Failed to upgrade subscription:', upgradeResult.error);
+        setErrorDetails(`Subscription upgrade failed: ${upgradeResult.error}`);
+        setShowErrorDialog(true);
+      }
+      
+      setLoading(false);
+
+      // Original backend confirmation code (commented for testing)
+      /*
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
+      
+      console.log('Sending payment confirmation to backend...');
       const response = await fetch('/api/checkout/confirm', {
         method: 'POST',
         headers: {
@@ -101,29 +135,79 @@ export default function CheckoutPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to confirm payment');
+        console.error('Backend confirmation failed:', response.status, response.statusText);
+        throw new Error(`Failed to confirm payment: ${response.status}`);
       }
 
       const result = await response.json();
+      console.log('Backend confirmation successful:', result);
       
-      // Redirect to success page
-      router.push('/checkout/success');
+      console.log('Redirecting to profile page...');
+      router.push('/profile');
+      */
     } catch (error) {
-      console.error('Payment error:', error);
-      setError('Payment failed. Please try again.');
+      console.error('Payment approval error:', error);
+      setErrorAndSuppressRedirect(`Payment failed: ${error.message}`);
       setLoading(false);
     }
   };
 
   const handlePayPalError = (err) => {
     console.error('PayPal error:', err);
-    setError('Payment error occurred. Please try again.');
+    
+    // Handle specific PayPal errors
+    let errorMessage = 'Payment error occurred. Please try again.';
+    
+    if (err.message && err.message.includes('CANNOT_PAY_SELF')) {
+      errorMessage = 'Cannot process payment: You cannot pay to your own PayPal account. Please use a different PayPal account or payment method.';
+    } else if (err.message && err.message.includes('INSTRUMENT_DECLINED')) {
+      errorMessage = 'Your payment method was declined. Please try a different card or payment method.';
+    } else if (err.message && err.message.includes('PAYER_ACCOUNT_RESTRICTED')) {
+      errorMessage = 'Your PayPal account has restrictions. Please contact PayPal support or try a different payment method.';
+    }
+    
+    setErrorDetails(errorMessage);
+    setShowErrorDialog(true);
     setLoading(false);
   };
 
   const handlePayPalCancel = () => {
-    setError('Payment cancelled.');
+    console.log('Payment cancelled by user');
+    setShowCancelDialog(true);
     setLoading(false);
+  };
+
+  const handleRetryPayment = () => {
+    setShowCancelDialog(false);
+    setError('');
+    // Refresh PayPal buttons
+    buttonsRenderedRef.current = false;
+    setPaypalLoaded(false);
+    setScriptRetryKey((k) => k + 1);
+  };
+
+  const handleGoBack = () => {
+    setShowCancelDialog(false);
+    router.push('/pricing');
+  };
+
+  const handleSuccessDialogClose = () => {
+    setShowSuccessDialog(false);
+    router.push('/profile');
+  };
+
+  const handleErrorDialogClose = () => {
+    setShowErrorDialog(false);
+    setErrorDetails('');
+  };
+
+  const handleErrorRetry = () => {
+    setShowErrorDialog(false);
+    setErrorDetails('');
+    // Refresh PayPal buttons
+    buttonsRenderedRef.current = false;
+    setPaypalLoaded(false);
+    setScriptRetryKey((k) => k + 1);
   };
 
   return (
@@ -144,7 +228,7 @@ export default function CheckoutPage() {
               <p className="text-sm text-muted-foreground">Billed monthly</p>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-bold">$4.00</p>
+              <p className="text-2xl font-bold">$1.00</p>
               <p className="text-sm text-muted-foreground">/month</p>
             </div>
           </div>
@@ -160,28 +244,16 @@ export default function CheckoutPage() {
                 <span className="text-green-500">✓</span>
                 Unlimited post creation
               </li>
-              <li className="flex items-center gap-2">
-                <span className="text-green-500">✓</span>
-                Advanced analytics
-              </li>
+             
               <li className="flex items-center gap-2">
                 <span className="text-green-500">✓</span>
                 Priority support
               </li>
-              <li className="flex items-center gap-2">
-                <span className="text-green-500">✓</span>
-                Pro badge on profile
-              </li>
+              
             </ul>
           </div>
         </div>
 
-        {/* Error Message */}
-        {error && (
-          <div className="bg-destructive/10 text-destructive rounded-lg p-3 text-sm">
-            {error}
-          </div>
-        )}
 
         {/* PayPal Button Container */}
         <div className="bg-card rounded-lg border p-6">
@@ -221,14 +293,14 @@ export default function CheckoutPage() {
           onError={(e) => {
             console.error('[PayPal SDK] Script load error:', e?.message || e);
             // This often indicates a network block from adblock/privacy extensions
-            setError('Failed to load PayPal SDK. Please disable adblocker or privacy extensions and retry.');
+            setErrorAndSuppressRedirect('Failed to load PayPal SDK. Please disable adblocker or privacy extensions and retry.');
           }}
           onLoad={() => {
             try {
               const container = document.getElementById('paypal-button-container');
               setPaypalLoaded(true);
               if (!window?.paypal || !container) {
-                setError('PayPal SDK loaded but `window.paypal` is not available. This can happen when requests are blocked by browser extensions. Please disable blockers and retry.');
+                setErrorAndSuppressRedirect('PayPal SDK loaded but `window.paypal` is not available. This can happen when requests are blocked by browser extensions. Please disable blockers and retry.');
                 return;
               }
               // Prevent duplicate renders during Fast Refresh / StrictMode double-invoke
@@ -270,7 +342,7 @@ export default function CheckoutPage() {
               buttonsRenderedRef.current = true;
             } catch (e) {
               console.error('PayPal init error:', e);
-              setError('Failed to initialize PayPal. Please refresh the page.');
+              setErrorAndSuppressRedirect('Failed to initialize PayPal. Please refresh the page.');
             }
           }}
           key={scriptRetryKey}
@@ -280,31 +352,208 @@ export default function CheckoutPage() {
           PayPal client ID is missing. Please set NEXT_PUBLIC_PAYPAL_CLIENT_ID.
         </div>
       )}
-      {/* Retry / Troubleshooting UI */}
-      {error && (
-        <div className="mt-4 text-sm">
-          <div className="flex gap-2 items-center">
-            <button
-              onClick={() => {
-                // Try reloading the SDK with a cache-busting param
-                setError('');
-                buttonsRenderedRef.current = false;
-                setPaypalLoaded(false);
-                setScriptRetryKey((k) => k + 1);
-              }}
-              className="px-3 py-1 bg-primary text-white rounded"
-            >
-              Retry
-            </button>
-            <button
-              onClick={() => {
-                // Open a short help hint
-                window.open('https://stackoverflow.com/questions/44149696/paypal-button-for-react-js?rq=4', '_blank');
-              }}
-              className="px-3 py-1 border rounded"
-            >
-              Troubleshoot
-            </button>
+
+      {/* Cancel Payment Dialog - Modern & Responsive */}
+      {showCancelDialog && (
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          onClick={() => setShowCancelDialog(false)}
+        >
+          <div 
+            className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header with warning icon */}
+            <div className="bg-gradient-to-r from-orange-500 to-red-500 p-6 text-white relative">
+              {/* Close button */}
+              <button
+                onClick={() => setShowCancelDialog(false)}
+                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+                aria-label="Close dialog"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-white/20 rounded-full">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-center">Payment Cancelled</h3>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              <div className="text-center">
+                <p className="text-gray-600 dark:text-gray-300 mb-2">
+                  Your payment was cancelled. You can try again or return to our pricing page.
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  No charges were made to your account.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-3 pt-4">
+                <button
+                  onClick={handleRetryPayment}
+                  className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-blue-500/50"
+                >
+                  <div className="flex items-center justify-center space-x-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span>Try Payment Again</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={handleGoBack}
+                  className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-gray-500/50"
+                >
+                  <div className="flex items-center justify-center space-x-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    <span>Back to Pricing</span>
+                  </div>
+                </button>
+              </div>
+
+              {/* Help text */}
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+                  Need help? Contact our support team for assistance with your upgrade.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Payment Dialog */}
+      {showSuccessDialog && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {/* Success Header */}
+            <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-6 text-white">
+              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-white/20 rounded-full">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-center">Payment Successful!</h3>
+            </div>
+
+            {/* Success Content */}
+            <div className="p-6 space-y-4">
+              <div className="text-center">
+                <p className="text-gray-600 dark:text-gray-300 mb-2">
+                  Your Pro subscription is now active! Welcome to the Pro tier.
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  You now have access to all Pro features and benefits.
+                </p>
+              </div>
+
+              {/* Success Actions */}
+              <div className="space-y-3 pt-4">
+                <button
+                  onClick={handleSuccessDialogClose}
+                  className="w-full py-3 px-4 bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-green-500/50"
+                >
+                  <div className="flex items-center justify-center space-x-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <span>Go to My Profile</span>
+                  </div>
+                </button>
+              </div>
+
+              {/* Success Help text */}
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+                  🎉 Your Pro badge is now visible on your profile!
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Payment Dialog */}
+      {showErrorDialog && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {/* Error Header */}
+            <div className="bg-gradient-to-r from-red-500 to-red-600 p-6 text-white relative">
+              {/* Close button */}
+              <button
+                onClick={handleErrorDialogClose}
+                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+                aria-label="Close dialog"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-white/20 rounded-full">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-center">Payment Failed</h3>
+            </div>
+
+            {/* Error Content */}
+            <div className="p-6 space-y-4">
+              <div className="text-center">
+                <p className="text-gray-600 dark:text-gray-300 mb-2">
+                  {errorDetails || 'There was an issue processing your payment.'}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  No charges were made to your account.
+                </p>
+              </div>
+
+              {/* Error Actions */}
+              <div className="space-y-3 pt-4">
+                <button
+                  onClick={handleErrorRetry}
+                  className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-blue-500/50"
+                >
+                  <div className="flex items-center justify-center space-x-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span>Try Again</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={handleGoBack}
+                  className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-gray-500/50"
+                >
+                  <div className="flex items-center justify-center space-x-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    <span>Back to Pricing</span>
+                  </div>
+                </button>
+              </div>
+
+              {/* Error Help text */}
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+                  Need help? Contact our support team if this problem persists.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       )}

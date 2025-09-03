@@ -35,6 +35,9 @@ export default function LandingPage() {
   }, [handleScroll]);
 
   useEffect(() => {
+    // Force immediate visibility to prevent empty page after logout
+    setVisible(true);
+    
     const timer = setTimeout(() => {
       setVisible(true);
     }, 100);
@@ -106,7 +109,7 @@ export default function LandingPage() {
   };
   
   return (
-    <div className={`${styles.variables} ${visible ? 'auth-fade-in' : 'auth-fade-out'}`}>
+    <div className={styles.variables} style={{ opacity: visible ? 1 : 0, transition: 'opacity 0.3s ease' }}>
       <div className={styles.pageWrapper}>
         {/* Reduce the number of bubbles on mobile */}
         <div className={`${styles.bubble} ${styles.bubble1} ${styles.desktopOnly}`}></div>

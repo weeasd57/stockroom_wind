@@ -13,6 +13,7 @@ import { headers } from 'next/headers';
 import { FollowProvider } from '@/providers/FollowProvider'; // Import FollowProvider
 import { PostProvider } from '@/providers';
 import { BackgroundPostCreationProvider } from '@/providers';
+import { SubscriptionProvider } from '@/providers/SubscriptionProvider';
 import BackgroundPostCreationFloatingIndicator from '@/components/background/BackgroundPostCreationFloatingIndicator';
 import { Toaster } from 'sonner';
 
@@ -170,26 +171,28 @@ export default function RootLayout({ children }) {
         <SupabaseProvider>
           <UserProvider>
             <ProfileProvider>
-              <TradersProvider>
-                <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={true}>
-                  <CreatePostFormProvider>
-                    <ClientSideLayout>
-                      <AuthGuard>
-                        <ClientImagePreloader />
-                        <PostProvider>
-                          <BackgroundPostCreationProvider>
-                            <FollowProvider> {/* Wrap children with FollowProvider */}
-                              {children}
-                              <BackgroundPostCreationFloatingIndicator />
-                              <Toaster richColors position="top-right" />
-                            </FollowProvider>
-                          </BackgroundPostCreationProvider>
-                        </PostProvider>
-                      </AuthGuard>
-                    </ClientSideLayout>
-                  </CreatePostFormProvider>
-                </ThemeProvider>
-              </TradersProvider>
+              <SubscriptionProvider>
+                <TradersProvider>
+                  <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={true}>
+                    <CreatePostFormProvider>
+                      <ClientSideLayout>
+                        <AuthGuard>
+                          <ClientImagePreloader />
+                          <PostProvider>
+                            <BackgroundPostCreationProvider>
+                              <FollowProvider> {/* Wrap children with FollowProvider */}
+                                {children}
+                                <BackgroundPostCreationFloatingIndicator />
+                                <Toaster richColors position="top-right" />
+                              </FollowProvider>
+                            </BackgroundPostCreationProvider>
+                          </PostProvider>
+                        </AuthGuard>
+                      </ClientSideLayout>
+                    </CreatePostFormProvider>
+                  </ThemeProvider>
+                </TradersProvider>
+              </SubscriptionProvider>
             </ProfileProvider>
           </UserProvider>
         </SupabaseProvider>

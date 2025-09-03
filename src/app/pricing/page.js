@@ -134,7 +134,7 @@ export default function PricingPage() {
           <h2 className="text-xl font-semibold">Pro Plan</h2>
           <p className="text-muted-foreground mt-1">For active traders</p>
           <div className="mt-5 flex items-baseline gap-1">
-            <span className="text-3xl font-bold">$4.00</span>
+            <span className="text-3xl font-bold">$1.00</span>
             <span className="text-sm text-muted-foreground">/ month</span>
           </div>
           <ul className="mt-6 space-y-2 text-sm">

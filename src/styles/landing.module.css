@@ -457,14 +457,6 @@
   background: var(--button-hover);
   transform: translateY(-2px);
 }
-.logobackground{
-  background-color: #fff; /* Ensure visible on dark theme */
-  display: inline-flex;    /* Size to content and center logo */
-  align-items: center;
-  justify-content: center;
-  padding: 12px;           /* White padding around the logo */
-  border-radius: 16px;     /* Match image radius for consistent rounding */
-}
 /* Hero logo responsive size */
 .heroLogo {
   width: clamp(96px, 25vw, 100vw);

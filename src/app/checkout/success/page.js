@@ -8,10 +8,10 @@ export default function CheckoutSuccessPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to home after 5 seconds
+    // Redirect to profile after 3 seconds
     const timer = setTimeout(() => {
-      router.push('/home');
-    }, 5000);
+      router.push('/profile');
+    }, 3000);
 
     return () => clearTimeout(timer);
   }, [router]);
@@ -72,10 +72,10 @@ export default function CheckoutSuccessPage() {
 
         <div className="space-y-3">
           <Link
-            href="/home"
+            href="/profile"
             className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
-            Go to Dashboard
+            Go to Profile
           </Link>
           <p className="text-sm text-muted-foreground">
             You will be redirected automatically in a few seconds...

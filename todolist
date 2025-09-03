@@ -1,9 +1,11 @@
 
+** add tow section in pricing page (investor , brokers) posting , check pricing for brokers
+    masseges for investor
+    * and show dialog when begin into pricing page for select investor or brokers
 
- 
-**  set check posts just tow dailly
-
+** set sandbox apis paypal and try webhocks tests
 
 ** customize post details page
+
 ** need add in profile page tap for settings whatsapp
  (messages template and handle the list posts in one massege)

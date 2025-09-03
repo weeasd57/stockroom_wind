@@ -26,6 +26,7 @@ export function middleware(req: NextRequest) {
   requestHeaders.set('x-nonce', nonce)
 
   const paypal = "https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com"
+  const googleFonts = "https://fonts.googleapis.com https://fonts.gstatic.com"
 
   // For maximum compatibility with third-party SDKs that inject inline scripts (PayPal,
   // some toasters, etc.) we avoid requiring a script nonce in the CSP header. We still
@@ -41,9 +42,9 @@ export function middleware(req: NextRequest) {
     // We intentionally do NOT include a style nonce here because many third-party libs insert
     // <style> tags without a nonce at runtime which would otherwise be blocked when a nonce
     // is present in the directive. This is a pragmatic tradeoff for development convenience.
-    `style-src 'self' 'unsafe-inline' ${paypal}`,
+    `style-src 'self' 'unsafe-inline' ${paypal} ${googleFonts}`,
     "img-src 'self' data: blob: https:",
-    "font-src 'self' data: https:",
+    `font-src 'self' data: https: ${googleFonts}`,
     `connect-src 'self' https: wss:${isDev ? ' ws:' : ''} ${paypal}`,
     `frame-src 'self' ${paypal}`,
     "object-src 'none'",

@@ -55,24 +55,11 @@
 
 .logoImage {
   transition: all var(--animation-normal) var(--animation-ease);
-  border-radius: 6px;
+  border-radius: 8px;
   position: relative;
   z-index: 1; /* keep image above decorative triangle */
 }
 
-/* White square background behind logo */
-.logoWrapper::before {
-  content: '';
-  position: absolute;
-  left: -4px;
-  top: -4px;
-  width: 40px;
-  height: 40px;
-  background: #ffffff;
-  z-index: 0; /* sits behind the image */
-  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-  border-radius: 8px; /* square with subtle rounding */
-}
 
 .logo:hover .logoImage {
   transform: rotate(5deg) scale(1.1);

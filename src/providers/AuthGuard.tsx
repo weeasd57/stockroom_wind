@@ -6,7 +6,7 @@ import { useSupabase } from './SupabaseProvider';
 import '@/styles/auth.css';
 
 // Define paths that don't require authentication
-const PUBLIC_PATHS = ['/landing', '/login', '/register', '/auth/callback', '/traders', '/pricing'];
+const PUBLIC_PATHS = ['/landing', '/login', '/register', '/auth/callback', '/traders', '/pricing', '/checkout'];
 
 // Define path prefixes that should be public (for dynamic routes)
 const PUBLIC_PATH_PREFIXES = ['/view-profile/'];
@@ -69,6 +69,10 @@ function ProtectedContent({ children, pathname }: { children: React.ReactNode, p
     // Mark auth as checked after loading completes
     setAuthChecked(true);
     
+    console.log('AuthGuard processing path:', pathname, 'isAuthenticated:', isAuthenticated);
+    console.log('Is public path?', isPublicPath(pathname));
+    console.log('Should redirect to profile?', shouldRedirectToProfile(pathname));
+    
     // If we're on the root path, implement smart routing
     if (pathname === '/') {
       if (isAuthenticated) {
@@ -97,21 +101,34 @@ function ProtectedContent({ children, pathname }: { children: React.ReactNode, p
 
     // Current path is a public path, allow access
     if (isPublicPath(pathname)) {
+      console.log('Public path detected, allowing access:', pathname);
       return;
     }
 
     // For protected routes, redirect to landing if not authenticated
     if (!isAuthenticated && !isPublicPath(pathname)) {
       console.log('User not authenticated, redirecting to landing page');
-      
+      // Allow pages to suppress auth redirect if they encounter an error (e.g., checkout failing)
+      try {
+        const suppressed = (typeof window !== 'undefined') && localStorage.getItem('suppressAuthRedirect') === '1';
+        if (suppressed) {
+          // Clear suppression after reading
+          localStorage.removeItem('suppressAuthRedirect');
+          console.log('Auth redirect suppressed for current navigation due to page-level error');
+          return;
+        }
+      } catch (e) {
+        // ignore storage errors
+      }
+
       // Store the intended destination for post-login redirect
       if (typeof window !== 'undefined') {
         localStorage.setItem('postAuthRedirect', pathname);
       }
-      
+
       // Start the fade out animation
       setFadeOut(true);
-      
+
       // Wait for animation to complete before redirecting
       setTimeout(() => {
         router.push('/landing');
