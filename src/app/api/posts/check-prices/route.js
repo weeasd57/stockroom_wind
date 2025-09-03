@@ -92,8 +92,6 @@ function mapPostForDb(post) {
   return out;
 }
 
-const MAX_DAILY_CHECKS = 2;
-
 export async function GET(request) {
   try {
     if (!supabaseUrl || !supabaseAnonKey) {
@@ -125,18 +123,25 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'User ID not available' }, { status: 401 });
     }
 
-    const today = new Date().toISOString().split('T')[0];
-    const { data: usageData, error: usageError } = await adminSupabase
-      .from('price_check_usage')
-      .select('count')
+    // Get user's subscription info
+    const { data: subscriptionInfo, error: subError } = await adminSupabase
+      .from('user_subscription_info')
+      .select('*')
       .eq('user_id', userId)
-      .eq('check_date', today)
       .single();
 
-    const usageCount = (!usageError && usageData) ? (usageData.count || 0) : 0;
-    const remainingChecks = Math.max(MAX_DAILY_CHECKS - usageCount, 0);
+    // Default to free plan limits if no subscription found
+    const maxDailyChecks = subscriptionInfo?.price_check_limit || 2;
+    const usedChecks = subscriptionInfo?.price_checks_used || 0;
+    const remainingChecks = Math.max(maxDailyChecks - usedChecks, 0);
 
-    return NextResponse.json({ success: true, usageCount, remainingChecks, maxDailyChecks: MAX_DAILY_CHECKS });
+    return NextResponse.json({ 
+      success: true, 
+      usageCount: usedChecks, 
+      remainingChecks, 
+      maxDailyChecks,
+      planName: subscriptionInfo?.plan_name || 'free'
+    });
   } catch (error) {
     console.error('Error in GET /api/posts/check-prices:', error);
     return NextResponse.json({ success: false, message: 'Internal Server Error' }, { status: 500 });
@@ -238,62 +243,48 @@ export async function POST(request) {
       );
     }
     
-    
-    const today = new Date().toISOString().split('T')[0]; 
-    if (DEBUG) console.log(`[DEBUG] Checking usage for user ${userId} on date ${today}`);
-    
-    // Reduce SELECT fields to improve performance
-    const { data: usageData, error: usageError } = await adminSupabase
-      .from('price_check_usage')
-      .select('count')
+    // Get user's subscription info
+    const { data: subscriptionInfo, error: subError } = await adminSupabase
+      .from('user_subscription_info')
+      .select('*')
       .eq('user_id', userId)
-      .eq('check_date', today)
       .single();
     
+    // Default to free plan limits if no subscription found
+    const maxDailyChecks = subscriptionInfo?.price_check_limit || 2;
+    const usedChecks = subscriptionInfo?.price_checks_used || 0;
     
-    if (!usageError && usageData) {
-      if (DEBUG) console.log(`[DEBUG] Found existing usage record: ${JSON.stringify(usageData)}`);
-      
-      if (usageData.count >= MAX_DAILY_CHECKS) {
-        if (DEBUG) console.log(`[DEBUG] User has reached maximum daily checks (${usageData.count}/${MAX_DAILY_CHECKS})`);
-        return NextResponse.json(
-          { 
-            success: false, 
-            message: 'You have reached the maximum checks for today. Try again tomorrow.', 
-            remainingChecks: 0,
-            usageCount: usageData.count
-          },
-          { status: 429 }
-        );
-      }
-      
-      if (DEBUG) console.log(`[DEBUG] Updating usage count from ${usageData.count} to ${usageData.count + 1}`);
-      const { error: updateError } = await adminSupabase
-        .from('price_check_usage')
-        .update({ 
-          count: usageData.count + 1,
-          last_check: new Date().toISOString()
-        })
-        .eq('user_id', userId)
-        .eq('check_date', today);
-      
-      if (updateError) {
-        console.error('[ERROR] Error updating usage count:', updateError);
-      }
+    if (DEBUG) console.log(`[DEBUG] User ${userId} subscription: ${subscriptionInfo?.plan_name || 'free'}, used: ${usedChecks}/${maxDailyChecks}`);
+    
+    // Check if user has reached their limit
+    if (usedChecks >= maxDailyChecks) {
+      if (DEBUG) console.log(`[DEBUG] User has reached maximum daily checks (${usedChecks}/${maxDailyChecks})`);
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: `You have reached your ${subscriptionInfo?.plan_name || 'free'} plan limit of ${maxDailyChecks} checks today.`, 
+          remainingChecks: 0,
+          usageCount: usedChecks,
+          planName: subscriptionInfo?.plan_name || 'free',
+          maxDailyChecks
+        },
+        { status: 429 }
+      );
+    }
+    
+    // Increment usage counter
+    const { error: updateUsageError } = await adminSupabase
+      .from('user_subscriptions')
+      .update({ 
+        price_checks_used: usedChecks + 1
+      })
+      .eq('user_id', userId)
+      .eq('status', 'active');
+    
+    if (updateUsageError) {
+      console.error('[ERROR] Error updating usage count:', updateUsageError);
     } else {
-      if (DEBUG) console.log(`[DEBUG] No existing usage record found, creating new record`);
-      
-      const { error: insertError } = await adminSupabase
-        .from('price_check_usage')
-        .insert([
-          { user_id: userId, check_date: today, count: 1 }
-        ]);
-      
-      if (insertError) {
-        console.error('[ERROR] Error creating new usage record:', insertError);
-      } else {
-        if (DEBUG) console.log(`[DEBUG] Successfully created new usage record`);
-      }
+      if (DEBUG) console.log(`[DEBUG] Updated usage count from ${usedChecks} to ${usedChecks + 1}`);
     }
     
     if (DEBUG) console.log(`[DEBUG] Fetching all posts to count closed posts`);

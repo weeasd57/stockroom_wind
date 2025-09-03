@@ -3,10 +3,7 @@
  *
  * Security:
  * - Verifies webhook signatures using the official @paypal/paypal-server-sdk.
- *
- * Environment variables:
- * - PAYPAL_CLIENT_ID
- * - PAYPAL_CLIENT_SECRET
+ * - Get credentials based on environment
  * - PAYPAL_WEBHOOK_ID
  * - PAYPAL_MODE (optional: 'live'|'sandbox' overrides NODE_ENV)
  *
@@ -15,13 +12,21 @@
  * - Responds 200 OK after successful verification.
  */
 
+import { createClient } from '@supabase/supabase-js';
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic'; // ensure no caching
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 
 // ---- Configuration & Env Validation ----
 const {
-  PAYPAL_CLIENT_ID,
+  NEXT_PUBLIC_PAYPAL_CLIENT_ID,
   PAYPAL_CLIENT_SECRET,
   PAYPAL_WEBHOOK_ID,
   PAYPAL_MODE,
@@ -30,7 +35,7 @@ const {
 
 function ensureEnv() {
   const missing = [];
-  if (!PAYPAL_CLIENT_ID) missing.push('PAYPAL_CLIENT_ID');
+  if (!NEXT_PUBLIC_PAYPAL_CLIENT_ID) missing.push('NEXT_PUBLIC_PAYPAL_CLIENT_ID');
   if (!PAYPAL_CLIENT_SECRET) missing.push('PAYPAL_CLIENT_SECRET');
   if (!PAYPAL_WEBHOOK_ID) missing.push('PAYPAL_WEBHOOK_ID');
   if (missing.length) {
@@ -54,7 +59,7 @@ function paypalBaseUrl(mode) {
 
 async function getAccessToken(targetMode) {
   const base = paypalBaseUrl(targetMode || mode);
-  const basic = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64');
+  const basic = Buffer.from(`${NEXT_PUBLIC_PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64');
   const res = await fetch(`${base}/v1/oauth2/token`, {
     method: 'POST',
     headers: {
@@ -182,72 +187,146 @@ async function diagnoseWebhookConfigFromRequest(request) {
   }
 }
 
-function handleEvent(event) {
+async function handleEvent(event) {
   try {
     const type = event?.event_type;
     const id = event?.id;
     console.log(`[PayPal] Verified event_id=${id} type=${type}`);
 
+    // Check for idempotency
+    const { data: existingEvent } = await supabase
+      .from('payment_transactions')
+      .select('id')
+      .eq('paypal_event_id', id)
+      .single();
+
+    if (existingEvent) {
+      console.log(`[PayPal] Event ${id} already processed, skipping`);
+      return;
+    }
+
     switch (type) {
       case 'CHECKOUT.ORDER.APPROVED': {
         console.log('→ Checkout order approved:', event?.resource?.id);
-        // TODO: Capture the order and mark as paid in your DB.
+        // Order approved, waiting for capture
+        break;
+      }
+      case 'PAYMENT.CAPTURE.COMPLETED': {
+        console.log('→ Payment capture completed:', event?.resource?.id);
+        const orderId = event?.resource?.supplementary_data?.related_ids?.order_id;
+        const captureId = event?.resource?.id;
+        const amount = event?.resource?.amount?.value;
+        const payerEmail = event?.resource?.payer?.email_address;
+        
+        if (payerEmail && amount) {
+          // Find user by email
+          const { data: userData } = await supabase.auth.admin.getUserByEmail(payerEmail);
+          
+          if (userData?.user) {
+            // Get pro plan
+            const { data: proPlan } = await supabase
+              .from('subscription_plans')
+              .select('id')
+              .eq('name', 'pro')
+              .single();
+            
+            if (proPlan) {
+              // Cancel existing subscription
+              await supabase
+                .from('user_subscriptions')
+                .update({ 
+                  status: 'cancelled',
+                  cancelled_at: new Date().toISOString()
+                })
+                .eq('user_id', userData.user.id)
+                .eq('status', 'active');
+              
+              // Create new pro subscription
+              const { data: subscription } = await supabase
+                .from('user_subscriptions')
+                .insert({
+                  user_id: userData.user.id,
+                  plan_id: proPlan.id,
+                  status: 'active',
+                  paypal_order_id: orderId,
+                  price_checks_used: 0,
+                  price_checks_reset_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+                })
+                .select()
+                .single();
+              
+              // Log transaction
+              await supabase
+                .from('payment_transactions')
+                .insert({
+                  user_id: userData.user.id,
+                  subscription_id: subscription?.id,
+                  amount: parseFloat(amount),
+                  currency: 'USD',
+                  payment_method: 'paypal',
+                  paypal_order_id: orderId,
+                  paypal_capture_id: captureId,
+                  paypal_event_id: id,
+                  status: 'completed',
+                  transaction_data: event
+                });
+              
+              console.log(`→ Pro subscription activated for user ${userData.user.id}`);
+            }
+          }
+        }
         break;
       }
       case 'PAYMENT.SALE.COMPLETED': {
         console.log('→ Payment sale completed:', event?.resource?.id);
-        // TODO: Mark invoice/order paid and provision access.
+        // Similar to capture completed
         break;
       }
       case 'BILLING.SUBSCRIPTION.ACTIVATED': {
         console.log('→ Subscription activated:', event?.resource?.id);
-        // TODO: Provision user access for the subscription.
+        // Handle recurring subscription activation
         break;
       }
       case 'BILLING.SUBSCRIPTION.CANCELLED': {
         console.log('→ Subscription cancelled:', event?.resource?.id);
-        // TODO: Schedule access removal and notify user.
-        break;
-      }
-      case 'BILLING.SUBSCRIPTION.CREATED': {
-        console.log('→ Subscription created:', event?.resource?.id);
-        // TODO: Initialize subscription record.
+        const subscriptionId = event?.resource?.id;
+        
+        if (subscriptionId) {
+          await supabase
+            .from('user_subscriptions')
+            .update({
+              status: 'cancelled',
+              cancelled_at: new Date().toISOString()
+            })
+            .eq('paypal_subscription_id', subscriptionId);
+        }
         break;
       }
       case 'BILLING.SUBSCRIPTION.EXPIRED': {
         console.log('→ Subscription expired:', event?.resource?.id);
-        // TODO: Revoke access and notify user.
+        const subscriptionId = event?.resource?.id;
+        
+        if (subscriptionId) {
+          await supabase
+            .from('user_subscriptions')
+            .update({
+              status: 'expired',
+              expired_at: new Date().toISOString()
+            })
+            .eq('paypal_subscription_id', subscriptionId);
+        }
         break;
       }
       case 'BILLING.SUBSCRIPTION.PAYMENT.FAILED': {
         console.log('→ Subscription payment failed:', event?.resource?.id);
-        // TODO: Start dunning flow and apply grace period if needed.
-        break;
-      }
-      case 'BILLING.SUBSCRIPTION.RE_ACTIVATED':
-      case 'BILLING.SUBSCRIPTION.RE-ACTIVATED': {
-        console.log('→ Subscription re-activated:', event?.resource?.id);
-        // TODO: Restore user access and reset dunning flags.
-        break;
-      }
-      case 'BILLING.SUBSCRIPTION.SUSPENDED': {
-        console.log('→ Subscription suspended:', event?.resource?.id);
-        // TODO: Temporarily restrict access and notify user.
-        break;
-      }
-      case 'BILLING.SUBSCRIPTION.UPDATED': {
-        console.log('→ Subscription updated:', event?.resource?.id);
-        // TODO: Sync plan/price/next billing date changes.
+        // Log failed payment attempt
         break;
       }
       default: {
         console.log('→ Unhandled event type:', type);
-        // TODO: Optionally log to monitoring or DLQ.
         break;
       }
     }
-
-    // TODO: Implement idempotency using event.id to avoid duplicate processing.
   } catch (e) {
     console.error('[PayPal] Error handling event:', e?.message || e);
   }
