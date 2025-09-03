@@ -9,6 +9,7 @@ import { AuthGuard } from '@/providers/AuthGuard';
 import { ClientSideLayout } from '@/providers/ClientSideLayout';
 import ClientImagePreloader from '@/providers/ClientImagePreloader';
 import Script from 'next/script';
+import { headers } from 'next/headers';
 import { FollowProvider } from '@/providers/FollowProvider'; // Import FollowProvider
 import { PostProvider } from '@/providers';
 import { BackgroundPostCreationProvider } from '@/providers';
@@ -32,6 +33,19 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   const isProd = process.env.NODE_ENV === 'production';
+  // Try to read a nonce forwarded via request headers by middleware/CDN if available
+  const reqHeaders = headers();
+  const cspHeader = reqHeaders.get('content-security-policy') || '';
+  const extractNonce = (headerVal) => {
+    if (!headerVal) return '';
+    // Prefer style-src nonce, fallback to script-src nonce
+    const styleMatch = headerVal.match(/style-src[^;]*'nonce-([^']+)'/i);
+    if (styleMatch && styleMatch[1]) return styleMatch[1];
+    const scriptMatch = headerVal.match(/script-src[^;]*'nonce-([^']+)'/i);
+    if (scriptMatch && scriptMatch[1]) return scriptMatch[1];
+    return '';
+  };
+  const cspNonce = extractNonce(cspHeader) || reqHeaders.get('x-nonce') || '';
   return (
     <html lang="en" className={`scroll-smooth ${inter.variable} ${robotoMono.variable}`} suppressHydrationWarning translate="no">
       <head>
@@ -42,18 +56,16 @@ export default function RootLayout({ children }) {
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon_io/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon_io/favicon-16x16.png" />
         <link rel="manifest" href="/favicon_io/site.webmanifest" />
-        <link rel="preload" as="image" href="/favicon_io/android-chrome-192x192.png" />
-        <link rel="preload" as="image" href="/profile-bg.jpg" />
-        <link rel="preload" as="image" href="/default-avatar.svg" />
       </head>
       <body
         translate="no"
-        style={{
-          paddingTop: 'var(--navbar-height)',
-          paddingBottom: 'env(safe-area-inset-bottom)'
-        }}
+        className="pt-[var(--navbar-height)] pb-[env(safe-area-inset-bottom)]"
       >
-        <Script id="global-abort-init" strategy="beforeInteractive">
+        {/* Expose CSP nonce to client scripts (e.g., PayPal SDK expects data-csp-nonce for injected styles) */}
+        <Script id="csp-nonce-init" strategy="beforeInteractive" nonce={cspNonce || undefined}>
+          {`window.__CSP_NONCE__ = ${JSON.stringify(cspNonce || '')};`}
+        </Script>
+        <Script id="global-abort-init" strategy="beforeInteractive" nonce={cspNonce || undefined}>
           {`
             window.abortPostsFetch = function() {
               console.log('Initial abort function called - no active fetch to cancel');
@@ -62,7 +74,7 @@ export default function RootLayout({ children }) {
           `}
         </Script>
         
-        <Script id="console-suppressor" strategy="beforeInteractive">
+        <Script id="console-suppressor" strategy="beforeInteractive" nonce={cspNonce || undefined}>
           {`
             if (${isProd}) {
               const originalLog = console.log;
@@ -81,7 +93,7 @@ export default function RootLayout({ children }) {
             }
           `}
         </Script>
-        <Script id="image-cache-manager" strategy="beforeInteractive">
+        <Script id="image-cache-manager" strategy="beforeInteractive" nonce={cspNonce || undefined}>
           {`
             window.imageCacheManager = {
               cache: {},

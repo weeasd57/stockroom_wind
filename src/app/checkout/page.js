@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useSupabase } from '@/providers/SupabaseProvider';
@@ -11,10 +11,23 @@ export default function CheckoutPage() {
   const { user } = useAuth();
   const { supabase } = useSupabase();
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+  // Normalize and encode client id to avoid accidental whitespace/encoding issues
+  const encodedClientId = encodeURIComponent((paypalClientId || '').trim());
+  const buttonsRenderedRef = useRef(false);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [subscriptionInfo, setSubscriptionInfo] = useState(null);
+  const [cspNonce, setCspNonce] = useState('');
+
+  // Obtain CSP nonce exposed by RootLayout to allow PayPal SDK to inject styles with the same nonce
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line no-undef
+      const n = typeof window !== 'undefined' ? (window.__CSP_NONCE__ || '') : '';
+      setCspNonce(n);
+    } catch (_) {}
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -192,42 +205,61 @@ export default function CheckoutPage() {
       {/* PayPal SDK */}
       {paypalClientId ? (
         <Script
-          src={`https://www.paypal.com/sdk/js?client-id=${paypalClientId}&currency=USD`}
+          strategy="afterInteractive"
+          src={`https://www.paypal.com/sdk/js?client-id=${encodedClientId}&currency=USD&components=buttons&intent=CAPTURE&commit=true`}
+          // Provide nonce attributes so SDK can tag injected <style> with the same nonce
+          nonce={cspNonce}
+          data-csp-nonce={cspNonce}
+          onError={(e) => {
+            console.error('[PayPal SDK] Script load error:', e?.message || e);
+            setError('Failed to load PayPal SDK (network/400). Please retry or disable blockers.');
+          }}
           onLoad={() => {
-            if (window?.paypal) {
-              window.paypal
-                .Buttons({
-                  createOrder: (data, actions) => {
-                    return actions.order.create({
-                      purchase_units: [
-                        {
-                          amount: {
-                            value: '4.00',
-                            currency_code: 'USD',
-                          },
-                          description: 'SharksZone Pro Plan - Monthly Subscription',
+            try {
+              const container = document.getElementById('paypal-button-container');
+              if (!window?.paypal || !container) {
+                setError('Failed to load PayPal SDK. Please refresh the page.');
+                return;
+              }
+              // Prevent duplicate renders during Fast Refresh / StrictMode double-invoke
+              if (buttonsRenderedRef.current || container.hasChildNodes()) {
+                return;
+              }
+
+              const buttons = window.paypal.Buttons({
+                createOrder: (data, actions) => {
+                  return actions.order.create({
+                    purchase_units: [
+                      {
+                        amount: {
+                          value: '4.00',
+                          currency_code: 'USD',
                         },
-                      ],
-                      application_context: {
-                        brand_name: 'SharksZone',
-                        landing_page: 'NO_PREFERENCE',
-                        user_action: 'PAY_NOW',
+                        description: 'SharksZone Pro Plan - Monthly Subscription',
                       },
-                    });
-                  },
-                  onApprove: handlePayPalApprove,
-                  onError: handlePayPalError,
-                  onCancel: handlePayPalCancel,
-                  style: {
-                    layout: 'vertical',
-                    color: 'blue',
-                    shape: 'rect',
-                    label: 'paypal',
-                  },
-                })
-                .render('#paypal-button-container');
-            } else {
-              setError('Failed to load PayPal SDK. Please refresh the page.');
+                    ],
+                    application_context: {
+                      brand_name: 'SharksZone',
+                      landing_page: 'NO_PREFERENCE',
+                      user_action: 'PAY_NOW',
+                    },
+                  });
+                },
+                onApprove: handlePayPalApprove,
+                onError: handlePayPalError,
+                onCancel: handlePayPalCancel,
+                style: {
+                  layout: 'vertical',
+                  color: 'blue',
+                  shape: 'rect',
+                  label: 'paypal',
+                },
+              });
+              buttons.render(container);
+              buttonsRenderedRef.current = true;
+            } catch (e) {
+              console.error('PayPal init error:', e);
+              setError('Failed to initialize PayPal. Please refresh the page.');
             }
           }}
         />
