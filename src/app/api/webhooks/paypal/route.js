@@ -43,13 +43,16 @@ function ensureEnv() {
   }
 }
 
-const normalizedMode = (PAYPAL_MODE || 'sandbox').toLowerCase();
-// Default to 'sandbox' if PAYPAL_MODE is not provided, regardless of NODE_ENV.
-// This prevents accidental 'live' verification during testing on production infra.
-const mode = normalizedMode === 'live' ? 'live' : 'sandbox';
-if (!PAYPAL_MODE) {
-  console.warn('[PayPal] PAYPAL_MODE is not set. Falling back to "sandbox".');
-}
+const mode = (PAYPAL_MODE || 'sandbox').toLowerCase() === 'live' ? 'live' : 'sandbox';
+console.log(`[PayPal] Using ${mode} mode${!PAYPAL_MODE ? ' (default)' : ''}`);
+
+// The credentials work for both live and sandbox based on PAYPAL_MODE
+const credentials = {
+  clientId: NEXT_PUBLIC_PAYPAL_CLIENT_ID,
+  clientSecret: PAYPAL_CLIENT_SECRET,
+  webhookId: PAYPAL_WEBHOOK_ID,
+  mode
+};
 
 // ---- PayPal REST Helpers (manual, since SDK doesn't expose webhooks verify) ----
 function paypalBaseUrl(mode) {
@@ -59,7 +62,7 @@ function paypalBaseUrl(mode) {
 
 async function getAccessToken(targetMode) {
   const base = paypalBaseUrl(targetMode || mode);
-  const basic = Buffer.from(`${NEXT_PUBLIC_PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64');
+  const basic = Buffer.from(`${credentials.clientId}:${credentials.clientSecret}`).toString('base64');
   const res = await fetch(`${base}/v1/oauth2/token`, {
     method: 'POST',
     headers: {
@@ -91,7 +94,7 @@ async function verifyPaypalWebhook(request, body) {
     throw err;
   }
 
-  // Detect event environment from cert_url host to avoid env mismatches
+  // Detect event environment from cert_url host for logging purposes
   let eventEnv = 'sandbox';
   try {
     const host = new URL(certUrl).hostname || '';
@@ -100,11 +103,16 @@ async function verifyPaypalWebhook(request, body) {
     // keep default sandbox if parsing fails
   }
   if (eventEnv !== mode) {
-    console.warn('[PayPal] Environment mismatch', { configuredMode: mode, eventEnv });
+    console.warn('[PayPal] Environment mismatch - using configured mode', { 
+      configuredMode: mode, 
+      eventEnv,
+      action: `forcing ${mode} mode for authentication` 
+    });
   }
 
-  const accessToken = await getAccessToken(eventEnv);
-  const base = paypalBaseUrl(eventEnv);
+  // Always use the configured mode for authentication, not auto-detected
+  const accessToken = await getAccessToken(mode);
+  const base = paypalBaseUrl(mode);
 
   const payload = {
     auth_algo: authAlgo,
@@ -112,7 +120,7 @@ async function verifyPaypalWebhook(request, body) {
     transmission_id: transmissionId,
     transmission_sig: transmissionSig,
     transmission_time: transmissionTime,
-    webhook_id: PAYPAL_WEBHOOK_ID,
+    webhook_id: credentials.webhookId,
     webhook_event: body,
   };
 
@@ -171,11 +179,14 @@ async function diagnoseWebhookConfigFromRequest(request) {
   } catch (_) {}
 
   try {
-    const hooks = await listWebhooks(eventEnv);
-    const configuredId = PAYPAL_WEBHOOK_ID;
+    // Use configured mode instead of auto-detected eventEnv
+    const hooks = await listWebhooks(mode);
+    const configuredId = credentials.webhookId;
     const found = hooks.find((h) => h?.id === configuredId);
     const summary = {
       eventEnv,
+      configuredMode: mode,
+      usingMode: mode,
       configuredIdSuffix: configuredId ? configuredId.slice(-6) : 'none',
       totalHooks: hooks.length,
       foundConfiguredId: !!found,
@@ -347,9 +358,9 @@ export async function POST(request) {
     }
     // Diagnostic log (safe): print selected mode and a masked webhook id suffix
     console.log('[PayPal] Diagnostic', {
-      mode,
+      mode: credentials.mode,
       nodeEnv: NODE_ENV,
-      webhookIdSuffix: PAYPAL_WEBHOOK_ID ? PAYPAL_WEBHOOK_ID.slice(-6) : 'none',
+      webhookIdSuffix: credentials.webhookId ? credentials.webhookId.slice(-6) : 'none',
     });
 
     // Light diagnostics for headers presence (no secrets)
