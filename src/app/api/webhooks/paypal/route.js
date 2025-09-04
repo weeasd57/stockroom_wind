@@ -99,13 +99,20 @@ async function verifyPaypalWebhook(request, body) {
   try {
     const host = new URL(certUrl).hostname || '';
     eventEnv = host.includes('sandbox') ? 'sandbox' : 'live';
-  } catch (_) {
+    console.log('[PayPal] Cert URL analysis', { 
+      certUrl: certUrl,
+      hostname: host,
+      detectedEnv: eventEnv 
+    });
+  } catch (e) {
+    console.warn('[PayPal] Failed to parse cert_url', { certUrl, error: e.message });
     // keep default sandbox if parsing fails
   }
   if (eventEnv !== mode) {
     console.warn('[PayPal] Environment mismatch - using configured mode', { 
       configuredMode: mode, 
       eventEnv,
+      certUrl,
       action: `forcing ${mode} mode for authentication` 
     });
   }
