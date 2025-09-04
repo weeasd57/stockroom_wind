@@ -271,7 +271,7 @@ body {
 }
 
 .dialog-content {
-  background-color: var(--background);
+  background-color: var(--background-color);
   border-radius: 8px;
   width: 90%;
   max-width: 600px;
@@ -288,7 +288,7 @@ body {
   align-items: center;
   padding: 16px 20px;
   border-bottom: 1px solid var(--border-color);
-  background-color: var(--background);
+  background-color: var(--background-color);
   position: sticky;
   top: 0;
   z-index: 1000;

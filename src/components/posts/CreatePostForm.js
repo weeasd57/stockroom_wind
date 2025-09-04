@@ -60,6 +60,18 @@ export default function CreatePostForm() {
   const { tasks, startBackgroundPostCreation, cancelTask } = useBackgroundPostCreation();
   const [initialPrice, setInitialPrice] = useState(null); // Added initialPrice state
   
+  // Refs
+  const lastAvatarRefresh = useRef(Date.now());
+  const unsubscribeRef = useRef(null);
+  const navRef = useRef(null);
+  const stockInfoRef = useRef(null);
+  const formWrapperRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const strategySelectRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
+  const stockSearchResultsRef = useRef(null);
+  
   // Since there's no formState, directly destructure values from context with defaults
   const {
     title,
@@ -300,24 +312,24 @@ export default function CreatePostForm() {
                 if (newError) {
                   // console.error('Table user_strategies does not exist. Please run the migration script.');
                 } else {
-                  setUserStrategies(newData || []);
+                  setStrategies(newData || []);
                 }
               } catch (setupError) {
                 // console.error('Database error fetching strategies:', setupError);
               }
             }
             // For other errors, set default strategies
-            setDefaultStrategies();
+            setStrategies(DEFAULT_STRATEGIES);
           } else if (data && data.length > 0) {
             // console.log('Retrieved user strategies from database:', data);
-            setUserStrategies(data);
+            setStrategies(data.map(item => item.strategy_name));
           } else {
             // console.log('No user strategies found, using default strategies');
-            setDefaultStrategies();
+            setStrategies(DEFAULT_STRATEGIES);
           }
         } catch (error) {
           // console.error('Error fetching strategies:', error);
-          setDefaultStrategies();
+          setStrategies(DEFAULT_STRATEGIES);
         } finally {
           setStrategiesLoading(false);
         }
@@ -1637,22 +1649,7 @@ export default function CreatePostForm() {
     }
   }, []);
 
-  // Refs
-  const lastAvatarRefresh = useRef(Date.now());
-  const unsubscribeRef = useRef(null);
-  const navRef = useRef(null);
-  const stockInfoRef = useRef(null);
-  const formWrapperRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const searchInputRef = useRef(null);
-  const strategySelectRef = useRef(null);
-  const searchTimeoutRef = useRef(null);
-  const stockSearchResultsRef = useRef(null);
-
-  // Function to set default strategies
-  const setDefaultStrategies = useCallback(() => {
-    setStrategies([]);
-  }, []);
+  const priceInputRef = useRef(null);
 
   // Effects
   useEffect(() => {
