@@ -295,6 +295,40 @@
   color: var(--primary-color, #3b82f6);
 }
 
+.editButton {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.editButton:hover {
+  background: var(--border-light, #f3f4f6);
+  color: #f59e0b;
+}
+
+.deleteButton {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.deleteButton:hover {
+  background: var(--border-light, #f3f4f6);
+  color: #ef4444;
+}
+
 .editedLabel {
   font-size: 0.75rem;
   color: var(--text-secondary, #6b7280);
@@ -394,6 +428,75 @@
 }
 
 .cancelReplyButton:hover {
+  background: var(--border-light, #f3f4f6);
+  color: var(--text-primary, #1f2937);
+}
+
+/* Edit Form */
+.editForm {
+  margin-top: 8px;
+}
+
+.editInput {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--primary-color, #3b82f6);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  resize: none;
+  font-family: inherit;
+  background: var(--card-background, #ffffff);
+  color: var(--text-primary, #1f2937);
+  margin-bottom: 8px;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.editInput:focus {
+  outline: none;
+  border-color: var(--primary-color, #3b82f6);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.editActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.saveEditButton {
+  padding: 6px 16px;
+  background: var(--primary-color, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 16px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.saveEditButton:hover:not(:disabled) {
+  background: var(--primary-hover, #2563eb);
+}
+
+.saveEditButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cancelEditButton {
+  padding: 6px 16px;
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 16px;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cancelEditButton:hover {
   background: var(--border-light, #f3f4f6);
   color: var(--text-primary, #1f2937);
 }

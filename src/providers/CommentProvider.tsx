@@ -18,11 +18,14 @@ interface CommentContextType {
   error: string | null;
   addComment: (postId: string, content: string) => Promise<Comment>;
   deleteComment: (id: string) => Promise<void>;
+  editComment: (id: string, newContent: string) => Promise<void>;
   getPostComments: (postId: string) => Comment[];
   getPostStats: (postId: string) => PostStats;
   fetchCommentsForPost: (postId: string) => Promise<void>;
   toggleBuyVote: (postId: string, currentAction?: 'buy' | 'sell' | null) => Promise<void>;
   toggleSellVote: (postId: string, currentAction?: 'buy' | 'sell' | null) => Promise<void>;
+  startPolling: (postId: string) => void;
+  stopPolling: () => void;
 }
 
 const CommentContext = createContext<CommentContextType | null>(null);
@@ -35,6 +38,8 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [subscriptions, setSubscriptions] = useState<Record<string, any>>({});
   const [loadedCommentsPosts, setLoadedCommentsPosts] = useState<Set<string>>(new Set());
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+  const [currentPollingPostId, setCurrentPollingPostId] = useState<string | null>(null);
 
   // Subscribe to real-time updates for a specific post
   const subscribeToPost = useCallback((postId: string) => {
@@ -110,6 +115,8 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
         sellCount: (sellVotesResponse.count as number) || 0
       };
 
+      // Stats updated silently
+
       setPostStats(prev => ({
         ...prev,
         [postId]: stats
@@ -125,28 +132,33 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const { data, error } = await supabase
-        .from('comments')
-        .select(`
-          *,
-          profiles:user_id (
-            username,
-            avatar_url
-          )
-        `)
+        .from('comments_with_user_info')
+        .select('*')
         .eq('post_id', postId)
         .order('created_at', { ascending: true });
 
+      console.debug("Comments fetched for post:", postId, data);
+
       if (error) throw error;
 
-      const formattedComments = data.map(comment => ({
+      // Group comments by parent_comment_id for nested structure
+      const topLevelComments = data.filter(comment => !comment.parent_comment_id);
+      const replies = data.filter(comment => comment.parent_comment_id);
+      
+      // Add replies to their parent comments
+      const formattedComments = topLevelComments.map(comment => ({
         ...comment,
-        profile: comment.profiles
+        replies: replies.filter(reply => reply.parent_comment_id === comment.id)
       }));
+
+      // Comments fetched silently
 
       // Update comments state, replacing existing comments for this post
       setComments(prev => {
         const filtered = prev.filter(c => c.post_id !== postId);
-        return [...filtered, ...formattedComments];
+        const newComments = [...filtered, ...formattedComments];
+        // Comments state updated silently
+        return newComments;
       });
 
       // Ensure realtime subscription is active for this post
@@ -301,6 +313,98 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const editComment = async (id: string, newContent: string): Promise<void> => {
+    if (!supabase || !user) throw new Error('Not authenticated');
+    if (!newContent.trim()) throw new Error('Comment content cannot be empty');
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('comments')
+        .update({ 
+          content: newContent.trim(),
+          is_edited: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .eq('user_id', user.id); // Only allow users to edit their own comments
+
+      if (error) throw error;
+
+      // Optimistically update local state
+      setComments(prev => prev.map(comment => 
+        comment.id === id 
+          ? { ...comment, content: newContent.trim(), is_edited: true, updated_at: new Date().toISOString() }
+          : comment
+      ));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to edit comment');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Start polling for comments updates every 8 seconds
+  const startPolling = useCallback((postId: string) => {
+    if (!supabase || !postId) return;
+    
+    // Use current state values directly instead of relying on state in closure
+    setCurrentPollingPostId(current => {
+      if (current === postId) {
+        console.log(`🔄 Polling already active for post: ${postId}`);
+        return current;
+      }
+      
+      console.log(`🚀 Starting polling for post: ${postId}`);
+      return postId;
+    });
+    
+    // Clear any existing interval
+    setPollingInterval(currentInterval => {
+      if (currentInterval) {
+        clearInterval(currentInterval);
+      }
+      
+      // Set up new polling every 10 seconds
+      console.log(`⏰ Setting up interval for post: ${postId} (10s)`);
+      const newInterval = setInterval(async () => {
+        console.log(`🔄 Polling cycle for post: ${postId}`);
+        try {
+          await fetchCommentsForPost(postId);
+          await updatePostStats(postId);
+          console.log(`✅ Polling cycle completed for post: ${postId}`);
+        } catch (error) {
+          console.error(`❌ Polling error for post ${postId}:`, error);
+        }
+      }, 10000);
+      
+      return newInterval;
+    });
+  }, [supabase, fetchCommentsForPost, updatePostStats]);
+
+  const stopPolling = useCallback(() => {
+    if (pollingInterval) {
+      console.log(`🛑 Stopping polling for post: ${currentPollingPostId}`);
+      clearInterval(pollingInterval);
+      setPollingInterval(null);
+      setCurrentPollingPostId(null);
+      console.log(`✅ Polling stopped successfully`);
+    } else {
+      console.log(`ℹ️ No active polling to stop`);
+      setCurrentPollingPostId(null);
+    }
+  }, [pollingInterval, currentPollingPostId]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
+  }, [pollingInterval]);
+
   const toggleBuyVote = async (postId: string, currentAction: 'buy' | 'sell' | null = null): Promise<void> => {
     if (!supabase || !user) throw new Error('Not authenticated');
     if (!isValidUUID(postId) || isTempId(postId)) {
@@ -407,12 +511,15 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
       loading, 
       error,
       addComment, 
-      deleteComment, 
+      deleteComment,
+      editComment,
       getPostComments,
       getPostStats,
       fetchCommentsForPost,
       toggleBuyVote,
-      toggleSellVote
+      toggleSellVote,
+      startPolling,
+      stopPolling
     }}>
       {children}
     </CommentContext.Provider>

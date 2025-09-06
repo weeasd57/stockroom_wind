@@ -185,6 +185,9 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 /* Trader Card */
@@ -197,29 +200,33 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  width: 100%;
 }
 
 .traderCardRow {
   flex-direction: row;
-  align-items: flex-start;
-  gap: 2rem;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem;
 }
 
 /* Two column layout for list view */
 .leftColumn {
-  flex: 1;
+  flex: 1 1 60%;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.75rem;
   min-width: 0;
 }
 
 .rightColumn {
-  width: 300px;
+  flex: 0 0 auto;
+  width: 280px;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  flex-shrink: 0;
+  gap: 0.75rem;
+  align-self: stretch;
 }
 
 /* In row view, adjust stats layout */
@@ -235,8 +242,8 @@
 }
 
 .traderCard:hover {
-  transform: translateY(-5px);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .traderHeader {
@@ -298,10 +305,11 @@
 
 .traderStats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
   background-color: hsl(var(--muted));
   border-radius: 8px;
   padding: 0.75rem;
+  gap: 0.5rem;
 }
 
 /* Wrapper for stats and actions in row view */
@@ -583,6 +591,16 @@
 }
 
 /* Responsive Styles */
+@media (max-width: 992px) {
+  .rightColumn {
+    width: 240px;
+  }
+  
+  .traderCardRow {
+    gap: 1rem;
+  }
+}
+
 @media (max-width: 768px) {
   .pageHeader h1 {
     font-size: 2rem;
@@ -600,11 +618,41 @@
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     gap: 1rem;
   }
+  
+  /* List view responsive adjustments */
+  .traderCardRow {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+  }
+  
+  .leftColumn {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+  
+  .rightColumn {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+  
+  .traderCardRow .traderStats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+  
+  .traderCardRow .traderHeader {
+    margin-bottom: 0.5rem;
+  }
+  
+  .traderCardRow .traderBio {
+    margin-bottom: 0.5rem;
+  }
 }
 
 @media (max-width: 480px) {
   .tradersPage {
-    padding: 1.5rem 1rem;
+    padding: 1rem 0.75rem;
   }
   
   .pageHeader {
@@ -615,6 +663,28 @@
     font-size: 1.75rem;
   }
   
+  .searchBar input {
+    width: 100%;
+    padding: 0.65rem 1rem 0.65rem 2.25rem;
+    font-size: 0.95rem;
+  }
+  
+  .controlsRow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  
+  .viewToggle {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .select {
+    width: 100%;
+    padding: 0.6rem;
+  }
+  
   .traderAvatar {
     width: 48px;
     height: 48px;
@@ -622,6 +692,60 @@
   
   .traderStats {
     padding: 0.5rem;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+  
+  .statItem {
+    padding: 0.25rem;
+  }
+  
+  .statLabel {
+    font-size: 0.7rem;
+  }
+  
+  .statValue {
+    font-size: 0.9rem;
+  }
+  
+  .traderCardRow {
+    padding: 0.75rem;
+  }
+  
+  .traderHeader {
+    gap: 0.75rem;
+  }
+  
+  .traderInfo h3 {
+    font-size: 1.1rem;
+  }
+  
+  .username {
+    font-size: 0.85rem;
+  }
+  
+  .traderBio {
+    font-size: 0.85rem;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+  
+  .countriesRow {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  
+  .countryBadge {
+    padding: 0.2rem 0.4rem;
+    gap: 0.25rem;
+  }
+  
+  .countryBadge .fi {
+    font-size: 0.85rem;
+  }
+  
+  .countryCount {
+    font-size: 0.7rem;
   }
   
   .statsAndActionsRow {
@@ -643,7 +767,7 @@
   }
   
   .cardActions {
-    flex-direction: column;
+    flex-direction: row;
     gap: 0.5rem;
   }
   
@@ -651,6 +775,12 @@
   .followButton,
   .unfollowButton {
     width: 100%;
-    padding: 0.5rem;
+    padding: 0.6rem;
+    font-size: 0.9rem;
+  }
+  
+  .loadMoreButton {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.9rem;
   }
 }

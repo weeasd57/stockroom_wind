@@ -3,11 +3,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { formatDistanceToNow } from 'date-fns';
-import { getPostComments, createComment, getPostCommentCount } from '@/utils/comments';
+import { getPostComments, createComment, getPostCommentCount, updateComment, deleteComment } from '@/utils/comments';
 import { detectTextDirection, applyTextDirection } from '@/utils/textDirection';
 import styles from '@/styles/CommentsDialog.module.css';
 import { useComments } from '@/providers/CommentProvider';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 // Child component for a single comment/reply to keep hooks at top level
 function CommentItem({
@@ -21,9 +22,17 @@ function CommentItem({
   handleSubmitReply,
   handleReplyTextChange,
   submitting,
+  editingComment,
+  setEditingComment,
+  editText,
+  setEditText,
+  handleSubmitEdit,
+  handleDeleteComment,
 }) {
   const replyInputRef = useRef(null);
+  const editInputRef = useRef(null);
   const commentDirection = detectTextDirection(comment.content);
+  const isOwner = user?.id === comment.user_id;
 
   return (
     <div className={`${styles.comment} ${isReply ? styles.reply : ''}`}>
@@ -52,15 +61,49 @@ function CommentItem({
               </span>
             </div>
             <div className={styles.commentText}>
-              <p
-                dir={commentDirection}
-                style={{
-                  textAlign: commentDirection === 'rtl' ? 'right' : 'left',
-                  direction: commentDirection,
-                }}
-              >
-                {comment.content}
-              </p>
+              {editingComment === comment.id ? (
+                <div className={styles.editForm}>
+                  <textarea
+                    ref={editInputRef}
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    className={styles.editInput}
+                    dir={detectTextDirection(editText)}
+                    style={{
+                      textAlign: detectTextDirection(editText) === 'rtl' ? 'right' : 'left',
+                      direction: detectTextDirection(editText),
+                    }}
+                  />
+                  <div className={styles.editActions}>
+                    <button
+                      onClick={() => handleSubmitEdit(comment.id)}
+                      disabled={!editText.trim() || submitting}
+                      className={styles.saveEditButton}
+                    >
+                      {submitting ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingComment(null);
+                        setEditText('');
+                      }}
+                      className={styles.cancelEditButton}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p
+                  dir={commentDirection}
+                  style={{
+                    textAlign: commentDirection === 'rtl' ? 'right' : 'left',
+                    direction: commentDirection,
+                  }}
+                >
+                  {comment.content}
+                </p>
+              )}
             </div>
           </div>
 
@@ -75,6 +118,25 @@ function CommentItem({
               >
                 Reply
               </button>
+            )}
+            {isOwner && editingComment !== comment.id && (
+              <>
+                <button
+                  className={styles.editButton}
+                  onClick={() => {
+                    setEditingComment(comment.id);
+                    setEditText(comment.content);
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  className={styles.deleteButton}
+                  onClick={() => handleDeleteComment(comment.id)}
+                >
+                  Delete
+                </button>
+              </>
             )}
             {comment.is_edited && (
               <span className={styles.editedLabel}>Edited</span>
@@ -150,8 +212,14 @@ function CommentItem({
               handleSubmitReply={handleSubmitReply}
               handleReplyTextChange={handleReplyTextChange}
               submitting={submitting}
-            />)
-          )}
+              editingComment={editingComment}
+              setEditingComment={setEditingComment}
+              editText={editText}
+              setEditText={setEditText}
+              handleSubmitEdit={handleSubmitEdit}
+              handleDeleteComment={handleDeleteComment}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -160,26 +228,58 @@ function CommentItem({
 
 export default function CommentsDialog({ postId, isOpen, onClose, initialCommentCount = 0 }) {
   const { user } = useSupabase();
-  const { fetchCommentsForPost } = useComments();
-  const [comments, setComments] = useState([]);
+  const { 
+    fetchCommentsForPost, 
+    startPolling, 
+    stopPolling, 
+    deleteComment, 
+    editComment,
+    getPostComments,
+    getPostStats,
+    addComment
+  } = useComments();
+  
+  // Use provider's real-time data instead of local state
+  const comments = getPostComments(postId);
+  const postStats = getPostStats(postId);
+  const commentCount = postStats.commentCount;
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [newComment, setNewComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [commentCount, setCommentCount] = useState(initialCommentCount);
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyText, setReplyText] = useState('');
+  const [editingComment, setEditingComment] = useState(null);
+  const [editText, setEditText] = useState('');
   const dialogRef = useRef(null);
   const commentInputRef = useRef(null);
+  
+  // Component rendered silently
 
-  // Fetch comments when dialog opens
+  // Fetch comments and start polling when dialog opens
   useEffect(() => {
     if (isOpen && postId) {
-      fetchComments();
-      // Focus on comment input when dialog opens
+      // Start polling when dialog opens  
+      startPolling(postId);
+      
+      // Load comments for this post if not already loaded
+      if (!getPostComments(postId) || getPostComments(postId).length === 0) {
+        fetchCommentsForPost(postId);
+      }
+
+      // Focus on comment input after a brief delay
       setTimeout(() => {
         commentInputRef.current?.focus();
       }, 100);
+
+      // Return cleanup function that will run when dialog closes or unmounts
+      return () => {
+        stopPolling();
+      };
+    } else if (!isOpen) {
+      // Explicitly stop polling when dialog closes
+      stopPolling();
     }
   }, [isOpen, postId]);
 
@@ -226,28 +326,10 @@ export default function CommentsDialog({ postId, isOpen, onClose, initialComment
     }
   }, [newComment]);
 
-  const fetchComments = async () => {
-    if (!postId) return;
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const { data, error } = await getPostComments(postId);
-      
-      if (error) throw error;
+  // Real-time updates handled silently
 
-      setComments(data);
-      setCommentCount(data.reduce((total, comment) => {
-        return total + 1 + (comment.replies ? comment.replies.length : 0);
-      }, 0));
-    } catch (error) {
-      console.error('Error fetching comments:', error);
-      setError('Failed to load comments');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // This function is no longer needed since we use provider's real-time data
+  // Keeping for backward compatibility but it's not used anymore
 
   const handleSubmitComment = async (e) => {
     e.preventDefault();
@@ -255,17 +337,16 @@ export default function CommentsDialog({ postId, isOpen, onClose, initialComment
 
     setSubmitting(true);
     try {
-      const { data, error } = await createComment(postId, user.id, newComment.trim());
-
-      if (error) throw error;
-
+      await addComment(postId, newComment.trim());
       setNewComment('');
-      // Pull fresh comments via provider to broadcast updates across the app
-      try { await fetchCommentsForPost(postId); } catch {}
-      await fetchComments(); // Refresh comments
+      toast.success('Comment posted successfully', {
+        description: 'Your comment has been added to the discussion.',
+      });
     } catch (error) {
       console.error('Error submitting comment:', error);
-      setError('Failed to submit comment');
+      toast.error('Failed to post comment', {
+        description: 'Please check your connection and try again.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -276,18 +357,19 @@ export default function CommentsDialog({ postId, isOpen, onClose, initialComment
 
     setSubmitting(true);
     try {
+      // Use createComment function for replies since addComment from provider doesn't support parentCommentId yet
       const { data, error } = await createComment(postId, user.id, replyText.trim(), parentCommentId);
-
       if (error) throw error;
-
       setReplyText('');
       setReplyingTo(null);
-      // Pull fresh comments via provider to broadcast updates across the app
-      try { await fetchCommentsForPost(postId); } catch {}
-      await fetchComments(); // Refresh comments
+      toast.success('Reply posted successfully', {
+        description: 'Your reply has been added to the conversation.',
+      });
     } catch (error) {
       console.error('Error submitting reply:', error);
-      setError('Failed to submit reply');
+      toast.error('Failed to post reply', {
+        description: 'Please check your connection and try again.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -297,14 +379,50 @@ export default function CommentsDialog({ postId, isOpen, onClose, initialComment
   const handleReplyTextChange = (e, replyInputRef) => {
     const value = e.target.value;
     setReplyText(value);
-    
+
     // Apply text direction
     if (replyInputRef && value) {
       applyTextDirection(replyInputRef, value);
     }
   };
 
-  
+  // Handle editing a comment
+  const handleSubmitEdit = async (commentId) => {
+    if (!editText.trim()) return;
+
+    setSubmitting(true);
+    try {
+      await editComment(commentId, editText.trim());
+      setEditingComment(null);
+      setEditText('');
+      toast.success('Comment updated successfully', {
+        description: 'Your changes have been saved.',
+      });
+    } catch (error) {
+      console.error('Error editing comment:', error);
+      toast.error('Failed to update comment', {
+        description: 'Please try again later.',
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle deleting a comment
+  const handleDeleteComment = async (commentId) => {
+    try {
+      await deleteComment(commentId);
+      // Dialog data will update automatically through CommentProvider
+      toast.success('Comment deleted successfully', {
+        description: 'Your comment has been removed.',
+      });
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      toast.error('Failed to delete comment', {
+        description: 'Please try again later.',
+      });
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -336,8 +454,8 @@ export default function CommentsDialog({ postId, isOpen, onClose, initialComment
                     <img src={user.user_metadata.avatar_url} alt="Your avatar" />
                   ) : (
                     <div className={styles.avatarPlaceholder}>
-                      {user.user_metadata?.full_name?.charAt(0).toUpperCase() || 
-                       user.email?.charAt(0).toUpperCase() || '?'}
+                      {user.user_metadata?.full_name?.charAt(0).toUpperCase() ||
+                        user.email?.charAt(0).toUpperCase() || '?'}
                     </div>
                   )}
                 </div>
@@ -397,19 +515,52 @@ export default function CommentsDialog({ postId, isOpen, onClose, initialComment
             ) : comments.length > 0 ? (
               <div className={styles.commentsList}>
                 {comments.map((comment) => (
-                  <CommentItem
-                    key={comment.id}
-                    comment={comment}
-                    isReply={false}
-                    user={user}
-                    replyingTo={replyingTo}
-                    setReplyingTo={setReplyingTo}
-                    replyText={replyText}
-                    setReplyText={setReplyText}
-                    handleSubmitReply={handleSubmitReply}
-                    handleReplyTextChange={handleReplyTextChange}
-                    submitting={submitting}
-                  />
+                  <div key={comment.id}>
+                    <CommentItem
+                      comment={comment}
+                      isReply={false}
+                      user={user}
+                      replyingTo={replyingTo}
+                      setReplyingTo={setReplyingTo}
+                      replyText={replyText}
+                      setReplyText={setReplyText}
+                      handleSubmitReply={handleSubmitReply}
+                      handleReplyTextChange={handleReplyTextChange}
+                      submitting={submitting}
+                      editingComment={editingComment}
+                      setEditingComment={setEditingComment}
+                      editText={editText}
+                      setEditText={setEditText}
+                      handleSubmitEdit={handleSubmitEdit}
+                      handleDeleteComment={handleDeleteComment}
+                    />
+                    {/* Render nested replies */}
+                    {comment.replies && comment.replies.length > 0 && (
+                      <div className={styles.repliesContainer}>
+                        {comment.replies.map((reply) => (
+                          <CommentItem
+                            key={reply.id}
+                            comment={reply}
+                            isReply={true}
+                            user={user}
+                            replyingTo={replyingTo}
+                            setReplyingTo={setReplyingTo}
+                            replyText={replyText}
+                            setReplyText={setReplyText}
+                            handleSubmitReply={handleSubmitReply}
+                            handleReplyTextChange={handleReplyTextChange}
+                            submitting={submitting}
+                            editingComment={editingComment}
+                            setEditingComment={setEditingComment}
+                            editText={editText}
+                            setEditText={setEditText}
+                            handleSubmitEdit={handleSubmitEdit}
+                            handleDeleteComment={handleDeleteComment}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             ) : (
