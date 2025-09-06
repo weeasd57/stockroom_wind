@@ -225,7 +225,7 @@ export default function CheckoutPage() {
               <p className="text-sm text-muted-foreground">Billed monthly</p>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-bold">$1.00</p>
+              <p className="text-2xl font-bold">$7.00</p>
               <p className="text-sm text-muted-foreground">/month</p>
             </div>
           </div>
@@ -235,11 +235,11 @@ export default function CheckoutPage() {
             <ul className="space-y-2 text-sm">
               <li className="flex items-center gap-2">
                 <span className="text-green-500">✓</span>
-                30 price checks per month
+                300 price checks per month
               </li>
               <li className="flex items-center gap-2">
                 <span className="text-green-500">✓</span>
-                Unlimited post creation
+                500 posts per month
               </li>
              
               <li className="flex items-center gap-2">

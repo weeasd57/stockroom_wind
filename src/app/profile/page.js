@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
+import { useSubscription } from '@/providers/SubscriptionProvider';
 // No longer needed since we're using the ProfileProvider
 // import useProfileStore from '@/store/profileStore';
 import Link from 'next/link';
@@ -22,6 +23,12 @@ import { DashboardSection } from '@/components/home/DashboardSection';
 
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useSupabase();
+  const { 
+    subscription,
+    getRemainingPriceChecks,
+    getRemainingPosts,
+    isPro
+  } = useSubscription();
   const { 
     profile, 
     loading: profileLoading,
@@ -1034,6 +1041,79 @@ export default function Profile() {
           </div>
         </div>
       </div>
+      {/* Subscription Info Section */}
+      <div className={styles.subscriptionInfo}>
+        <div className={styles.subscriptionCard}>
+          <div className={styles.planHeader}>
+            <span className={styles.planBadge} data-plan={subscription?.tier || 'free'}>
+              {subscription?.tier === 'pro' ? '⭐ Pro' : '🆓 Free'} Plan
+            </span>
+            {subscription?.status === 'active' && (
+              <span className={styles.statusBadge}>Active</span>
+            )}
+          </div>
+          
+          <div className={styles.limitsGrid}>
+            <div className={styles.limitItem}>
+              <div className={styles.limitHeader}>
+                <span className={styles.limitIcon}>📊</span>
+                <span className={styles.limitTitle}>Price Checks</span>
+              </div>
+              <div className={styles.limitProgress}>
+                <div className={styles.limitBar}>
+                  <div 
+                    className={styles.limitFill} 
+                    style={{ 
+                      width: `${((subscription?.priceChecks || 0) / (subscription?.maxPriceChecks || (subscription?.tier === 'pro' ? 300 : 2))) * 100}%`,
+                      backgroundColor: subscription?.tier === 'pro' ? '#10b981' : '#3b82f6'
+                    }}
+                  />
+                </div>
+                <span className={styles.limitText}>
+                  {getRemainingPriceChecks()} / {subscription?.maxPriceChecks || (subscription?.tier === 'pro' ? 300 : 2)} remaining
+                </span>
+              </div>
+            </div>
+            
+            <div className={styles.limitItem}>
+              <div className={styles.limitHeader}>
+                <span className={styles.limitIcon}>📝</span>
+                <span className={styles.limitTitle}>Posts</span>
+              </div>
+              <div className={styles.limitProgress}>
+                <div className={styles.limitBar}>
+                  <div 
+                    className={styles.limitFill} 
+                    style={{ 
+                      width: `${((subscription?.postsCreated || 0) / (subscription?.maxPostsCreation || 100)) * 100}%`,
+                      backgroundColor: subscription?.tier === 'pro' ? '#10b981' : '#3b82f6'
+                    }}
+                  />
+                </div>
+                <span className={styles.limitText}>
+                  {getRemainingPosts()} / {subscription?.maxPostsCreation || 100} remaining
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          {subscription?.tier === 'free' && (
+            <div className={styles.upgradePrompt}>
+              <p>Upgrade to Pro for more features!</p>
+              <Link href="/pricing" className={styles.upgradeButton}>
+                Upgrade to Pro 🚀
+              </Link>
+            </div>
+          )}
+          
+          {subscription?.tier === 'pro' && subscription?.nextBillingDate && (
+            <div className={styles.billingInfo}>
+              <span>Next billing: {new Date(subscription.nextBillingDate).toLocaleDateString()}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Unified Dashboard Section */}
       <DashboardSection />
 

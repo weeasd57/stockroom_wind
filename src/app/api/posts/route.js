@@ -131,6 +131,10 @@ export async function POST(request) {
     
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+    // Get authorization header for authenticated requests
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+    
     // Read and sanitize payload to avoid non-existent DB fields
     let postPayload = stripInvalidPostFields(await request.json());
     // Log incoming sanitized payload keys for debugging (avoid logging sensitive values)
@@ -142,6 +146,37 @@ export async function POST(request) {
       console.debug('[API /posts] Authorization header:', request.headers.get('authorization'));
     } catch (e) {
       console.debug('[API /posts] Failed to read authorization header', e);
+    }
+
+    // Check post creation limit if user is authenticated
+    if (postPayload.user_id && token) {
+      try {
+        // Create authenticated client
+        const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+          global: {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        });
+
+        // Check if user can create a post
+        const { data: canCreate, error: limitError } = await authClient
+          .rpc('check_post_limit', { p_user_id: postPayload.user_id });
+        
+        if (limitError) {
+          console.error('Error checking post limit:', limitError);
+        } else if (canCreate === false) {
+          return NextResponse.json({
+            error: 'لقد وصلت إلى الحد الأقصى لإنشاء المنشورات لهذا الشهر. يرجى الترقية إلى Pro للحصول على المزيد.',
+            error_en: 'You have reached your monthly post creation limit. Please upgrade to Pro for more.',
+            success: false
+          }, { status: 403 });
+        }
+      } catch (err) {
+        console.warn('Failed to check post limit:', err);
+        // Continue anyway - let database handle the limit
+      }
     }
 
     // Basic validation to catch schema issues early
@@ -205,25 +240,43 @@ export async function POST(request) {
       }
     }
 
-    const { data, error } = await dbClient
+    const { data: post, error } = await dbClient
       .from('posts')
       .insert([postPayload])
       .select(`
         *,
         user:user_id(username, full_name, avatar_url)
-      `);
+      `)
+      .single();
 
     if (error) {
-      // Log full error for debugging
-      console.error('[API /posts] Supabase insert error:', JSON.stringify(error));
-      return NextResponse.json({ error: error.message || 'Insert failed', supabaseError: error }, { status: 500 });
+      console.error('[API /posts] Error creating post:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const newPost = data[0];
-    
-    // WhatsApp notifications removed
+    // Log post creation if successful and user is authenticated
+    if (post && postPayload.user_id && token) {
+      try {
+        const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+          global: {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        });
+        
+        const { error: logError } = await authClient
+          .rpc('log_post_creation', { p_user_id: postPayload.user_id });
+        
+        if (logError) {
+          console.warn('Failed to log post creation:', logError);
+        }
+      } catch (err) {
+        console.warn('Error logging post creation:', err);
+      }
+    }
 
-    return NextResponse.json({ data: newPost, success: true }, { status: 201 });
+    return NextResponse.json({ data: post, success: true });
   } catch (error) {
     console.error('Unhandled error in POST /api/posts:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

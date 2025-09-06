@@ -181,17 +181,6 @@ CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 
 
 
--- ===================================================================
--- Table: PRICE_CHECK_USAGE (Daily usage limits per user)
--- ===================================================================
-CREATE TABLE price_check_usage (
-    id SERIAL PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES profiles(id),
-    check_date DATE NOT NULL,
-    count INTEGER NOT NULL DEFAULT 1,
-    last_check TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    CONSTRAINT price_check_usage_user_id_check_date_key UNIQUE (user_id, check_date)
-);
 
 
 -- ===================================================================
@@ -206,7 +195,6 @@ ALTER TABLE user_followings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE post_actions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE price_check_usage ENABLE ROW LEVEL SECURITY;
 
 -- Ensure posts RLS and insert policy (explicitly added)
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
@@ -288,12 +276,6 @@ CREATE POLICY "Notifications readable by owner" ON notifications
 CREATE POLICY "Owner can mark notifications read" ON notifications
   FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 
--- Price check usage policies
-CREATE POLICY "Usage readable by owner" ON price_check_usage
-  FOR SELECT USING (user_id = auth.uid());
-
-CREATE POLICY "Owner can insert/update own usage" ON price_check_usage
-  FOR ALL USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 
 
 

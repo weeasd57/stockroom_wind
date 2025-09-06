@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
     price DECIMAL(10, 2) NOT NULL,
     currency VARCHAR(3) DEFAULT 'USD',
     price_check_limit INTEGER NOT NULL,
+    post_creation_limit INTEGER NOT NULL DEFAULT 100,
     features JSONB,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -19,7 +20,9 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
     plan_id UUID NOT NULL REFERENCES subscription_plans(id),
     status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'cancelled', 'expired', 'pending')),
     price_checks_used INTEGER DEFAULT 0,
+    posts_created INTEGER DEFAULT 0,
     price_checks_reset_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() + INTERVAL '1 month',
+    posts_reset_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() + INTERVAL '1 month',
     paypal_subscription_id VARCHAR(255),
     paypal_order_id VARCHAR(255),
     started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -104,10 +107,15 @@ EXCEPTION
 END $$;
 
 -- Insert default subscription plans
-INSERT INTO subscription_plans (name, display_name, price, price_check_limit, features) VALUES
-('free', 'Free', 0, 2, '["2 price checks per day", "Basic features", "Community support"]'),
-('pro', 'Pro', 4.00, 10, '["30 price checks per day", "Priority support", "Advanced analytics", "Pro badge"]')
-ON CONFLICT (name) DO NOTHING;
+INSERT INTO subscription_plans (name, display_name, price, price_check_limit, post_creation_limit, features) VALUES
+('free', 'Free', 0, 2, 100, '["2 price checks per month", "100 posts per month", "Basic features", "Community support"]'),
+('pro', 'Pro', 7.00, 300, 500, '["300 price checks per month", "500 posts per month", "Priority support"]')
+ON CONFLICT (name) DO UPDATE SET
+    price = EXCLUDED.price,
+    price_check_limit = EXCLUDED.price_check_limit,
+    post_creation_limit = EXCLUDED.post_creation_limit,
+    features = EXCLUDED.features,
+    updated_at = NOW();
 
 -- Function to check if user has reached their price check limit
 CREATE OR REPLACE FUNCTION check_price_limit(p_user_id UUID)
@@ -121,10 +129,15 @@ BEGIN
         COALESCE(p.price_check_limit, 2),
         COALESCE(s.price_checks_used, 0)
     INTO v_limit, v_used
-    FROM auth.users u
-    LEFT JOIN user_subscriptions s ON u.id = s.user_id AND s.status = 'active'
+    FROM user_subscriptions s
     LEFT JOIN subscription_plans p ON s.plan_id = p.id
-    WHERE u.id = p_user_id;
+    WHERE s.user_id = p_user_id AND s.status = 'active';
+    
+    -- If no active subscription found, use free plan defaults
+    IF v_limit IS NULL THEN
+        v_limit := 2;  -- Free plan default
+        v_used := 0;
+    END IF;
     
     -- Return true if user can make more checks
     RETURN v_used < v_limit;
@@ -143,6 +156,7 @@ CREATE OR REPLACE FUNCTION log_price_check(
 RETURNS BOOLEAN AS $$
 DECLARE
     v_can_check BOOLEAN;
+    v_subscription_exists BOOLEAN;
 BEGIN
     -- Check if user can make the price check
     SELECT check_price_limit(p_user_id) INTO v_can_check;
@@ -151,19 +165,30 @@ BEGIN
         RETURN FALSE;
     END IF;
     
-    -- Log the price check
-    INSERT INTO price_check_logs (user_id, symbol, exchange, country, ip_address, user_agent)
-    VALUES (p_user_id, p_symbol, p_exchange, p_country, p_ip_address, p_user_agent);
+    -- Check if user has an active subscription
+    SELECT EXISTS(
+        SELECT 1 FROM user_subscriptions 
+        WHERE user_id = p_user_id AND status = 'active'
+    ) INTO v_subscription_exists;
     
-    -- Increment the usage counter
-    INSERT INTO user_subscriptions (user_id, plan_id, price_checks_used)
-    SELECT p_user_id, sp.id, 1
-    FROM subscription_plans sp
-    WHERE sp.name = 'free'
-    ON CONFLICT (user_id, status) 
-    DO UPDATE SET 
-        price_checks_used = user_subscriptions.price_checks_used + 1,
-        updated_at = NOW();
+    -- If user has active subscription, increment the counter
+    IF v_subscription_exists THEN
+        UPDATE user_subscriptions 
+        SET 
+            price_checks_used = COALESCE(price_checks_used, 0) + 1,
+            updated_at = NOW()
+        WHERE user_id = p_user_id AND status = 'active';
+    ELSE
+        -- Create free subscription if none exists
+        INSERT INTO user_subscriptions (user_id, plan_id, status, price_checks_used, posts_created)
+        SELECT p_user_id, sp.id, 'active', 1, 0
+        FROM subscription_plans sp
+        WHERE sp.name = 'free'
+        ON CONFLICT (user_id) WHERE status = 'active'
+        DO UPDATE SET 
+            price_checks_used = COALESCE(user_subscriptions.price_checks_used, 0) + 1,
+            updated_at = NOW();
+    END IF;
     
     RETURN TRUE;
 END;
@@ -200,12 +225,14 @@ BEGIN
         status,
         paypal_order_id,
         price_checks_used,
+        posts_created,
         expires_at
     ) VALUES (
         p_user_id,
         v_pro_plan_id, 
         'active',
         p_paypal_order_id,
+        0,
         0,
         NOW() + INTERVAL '1 month'
     )
@@ -226,6 +253,9 @@ SELECT
   COALESCE(p.price_check_limit, 2) as price_check_limit,
   COALESCE(s.price_checks_used, 0) as price_checks_used,
   COALESCE(p.price_check_limit, 2) - COALESCE(s.price_checks_used, 0) as remaining_checks,
+  COALESCE(p.post_creation_limit, 100) as post_creation_limit,
+  COALESCE(s.posts_created, 0) as posts_created,
+  COALESCE(p.post_creation_limit, 100) - COALESCE(s.posts_created, 0) as remaining_posts,
   s.status as subscription_status,
   s.started_at as start_date,
   s.expires_at as end_date
@@ -234,13 +264,65 @@ FROM
   LEFT JOIN user_subscriptions s ON u.id = s.user_id AND s.status = 'active'
   LEFT JOIN subscription_plans p ON s.plan_id = p.id;
 
--- Function to reset daily usage (should be called daily via cron job)
-CREATE OR REPLACE FUNCTION reset_daily_price_checks()
+-- Function to check if user has reached their post creation limit
+CREATE OR REPLACE FUNCTION check_post_limit(p_user_id UUID)
+RETURNS BOOLEAN AS $$
+DECLARE
+    v_limit INTEGER;
+    v_used INTEGER;
+BEGIN
+    -- Get user's current plan limits and usage
+    SELECT 
+        COALESCE(p.post_creation_limit, 100),
+        COALESCE(s.posts_created, 0)
+    INTO v_limit, v_used
+    FROM auth.users u
+    LEFT JOIN user_subscriptions s ON u.id = s.user_id AND s.status = 'active'
+    LEFT JOIN subscription_plans p ON s.plan_id = p.id
+    WHERE u.id = p_user_id;
+    
+    -- Return true if user can create more posts
+    RETURN v_used < v_limit;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to log a post creation
+CREATE OR REPLACE FUNCTION log_post_creation(p_user_id UUID)
+RETURNS BOOLEAN AS $$
+DECLARE
+    v_can_create BOOLEAN;
+BEGIN
+    -- Check if user can create the post
+    SELECT check_post_limit(p_user_id) INTO v_can_create;
+    
+    IF NOT v_can_create THEN
+        RETURN FALSE;
+    END IF;
+    
+    -- Increment the usage counter
+    INSERT INTO user_subscriptions (user_id, plan_id, price_checks_used, posts_created)
+    SELECT p_user_id, sp.id, 0, 1
+    FROM subscription_plans sp
+    WHERE sp.name = 'free'
+    ON CONFLICT (user_id, status) 
+    DO UPDATE SET 
+        posts_created = user_subscriptions.posts_created + 1,
+        updated_at = NOW();
+    
+    RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to reset monthly usage (should be called monthly via cron job)
+CREATE OR REPLACE FUNCTION reset_monthly_usage()
 RETURNS void AS $$
 BEGIN
-  -- Reset price_checks_used to 0 for all active subscriptions
+  -- Reset price_checks_used and posts_created to 0 for all active subscriptions
   UPDATE user_subscriptions
-  SET price_checks_used = 0
+  SET price_checks_used = 0,
+      posts_created = 0,
+      price_checks_reset_at = NOW() + INTERVAL '1 month',
+      posts_reset_at = NOW() + INTERVAL '1 month'
   WHERE status = 'active';
 END;
 $$ LANGUAGE plpgsql;
@@ -321,7 +403,9 @@ GRANT SELECT ON payment_transactions TO authenticated;
 GRANT SELECT ON user_subscription_info TO authenticated;
 GRANT EXECUTE ON FUNCTION check_price_limit TO authenticated;
 GRANT EXECUTE ON FUNCTION log_price_check TO authenticated;
-GRANT EXECUTE ON FUNCTION reset_daily_price_checks TO service_role;
+GRANT EXECUTE ON FUNCTION check_post_limit TO authenticated;
+GRANT EXECUTE ON FUNCTION log_post_creation TO authenticated;
+GRANT EXECUTE ON FUNCTION reset_monthly_usage TO service_role;
 GRANT EXECUTE ON FUNCTION create_pro_subscription TO service_role;
 
 -- Note: Views cannot have RLS policies directly

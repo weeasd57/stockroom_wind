@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSupabase } from '@/providers/SupabaseProvider'; // Updated from useAuth
 import { useProfile } from '@/providers/ProfileProvider'; // Updated from contexts/ProfileContext
+import { useSubscription } from '@/providers/SubscriptionProvider';
 import { getCountrySymbolCounts, searchStocks } from '@/utils/symbolSearch';
 // Background post creation handles image compression/upload and post insert
 import { useBackgroundPostCreation } from '@/providers/BackgroundPostCreationProvider';
@@ -56,6 +57,7 @@ const currencySymbolFor = (countryOrCode) => {
 export default function CreatePostForm() {
   const { user, supabase } = useSupabase(); // Get the supabase client from the provider
   const { profile, getEffectiveAvatarUrl } = useProfile();
+  const { canCreatePost, incrementPostUsage, getRemainingPosts } = useSubscription();
   const router = useRouter();
   const { tasks, startBackgroundPostCreation, cancelTask } = useBackgroundPostCreation();
   const [initialPrice, setInitialPrice] = useState(null); // Added initialPrice state
@@ -1171,14 +1173,19 @@ export default function CreatePostForm() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (isSubmitting) return; // Prevent multiple submissions
+
+    // Check if user can create a post (subscription limits)
+    if (!canCreatePost()) {
+      toast.error(`You've reached your post limit. ${getRemainingPosts()} posts remaining.`);
+      return;
+    }
+
     setIsSubmitting(true); // Set submitting state to true
 
-    setErrors({}); // Reset errors
-
-    // Simple validation checks
+    // Basic validation check first
     if (!selectedStock || !selectedStock.symbol) {
-      setErrors({ stock: 'Please select a stock symbol' });
-      setIsSubmitting(false); // Reset submitting state on error
+      console.error('[handleSubmit] No stock selected');
+      setIsSubmitting(false);
       return;
     }
 
@@ -1263,6 +1270,15 @@ export default function CreatePostForm() {
         imageFile: fileToUpload,
         existingImageUrl: resolvedExistingUrl,
         title: title || selectedStock?.symbol || 'New post',
+        onSuccess: async () => {
+          // Increment post usage when post is successfully created
+          const result = await incrementPostUsage();
+          if (result.success) {
+            console.log('[handleSubmit] Post usage incremented successfully');
+          } else {
+            console.warn('[handleSubmit] Failed to increment post usage:', result.error);
+          }
+        }
       });
 
       console.debug('[handleSubmit] background task started', { taskId });
@@ -1276,7 +1292,6 @@ export default function CreatePostForm() {
       // No need to manually refresh - PostProvider handles real-time updates
 
       // Defer form reset/close until task completion (handled by useEffect on currentTask)
-      return;
     } catch (error) {
       console.error("Error creating post:", error);
       setGlobalStatus({ type: 'error', message: error.message || 'Error creating post. Please try again.' });

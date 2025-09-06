@@ -123,12 +123,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'User ID not available' }, { status: 401 });
     }
 
-    // Get user's subscription info
-    const { data: subscriptionInfo, error: subError } = await adminSupabase
+    // Get user's subscription info (may not exist for new users)
+    const { data: subscriptionData, error: subError } = await adminSupabase
       .from('user_subscription_info')
       .select('*')
-      .eq('user_id', userId)
-      .single();
+      .eq('user_id', userId);
+    
+    const subscriptionInfo = subscriptionData && subscriptionData.length > 0 ? subscriptionData[0] : null;
 
     // Default to free plan limits if no subscription found
     const maxDailyChecks = subscriptionInfo?.price_check_limit || 2;
@@ -243,48 +244,63 @@ export async function POST(request) {
       );
     }
     
-    // Get user's subscription info
-    const { data: subscriptionInfo, error: subError } = await adminSupabase
-      .from('user_subscription_info')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+    // Check if user can perform price check using RPC function
+    const { data: canCheck, error: checkError } = await adminSupabase
+      .rpc('check_price_limit', { p_user_id: userId });
     
-    // Default to free plan limits if no subscription found
-    const maxDailyChecks = subscriptionInfo?.price_check_limit || 2;
-    const usedChecks = subscriptionInfo?.price_checks_used || 0;
-    
-    if (DEBUG) console.log(`[DEBUG] User ${userId} subscription: ${subscriptionInfo?.plan_name || 'free'}, used: ${usedChecks}/${maxDailyChecks}`);
-    
-    // Check if user has reached their limit
-    if (usedChecks >= maxDailyChecks) {
-      if (DEBUG) console.log(`[DEBUG] User has reached maximum daily checks (${usedChecks}/${maxDailyChecks})`);
+    if (checkError) {
+      console.error('[ERROR] Error checking price limit:', checkError);
       return NextResponse.json(
         { 
           success: false, 
-          message: `You have reached your ${subscriptionInfo?.plan_name || 'free'} plan limit of ${maxDailyChecks} checks today.`, 
+          message: 'Error checking subscription limits', 
+          error: checkError.message 
+        },
+        { status: 500 }
+      );
+    }
+    
+    if (canCheck === false) {
+      // Get subscription info for error message (may not exist for new users)
+      const { data: subscriptionData } = await adminSupabase
+        .from('user_subscription_info')
+        .select('*')
+        .eq('user_id', userId);
+      
+      const subscriptionInfo = subscriptionData && subscriptionData.length > 0 ? subscriptionData[0] : null;
+      
+      const maxChecks = subscriptionInfo?.price_check_limit || 2;
+      const usedChecks = subscriptionInfo?.price_checks_used || 0;
+      const planName = subscriptionInfo?.plan_name || 'free';
+      
+      if (DEBUG) console.log(`[DEBUG] User has reached maximum checks (${usedChecks}/${maxChecks})`);
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: `لقد وصلت إلى الحد الأقصى لفحص الأسعار (${maxChecks} فحص شهريًا). يرجى الترقية إلى Pro للحصول على المزيد.`,
+          message_en: `You have reached your ${planName} plan limit of ${maxChecks} price checks per month. Please upgrade to Pro for more.`,
           remainingChecks: 0,
           usageCount: usedChecks,
-          planName: subscriptionInfo?.plan_name || 'free',
-          maxDailyChecks
+          planName: planName,
+          maxMonthlyChecks: maxChecks
         },
         { status: 429 }
       );
     }
     
-    // Increment usage counter
-    const { error: updateUsageError } = await adminSupabase
-      .from('user_subscriptions')
-      .update({ 
-        price_checks_used: usedChecks + 1
-      })
-      .eq('user_id', userId)
-      .eq('status', 'active');
+    // Log the price check using RPC function
+    const { data: logResult, error: logError } = await adminSupabase
+      .rpc('log_price_check', { 
+        p_user_id: userId,
+        p_symbol: 'BATCH_CHECK', // Generic symbol for batch check
+        p_exchange: null,
+        p_country: null
+      });
     
-    if (updateUsageError) {
-      console.error('[ERROR] Error updating usage count:', updateUsageError);
+    if (logError) {
+      console.error('[ERROR] Error logging price check:', logError);
     } else {
-      if (DEBUG) console.log(`[DEBUG] Updated usage count from ${usedChecks} to ${usedChecks + 1}`);
+      if (DEBUG) console.log(`[DEBUG] Successfully logged price check`);
     }
     
     if (DEBUG) console.log(`[DEBUG] Fetching all posts to count closed posts`);
@@ -1055,16 +1071,17 @@ export async function POST(request) {
       results.updateSuccess = updateSuccess;
     }
     
+    // Get user's subscription limits from Supabase (may not exist for new users)
+    const { data: subscriptionData } = await adminSupabase
+      .from('user_subscription_info')
+      .select('*')
+      .eq('user_id', userId);
     
-    const { data: currentUsage, error: currentUsageError } = await adminSupabase
-      .from('price_check_usage')
-      .select('count')
-      .eq('user_id', userId)
-      .eq('check_date', today)
-      .single();
+    const subscriptionInfo = subscriptionData && subscriptionData.length > 0 ? subscriptionData[0] : null;
     
-    const usageCount = currentUsage ? currentUsage.count : 1;
-    const remainingChecks = MAX_DAILY_CHECKS - usageCount;
+    const maxDailyChecks = subscriptionInfo?.price_check_limit || 2;
+    const usageCount = subscriptionInfo?.price_checks_used || 0;
+    const remainingChecks = Math.max(maxDailyChecks - usageCount, 0);
     
     if (DEBUG) console.log(`[DEBUG] Price check completed for ${posts.length} posts. Updated: ${updatedPosts.length}, Skipped: ${closedPostsCount}, Remaining checks today: ${remainingChecks}`);
     

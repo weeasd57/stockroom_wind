@@ -20,7 +20,9 @@ export function SubscriptionProvider({ children }) {
     tier: 'free', // 'free' | 'pro'
     status: 'inactive', // 'active' | 'inactive' | 'expired' | 'cancelled'
     priceChecks: 0,
-    maxPriceChecks: 5, // Free tier limit
+    maxPriceChecks: 2, // Free tier limit
+    postsCreated: 0,
+    maxPostsCreation: 100, // Free tier limit
     billingPeriod: null,
     nextBillingDate: null,
     subscriptionId: null,
@@ -84,6 +86,8 @@ export function SubscriptionProvider({ children }) {
           plan_display_name: userSub.subscription_plans?.display_name || 'Free',
           price_check_limit: userSub.subscription_plans?.price_check_limit || 2,
           price_checks_used: userSub.price_checks_used || 0,
+          post_creation_limit: userSub.subscription_plans?.post_creation_limit || 100,
+          posts_created: userSub.posts_created || 0,
           subscription_status: userSub.status,
           start_date: userSub.started_at,
           end_date: userSub.expires_at
@@ -96,6 +100,8 @@ export function SubscriptionProvider({ children }) {
           plan_display_name: 'Free',
           price_check_limit: 2,
           price_checks_used: 0,
+          post_creation_limit: 100,
+          posts_created: 0,
           subscription_status: 'inactive'
         };
       }
@@ -109,6 +115,8 @@ export function SubscriptionProvider({ children }) {
         status: subscriptionInfo?.subscription_status || 'inactive',
         priceChecks: priceCheckCount,
         maxPriceChecks: subscriptionInfo?.price_check_limit || 2,
+        postsCreated: subscriptionInfo?.posts_created || 0,
+        maxPostsCreation: subscriptionInfo?.post_creation_limit || 100,
         billingPeriod: 'monthly', // Based on existing schema
         nextBillingDate: subscriptionInfo?.end_date || null,
         subscriptionId: subscriptionInfo?.plan_id || null,
@@ -195,15 +203,91 @@ export function SubscriptionProvider({ children }) {
     return Math.max(0, subscription.maxPriceChecks - subscription.priceChecks);
   };
 
-  // Check if user is Pro
-  const isPro = () => {
-    return subscription.tier === 'pro' && subscription.status === 'active';
+  // Get remaining posts
+  const getRemainingPosts = () => {
+    return Math.max(0, subscription.maxPostsCreation - subscription.postsCreated);
   };
 
-  // Load subscription on mount and when user changes
-  useEffect(() => {
-    refreshSubscription();
-  }, [isAuthenticated, user?.id]);
+  // Function to increment post usage
+  const incrementPostUsage = async () => {
+    if (!user) return { success: false, error: 'No user' };
+    
+    try {
+      // Get current subscription (may not exist for new users)
+      const { data: userSubData } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active');
+      
+      const userSub = userSubData && userSubData.length > 0 ? userSubData[0] : null;
+      
+      if (userSub) {
+        // Increment posts_created counter
+        const { error } = await supabase
+          .from('user_subscriptions')
+          .update({ 
+            posts_created: (userSub.posts_created || 0) + 1,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userSub.id);
+          
+        if (error) throw error;
+      }
+      
+      // Refresh subscription data
+      await refreshSubscription();
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error incrementing post usage:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Function to increment price check usage
+  const incrementPriceCheckUsage = async () => {
+    if (!user) return { success: false, error: 'No user' };
+    
+    try {
+      // Get current subscription (may not exist for new users)
+      const { data: userSubData } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active');
+      
+      const userSub = userSubData && userSubData.length > 0 ? userSubData[0] : null;
+      
+      if (userSub) {
+        // Increment price_checks_used counter
+        const { error } = await supabase
+          .from('user_subscriptions')
+          .update({ 
+            price_checks_used: (userSub.price_checks_used || 0) + 1,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userSub.id);
+          
+        if (error) throw error;
+      }
+      
+      // Refresh subscription data
+      await refreshSubscription();
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error incrementing price check usage:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Function to check if user can check prices
+  const canCheckPrices = () => {
+    return getRemainingPriceChecks() > 0;
+  };
+
+  const isPro = subscription.tier === 'pro';
 
   const value = {
     // Subscription state
@@ -215,17 +299,19 @@ export function SubscriptionProvider({ children }) {
     upgradeToProSubscription,
     cancelSubscription,
     
-    // Helpers
-    canPerformPriceCheck,
+    // Getters
     getRemainingPriceChecks,
-    isPro,
+    getRemainingPosts,
+    canPerformPriceCheck,
+    canCreatePost: () => getRemainingPosts() > 0,
+    canCheckPrices,
     
-    // Quick access
-    isLoading: subscription.loading,
-    error: subscription.error,
-    tier: subscription.tier,
-    priceChecks: subscription.priceChecks,
-    maxPriceChecks: subscription.maxPriceChecks
+    // Usage incrementers
+    incrementPostUsage,
+    incrementPriceCheckUsage,
+    
+    // Flags
+    isPro
   };
 
   return (

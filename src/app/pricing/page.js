@@ -105,7 +105,9 @@ export default function PricingPage() {
           </div>
           <ul className="mt-6 space-y-2 text-sm">
             <li className="flex items-start gap-2"><span>✅</span> <strong>2 price checks per month</strong></li>
-            <li className="flex items-start gap-2"><span>✅</span> Create and view posts</li>
+            <li className="flex items-start gap-2"><span>✅</span> <strong>100 posts per month</strong></li>
+            <li className="flex items-start gap-2"><span>✅</span> Basic features</li>
+            <li className="flex items-start gap-2"><span>✅</span> Community support</li>
           </ul>
           <div className="mt-6">
             {currentPlan === 'free' ? (
@@ -134,12 +136,12 @@ export default function PricingPage() {
           <h2 className="text-xl font-semibold">Pro Plan</h2>
           <p className="text-muted-foreground mt-1">For active traders</p>
           <div className="mt-5 flex items-baseline gap-1">
-            <span className="text-3xl font-bold">$1.00</span>
+            <span className="text-3xl font-bold">$7.00</span>
             <span className="text-sm text-muted-foreground">/ month</span>
           </div>
           <ul className="mt-6 space-y-2 text-sm">
-            <li className="flex items-start gap-2"><span>🚀</span> <strong>30 price checks per month</strong></li>
-            <li className="flex items-start gap-2"><span>🚀</span> Unlimited post creation</li>
+            <li className="flex items-start gap-2"><span>🚀</span> <strong>300 price checks per month</strong></li>
+            <li className="flex items-start gap-2"><span>🚀</span> <strong>500 posts per month</strong></li>
             <li className="flex items-start gap-2"><span>🚀</span> Priority support</li>
           </ul>
           <div className="mt-6 grid grid-cols-1 gap-2">

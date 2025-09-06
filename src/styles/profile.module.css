@@ -266,6 +266,150 @@
   min-height: 300px;
 }
 
+/* Subscription Info Styles */
+.subscriptionInfo {
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+}
+
+.subscriptionCard {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.planHeader {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.planBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.planBadge[data-plan="free"] {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.planBadge[data-plan="pro"] {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+}
+
+.statusBadge {
+  padding: 0.25rem 0.75rem;
+  background: #10b981;
+  color: white;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.limitsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.limitItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.limitHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.limitIcon {
+  font-size: 1.25rem;
+}
+
+.limitTitle {
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.limitProgress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.limitBar {
+  width: 100%;
+  height: 8px;
+  background: hsl(var(--muted));
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.limitFill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 4px;
+}
+
+.limitText {
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.upgradePrompt {
+  background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+  border: 1px solid #667eea30;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.upgradePrompt p {
+  margin-bottom: 0.75rem;
+  color: hsl(var(--foreground));
+}
+
+.upgradeButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.upgradeButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.billingInfo {
+  padding-top: 1rem;
+  border-top: 1px solid hsl(var(--border));
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+  text-align: center;
+}
+
 .postsGrid {
   display: flex;
   flex-direction: column;

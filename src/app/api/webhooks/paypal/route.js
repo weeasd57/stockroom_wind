@@ -54,6 +54,8 @@ const credentials = {
   mode
 };
 
+const basic = Buffer.from(`${credentials.clientId}:${credentials.clientSecret}`).toString('base64');
+
 // ---- PayPal REST Helpers (manual, since SDK doesn't expose webhooks verify) ----
 function paypalBaseUrl(mode) {
   // Use modern api-m domains per PayPal docs
@@ -62,7 +64,6 @@ function paypalBaseUrl(mode) {
 
 async function getAccessToken(targetMode) {
   const base = paypalBaseUrl(targetMode || mode);
-  const basic = Buffer.from(`${credentials.clientId}:${credentials.clientSecret}`).toString('base64');
   const res = await fetch(`${base}/v1/oauth2/token`, {
     method: 'POST',
     headers: {
@@ -94,7 +95,7 @@ async function verifyPaypalWebhook(request, body) {
     throw err;
   }
 
-  // Detect event environment from cert_url host for logging purposes
+  // Detect event environment from cert_url host
   let eventEnv = 'sandbox';
   try {
     const host = new URL(certUrl).hostname || '';
@@ -102,24 +103,21 @@ async function verifyPaypalWebhook(request, body) {
     console.log('[PayPal] Cert URL analysis', { 
       certUrl: certUrl,
       hostname: host,
-      detectedEnv: eventEnv 
+      detectedEnv: eventEnv,
+      configuredMode: mode
     });
   } catch (e) {
     console.warn('[PayPal] Failed to parse cert_url', { certUrl, error: e.message });
     // keep default sandbox if parsing fails
   }
-  if (eventEnv !== mode) {
-    console.warn('[PayPal] Environment mismatch - using configured mode', { 
-      configuredMode: mode, 
-      eventEnv,
-      certUrl,
-      action: `forcing ${mode} mode for authentication` 
-    });
-  }
 
-  // Always use the configured mode for authentication, not auto-detected
-  const accessToken = await getAccessToken(mode);
-  const base = paypalBaseUrl(mode);
+  // Use detected environment from cert URL for verification
+  // This ensures webhook signature verification works for both environments
+  const verificationMode = eventEnv;
+  const accessToken = await getAccessToken(verificationMode);
+  const base = paypalBaseUrl(verificationMode);
+  
+  console.log(`[PayPal] Using ${verificationMode} mode for webhook verification (detected from cert URL)`);
 
   const payload = {
     auth_algo: authAlgo,
@@ -268,7 +266,10 @@ async function handleEvent(event) {
                   status: 'active',
                   paypal_order_id: orderId,
                   price_checks_used: 0,
-                  price_checks_reset_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+                  posts_created: 0,
+                  price_checks_reset_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                  posts_reset_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                  expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
                 })
                 .select()
                 .single();

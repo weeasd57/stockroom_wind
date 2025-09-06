@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import styles from '@/styles/profile.module.css';
 import { useProfile } from '@/providers/ProfileProvider';
 import { useSupabase } from '@/providers/SupabaseProvider';
+import { useSubscription } from '@/providers/SubscriptionProvider';
 import dialogStyles from '@/styles/ProfilePostCard.module.css';
 import ConfirmActionDialog from '@/components/common/ConfirmActionDialog'; // Import the new dialog
 
@@ -13,6 +14,7 @@ export default function CheckPostPricesButton({ userId }) {
   const [error, setError] = useState(null);
   const { refreshData } = useProfile();
   const { supabase } = useSupabase();
+  const { canCheckPrices, incrementPriceCheckUsage, getRemainingPriceChecks } = useSubscription();
   const [abortController, setAbortController] = useState(null);
   const [isCancelled, setIsCancelled] = useState(false);
   const [showStatsDialog, setShowStatsDialog] = useState(false);
@@ -102,6 +104,13 @@ export default function CheckPostPricesButton({ userId }) {
   // Function to actually perform the POST request after confirmation - using useCallback
   const handleProceedCheck = useCallback(async () => {
     setShowConfirmDialog(false); // Close any open confirmation dialog
+    
+    // Check if user can perform price check
+    if (!canCheckPrices()) {
+      setError(`You have reached your price check limit. Remaining: ${getRemainingPriceChecks()}`);
+      return;
+    }
+    
     setIsChecking(true);
 
     // Create a new AbortController for this request
@@ -160,6 +169,14 @@ export default function CheckPostPricesButton({ userId }) {
         setDetailedResults(data.results);
       }
       
+      // Increment price check usage after successful check
+      const usageResult = await incrementPriceCheckUsage();
+      if (usageResult.success) {
+        console.log('[CheckPostPricesButton] Price check usage incremented successfully');
+      } else {
+        console.warn('[CheckPostPricesButton] Failed to increment price check usage:', usageResult.error);
+      }
+      
       if (userId && !isCancelled) {
         refreshData(userId);
       }
@@ -179,16 +196,12 @@ export default function CheckPostPricesButton({ userId }) {
         setError(err.message || 'An error occurred while checking prices');
       }
     } finally {
-      // Ensure loading state is shown for at least 500ms to improve UX
-      await new Promise(resolve => setTimeout(resolve, 500)); 
       setIsChecking(false);
       setAbortController(null);
-      // Reset cancelled state if it was an error other than abort
-      if (!isCancelled) {
-        setIsCancelled(false);
-      }
+      // Reset cancelled state
+      setIsCancelled(false);
     }
-  }, [userId, isCancelled, refreshData]); // Add all dependencies to useCallback
+  }, [userId, refreshData, canCheckPrices, getRemainingPriceChecks, incrementPriceCheckUsage]);
   
   const checkPostPrices = async () => {
     setCheckStats(null);
