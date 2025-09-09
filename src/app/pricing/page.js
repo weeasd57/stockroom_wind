@@ -4,45 +4,18 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSupabase } from '@/providers/SupabaseProvider';
-import { useAuth } from '@/hooks/useAuth';
+import { useSubscription } from '@/providers/SubscriptionProvider';
 
 export default function PricingPage() {
   const router = useRouter();
-  const { supabase } = useSupabase();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useSupabase();
+  const { 
+    subscriptionInfo, 
+    isPro,
+    loading: subscriptionLoading,
+    syncing 
+  } = useSubscription();
   const [loading, setLoading] = useState(false);
-  const [currentPlan, setCurrentPlan] = useState(null);
-  const [subscriptionInfo, setSubscriptionInfo] = useState(null);
-  // Fetch user's current subscription
-  useEffect(() => {
-    if (user) {
-      fetchSubscriptionInfo();
-    }
-  }, [user]);
-
-  const fetchSubscriptionInfo = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      const response = await (token
-        ? fetch('/api/subscription/info', {
-            headers: { Authorization: `Bearer ${token}` },
-            cache: 'no-store',
-          })
-        : fetch('/api/subscription/info', {
-            credentials: 'include',
-            cache: 'no-store',
-          }));
-      const result = await response.json();
-
-      if (result.success && result.data) {
-        setSubscriptionInfo(result.data);
-        setCurrentPlan(result.data.plan_name);
-      }
-    } catch (error) {
-      console.error('Error fetching subscription:', error);
-    }
-  };
 
   const handleUpgradeToPro = async () => {
     if (!user) {
@@ -75,23 +48,28 @@ export default function PricingPage() {
         <p className="text-muted-foreground max-w-2xl mx-auto">
           Choose the plan that works best for you. Start with Free or upgrade to Pro for more price checks.
         </p>
-        {subscriptionInfo && (
-          <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-sm">
-            <span>Current Plan:</span>
-            <span className="font-semibold">{subscriptionInfo.plan_display_name}</span>
-            {subscriptionInfo.plan_name === 'free' && (
-              <span className="text-muted-foreground">
-                ({subscriptionInfo.remaining_checks}/{subscriptionInfo.price_check_limit} price checks remaining)
-              </span>
-            )}
-          </div>
-        )}
+      {subscriptionInfo && !subscriptionLoading && (
+        <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-sm">
+          <span>Current Plan:</span>
+          <span className="font-semibold">{subscriptionInfo.plan_display_name || 'Free'}</span>
+          {!isPro && (
+            <span className="text-muted-foreground">
+              ({subscriptionInfo.remaining_checks || 0}/{subscriptionInfo.price_check_limit || 2} price checks remaining)
+            </span>
+          )}
+        </div>
+      )}
       </section>
 
       {/* Plans */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Free */}
-        <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 flex flex-col">
+        <div className={`rounded-xl border ${!isPro ? 'ring-2 ring-primary' : ''} bg-card text-card-foreground shadow-sm p-6 flex flex-col relative`}>
+          {!isPro && (
+            <div className="absolute -top-3 left-6 px-2 py-1 bg-primary text-primary-foreground text-xs font-semibold rounded">
+              Current Plan
+            </div>
+          )}
           <div className="mb-4">
             <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium">
               Free
@@ -109,8 +87,8 @@ export default function PricingPage() {
             <li className="flex items-start gap-2"><span>✅</span> Basic features</li>
             <li className="flex items-start gap-2"><span>✅</span> Community support</li>
           </ul>
-          <div className="mt-6">
-            {currentPlan === 'free' ? (
+          <div className="mt-6 grid grid-cols-1 gap-2">
+            {!isPro ? (
               <button disabled className="inline-flex w-full items-center justify-center rounded-md bg-muted px-4 py-2 text-sm font-medium text-muted-foreground cursor-not-allowed">
                 Current Plan
               </button>
@@ -126,7 +104,12 @@ export default function PricingPage() {
         </div>
 
         {/* Pro */}
-        <div className="relative rounded-xl border bg-card/60 backdrop-blur text-card-foreground shadow-sm p-6 flex flex-col ring-1 ring-primary/10">
+        <div className={`relative rounded-xl border ${isPro ? 'ring-2 ring-primary' : 'ring-1 ring-primary/10'} bg-card/60 backdrop-blur text-card-foreground shadow-sm p-6 flex flex-col`}>
+          {isPro && (
+            <div className="absolute -top-3 left-6 px-2 py-1 bg-primary text-primary-foreground text-xs font-semibold rounded">
+              Current Plan
+            </div>
+          )}
           <div className="mb-4 flex items-center gap-2">
             <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium">
               Pro
@@ -145,7 +128,7 @@ export default function PricingPage() {
             <li className="flex items-start gap-2"><span>🚀</span> Priority support</li>
           </ul>
           <div className="mt-6 grid grid-cols-1 gap-2">
-            {currentPlan === 'pro' ? (
+            {isPro ? (
               <button disabled className="inline-flex w-full items-center justify-center rounded-md bg-muted px-4 py-2 text-sm font-medium text-muted-foreground cursor-not-allowed">
                 Current Plan
               </button>

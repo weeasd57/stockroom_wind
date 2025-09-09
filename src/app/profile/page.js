@@ -20,14 +20,21 @@ import CheckPostPricesButton from '@/components/profile/CheckPostPricesButton';
 import StrategyDetailsModal from '@/components/profile/StrategyDetailsModal';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 import { DashboardSection } from '@/components/home/DashboardSection';
+import { useTheme } from '@/providers/theme-provider';
 
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useSupabase();
+  const { theme } = useTheme();
   const { 
-    subscription,
-    getRemainingPriceChecks,
-    getRemainingPosts,
-    isPro
+    subscriptionInfo,
+    loading: subscriptionLoading,
+    syncing: subscriptionSyncing,
+    canPerformPriceCheck,
+    canCreatePost,
+    getUsageInfo,
+    isPro,
+    getSubscriptionMessage,
+    refreshSubscription
   } = useSubscription();
   const { 
     profile, 
@@ -53,6 +60,9 @@ export default function Profile() {
     lastFetched, // Added lastFetched
     isRefreshing // Added isRefreshing
   } = useProfile();
+  
+  // Get dialog state at the component level - MUST be before any conditions
+  const { isOpen, closeDialog } = useCreatePostForm();
 
   // Debug authentication on mount
   useEffect(() => {
@@ -62,6 +72,15 @@ export default function Profile() {
       userId: user?.id,
       authLoading,
       profileLoading
+    });
+    
+    // Debug subscription data
+    console.log("[PROFILE] Subscription Info:", subscriptionInfo);
+    console.log("[PROFILE] Subscription Info Details:", {
+      remaining_checks: subscriptionInfo?.remaining_checks,
+      price_checks_used: subscriptionInfo?.price_checks_used,
+      price_check_limit: subscriptionInfo?.price_check_limit,
+      subscriptionLoading
     });
     
     // Debug the profile data
@@ -78,7 +97,7 @@ export default function Profile() {
     } else {
       console.log("[PROFILE] No profile data available");
     }
-  }, [isAuthenticated, user, authLoading, profileLoading, profile]);
+  }, [isAuthenticated, user, authLoading, profileLoading, profile, subscriptionInfo, subscriptionLoading]);
 
   
   const [showEditModal, setShowEditModal] = useState(false);
@@ -112,7 +131,6 @@ export default function Profile() {
   const [selectedSymbol, setSelectedSymbol] = useState('');
   const [discoveredCountries, setDiscoveredCountries] = useState([]);
   const [discoveredSymbols, setDiscoveredSymbols] = useState([]);
-  const [activeWhatsAppTab, setActiveWhatsAppTab] = useState('subscriptionUsers'); // New state for nested WhatsApp tabs
 
   // Initialize data once when authenticated
   useEffect(() => {
@@ -279,10 +297,6 @@ export default function Profile() {
     // If switching to a tab other than posts, we don't need to do anything with filters
     // as they'll only apply when we come back to the posts tab
   }, [activeTab, selectedStrategyForDetails]);
-
-  const handleWhatsAppTabChange = useCallback((tab) => {
-    setActiveWhatsAppTab(tab);
-  }, []);
 
   const handleEditProfile = useCallback(() => {
     setShowEditModal(true);
@@ -893,9 +907,6 @@ export default function Profile() {
   // We'll handle the dialog rendering directly in the JSX rather than using portals
   // This avoids the need for additional hooks that might cause issues
 
-  // Get dialog state at the component level to avoid hooks in render functions
-  const { isOpen, closeDialog } = useCreatePostForm();
-
   // Add a helper function to determine if a post matches a given status
   const matchesStatus = (post, statusFilter) => {
     if (!statusFilter) {
@@ -1045,59 +1056,22 @@ export default function Profile() {
       <div className={styles.subscriptionInfo}>
         <div className={styles.subscriptionCard}>
           <div className={styles.planHeader}>
-            <span className={styles.planBadge} data-plan={subscription?.tier || 'free'}>
-              {subscription?.tier === 'pro' ? '⭐ Pro' : '🆓 Free'} Plan
+            <span className={styles.planBadge} data-plan={subscriptionInfo?.plan_name || 'free'}>
+              {isPro ? '⭐ Pro' : '🆓 Free'} Plan
             </span>
-            {subscription?.status === 'active' && (
+            {subscriptionInfo?.subscription_status === 'active' && (
               <span className={styles.statusBadge}>Active</span>
             )}
           </div>
           
-          <div className={styles.limitsGrid}>
-            <div className={styles.limitItem}>
-              <div className={styles.limitHeader}>
-                <span className={styles.limitIcon}>📊</span>
-                <span className={styles.limitTitle}>Price Checks</span>
-              </div>
-              <div className={styles.limitProgress}>
-                <div className={styles.limitBar}>
-                  <div 
-                    className={styles.limitFill} 
-                    style={{ 
-                      width: `${((subscription?.priceChecks || 0) / (subscription?.maxPriceChecks || (subscription?.tier === 'pro' ? 300 : 2))) * 100}%`,
-                      backgroundColor: subscription?.tier === 'pro' ? '#10b981' : '#3b82f6'
-                    }}
-                  />
-                </div>
-                <span className={styles.limitText}>
-                  {getRemainingPriceChecks()} / {subscription?.maxPriceChecks || (subscription?.tier === 'pro' ? 300 : 2)} remaining
-                </span>
-              </div>
+          {subscriptionLoading ? (
+            <div className={styles.loadingContainer}>
+              <div className={styles.loadingSpinner} />
+              <p>Loading subscription info...</p>
             </div>
-            
-            <div className={styles.limitItem}>
-              <div className={styles.limitHeader}>
-                <span className={styles.limitIcon}>📝</span>
-                <span className={styles.limitTitle}>Posts</span>
-              </div>
-              <div className={styles.limitProgress}>
-                <div className={styles.limitBar}>
-                  <div 
-                    className={styles.limitFill} 
-                    style={{ 
-                      width: `${((subscription?.postsCreated || 0) / (subscription?.maxPostsCreation || 100)) * 100}%`,
-                      backgroundColor: subscription?.tier === 'pro' ? '#10b981' : '#3b82f6'
-                    }}
-                  />
-                </div>
-                <span className={styles.limitText}>
-                  {getRemainingPosts()} / {subscription?.maxPostsCreation || 100} remaining
-                </span>
-              </div>
-            </div>
-          </div>
+          ) : null}
           
-          {subscription?.tier === 'free' && (
+          {!isPro && (
             <div className={styles.upgradePrompt}>
               <p>Upgrade to Pro for more features!</p>
               <Link href="/pricing" className={styles.upgradeButton}>
@@ -1106,9 +1080,119 @@ export default function Profile() {
             </div>
           )}
           
-          {subscription?.tier === 'pro' && subscription?.nextBillingDate && (
+          {isPro && subscriptionInfo?.end_date && (
             <div className={styles.billingInfo}>
-              <span>Next billing: {new Date(subscription.nextBillingDate).toLocaleDateString()}</span>
+              <span>Next billing: {new Date(subscriptionInfo.end_date).toLocaleDateString()}</span>
+            </div>
+          )}
+          
+          {/* Modern Subscription Details */}
+          {subscriptionInfo && !subscriptionLoading && (
+            <div className={styles.modernCard} style={{ position: 'relative' }}>
+              {subscriptionSyncing && (
+                <div className={styles.syncingBadge}>
+                  <div style={{ 
+                    width: '8px', 
+                    height: '8px', 
+                    borderRadius: '50%', 
+                    backgroundColor: 'currentColor',
+                    animation: 'pulse 1.5s ease-in-out infinite' 
+                  }} />
+                  Syncing...
+                </div>
+              )}
+              <h4 className={styles.detailsTitle}>
+                Subscription Details
+              </h4>
+              <div className={styles.detailsGrid}>
+                <div className={styles.detailsRow}>
+                  <span className={styles.detailsLabel}>Plan ID</span>
+                  <span className={`${styles.detailsValue} ${styles.mono}`}>
+                    {subscriptionInfo.plan_id || 'N/A'}
+                  </span>
+                </div>
+                
+                <div className={styles.detailsRow}>
+                  <span className={styles.detailsLabel}>User ID</span>
+                  <span className={`${styles.detailsValue} ${styles.mono}`}>
+                    {subscriptionInfo.user_id || 'N/A'}
+                  </span>
+                </div>
+                
+                <div className={styles.detailsRow}>
+                  <span className={styles.detailsLabel}>Plan Name</span>
+                  <span className={styles.detailsValue} style={{ color: isPro ? '#0f9d58' : undefined, textTransform: 'capitalize' }}>
+                    {subscriptionInfo.plan_display_name || subscriptionInfo.plan_name || 'N/A'}
+                  </span>
+                </div>
+                
+                <div className={styles.detailsRow}>
+                  <span className={styles.detailsLabel}>Status</span>
+                  <span className={`${styles.detailsValue} ${subscriptionInfo.subscription_status === 'active' ? styles.statusActive : styles.statusInactive}`} style={{ textTransform: 'capitalize' }}>
+                    {subscriptionInfo.subscription_status || 'N/A'}
+                  </span>
+                </div>
+                
+                <div className={styles.detailsRow}>
+                  <span className={styles.detailsLabel}>Start Date</span>
+                  <span className={styles.detailsValue}>
+                    {subscriptionInfo.start_date 
+                      ? new Date(subscriptionInfo.start_date).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short', 
+                          day: 'numeric'
+                        })
+                      : 'N/A'
+                    }
+                  </span>
+                </div>
+                
+                <div className={styles.detailsRow}>
+                  <span className={styles.detailsLabel}>End Date</span>
+                  <span className={styles.detailsValue}>
+                    {subscriptionInfo.end_date 
+                      ? new Date(subscriptionInfo.end_date).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short', 
+                          day: 'numeric'
+                        })
+                      : 'N/A'
+                    }
+                  </span>
+                </div>
+
+                {/* Price Checks Progress Bar */}
+                <div className={styles.progressBlock}>
+                  <div className={styles.progressHeader}>
+                    <span className={styles.progressLabel}>📊 Price Checks</span>
+                    <span className={styles.progressCount} style={{ color: (subscriptionInfo.price_checks_used || 0) >= (subscriptionInfo.price_check_limit || 2) ? '#dc2626' : undefined }}>
+                      {subscriptionInfo.price_checks_used || 0} / {subscriptionInfo.price_check_limit || 2}
+                    </span>
+                  </div>
+                  <div className={styles.progressTrack}>
+                    <div
+                      className={`${styles.progressFill} ${ (subscriptionInfo.price_checks_used || 0) >= (subscriptionInfo.price_check_limit || 2) ? styles.fillRed : (isPro ? styles.fillGreen : styles.fillBlue) }`}
+                      style={{ width: `${((subscriptionInfo.price_checks_used || 0) / (subscriptionInfo.price_check_limit || 2)) * 100}%` }}
+                    />
+                  </div>
+                </div>
+                
+                {/* Posts Progress Bar */}
+                <div className={styles.progressBlock}>
+                  <div className={styles.progressHeader}>
+                    <span className={styles.progressLabel}>📝 Posts Created</span>
+                    <span className={styles.progressCount}>
+                      {subscriptionInfo.posts_created || 0} / {subscriptionInfo.post_creation_limit || 100}
+                    </span>
+                  </div>
+                  <div className={styles.progressTrack}>
+                    <div
+                      className={`${styles.progressFill} ${ isPro ? styles.fillGreen : styles.fillBlue }`}
+                      style={{ width: `${((subscriptionInfo.posts_created || 0) / (subscriptionInfo.post_creation_limit || 100)) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -1152,12 +1236,6 @@ export default function Profile() {
           onClick={() => handleTabChange('following')}
         >
           Following
-        </button>
-        <button 
-          className={`${styles.tabButton} ${activeTab === 'whatsapp' ? styles.activeTab : ''}`}
-          onClick={() => handleTabChange('whatsapp')}
-        >
-          WhatsApp
         </button>
       </div>
 
@@ -1442,47 +1520,6 @@ export default function Profile() {
           </div>
         )}
 
-        {activeTab === 'whatsapp' && (
-          <div className={styles.whatsappTabContent}>
-            <div className={styles.whatsappSubTabs}>
-              <button
-                className={`${styles.tabButton} ${activeWhatsAppTab === 'subscriptionUsers' ? styles.activeTab : ''}`}
-                onClick={() => handleWhatsAppTabChange('subscriptionUsers')}
-              >
-                Subscription Users
-              </button>
-              <button
-                className={`${styles.tabButton} ${activeWhatsAppTab === 'settingsMessages' ? styles.activeTab : ''}`}
-                onClick={() => handleWhatsAppTabChange('settingsMessages')}
-              >
-                Settings Messages
-              </button>
-            </div>
-
-            <div className={styles.whatsappSubTabContent}>
-              {activeWhatsAppTab === 'subscriptionUsers' && (
-                <div className={styles.emptyStateContainer}>
-                  <div className={styles.emptyState}>
-                    <h3>WhatsApp Subscription Users</h3>
-                    <p>Manage users subscribed to WhatsApp notifications here.</p>
-                    {/* Placeholder for subscription users content */}
-                  </div>
-                </div>
-              )}
-
-              {activeWhatsAppTab === 'settingsMessages' && (
-                <div className={styles.emptyStateContainer}>
-                  <div className={styles.emptyState}>
-                    <h3>WhatsApp Message Settings</h3>
-                    <p>Configure the types of messages you receive on WhatsApp.</p>
-                    {/* Placeholder for message settings content */}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-        
         {activeTab === 'strategies' && (
           <div className={styles.strategiesContainer}>
             {isLoading ? (

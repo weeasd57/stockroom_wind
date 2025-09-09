@@ -99,6 +99,11 @@ export default function RootLayout({ children }) {
             window.imageCacheManager = {
               cache: {},
               listeners: [],
+              failedUrls: new Set(),
+              requestQueue: [],
+              isProcessing: false,
+              rateLimitDelay: 1000, // 1 second between requests
+              maxRetries: 2,
               
               // Register a component to be notified of image changes
               subscribe: function(callback) {
@@ -121,49 +126,155 @@ export default function RootLayout({ children }) {
                 });
               },
               
-              preload: function(urls) {
-                if (!Array.isArray(urls)) urls = [urls];
-                urls.forEach(url => {
-                  if (!url || this.cache[url]) return;
+              // Check if URL is a Google profile image
+              isGoogleProfileImage: function(url) {
+                return url && (url.includes('googleusercontent.com') || url.includes('google.com/'));
+              },
+              
+              // Get fallback image for failed URLs
+              getFallbackImage: function(imageType) {
+                if (imageType === 'avatar') {
+                  return '/default-avatar.svg';
+                }
+                return null;
+              },
+              
+              // Process request queue with rate limiting
+              processQueue: async function() {
+                if (this.isProcessing || this.requestQueue.length === 0) return;
+                
+                this.isProcessing = true;
+                
+                while (this.requestQueue.length > 0) {
+                  const request = this.requestQueue.shift();
+                  
+                  try {
+                    await this.loadImageWithRetry(request.url, request.retries || 0);
+                  } catch (error) {
+                    console.warn('Failed to load image after retries:', request.url, error);
+                    this.failedUrls.add(request.url);
+                  }
+                  
+                  // Rate limiting delay
+                  if (this.requestQueue.length > 0) {
+                    await new Promise(resolve => setTimeout(resolve, this.rateLimitDelay));
+                  }
+                }
+                
+                this.isProcessing = false;
+              },
+              
+              // Load image with retry logic
+              loadImageWithRetry: function(url, retryCount = 0) {
+                return new Promise((resolve, reject) => {
+                  if (this.cache[url] || this.failedUrls.has(url)) {
+                    resolve();
+                    return;
+                  }
                   
                   const img = new Image();
+                  
                   img.onload = () => {
                     this.cache[url] = true;
-                    console.log('Image preloaded:', url);
+                    console.log('Image loaded successfully:', url);
+                    resolve();
                   };
+                  
+                  img.onerror = () => {
+                    if (retryCount < this.maxRetries && this.isGoogleProfileImage(url)) {
+                      console.warn(\`Image load failed, retrying (\${retryCount + 1}/\${this.maxRetries}):\`, url);
+                      setTimeout(() => {
+                        this.loadImageWithRetry(url, retryCount + 1).then(resolve).catch(reject);
+                      }, Math.pow(2, retryCount) * 1000); // Exponential backoff
+                    } else {
+                      console.error('Image load failed permanently:', url);
+                      this.failedUrls.add(url);
+                      reject(new Error('Image load failed'));
+                    }
+                  };
+                  
                   img.src = url;
                 });
               },
               
+              // Enhanced preload with rate limiting
+              preload: function(urls) {
+                if (!Array.isArray(urls)) urls = [urls];
+                
+                urls.forEach(url => {
+                  if (!url || this.cache[url] || this.failedUrls.has(url)) return;
+                  
+                  // Add to queue instead of immediate loading
+                  this.requestQueue.push({ url, retries: 0 });
+                });
+                
+                // Process queue
+                this.processQueue();
+              },
+              
               getAvatarUrl: function(userId) {
                 const key = 'avatar_' + userId;
-                return localStorage.getItem(key);
+                const url = localStorage.getItem(key);
+                
+                // If the stored URL has failed before, return fallback
+                if (url && this.failedUrls.has(url)) {
+                  return this.getFallbackImage('avatar');
+                }
+                
+                return url;
               },
               
               setAvatarUrl: function(userId, url) {
-                if (!userId || !url) return;
+                if (!userId) return;
+                
+                // If no URL provided or URL has failed, use fallback
+                if (!url || this.failedUrls.has(url)) {
+                  url = this.getFallbackImage('avatar');
+                }
+                
                 const key = 'avatar_' + userId;
                 localStorage.setItem(key, url);
-                this.preload(url);
+                
+                // Only preload if not a fallback image
+                if (url !== this.getFallbackImage('avatar')) {
+                  this.preload(url);
+                }
                 
                 // Notify all subscribers about the avatar change
                 this.notifyChange(userId, 'avatar', url);
               },
               
-              // Add method for background images
               getBackgroundUrl: function(userId) {
                 const key = 'background_' + userId;
-                return localStorage.getItem(key);
+                const url = localStorage.getItem(key);
+                
+                // If the stored URL has failed before, return null
+                if (url && this.failedUrls.has(url)) {
+                  return null;
+                }
+                
+                return url;
               },
               
               setBackgroundUrl: function(userId, url) {
-                if (!userId || !url) return;
+                if (!userId || !url || this.failedUrls.has(url)) return;
+                
                 const key = 'background_' + userId;
                 localStorage.setItem(key, url);
                 this.preload(url);
                 
                 // Notify all subscribers about the background change
                 this.notifyChange(userId, 'background', url);
+              },
+              
+              // Clear failed URLs cache (for retry scenarios)
+              clearFailedUrls: function() {
+                this.failedUrls.clear();
+              },
+              
+              // Check if URL has failed
+              hasUrlFailed: function(url) {
+                return this.failedUrls.has(url);
               }
             };
           `}

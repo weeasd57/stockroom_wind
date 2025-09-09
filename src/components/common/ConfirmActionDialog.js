@@ -4,8 +4,6 @@ import styles from '@/styles/ProfilePostCard.module.css'; // Using existing dial
 import profileStyles from '@/styles/profile.module.css'; // Reuse profile button styles for consistency
 
 export default function ConfirmActionDialog({ isOpen, onClose, onConfirm, title, message, confirmText = 'Confirm', cancelText = 'Cancel', showCancelButton = true }) {
-  if (!isOpen) return null;
-
   const dialogRef = useRef(null);
   const titleId = useId();
   const descId = useId();
@@ -20,9 +18,14 @@ export default function ConfirmActionDialog({ isOpen, onClose, onConfirm, title,
         onClose?.();
       }
     };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
   }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
 
   return (
     <div className={styles.dialogOverlay} onClick={onClose} style={{ zIndex: 10001 }}>

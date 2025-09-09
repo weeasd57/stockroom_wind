@@ -71,7 +71,7 @@ export default function CheckoutPage() {
     console.log('User authenticated, checkout page ready');
     
     // Check if user is already Pro
-    if (isPro()) {
+    if (isPro) {
       console.log('User already has Pro subscription, redirecting to profile');
       router.push('/profile');
       return;

@@ -7,6 +7,132 @@
   overflow-x: hidden;
 }
 
+/* Subscription Details: modern card and progress styles */
+.modernCard {
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 16px;
+}
+
+/* Theme-aware backgrounds and borders */
+:global(.light) .modernCard {
+  background: #ffffff;
+  border: 1px solid #ced4da;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+:global(.dark) .modernCard {
+  background: linear-gradient(145deg, #1a1a1a 0%, #2d2d2d 100%);
+  border: 1px solid #333;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.detailsTitle {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom-width: 2px;
+  border-bottom-style: solid;
+}
+
+:global(.light) .detailsTitle { color: #111; border-bottom-color: #e9ecef; }
+:global(.dark) .detailsTitle { color: #fff; border-bottom-color: #444; }
+
+.detailsGrid {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.detailsRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.detailsLabel { font-weight: 600; }
+:global(.light) .detailsLabel { color: #495057; }
+:global(.dark) .detailsLabel { color: #bbb; }
+
+.detailsValue { font-weight: 700; }
+:global(.light) .detailsValue { color: #111; }
+:global(.dark) .detailsValue { color: #fff; }
+
+.mono { font-family: monospace; font-size: 13px; font-weight: 600; }
+
+.statusActive { color: #10b981; }
+.statusInactive { color: #ef4444; }
+
+.progressBlock { margin-top: 16px; }
+.progressHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.progressLabel { font-size: 15px; font-weight: 600; }
+:global(.light) .progressLabel { color: #495057; }
+:global(.dark) .progressLabel { color: #bbb; }
+
+.progressCount { font-weight: 700; }
+:global(.light) .progressCount { color: #111; }
+:global(.dark) .progressCount { color: #fff; }
+
+.progressTrack {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+:global(.light) .progressTrack { background-color: #dfe3e6; }
+:global(.dark) .progressTrack { background-color: #333; }
+
+.progressFill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.fillRed { background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%); }
+.fillGreen { background: linear-gradient(90deg, #10b981 0%, #059669 100%); }
+.fillBlue { background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%); }
+
+/* Syncing indicator */
+.syncingBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.9;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+:global(.light) .syncingBadge {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+:global(.dark) .syncingBadge {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.6; }
+}
+
 .profileHeader {
   position: relative;
   margin-bottom: 2rem;
@@ -2295,28 +2421,4 @@
 .infoContent li {
   margin-bottom: 0.5rem;
   color: hsl(var(--foreground));
-}
-
-/* New WhatsApp Tab Styles */
-.whatsappTabContent {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  padding: 1.5rem 0;
-}
-
-.whatsappSubTabs {
-  display: flex;
-  border-bottom: 1px solid hsl(var(--border));
-  margin-bottom: 1.5rem;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.whatsappSubTabs::-webkit-scrollbar {
-  display: none;
-}
-
-.whatsappSubTabContent {
-  padding: 1rem 0;
 }

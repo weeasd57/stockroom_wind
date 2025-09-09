@@ -223,8 +223,83 @@ async function handleEvent(event) {
 
     switch (type) {
       case 'CHECKOUT.ORDER.APPROVED': {
-        console.log('→ Checkout order approved:', event?.resource?.id);
-        // Order approved, waiting for capture
+        const orderId = event?.resource?.id;
+        const payerEmail = event?.resource?.payer?.email_address;
+        console.log('→ Checkout order approved:', { orderId, payerEmail });
+        
+        // For one-time payments, we need to process immediately since capture might not send separate webhook
+        if (orderId && payerEmail) {
+          console.log('→ Processing order approval as one-time payment...');
+          
+          // Find user by email
+          const { data: userData, error: userError } = await supabase.auth.admin.getUserByEmail(payerEmail);
+          console.log('→ User lookup:', { found: !!userData?.user, error: userError?.message });
+          
+          if (userData?.user) {
+            // Get pro plan
+            const { data: proPlan } = await supabase
+              .from('subscription_plans')
+              .select('id')
+              .eq('name', 'pro')
+              .single();
+            
+            if (proPlan) {
+              console.log('→ Creating Pro subscription for user:', userData.user.id);
+              
+              // Cancel existing subscription
+              await supabase
+                .from('user_subscriptions')
+                .update({ 
+                  status: 'cancelled',
+                  cancelled_at: new Date().toISOString()
+                })
+                .eq('user_id', userData.user.id)
+                .eq('status', 'active');
+              
+              // Create new pro subscription
+              const { data: subscription, error: subError } = await supabase
+                .from('user_subscriptions')
+                .insert({
+                  user_id: userData.user.id,
+                  plan_id: proPlan.id,
+                  status: 'active',
+                  paypal_order_id: orderId,
+                  price_checks_used: 0,
+                  posts_created: 0,
+                  started_at: new Date().toISOString(),
+                  expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+                })
+                .select()
+                .single();
+              
+              console.log('→ Subscription creation:', { success: !!subscription, error: subError?.message });
+              
+              // Log transaction
+              const { error: txError } = await supabase
+                .from('payment_transactions')
+                .insert({
+                  user_id: userData.user.id,
+                  subscription_id: subscription?.id,
+                  amount: 7.00, // Pro plan amount
+                  currency: 'USD',
+                  payment_method: 'paypal',
+                  paypal_order_id: orderId,
+                  paypal_event_id: id,
+                  status: 'completed',
+                  transaction_data: event
+                });
+              
+              console.log('→ Transaction log:', { error: txError?.message });
+              console.log(`→ Pro subscription activated for user ${userData.user.id}`);
+            } else {
+              console.error('→ Pro plan not found in database');
+            }
+          } else {
+            console.error('→ User not found with email:', payerEmail);
+          }
+        } else {
+          console.error('→ Missing orderId or payerEmail in approved event');
+        }
         break;
       }
       case 'PAYMENT.CAPTURE.COMPLETED': {

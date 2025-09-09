@@ -808,7 +808,52 @@ export const checkFileExists = async (bucket, path) => {
 async function createPost(post, userId) {
   const startTime = performance.now();
 
-  
+  // Check if user can create post (subscription limits)
+  try {
+    const { data: canCreate, error: limitError } = await supabase
+      .rpc('check_post_limit', { p_user_id: userId });
+    
+    if (limitError) {
+      console.error('Error checking post limit:', limitError);
+      throw new Error('Error checking subscription limits: ' + limitError.message);
+    }
+    
+    if (canCreate === false) {
+      // Get subscription info for error message
+      const { data: subscriptionData } = await supabase
+        .from('user_subscription_info')
+        .select('*')
+        .eq('user_id', userId);
+      
+      const subscriptionInfo = subscriptionData && subscriptionData.length > 0 ? subscriptionData[0] : null;
+      const maxPosts = subscriptionInfo?.post_creation_limit || 100;
+      const usedPosts = subscriptionInfo?.posts_created || 0;
+      const planName = subscriptionInfo?.plan_name || 'free';
+      
+      const errorMessage = planName === 'free' 
+        ? `لقد وصلت إلى الحد الأقصى للمنشورات (${maxPosts} منشور شهريًا). يرجى الترقية إلى Pro للحصول على المزيد.`
+        : `لقد وصلت إلى الحد الأقصى للمنشورات في خطة ${planName} (${maxPosts} منشور شهريًا).`;
+      
+      throw new Error(errorMessage);
+    }
+    
+    // Log the post creation using RPC function
+    const { data: logResult, error: logError } = await supabase
+      .rpc('log_post_creation', { p_user_id: userId });
+    
+    if (logError) {
+      console.error('Error logging post creation:', logError);
+      // Continue with post creation even if logging fails
+    }
+  } catch (error) {
+    // If it's a subscription limit error, rethrow it
+    if (error.message.includes('الحد الأقصى') || error.message.includes('limit')) {
+      throw error;
+    }
+    // For other errors, log but continue (backward compatibility)
+    console.warn('Subscription check failed, continuing with post creation:', error);
+  }
+
   // Create a sanitized post object without the images field
   const { images, ...sanitizedPost } = post;
   

@@ -14,7 +14,7 @@ export default function CheckPostPricesButton({ userId }) {
   const [error, setError] = useState(null);
   const { refreshData } = useProfile();
   const { supabase } = useSupabase();
-  const { canCheckPrices, incrementPriceCheckUsage, getRemainingPriceChecks } = useSubscription();
+  const { canPerformPriceCheck, refreshSubscriptionInfo, usageInfo } = useSubscription();
   const [abortController, setAbortController] = useState(null);
   const [isCancelled, setIsCancelled] = useState(false);
   const [showStatsDialog, setShowStatsDialog] = useState(false);
@@ -106,8 +106,8 @@ export default function CheckPostPricesButton({ userId }) {
     setShowConfirmDialog(false); // Close any open confirmation dialog
     
     // Check if user can perform price check
-    if (!canCheckPrices()) {
-      setError(`You have reached your price check limit. Remaining: ${getRemainingPriceChecks()}`);
+    if (!canPerformPriceCheck()) {
+      setError(`You have reached your price check limit. Remaining: ${usageInfo?.priceChecks?.remaining || 0}`);
       return;
     }
     
@@ -169,13 +169,8 @@ export default function CheckPostPricesButton({ userId }) {
         setDetailedResults(data.results);
       }
       
-      // Increment price check usage after successful check
-      const usageResult = await incrementPriceCheckUsage();
-      if (usageResult.success) {
-        console.log('[CheckPostPricesButton] Price check usage incremented successfully');
-      } else {
-        console.warn('[CheckPostPricesButton] Failed to increment price check usage:', usageResult.error);
-      }
+      // Refresh subscription info after successful check
+      refreshSubscriptionInfo();
       
       if (userId && !isCancelled) {
         refreshData(userId);
@@ -201,7 +196,7 @@ export default function CheckPostPricesButton({ userId }) {
       // Reset cancelled state
       setIsCancelled(false);
     }
-  }, [userId, refreshData, canCheckPrices, getRemainingPriceChecks, incrementPriceCheckUsage]);
+  }, [userId, refreshData, canPerformPriceCheck, usageInfo, refreshSubscriptionInfo]);
   
   const checkPostPrices = async () => {
     setCheckStats(null);
@@ -209,29 +204,11 @@ export default function CheckPostPricesButton({ userId }) {
     setIsCancelled(false);
     setDetailedResults([]);
 
-    // Start preflight phase and show loading on the button
-    setIsPreflight(true);
-
-    let remaining = null;
-    try {
-      const preflightRes = await fetch(`/api/posts/check-prices?userId=${encodeURIComponent(userId || '')}`, {
-        method: 'GET',
-        credentials: 'include'
-      });
-      const preflight = await preflightRes.json().catch(() => ({}));
-      if (preflightRes.ok && preflight && typeof preflight.remainingChecks !== 'undefined') {
-        remaining = preflight.remainingChecks;
-      }
-    } catch (e) {
-      console.warn('Preflight check failed, will still ask for confirmation:', e);
-      // Proceed to confirmation even if preflight fails
-    } finally {
-      // Stop preflight loading before showing dialog
-      setIsPreflight(false);
-    }
+    // Get remaining checks from subscription provider
+    const remaining = usageInfo?.priceChecks?.remaining || 0;
 
     // If limit reached, show info-only dialog
-    if (typeof remaining === 'number' && remaining <= 0) {
+    if (remaining <= 0) {
       setConfirmDialogContent({
         title: 'Daily Check Limit Reached',
         message: 'You have reached the maximum price checks for today. Please upgrade your plan or try again tomorrow.',
@@ -243,7 +220,7 @@ export default function CheckPostPricesButton({ userId }) {
       return;
     }
 
-    const remainingText = typeof remaining === 'number' ? ` You have ${remaining} checks left for today.` : '';
+    const remainingText = ` You have ${remaining} checks left for today.`;
     setConfirmDialogContent({
       title: 'Confirm Price Check',
       message: `This will check the latest prices for your posts and update their statuses accordingly.${remainingText}`,

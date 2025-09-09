@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSupabase } from './SupabaseProvider';
 
 const SubscriptionContext = createContext({});
@@ -16,20 +16,38 @@ export const useSubscription = () => {
 export function SubscriptionProvider({ children }) {
   const { supabase, user, isAuthenticated } = useSupabase();
   
-  const [subscription, setSubscription] = useState({
-    tier: 'free', // 'free' | 'pro'
-    status: 'inactive', // 'active' | 'inactive' | 'expired' | 'cancelled'
-    priceChecks: 0,
-    maxPriceChecks: 2, // Free tier limit
-    postsCreated: 0,
-    maxPostsCreation: 100, // Free tier limit
-    billingPeriod: null,
-    nextBillingDate: null,
-    subscriptionId: null,
-    loading: true,
-    error: null
+  // Debug logging
+  console.log('[SUBSCRIPTION PROVIDER] Component initialized', { 
+    hasUser: !!user, 
+    userId: user?.id, 
+    hasSupabase: !!supabase,
+    isAuthenticated 
   });
+  
+  // Default free plan state for immediate UI response (memoized)
+  const defaultFreePlan = useMemo(() => ({
+    user_id: null,
+    plan_id: null,
+    plan_name: 'free',
+    plan_display_name: 'Free',
+    price_check_limit: 2,
+    price_checks_used: 0,
+    remaining_checks: 2,
+    post_creation_limit: 100,
+    posts_created: 0,
+    remaining_posts: 100,
+    subscription_status: 'active',
+    start_date: null,
+    end_date: null
+  }), []);
 
+  // State for subscription info - start with default free plan
+  const [subscriptionInfo, setSubscriptionInfo] = useState(defaultFreePlan);
+  const [loading, setLoading] = useState(false); // Start as false since we have default data
+  const [syncing, setSyncing] = useState(false); // Background sync
+  const [error, setError] = useState(null);
+  
+  // State for user analytics
   const [analytics, setAnalytics] = useState({
     postsCount: 0,
     successPosts: 0,
@@ -37,105 +55,167 @@ export function SubscriptionProvider({ children }) {
     experienceScore: 0
   });
 
-  // Refresh subscription data
-  const refreshSubscription = async () => {
-    if (!isAuthenticated || !user?.id) {
-      setSubscription(prev => ({ ...prev, loading: false }));
+  // Cache and optimization
+  const fetchingRef = useRef(false);
+  const lastFetchTime = useRef(0);
+
+  // Optimized fetch subscription info from API with caching
+  const fetchSubscriptionInfo = useCallback(async (forceRefresh = false, options = { silent: false }) => {
+    console.log('[SUBSCRIPTION PROVIDER] fetchSubscriptionInfo called', { 
+      userId: user?.id, 
+      hasSupabase: !!supabase,
+      forceRefresh,
+      silent: options.silent
+    });
+
+    if (!user?.id || !supabase) {
+      console.log('[SUBSCRIPTION PROVIDER] No user or supabase, skipping fetch');
+      setSubscriptionInfo(null);
+      setLoading(false);
+      return;
+    }
+
+    // Prevent concurrent fetches
+    if (fetchingRef.current && !forceRefresh) {
+      console.log('[SUBSCRIPTION PROVIDER] Fetch already in progress, skipping');
+      return;
+    }
+
+    // Cache for 30 seconds to avoid excessive API calls
+    const now = Date.now();
+    if (!forceRefresh && (now - lastFetchTime.current) < 30000) {
+      console.log('[SUBSCRIPTION PROVIDER] Cache still valid, skipping fetch');
       return;
     }
 
     try {
-      setSubscription(prev => ({ ...prev, loading: true, error: null }));
-
-      // Get subscription info from profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError) {
-        console.error('Error fetching profile:', profileError);
-        throw profileError;
+      fetchingRef.current = true;
+      
+      // Show appropriate loading state
+      if (options.silent || (subscriptionInfo && forceRefresh)) {
+        setSyncing(true);
+      } else {
+        setLoading(true);
       }
+      
+      setError(null);
 
-      // Update analytics
-      setAnalytics({
-        postsCount: profile.posts_count || 0,
-        successPosts: profile.success_posts || 0,
-        lossPosts: profile.loss_posts || 0,
-        experienceScore: profile.experience_score || 0
+      console.log('[SUBSCRIPTION PROVIDER] Starting API call to /api/subscription/info');
+
+      // Use the existing API endpoint for subscription info
+      const response = await fetch('/api/subscription/info', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        }
       });
 
-      // Get subscription info directly from tables instead of view
-      let subscriptionInfo = null;
-      const { data: userSubs, error: subError } = await supabase
-        .from('user_subscriptions')
-        .select(`
-          *,
-          subscription_plans(*)
-        `)
-        .eq('user_id', user.id)
-        .eq('status', 'active');
+      console.log('[SUBSCRIPTION PROVIDER] API response received', { status: response.status, ok: response.ok });
 
-      if (!subError && userSubs && userSubs.length > 0) {
-        const userSub = userSubs[0]; // Get the first active subscription
-        subscriptionInfo = {
-          user_id: user.id,
-          plan_name: userSub.subscription_plans?.name || 'free',
-          plan_display_name: userSub.subscription_plans?.display_name || 'Free',
-          price_check_limit: userSub.subscription_plans?.price_check_limit || 2,
-          price_checks_used: userSub.price_checks_used || 0,
-          post_creation_limit: userSub.subscription_plans?.post_creation_limit || 100,
-          posts_created: userSub.posts_created || 0,
-          subscription_status: userSub.status,
-          start_date: userSub.started_at,
-          end_date: userSub.expires_at
-        };
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      console.log('[SUBSCRIPTION PROVIDER] API response data:', result);
+      
+      if (result.success && result.data) {
+        console.log('[SUBSCRIPTION PROVIDER] Setting subscription info:', result.data);
+        setSubscriptionInfo(result.data);
+        lastFetchTime.current = now;
       } else {
-        // User has no active subscription, use free defaults
-        subscriptionInfo = {
+        console.log('[SUBSCRIPTION PROVIDER] API response invalid or no data, using fallback');
+        // Fallback to default free plan
+        const defaultInfo = {
           user_id: user.id,
           plan_name: 'free',
           plan_display_name: 'Free',
           price_check_limit: 2,
           price_checks_used: 0,
+          remaining_checks: 2,
           post_creation_limit: 100,
           posts_created: 0,
-          subscription_status: 'inactive'
+          remaining_posts: 100,
+          subscription_status: null,
+          start_date: null,
+          end_date: null
         };
+        setSubscriptionInfo(defaultInfo);
       }
-
-      const priceCheckCount = subscriptionInfo?.price_checks_used || 0;
-
-      // Update subscription state using existing schema
-      const isPro = subscriptionInfo?.plan_name === 'pro';
-      setSubscription({
-        tier: subscriptionInfo?.plan_name || 'free',
-        status: subscriptionInfo?.subscription_status || 'inactive',
-        priceChecks: priceCheckCount,
-        maxPriceChecks: subscriptionInfo?.price_check_limit || 2,
-        postsCreated: subscriptionInfo?.posts_created || 0,
-        maxPostsCreation: subscriptionInfo?.post_creation_limit || 100,
-        billingPeriod: 'monthly', // Based on existing schema
-        nextBillingDate: subscriptionInfo?.end_date || null,
-        subscriptionId: subscriptionInfo?.plan_id || null,
-        loading: false,
-        error: null
-      });
-
-    } catch (error) {
-      console.error('Error refreshing subscription:', error);
-      setSubscription(prev => ({
-        ...prev,
-        loading: false,
-        error: error.message
-      }));
+    } catch (err) {
+      console.error('Error fetching subscription info:', err);
+      setError(err.message);
+      
+      // Set default free plan on error
+      const defaultInfo = {
+        user_id: user.id,
+        plan_name: 'free',
+        plan_display_name: 'Free',
+        price_check_limit: 2,
+        price_checks_used: 0,
+        remaining_checks: 2,
+        post_creation_limit: 100,
+        posts_created: 0,
+        remaining_posts: 100,
+        subscription_status: null,
+        start_date: null,
+        end_date: null
+      };
+      setSubscriptionInfo(defaultInfo);
+    } finally {
+      setLoading(false);
+      setSyncing(false);
+      fetchingRef.current = false;
     }
-  };
+  }, [user?.id, supabase]);
 
-  // Update subscription after successful payment using existing function
-  const upgradeToProSubscription = async (paymentDetails) => {
+  // Fetch user analytics from profile and posts
+  const fetchAnalytics = useCallback(async () => {
+    if (!user?.id || !supabase) return;
+
+    try {
+      // Get profile data
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('success_posts, loss_posts, experience_score')
+        .eq('id', user.id)
+        .single();
+
+      // Get posts count by counting user's posts
+      const { count: postsCount, error: postsError } = await supabase
+        .from('posts')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      if (!profileError && profile) {
+        setAnalytics({
+          postsCount: postsCount || 0,
+          successPosts: profile.success_posts || 0,
+          lossPosts: profile.loss_posts || 0,
+          experienceScore: profile.experience_score || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+    }
+  }, [user?.id, supabase]);
+
+  // Refresh subscription data (public method)
+  const refreshSubscription = useCallback(async () => {
+    await Promise.all([
+      fetchSubscriptionInfo(true), // Force refresh
+      fetchAnalytics()
+    ]);
+  }, [fetchSubscriptionInfo, fetchAnalytics]);
+
+  // Upgrade to Pro subscription
+  const upgradeToProSubscription = useCallback(async (paymentDetails) => {
+    if (!user?.id) {
+      return { success: false, error: 'No user logged in' };
+    }
+
     try {
       // Use the existing create_pro_subscription function
       const { data, error } = await supabase.rpc('create_pro_subscription', {
@@ -163,155 +243,318 @@ export function SubscriptionProvider({ children }) {
         console.warn('Failed to log transaction:', transactionError);
       }
 
-      // Refresh subscription state
-      await refreshSubscription();
+      // Force refresh subscription state
+      await fetchSubscriptionInfo(true);
       
       return { success: true, subscriptionId: data };
     } catch (error) {
       console.error('Error upgrading subscription:', error);
       return { success: false, error: error.message };
     }
-  };
+  }, [user?.id, supabase, fetchSubscriptionInfo]);
 
   // Cancel subscription
-  const cancelSubscription = async () => {
-    if (!subscription.subscriptionId) return { success: false, error: 'No active subscription' };
+  const cancelSubscription = useCallback(async () => {
+    if (!subscriptionInfo?.plan_id) {
+      return { success: false, error: 'No active subscription to cancel' };
+    }
 
     try {
       const { error } = await supabase
-        .from('subscriptions')
+        .from('user_subscriptions')
         .update({ status: 'cancelled' })
-        .eq('id', subscription.subscriptionId);
+        .eq('plan_id', subscriptionInfo.plan_id)
+        .eq('user_id', user.id);
 
       if (error) throw error;
 
-      await refreshSubscription();
+      // Force refresh subscription state
+      await fetchSubscriptionInfo(true);
       return { success: true };
     } catch (error) {
       console.error('Error cancelling subscription:', error);
       return { success: false, error: error.message };
     }
-  };
+  }, [subscriptionInfo?.plan_id, user?.id, supabase, fetchSubscriptionInfo]);
 
-  // Check if user can perform price check
-  const canPerformPriceCheck = () => {
-    return subscription.priceChecks < subscription.maxPriceChecks;
-  };
+  // Helper functions for subscription limits
+  const canPerformPriceCheck = useCallback(() => {
+    if (!subscriptionInfo) return false;
+    return (subscriptionInfo.remaining_checks || 0) > 0;
+  }, [subscriptionInfo]);
 
-  // Get remaining price checks
-  const getRemainingPriceChecks = () => {
-    return Math.max(0, subscription.maxPriceChecks - subscription.priceChecks);
-  };
+  const canCreatePost = useCallback(() => {
+    if (!subscriptionInfo) return false;
+    return (subscriptionInfo.remaining_posts || subscriptionInfo.post_creation_limit || 100) > 0;
+  }, [subscriptionInfo]);
 
-  // Get remaining posts
-  const getRemainingPosts = () => {
-    return Math.max(0, subscription.maxPostsCreation - subscription.postsCreated);
-  };
+  const getRemainingPriceChecks = useCallback(() => {
+    if (!subscriptionInfo) return 0;
+    return subscriptionInfo.remaining_checks || 0;
+  }, [subscriptionInfo]);
 
-  // Function to increment post usage
-  const incrementPostUsage = async () => {
-    if (!user) return { success: false, error: 'No user' };
+  const getRemainingPosts = useCallback(() => {
+    if (!subscriptionInfo) return 100; // Default for free users
+    const used = subscriptionInfo.posts_created || 0;
+    const limit = subscriptionInfo.post_creation_limit || 100;
+    return Math.max(0, limit - used);
+  }, [subscriptionInfo]);
+
+  const isProPlan = useCallback(() => {
+    return subscriptionInfo?.plan_name === 'pro';
+  }, [subscriptionInfo]);
+
+  const getUsageInfo = useCallback(() => {
+    if (!subscriptionInfo) return null;
+    
+    return {
+      priceChecks: {
+        used: subscriptionInfo.price_checks_used || 0,
+        limit: subscriptionInfo.price_check_limit || 2,
+        remaining: subscriptionInfo.remaining_checks || 0
+      },
+      posts: {
+        used: subscriptionInfo.posts_created || 0,
+        limit: subscriptionInfo.post_creation_limit || 100,
+        remaining: getRemainingPosts()
+      },
+      planName: subscriptionInfo.plan_name || 'free',
+      planDisplayName: subscriptionInfo.plan_display_name || 'Free',
+      subscriptionStatus: subscriptionInfo.subscription_status,
+      startDate: subscriptionInfo.start_date,
+      endDate: subscriptionInfo.end_date
+    };
+  }, [subscriptionInfo, getRemainingPosts]);
+
+  // Increment post usage and refresh state with optimistic update
+  const incrementPostUsage = useCallback(async () => {
+    if (!user?.id) return { success: false, error: 'No user logged in' };
     
     try {
-      // Get current subscription (may not exist for new users)
+      // Optimistic update: immediately update local state
+      if (subscriptionInfo) {
+        const optimisticUpdate = {
+          ...subscriptionInfo,
+          posts_created: (subscriptionInfo.posts_created || 0) + 1,
+          remaining_posts: Math.max((subscriptionInfo.remaining_posts || 0) - 1, 0)
+        };
+        setSubscriptionInfo(optimisticUpdate);
+        console.log('[SUBSCRIPTION PROVIDER] Optimistic post increment:', optimisticUpdate.posts_created);
+      }
+      
+      // Get current active subscription
       const { data: userSubData } = await supabase
         .from('user_subscriptions')
         .select('*')
         .eq('user_id', user.id)
-        .eq('status', 'active');
+        .eq('status', 'active')
+        .single();
       
-      const userSub = userSubData && userSubData.length > 0 ? userSubData[0] : null;
-      
-      if (userSub) {
+      if (userSubData) {
         // Increment posts_created counter
         const { error } = await supabase
           .from('user_subscriptions')
           .update({ 
-            posts_created: (userSub.posts_created || 0) + 1,
+            posts_created: (userSubData.posts_created || 0) + 1,
             updated_at: new Date().toISOString()
           })
-          .eq('id', userSub.id);
+          .eq('id', userSubData.id);
           
         if (error) throw error;
       }
       
-      // Refresh subscription data
-      await refreshSubscription();
+      // Silent refresh to sync with server
+      await fetchSubscriptionInfo(true, { silent: true });
       
       return { success: true };
     } catch (error) {
       console.error('Error incrementing post usage:', error);
+      // Revert optimistic update on error
+      await fetchSubscriptionInfo(true, { silent: true });
       return { success: false, error: error.message };
     }
-  };
+  }, [user?.id, supabase, fetchSubscriptionInfo, subscriptionInfo]);
 
-  // Function to increment price check usage
-  const incrementPriceCheckUsage = async () => {
-    if (!user) return { success: false, error: 'No user' };
+  // Increment price check usage and refresh state with optimistic update
+  const incrementPriceCheckUsage = useCallback(async () => {
+    if (!user?.id) return { success: false, error: 'No user logged in' };
     
     try {
-      // Get current subscription (may not exist for new users)
-      const { data: userSubData } = await supabase
-        .from('user_subscriptions')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'active');
+      // Check if we can perform price check first
+      const { data: canCheck, error: checkError } = await supabase
+        .rpc('check_price_limit', { p_user_id: user.id });
       
-      const userSub = userSubData && userSubData.length > 0 ? userSubData[0] : null;
-      
-      if (userSub) {
-        // Increment price_checks_used counter
-        const { error } = await supabase
-          .from('user_subscriptions')
-          .update({ 
-            price_checks_used: (userSub.price_checks_used || 0) + 1,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', userSub.id);
-          
-        if (error) throw error;
+      if (checkError) {
+        throw checkError;
       }
       
-      // Refresh subscription data
-      await refreshSubscription();
+      if (canCheck === false) {
+        return { success: false, error: 'Price check limit exceeded' };
+      }
+      
+      // Optimistic update: immediately update local state
+      if (subscriptionInfo) {
+        const optimisticUpdate = {
+          ...subscriptionInfo,
+          price_checks_used: (subscriptionInfo.price_checks_used || 0) + 1,
+          remaining_checks: Math.max((subscriptionInfo.remaining_checks || 0) - 1, 0)
+        };
+        setSubscriptionInfo(optimisticUpdate);
+        console.log('[SUBSCRIPTION PROVIDER] Optimistic price check increment:', optimisticUpdate.price_checks_used);
+      }
+      
+      // Log the price check using the existing RPC function
+      const { error: logError } = await supabase
+        .rpc('log_price_check', { 
+          p_user_id: user.id,
+          p_symbol: 'API_CALL',
+          p_exchange: null,
+          p_country: null
+        });
+      
+      if (logError) {
+        throw logError;
+      }
+      
+      // Silent refresh to sync with server
+      await fetchSubscriptionInfo(true, { silent: true });
       
       return { success: true };
     } catch (error) {
       console.error('Error incrementing price check usage:', error);
+      // Revert optimistic update on error
+      await fetchSubscriptionInfo(true, { silent: true });
       return { success: false, error: error.message };
     }
-  };
+  }, [user?.id, supabase, fetchSubscriptionInfo, subscriptionInfo]);
 
-  // Function to check if user can check prices
-  const canCheckPrices = () => {
-    return getRemainingPriceChecks() > 0;
-  };
+  // Get subscription status message
+  const getSubscriptionMessage = useCallback(() => {
+    if (!subscriptionInfo) return null;
+    
+    const { plan_name, remaining_checks, remaining_posts } = subscriptionInfo;
+    const remainingChecks = remaining_checks || 0;
+    const remainingPostsCount = getRemainingPosts();
+    
+    if (plan_name === 'free') {
+      if (remainingChecks === 0) {
+        return {
+          type: 'warning',
+          message: 'لقد استنفدت عدد فحصات الأسعار المتاحة. قم بالترقية إلى Pro للحصول على المزيد.',
+          message_en: 'You have used all your price checks. Upgrade to Pro for more.'
+        };
+      }
+      if (remainingPostsCount === 0) {
+        return {
+          type: 'warning', 
+          message: 'لقد استنفدت عدد المنشورات المتاحة. قم بالترقية إلى Pro للحصول على المزيد.',
+          message_en: 'You have used all your posts. Upgrade to Pro for more.'
+        };
+      }
+      return {
+        type: 'info',
+        message: `الخطة المجانية: ${remainingChecks} فحص أسعار و ${remainingPostsCount} منشور متبقي`,
+        message_en: `Free plan: ${remainingChecks} price checks and ${remainingPostsCount} posts remaining`
+      };
+    }
+    
+    return {
+      type: 'success',
+      message: `خطة Pro: ${remainingChecks} فحص أسعار و ${remainingPostsCount} منشور متبقي`,
+      message_en: `Pro plan: ${remainingChecks} price checks and ${remainingPostsCount} posts remaining`
+    };
+  }, [subscriptionInfo, getRemainingPosts]);
 
-  const isPro = subscription.tier === 'pro';
+  // Auto-fetch subscription info when user changes
+  useEffect(() => {
+    console.log('[SUBSCRIPTION PROVIDER] useEffect triggered - user change detected', { 
+      userId: user?.id, 
+      hasUser: !!user,
+      isAuthenticated 
+    });
+
+    if (user?.id) {
+      console.log('[SUBSCRIPTION PROVIDER] User found, updating default plan and fetching in background');
+      // Update default plan with actual user ID
+      const userDefaultPlan = {
+        ...defaultFreePlan,
+        user_id: user.id
+      };
+      setSubscriptionInfo(userDefaultPlan);
+      
+      // Fetch real data in background without blocking UI
+      fetchSubscriptionInfo(false, { silent: true });
+      fetchAnalytics();
+    } else {
+      console.log('[SUBSCRIPTION PROVIDER] No user found, resetting to default');
+      setSubscriptionInfo(defaultFreePlan);
+      setLoading(false);
+      setError(null);
+    }
+  }, [user?.id, fetchSubscriptionInfo, fetchAnalytics]);
+
+  // Set up real-time subscription for changes
+  useEffect(() => {
+    if (!user?.id || !supabase) {
+      return;
+    }
+
+    const channel = supabase
+      .channel('subscription-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_subscriptions',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('Real-time subscription change detected:', payload);
+          // Refresh subscription info when changes occur (silently)
+          fetchSubscriptionInfo(true, { silent: true });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, supabase, fetchSubscriptionInfo]);
 
   const value = {
-    // Subscription state
-    subscription,
+    // State
+    subscriptionInfo,
+    loading,
+    syncing,
+    error,
     analytics,
     
-    // Actions
+    // Methods
+    fetchSubscriptionInfo,
     refreshSubscription,
     upgradeToProSubscription,
     cancelSubscription,
     
+    // Checkers
+    canPerformPriceCheck,
+    canCreatePost,
+    isProPlan,
+    
     // Getters
     getRemainingPriceChecks,
     getRemainingPosts,
-    canPerformPriceCheck,
-    canCreatePost: () => getRemainingPosts() > 0,
-    canCheckPrices,
+    getUsageInfo,
+    getSubscriptionMessage,
     
     // Usage incrementers
     incrementPostUsage,
     incrementPriceCheckUsage,
     
-    // Flags
-    isPro
+    // Computed values
+    isPro: isProPlan(),
+    usageInfo: getUsageInfo(),
+    subscriptionMessage: getSubscriptionMessage()
   };
 
   return (
@@ -320,3 +563,5 @@ export function SubscriptionProvider({ children }) {
     </SubscriptionContext.Provider>
   );
 }
+
+export default SubscriptionProvider;

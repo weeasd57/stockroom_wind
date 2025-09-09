@@ -184,7 +184,7 @@ BEGIN
         SELECT p_user_id, sp.id, 'active', 1, 0
         FROM subscription_plans sp
         WHERE sp.name = 'free'
-        ON CONFLICT (user_id) WHERE status = 'active'
+        ON CONFLICT (user_id, status)
         DO UPDATE SET 
             price_checks_used = COALESCE(user_subscriptions.price_checks_used, 0) + 1,
             updated_at = NOW();
@@ -291,6 +291,7 @@ CREATE OR REPLACE FUNCTION log_post_creation(p_user_id UUID)
 RETURNS BOOLEAN AS $$
 DECLARE
     v_can_create BOOLEAN;
+    v_subscription_exists BOOLEAN;
 BEGIN
     -- Check if user can create the post
     SELECT check_post_limit(p_user_id) INTO v_can_create;
@@ -299,15 +300,30 @@ BEGIN
         RETURN FALSE;
     END IF;
     
+    -- Check if user has an active subscription
+    SELECT EXISTS(
+        SELECT 1 FROM user_subscriptions 
+        WHERE user_id = p_user_id AND status = 'active'
+    ) INTO v_subscription_exists;
+    
     -- Increment the usage counter
-    INSERT INTO user_subscriptions (user_id, plan_id, price_checks_used, posts_created)
-    SELECT p_user_id, sp.id, 0, 1
-    FROM subscription_plans sp
-    WHERE sp.name = 'free'
-    ON CONFLICT (user_id, status) 
-    DO UPDATE SET 
-        posts_created = user_subscriptions.posts_created + 1,
-        updated_at = NOW();
+    IF v_subscription_exists THEN
+        UPDATE user_subscriptions 
+        SET 
+            posts_created = COALESCE(posts_created, 0) + 1,
+            updated_at = NOW()
+        WHERE user_id = p_user_id AND status = 'active';
+    ELSE
+        -- Create free subscription if none exists
+        INSERT INTO user_subscriptions (user_id, plan_id, status, price_checks_used, posts_created)
+        SELECT p_user_id, sp.id, 'active', 0, 1
+        FROM subscription_plans sp
+        WHERE sp.name = 'free'
+        ON CONFLICT (user_id, status)
+        DO UPDATE SET 
+            posts_created = COALESCE(user_subscriptions.posts_created, 0) + 1,
+            updated_at = NOW();
+    END IF;
     
     RETURN TRUE;
 END;
