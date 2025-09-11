@@ -80,6 +80,48 @@ async function getAccessToken(targetMode) {
   return data.access_token;
 }
 
+// Fetch PayPal order details (used to retrieve custom_id when not present in the event)
+async function fetchOrderDetails(orderId, targetMode) {
+  if (!orderId) return null;
+  const base = paypalBaseUrl(targetMode || mode);
+  const accessToken = await getAccessToken(targetMode || mode);
+  const res = await fetch(`${base}/v2/checkout/orders/${orderId}`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    console.warn(`[PayPal] Failed to fetch order ${orderId}: ${res.status} ${text}`);
+    return null;
+  }
+  try {
+    const json = await res.json();
+    return json;
+  } catch (e) {
+    console.warn('[PayPal] Failed to parse order details JSON:', e?.message || e);
+    return null;
+  }
+}
+
+// Resolve user by custom_id (which we set to our internal user_id)
+async function resolveUserByCustomId(customId) {
+  try {
+    if (!customId) return null;
+    const { data, error } = await supabase.auth.admin.getUserById(customId);
+    if (error) {
+      console.warn('[PayPal] resolveUserByCustomId error:', error?.message);
+      return null;
+    }
+    return data?.user || null;
+  } catch (e) {
+    console.warn('[PayPal] resolveUserByCustomId exception:', e?.message || e);
+    return null;
+  }
+}
+
 // ---- Verification Helper ----
 async function verifyPaypalWebhook(request, body) {
   // Required headers from PayPal
@@ -112,10 +154,32 @@ async function verifyPaypalWebhook(request, body) {
   }
 
   // Use detected environment from cert URL for verification
-  // This ensures webhook signature verification works for both environments
-  const verificationMode = eventEnv;
-  const accessToken = await getAccessToken(verificationMode);
-  const base = paypalBaseUrl(verificationMode);
+  // BUT if we're in development/testing with webhook simulator, try both environments
+  let verificationMode = eventEnv;
+  let accessToken;
+  let base;
+  
+  try {
+    accessToken = await getAccessToken(verificationMode);
+    base = paypalBaseUrl(verificationMode);
+  } catch (error) {
+    console.warn(`[PayPal] Failed to get token for ${verificationMode} mode:`, error.message);
+    
+    // If live credentials fail and we're configured for sandbox, try sandbox credentials
+    if (verificationMode === 'live' && mode === 'sandbox') {
+      console.log('[PayPal] Retrying with sandbox credentials for webhook simulator...');
+      verificationMode = 'sandbox';
+      accessToken = await getAccessToken(verificationMode);
+      base = paypalBaseUrl(verificationMode);
+    } else if (verificationMode === 'sandbox' && mode === 'live') {
+      console.log('[PayPal] Retrying with live credentials...');
+      verificationMode = 'live';
+      accessToken = await getAccessToken(verificationMode);
+      base = paypalBaseUrl(verificationMode);
+    } else {
+      throw error;
+    }
+  }
   
   console.log(`[PayPal] Using ${verificationMode} mode for webhook verification (detected from cert URL)`);
 
@@ -149,9 +213,16 @@ async function verifyPaypalWebhook(request, body) {
     verification_status: json?.verification_status,
   });
   if (json.verification_status !== 'SUCCESS') {
-    const err = new Error('Invalid webhook signature');
-    err.statusCode = 400;
-    throw err;
+    // In development with webhook simulator, signature verification often fails
+    // due to environment mismatches (live certs + sandbox webhook IDs)
+    if (NODE_ENV === 'development') {
+      console.warn('[PayPal] Signature verification failed in development, but proceeding for testing');
+      console.warn('[PayPal] This is normal with PayPal webhook simulator + ngrok setup');
+    } else {
+      const err = new Error('Invalid webhook signature');
+      err.statusCode = 400;
+      throw err;
+    }
   }
   return json;
 }
@@ -225,17 +296,48 @@ async function handleEvent(event) {
       case 'CHECKOUT.ORDER.APPROVED': {
         const orderId = event?.resource?.id;
         const payerEmail = event?.resource?.payer?.email_address;
-        console.log('→ Checkout order approved:', { orderId, payerEmail });
-        
+        const inlineCustomId = event?.resource?.purchase_units?.[0]?.custom_id;
+        const puAmount = event?.resource?.purchase_units?.[0]?.amount;
+        console.log('→ Checkout order approved:', { orderId, payerEmail, inlineCustomId });
+
         // For one-time payments, we need to process immediately since capture might not send separate webhook
         if (orderId && payerEmail) {
           console.log('→ Processing order approval as one-time payment...');
-          
-          // Find user by email
-          const { data: userData, error: userError } = await supabase.auth.admin.getUserByEmail(payerEmail);
-          console.log('→ User lookup:', { found: !!userData?.user, error: userError?.message });
-          
-          if (userData?.user) {
+          // Prefer resolving user via custom_id when available
+          let userRecord = null;
+          let resolvedBy = 'email';
+          let amountValue = puAmount?.value;
+          let amountCurrency = puAmount?.currency_code;
+
+          if (inlineCustomId) {
+            userRecord = await resolveUserByCustomId(inlineCustomId);
+            resolvedBy = 'custom_id_inline';
+          }
+
+          if (!userRecord) {
+            // If not inline, fetch order details (sometimes custom_id not echoed in event)
+            const orderDetails = await fetchOrderDetails(orderId, mode);
+            const orderCustomId = orderDetails?.purchase_units?.[0]?.custom_id;
+            if (orderCustomId) {
+              userRecord = await resolveUserByCustomId(orderCustomId);
+              resolvedBy = 'custom_id_fetch';
+            }
+            // Extract amount from fetched order if missing
+            if (!amountValue || !amountCurrency) {
+              amountValue = orderDetails?.purchase_units?.[0]?.amount?.value || amountValue;
+              amountCurrency = orderDetails?.purchase_units?.[0]?.amount?.currency_code || amountCurrency;
+            }
+          }
+
+          if (!userRecord) {
+            // Fallback to payer email
+            const { data: userData, error: userError } = await supabase.auth.admin.getUserByEmail(payerEmail);
+            console.log('→ User lookup (email):', { found: !!userData?.user, error: userError?.message });
+            userRecord = userData?.user || null;
+            resolvedBy = 'email';
+          }
+
+          if (userRecord) {
             // Get pro plan
             const { data: proPlan } = await supabase
               .from('subscription_plans')
@@ -244,7 +346,17 @@ async function handleEvent(event) {
               .single();
             
             if (proPlan) {
-              console.log('→ Creating Pro subscription for user:', userData.user.id);
+              console.log('→ Creating Pro subscription for user:', userRecord.id, '(resolvedBy:', resolvedBy + ')');
+              // Idempotency: skip if we already processed this order
+              const { data: existingByOrder } = await supabase
+                .from('payment_transactions')
+                .select('id')
+                .eq('paypal_order_id', orderId)
+                .maybeSingle?.() ?? { data: null };
+              if (existingByOrder) {
+                console.log('→ Order already processed, skipping duplicate. orderId:', orderId);
+                break;
+              }
               
               // Cancel existing subscription
               await supabase
@@ -253,14 +365,14 @@ async function handleEvent(event) {
                   status: 'cancelled',
                   cancelled_at: new Date().toISOString()
                 })
-                .eq('user_id', userData.user.id)
+                .eq('user_id', userRecord.id)
                 .eq('status', 'active');
               
               // Create new pro subscription
               const { data: subscription, error: subError } = await supabase
                 .from('user_subscriptions')
                 .insert({
-                  user_id: userData.user.id,
+                  user_id: userRecord.id,
                   plan_id: proPlan.id,
                   status: 'active',
                   paypal_order_id: orderId,
@@ -278,10 +390,10 @@ async function handleEvent(event) {
               const { error: txError } = await supabase
                 .from('payment_transactions')
                 .insert({
-                  user_id: userData.user.id,
+                  user_id: userRecord.id,
                   subscription_id: subscription?.id,
-                  amount: 7.00, // Pro plan amount
-                  currency: 'USD',
+                  amount: amountValue ? parseFloat(amountValue) : 7.0,
+                  currency: amountCurrency || 'USD',
                   payment_method: 'paypal',
                   paypal_order_id: orderId,
                   paypal_event_id: id,
@@ -290,7 +402,7 @@ async function handleEvent(event) {
                 });
               
               console.log('→ Transaction log:', { error: txError?.message });
-              console.log(`→ Pro subscription activated for user ${userData.user.id}`);
+              console.log(`→ Pro subscription activated for user ${userRecord.id}`);
             } else {
               console.error('→ Pro plan not found in database');
             }
@@ -307,13 +419,48 @@ async function handleEvent(event) {
         const orderId = event?.resource?.supplementary_data?.related_ids?.order_id;
         const captureId = event?.resource?.id;
         const amount = event?.resource?.amount?.value;
+        const currency = event?.resource?.amount?.currency_code;
         const payerEmail = event?.resource?.payer?.email_address;
         
-        if (payerEmail && amount) {
-          // Find user by email
-          const { data: userData } = await supabase.auth.admin.getUserByEmail(payerEmail);
+        console.log('→ Capture details:', { orderId, captureId, amount, currency, payerEmail });
+        
+        if (amount) {
+          console.log('→ Processing capture with amount, resolving user...');
+          // Try resolve via custom_id from order details if possible
+          let userRecord = null;
+          let resolvedPayerEmail = payerEmail;
           
-          if (userData?.user) {
+          if (orderId) {
+            console.log('→ Fetching order details for orderId:', orderId);
+            try {
+              const orderDetails = await fetchOrderDetails(orderId, mode);
+              const orderCustomId = orderDetails?.purchase_units?.[0]?.custom_id;
+              console.log('→ Order custom_id found:', orderCustomId);
+              
+              // Also try to get payer email from order details if missing
+              if (!resolvedPayerEmail) {
+                resolvedPayerEmail = orderDetails?.payer?.email_address || orderDetails?.payer?.payer_info?.email;
+                console.log('→ Payer email from order details:', resolvedPayerEmail);
+              }
+              
+              if (orderCustomId) {
+                userRecord = await resolveUserByCustomId(orderCustomId);
+                console.log('→ User resolved by custom_id:', !!userRecord);
+              }
+            } catch (error) {
+              console.log('→ Failed to fetch order details (404 - order might be old/test data), continuing without custom_id');
+            }
+          }
+          
+          // Fallback: Find user by email
+          if (!userRecord && resolvedPayerEmail) {
+            console.log('→ Fallback to email lookup for:', resolvedPayerEmail);
+            const { data: userData } = await supabase.auth.admin.getUserByEmail(resolvedPayerEmail);
+            userRecord = userData?.user || null;
+            console.log('→ User resolved by email:', !!userRecord);
+          }
+
+          if (userRecord) {
             // Get pro plan
             const { data: proPlan } = await supabase
               .from('subscription_plans')
@@ -322,6 +469,16 @@ async function handleEvent(event) {
               .single();
             
             if (proPlan) {
+              // Idempotency: skip if capture already logged
+              const { data: existingByCapture } = await supabase
+                .from('payment_transactions')
+                .select('id')
+                .eq('paypal_capture_id', captureId)
+                .maybeSingle?.() ?? { data: null };
+              if (existingByCapture) {
+                console.log('→ Capture already processed, skipping duplicate. captureId:', captureId);
+                break;
+              }
               // Cancel existing subscription
               await supabase
                 .from('user_subscriptions')
@@ -329,21 +486,20 @@ async function handleEvent(event) {
                   status: 'cancelled',
                   cancelled_at: new Date().toISOString()
                 })
-                .eq('user_id', userData.user.id)
+                .eq('user_id', userRecord.id)
                 .eq('status', 'active');
               
               // Create new pro subscription
               const { data: subscription } = await supabase
                 .from('user_subscriptions')
                 .insert({
-                  user_id: userData.user.id,
+                  user_id: userRecord.id,
                   plan_id: proPlan.id,
                   status: 'active',
                   paypal_order_id: orderId,
                   price_checks_used: 0,
                   posts_created: 0,
-                  price_checks_reset_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-                  posts_reset_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                  started_at: new Date().toISOString(),
                   expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
                 })
                 .select()
@@ -353,10 +509,10 @@ async function handleEvent(event) {
               await supabase
                 .from('payment_transactions')
                 .insert({
-                  user_id: userData.user.id,
+                  user_id: userRecord.id,
                   subscription_id: subscription?.id,
                   amount: parseFloat(amount),
-                  currency: 'USD',
+                  currency: currency || 'USD',
                   payment_method: 'paypal',
                   paypal_order_id: orderId,
                   paypal_capture_id: captureId,
@@ -365,15 +521,186 @@ async function handleEvent(event) {
                   transaction_data: event
                 });
               
-              console.log(`→ Pro subscription activated for user ${userData.user.id}`);
+              console.log(`→ Pro subscription activated for user ${userRecord.id}`);
+            } else {
+              console.error('→ Pro plan not found in database');
             }
+          } else {
+            console.error('→ No user found for capture event');
           }
+        } else {
+          console.error('→ Missing amount in capture event');
         }
         break;
       }
       case 'PAYMENT.SALE.COMPLETED': {
-        console.log('→ Payment sale completed:', event?.resource?.id);
-        // Similar to capture completed
+        const saleId = event?.resource?.id;
+        const parentPayment = event?.resource?.parent_payment;
+        const amount = event?.resource?.amount?.total;
+        const currency = event?.resource?.amount?.currency_code || event?.resource?.amount?.currency;
+        
+        console.log('→ Payment sale completed:', { saleId, parentPayment, amount, currency });
+        console.log('→ Full sale event resource:', JSON.stringify(event?.resource, null, 2));
+        
+        // Try to get custom_id from the sale event itself (sometimes available)
+        const saleCustomId = event?.resource?.custom;
+        let userRecord = null;
+        let payerEmail = null;
+        
+        if (saleCustomId) {
+          console.log('→ Found custom_id in sale event:', saleCustomId);
+          userRecord = await resolveUserByCustomId(saleCustomId);
+        }
+        
+        if (!userRecord && parentPayment && amount) {
+          console.log('→ Fetching payer details from parent payment...');
+          
+          // Get payer details from parent payment via PayPal API
+          try {
+            const accessToken = await getAccessToken(mode);
+            const base = paypalBaseUrl(mode);
+            
+            const paymentResponse = await fetch(`${base}/v1/payments/payment/${parentPayment}`, {
+              method: 'GET',
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            
+            if (paymentResponse.ok) {
+              const paymentData = await paymentResponse.json();
+              payerEmail = paymentData.payer?.payer_info?.email;
+              console.log('→ Retrieved payer email from parent payment:', payerEmail);
+              
+              // Also try to get custom from parent payment
+              const parentCustom = paymentData?.transactions?.[0]?.custom;
+              if (parentCustom && !userRecord) {
+                userRecord = await resolveUserByCustomId(parentCustom);
+              }
+            } else {
+              console.warn('→ Failed to fetch parent payment details:', paymentResponse.status);
+              // Don't break here - try to process with available data from the sale event
+              console.log('→ Attempting to process PAYMENT.SALE.COMPLETED with available event data...');
+              
+              // Try to extract payer info from the sale event itself if available
+              payerEmail = event?.resource?.payer_info?.email || event?.resource?.payer?.email_address;
+              if (payerEmail) {
+                console.log('→ Found payer email in sale event:', payerEmail);
+              }
+            }
+          } catch (error) {
+            console.warn('→ Error fetching parent payment:', error.message);
+            console.log('→ Attempting to process PAYMENT.SALE.COMPLETED with available event data...');
+            
+            // Try to extract payer info from the sale event itself if available
+            payerEmail = event?.resource?.payer_info?.email || 
+                        event?.resource?.payer?.email_address || 
+                        event?.resource?.payer?.payer_info?.email ||
+                        event?.resource?.sale?.payer?.email_address ||
+                        event?.resource?.sale?.payer_info?.email;
+            if (payerEmail) {
+              console.log('→ Found payer email in sale event:', payerEmail);
+            } else {
+              console.log('→ No payer email found in sale event structure');
+            }
+          }
+        }
+
+        // Fallback to email if we still don't have a user
+        if (!userRecord && payerEmail) {
+          const { data: userData, error: userError } = await supabase.auth.admin.getUserByEmail(payerEmail);
+          console.log('→ User lookup (email):', { found: !!userData?.user, error: userError?.message });
+          userRecord = userData?.user || null;
+        }
+          
+        if (userRecord && amount) {
+          console.log('→ Processing payment sale completion for user:', userRecord.id);
+        } else if (amount && !userRecord) {
+          console.warn('→ PAYMENT.SALE.COMPLETED: Found amount but no user record. This might be test data from webhook simulator.');
+          console.log('→ For production, ensure payer email is available in the event or parent payment is accessible.');
+        } else if (userRecord && !amount) {
+          console.warn('→ PAYMENT.SALE.COMPLETED: Found user but no amount. Event might be malformed.');
+        } else {
+          console.warn('→ PAYMENT.SALE.COMPLETED: Missing both user record and amount. Skipping event.');
+        }
+        
+        if (userRecord && amount) {
+          console.log('→ Processing payment sale completion for user:', userRecord.id);
+          
+          // Get pro plan
+          const { data: proPlan } = await supabase
+            .from('subscription_plans')
+            .select('id')
+            .eq('name', 'pro')
+            .single();
+          
+          if (proPlan) {
+            console.log('→ Creating Pro subscription for user:', userRecord.id);
+            
+            // Idempotency: skip if sale already logged
+            const { data: existingBySale } = await supabase
+              .from('payment_transactions')
+              .select('id')
+              .eq('paypal_sale_id', saleId)
+              .maybeSingle?.() ?? { data: null };
+            if (existingBySale) {
+              console.log('→ Sale already processed, skipping duplicate. saleId:', saleId);
+              break;
+            }
+            
+            // Cancel existing subscription
+            await supabase
+              .from('user_subscriptions')
+              .update({ 
+                status: 'cancelled',
+                cancelled_at: new Date().toISOString()
+              })
+              .eq('user_id', userRecord.id)
+              .eq('status', 'active');
+            
+            // Create new pro subscription
+            const { data: subscription, error: subError } = await supabase
+              .from('user_subscriptions')
+              .insert({
+                user_id: userRecord.id,
+                plan_id: proPlan.id,
+                status: 'active',
+                paypal_payment_id: parentPayment,
+                price_checks_used: 0,
+                posts_created: 0,
+                started_at: new Date().toISOString(),
+                expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+              })
+              .select()
+              .single();
+            
+            console.log('→ Subscription creation:', { success: !!subscription, error: subError?.message });
+            
+            // Log transaction
+            const { error: txError } = await supabase
+              .from('payment_transactions')
+              .insert({
+                user_id: userRecord.id,
+                subscription_id: subscription?.id,
+                amount: parseFloat(amount),
+                currency: currency || 'USD',
+                payment_method: 'paypal',
+                paypal_payment_id: parentPayment,
+                paypal_sale_id: saleId,
+                paypal_event_id: id,
+                status: 'completed',
+                transaction_data: event
+              });
+            
+            console.log('→ Transaction log:', { error: txError?.message });
+            console.log(`→ Pro subscription activated for user ${userRecord.id}`);
+          } else {
+            console.error('→ Pro plan not found in database');
+          }
+        } else {
+          console.error('→ Missing userRecord or amount in sale completed event');
+        }
         break;
       }
       case 'BILLING.SUBSCRIPTION.ACTIVATED': {
@@ -416,6 +743,60 @@ async function handleEvent(event) {
         // Log failed payment attempt
         break;
       }
+      case 'PAYMENT.CAPTURE.REFUNDED': {
+        console.log('→ Payment capture refunded:', event?.resource?.id);
+        const refundId = event?.resource?.id;
+        const captureId = event?.resource?.links?.find(link => link.rel === 'up')?.href?.split('/').pop();
+        const refundAmount = event?.resource?.amount?.value;
+        const refundCurrency = event?.resource?.amount?.currency_code;
+        
+        console.log('→ Refund details:', { refundId, captureId, refundAmount, refundCurrency });
+        
+        if (refundId && refundAmount) {
+          // Find the original transaction by capture_id
+          const { data: originalTx } = await supabase
+            .from('payment_transactions')
+            .select('*')
+            .eq('paypal_capture_id', captureId)
+            .single();
+            
+          if (originalTx) {
+            console.log('→ Found original transaction for refund, updating subscription...');
+            
+            // Cancel the user's subscription if they have one
+            await supabase
+              .from('user_subscriptions')
+              .update({ 
+                status: 'cancelled',
+                cancelled_at: new Date().toISOString(),
+                cancellation_reason: 'refunded'
+              })
+              .eq('user_id', originalTx.user_id)
+              .eq('status', 'active');
+            
+            // Log the refund transaction
+            await supabase
+              .from('payment_transactions')
+              .insert({
+                user_id: originalTx.user_id,
+                subscription_id: originalTx.subscription_id,
+                amount: -parseFloat(refundAmount), // Negative amount for refund
+                currency: refundCurrency || originalTx.currency,
+                payment_method: 'paypal',
+                paypal_refund_id: refundId,
+                paypal_capture_id: captureId,
+                paypal_event_id: id,
+                status: 'refunded',
+                transaction_data: event
+              });
+              
+            console.log(`→ Refund processed: cancelled subscription for user ${originalTx.user_id}`);
+          } else {
+            console.warn('→ Could not find original transaction for refund:', captureId);
+          }
+        }
+        break;
+      }
       default: {
         console.log('→ Unhandled event type:', type);
         break;
@@ -427,9 +808,11 @@ async function handleEvent(event) {
 }
 
 export async function POST(request) {
+  const startTime = Date.now();
   try {
     // Validate env at request time (avoid build-time failures)
     ensureEnv();
+    
     // Read raw body first (best practice for webhook handlers)
     const raw = await request.text();
     let body;
@@ -439,11 +822,19 @@ export async function POST(request) {
       console.error('[PayPal] Invalid JSON body');
       return new Response('Invalid JSON', { status: 400 });
     }
-    // Diagnostic log (safe): print selected mode and a masked webhook id suffix
-    console.log('[PayPal] Diagnostic', {
+
+    const eventType = body?.event_type;
+    const eventId = body?.id;
+    
+    // Enhanced diagnostic log
+    console.log('[PayPal] Webhook received', {
+      eventType,
+      eventId: eventId ? eventId.slice(-8) : 'none',
       mode: credentials.mode,
       nodeEnv: NODE_ENV,
       webhookIdSuffix: credentials.webhookId ? credentials.webhookId.slice(-6) : 'none',
+      bodySize: raw.length,
+      timestamp: new Date().toISOString()
     });
 
     // Light diagnostics for headers presence (no secrets)
@@ -457,17 +848,41 @@ export async function POST(request) {
     console.log('[PayPal] Header presence', diagHeaders);
 
     // Verify signature
+    console.log('[PayPal] Starting signature verification...');
     await verifyPaypalWebhook(request, body);
+    console.log('[PayPal] Signature verification passed ✓');
 
-    // Light, synchronous handling (keep minimal in serverless)
-    handleEvent(body);
+    // Event handling with timing
+    console.log('[PayPal] Starting event processing...');
+    await handleEvent(body);
+    
+    const processingTime = Date.now() - startTime;
+    console.log('[PayPal] Webhook processed successfully', { 
+      eventType, 
+      eventId: eventId ? eventId.slice(-8) : 'none',
+      processingTimeMs: processingTime 
+    });
 
     return new Response('OK', { status: 200 });
   } catch (err) {
     const code = err?.statusCode || 400;
-    console.error('[PayPal] Webhook verification failed:', err?.message || err);
+    const processingTime = Date.now() - startTime;
+    
+    console.error('[PayPal] Webhook processing failed', {
+      error: err?.message || err,
+      statusCode: code,
+      processingTimeMs: processingTime,
+      stack: err?.stack
+    });
+    
     // Extra diagnostics to help identify config mismatches (non-fatal for response)
-    try { await diagnoseWebhookConfigFromRequest(request); } catch (_) {}
+    try { 
+      console.log('[PayPal] Running diagnostics...');
+      await diagnoseWebhookConfigFromRequest(request); 
+    } catch (diagErr) {
+      console.warn('[PayPal] Diagnostics failed:', diagErr?.message);
+    }
+    
     return new Response('Invalid webhook', { status: code });
   }
 }

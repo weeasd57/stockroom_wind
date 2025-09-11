@@ -235,7 +235,8 @@ export function SubscriptionProvider({ children }) {
           paypal_order_id: paymentDetails.paypal_order_id,
           paypal_capture_id: paymentDetails.paypal_order_id,
           status: 'completed',
-          transaction_type: 'payment',
+          // Allow dynamic transaction type, default to 'payment' for backward compatibility
+          transaction_type: paymentDetails.transaction_type || 'payment',
           metadata: paymentDetails
         });
 

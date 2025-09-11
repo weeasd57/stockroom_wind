@@ -14,6 +14,10 @@ export default function CheckoutPage() {
   
   // Support both Sandbox and Production modes
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID 
+  const paypalPlanId = (process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID || '').trim();
+  const useSubscriptionFlow = !!paypalPlanId;
+  const intentParam = useSubscriptionFlow ? 'subscription' : 'capture';
+  const vaultParam = useSubscriptionFlow ? '&vault=true' : '';
   
   // Normalize and encode client id to avoid accidental whitespace/encoding issues
   const encodedClientId = encodeURIComponent((paypalClientId || '').trim());
@@ -283,7 +287,7 @@ export default function CheckoutPage() {
       {paypalClientId ? (
         <Script
           strategy="afterInteractive"
-          src={`https://www.paypal.com/sdk/js?client-id=${encodedClientId}&currency=EUR&components=buttons&intent=authorize&commit=true&debug=true`}
+          src={`https://www.paypal.com/sdk/js?client-id=${encodedClientId}&currency=USD&components=buttons&intent=${intentParam}&commit=true${vaultParam}&debug=true`}
           // Provide nonce attributes so SDK can tag injected <style> with the same nonce
           nonce={cspNonce}
           data-csp-nonce={cspNonce}
@@ -305,27 +309,79 @@ export default function CheckoutPage() {
                 return;
               }
 
-              const buttons = window.paypal.Buttons({
-                createOrder: (data, actions) => {
-                  return actions.order.create({
-                    purchase_units: [
-                      {
-                        amount: {
-                          value: '4.00',
-                          currency_code: 'EUR',
-                        },
-                        description: 'SharksZone Pro Plan - Monthly Subscription',
-                      },
-                    ],
-                    application_context: {
-                      brand_name: 'SharksZone',
-                      landing_page: 'NO_PREFERENCE',
-                      user_action: 'PAY_NOW',
-                      intent: 'AUTHORIZE'
-                    },
-                  });
+              // Build PayPal Buttons configuration for either Subscription or one-time Order
+              const buttonsConfig = useSubscriptionFlow ? {
+                // Subscription flow
+                createSubscription: async (data, actions) => {
+                  try {
+                    console.log('Creating PayPal subscription with plan:', paypalPlanId);
+                    const subscriptionId = await actions.subscription.create({
+                      plan_id: paypalPlanId
+                    });
+                    console.log('PayPal subscription created successfully:', subscriptionId);
+                    return subscriptionId;
+                  } catch (error) {
+                    console.error('PayPal subscription creation failed:', error);
+                    throw error;
+                  }
                 },
-                onApprove: handlePayPalApprove,
+                onApprove: async (data, actions) => {
+                  console.log('Starting PayPal subscription approval process...', data);
+                  setErrorAndSuppressRedirect('');
+                  setLoading(true);
+
+                  try {
+                    // Verify subscription on server
+                    const response = await fetch('/api/paypal/verify-subscription', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ subscriptionId: data.subscriptionID })
+                    });
+
+                    const result = await response.json();
+                    if (response.ok && result.success) {
+                      console.log('PayPal subscription verification successful:', result);
+
+                      if (result.status === 'ACTIVE' || result.status === 'APPROVAL_PENDING') {
+                        // Treat ACTIVE as success; APPROVAL_PENDING may require short delay, but proceed optimistically
+                        await upgradeToProSubscription({
+                          paypal_order_id: result.id, // store subscription id
+                          transaction_type: 'subscription',
+                          amount: 7.00,
+                          currency: 'USD',
+                          paypal_subscription_id: result.id,
+                          plan_id: result.plan_id,
+                          status: result.status,
+                          verified_at: new Date().toISOString()
+                        });
+                        await refreshSubscription();
+                        router.push('/dashboard?payment=success');
+                        return;
+                      }
+
+                      // Not active
+                      setLoading(false);
+                      setErrorDetails(`Subscription status is ${result.status}. Please contact support or try again.`);
+                      setShowErrorDialog(true);
+                      return;
+                    }
+
+                    // Server returned an error with details
+                    const issue = result?.details?.[0]?.issue;
+                    if (result?.name === 'UNPROCESSABLE_ENTITY' && issue === 'COMPLIANCE_VIOLATION') {
+                      setLoading(false);
+                      setErrorDetails(result?.details?.[0]?.description || 'Payment blocked by PayPal compliance. Please try a different PayPal account or funding method.');
+                      setShowErrorDialog(true);
+                      return;
+                    }
+
+                    throw new Error(result?.message || 'Failed to verify subscription');
+                  } catch (error) {
+                    console.error('PayPal subscription onApprove failed:', error);
+                    setLoading(false);
+                    setErrorAndSuppressRedirect('Subscription processing failed. Please try again or contact support.');
+                  }
+                },
                 onError: handlePayPalError,
                 onCancel: handlePayPalCancel,
                 style: {
@@ -334,7 +390,229 @@ export default function CheckoutPage() {
                   shape: 'rect',
                   label: 'paypal',
                 },
-              });
+              } : {
+                // One-time order flow (existing)
+                createOrder: async (data, actions) => {
+                  try {
+                    const orderData = {
+                      intent: 'CAPTURE',
+                      purchase_units: [
+                        {
+                          custom_id: user?.id?.toString() || 'guest',
+                          amount: {
+                            currency_code: 'USD',
+                            value: '7.00'
+                          },
+                          description: 'SharksZone Pro Plan - Monthly Subscription'
+                        }
+                      ],
+                      application_context: {
+                        brand_name: 'SharksZone',
+                        landing_page: 'NO_PREFERENCE',
+                        user_action: 'PAY_NOW',
+                        shipping_preference: 'NO_SHIPPING',
+                        return_url: window.location.origin + '/dashboard?payment=success',
+                        cancel_url: window.location.origin + '/checkout?cancelled=true'
+                      }
+                    };
+
+                    console.log('Creating PayPal order with:', orderData);
+                    const order = await actions.order.create(orderData);
+                    console.log('PayPal order created successfully:', order);
+                    return order;
+                  } catch (error) {
+                    console.error('PayPal order creation failed:', error);
+                    throw error;
+                  }
+                },
+                onApprove: async (data, actions) => {
+                  console.log('Starting PayPal approval process...', data);
+                  setErrorAndSuppressRedirect('');
+                  setLoading(true);
+                  
+                  try {
+                    // Try server-side capture first, fallback to client-side if server error
+                    try {
+                      const response = await fetch('/api/paypal/capture-order', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          orderId: data.orderID
+                        }),
+                      });
+
+                      if (response.ok) {
+                        const result = await response.json();
+                        if (result.success) {
+                          console.log('PayPal server-side capture successful:', result);
+                          
+                          // Update user subscription in database with capture details
+                          await upgradeToProSubscription({
+                            transaction_type: 'payment',
+                            paypal_order_id: result?.captureData?.id || data.orderID,
+                            paypal_capture_id: result?.captureId || result?.captureData?.purchase_units?.[0]?.payments?.captures?.[0]?.id,
+                            amount: result?.amount?.value || result?.captureData?.purchase_units?.[0]?.amount?.value || '7.00',
+                            currency: result?.amount?.currency_code || result?.captureData?.purchase_units?.[0]?.amount?.currency_code || 'USD',
+                            captured_at: new Date().toISOString(),
+                          });
+                          await refreshSubscription();
+                          
+                          // Redirect to success page
+                          router.push('/dashboard?payment=success');
+                          return;
+                        }
+                      } else {
+                        // Log and handle structured server error to decide whether to restart
+                        let serverErr = null;
+                        try { serverErr = await response.json(); } catch (_) {}
+                        console.warn('Server-side capture failed:', { status: response.status, error: serverErr });
+
+                        const issue = serverErr?.details?.[0]?.issue;
+                        const name = serverErr?.name;
+
+                        // If PayPal signals a compliance block, do not retry client capture. Show clear message.
+                        if (name === 'UNPROCESSABLE_ENTITY' && issue === 'COMPLIANCE_VIOLATION') {
+                          setLoading(false);
+                          setErrorDetails(
+                            serverErr?.details?.[0]?.description ||
+                            'Payment blocked by PayPal compliance. Please try a different PayPal account or funding method.'
+                          );
+                          setShowErrorDialog(true);
+                          return;
+                        }
+
+                        // If instrument declined or additional payer action (3DS) is required, restart the flow
+                        if ((name === 'UNPROCESSABLE_ENTITY' && (issue === 'INSTRUMENT_DECLINED' || issue === 'PAYER_ACTION_REQUIRED')) || issue === 'INSTRUMENT_DECLINED' || issue === 'PAYER_ACTION_REQUIRED') {
+                          console.warn('Restarting PayPal flow due to:', issue || name);
+                          try {
+                            await actions.restart();
+                            return; // let SDK restart the approval flow
+                          } catch (restartErr) {
+                            console.warn('Failed to restart PayPal flow:', restartErr);
+                          }
+                        }
+
+                        // If server indicates order already captured, treat as success
+                        if (issue === 'ORDER_ALREADY_CAPTURED' || issue === 'ORDER_ALREADY_COMPLETED') {
+                          console.log('Order already captured according to server. Completing checkout...');
+                          await upgradeToProSubscription({
+                            transaction_type: 'payment',
+                            paypal_order_id: data.orderID,
+                            paypal_capture_id: serverErr?.details?.[0]?.capture_id || undefined,
+                            amount: '7.00',
+                            currency: 'USD',
+                            captured_at: new Date().toISOString(),
+                          });
+                          await refreshSubscription();
+                          router.push('/dashboard?payment=success');
+                          return;
+                        }
+                      }
+                    } catch (serverError) {
+                      console.warn('Server-side capture failed, trying client-side:', serverError);
+                    }
+
+                    // Fallback to client-side capture
+                    console.log('Attempting client-side capture for order:', data.orderID);
+                    
+                    // First get order details to check status
+                    try {
+                      const orderDetails = await actions.order.get();
+                      console.log('Order details before capture:', orderDetails);
+                      
+                      if (orderDetails.status === 'COMPLETED') {
+                        console.log('Order already captured, updating subscription...');
+                        await upgradeToProSubscription({
+                          transaction_type: 'payment',
+                          paypal_order_id: data.orderID,
+                          paypal_capture_id: orderDetails?.purchase_units?.[0]?.payments?.captures?.[0]?.id,
+                          amount: orderDetails?.purchase_units?.[0]?.amount?.value || '7.00',
+                          currency: orderDetails?.purchase_units?.[0]?.amount?.currency_code || 'USD',
+                          captured_at: new Date().toISOString(),
+                        });
+                        await refreshSubscription();
+                        router.push('/dashboard?payment=success');
+                        return;
+                      }
+                      
+                      if (orderDetails.status !== 'APPROVED') {
+                        throw new Error(`Order status is ${orderDetails.status}, cannot capture`);
+                      }
+                    } catch (statusError) {
+                      console.warn('Could not get order status:', statusError);
+                    }
+                    
+                    const order = await actions.order.capture();
+                    console.log('PayPal client-side capture successful:', order);
+                    
+                    // Update user subscription in database with captured order data
+                    await upgradeToProSubscription({
+                      transaction_type: 'payment',
+                      paypal_order_id: order?.id || data.orderID,
+                      paypal_capture_id: order?.purchase_units?.[0]?.payments?.captures?.[0]?.id,
+                      amount: order?.purchase_units?.[0]?.amount?.value || '7.00',
+                      currency: order?.purchase_units?.[0]?.amount?.currency_code || 'USD',
+                      captured_at: new Date().toISOString(),
+                    });
+                    await refreshSubscription();
+                    
+                    // Redirect to success page
+                    router.push('/dashboard?payment=success');
+                    
+                  } catch (error) {
+                    console.error('PayPal capture failed:', error);
+                    console.error('PayPal error details:', {
+                      name: error?.name,
+                      message: error?.message,
+                      details: error?.details,
+                      httpStatusCode: error?.httpStatusCode,
+                      stack: error?.stack
+                    });
+
+                    // On client-side capture errors, handle restart cases as recommended by PayPal
+                    try {
+                      const issue = error?.details?.[0]?.issue;
+                      if (error?.name === 'UNPROCESSABLE_ENTITY' && issue === 'COMPLIANCE_VIOLATION') {
+                        setLoading(false);
+                        setErrorDetails(
+                          error?.details?.[0]?.description ||
+                          'Payment blocked by PayPal compliance. Please try a different PayPal account or funding method.'
+                        );
+                        setShowErrorDialog(true);
+                        return;
+                      }
+                      if (issue === 'INSTRUMENT_DECLINED' || issue === 'PAYER_ACTION_REQUIRED' || error?.name === 'UNPROCESSABLE_ENTITY') {
+                        console.warn('Client-side capture requires restart due to:', issue || error?.name);
+                        await actions.restart();
+                        return;
+                      }
+                    } catch (_) {}
+                    setLoading(false);
+                    
+                    // Handle specific PayPal errors
+                    if (error?.details?.[0]?.issue === 'INSTRUMENT_DECLINED' || 
+                        error?.name === 'UNPROCESSABLE_ENTITY' ||
+                        error?.httpStatusCode === 422) {
+                      setErrorAndSuppressRedirect(`Payment method declined. Please try a different payment method. (${error?.details?.[0]?.issue || error?.name || '422'})`);
+                    } else if (error?.name === 'RESOURCE_NOT_FOUND') {
+                      setErrorAndSuppressRedirect('Payment session expired. Please refresh the page and try again.');
+                    } else {
+                      setErrorAndSuppressRedirect('Payment processing failed. Please try again or contact support.');
+                    }
+                  }
+                },
+                onError: handlePayPalError,
+                onCancel: handlePayPalCancel,
+                style: {
+                  layout: 'vertical',
+                  color: 'blue',
+                  shape: 'rect',
+                  label: 'paypal',
+                },
+              };
+              const buttons = window.paypal.Buttons(buttonsConfig);
               buttons.render(container);
               buttonsRenderedRef.current = true;
             } catch (e) {
