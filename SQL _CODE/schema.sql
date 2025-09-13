@@ -432,6 +432,7 @@ SELECT
     p.status_message,
     p.price_checks,
     p.closed_date,
+    p.status,
     COALESCE(buy_counts.buy_count, 0) as buy_count,
     COALESCE(sell_counts.sell_count, 0) as sell_count,
     COALESCE(comment_counts.comment_count, 0) as comment_count

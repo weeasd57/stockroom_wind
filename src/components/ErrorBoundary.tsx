@@ -18,19 +18,17 @@ interface ErrorBoundaryProps {
 }
 
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = {
-    hasError: false,
-    error: null,
-    errorInfo: null,
-    retryCount: 0,
-  };
-  private retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
-  declare setState: (state: Partial<ErrorBoundaryState> | ((prevState: ErrorBoundaryState, props: ErrorBoundaryProps) => Partial<ErrorBoundaryState>)) => void;
-  declare props: Readonly<ErrorBoundaryProps>;
-
   constructor(props: ErrorBoundaryProps) {
     super(props);
+    this.state = {
+      hasError: false,
+      error: null,
+      errorInfo: null,
+      retryCount: 0,
+    };
   }
+  
+  private retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     return {
