@@ -391,6 +391,10 @@ CREATE POLICY "Users can view own subscriptions" ON user_subscriptions
 CREATE POLICY "Users can update own subscriptions" ON user_subscriptions
     FOR UPDATE USING (auth.uid() = user_id);
 
+-- Users can insert their own subscriptions
+CREATE POLICY "Users can insert own subscriptions" ON user_subscriptions
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
 -- Service role can manage all subscriptions (for webhooks)
 CREATE POLICY "Service role can manage subscriptions" ON user_subscriptions
     FOR ALL USING (auth.role() = 'service_role');
@@ -407,15 +411,19 @@ CREATE POLICY "Users can insert own price checks" ON price_check_logs
 CREATE POLICY "Users can view own transactions" ON payment_transactions
     FOR SELECT USING (auth.uid() = user_id);
 
+-- Users can insert their own transactions
+CREATE POLICY "Users can insert own transactions" ON payment_transactions
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
 -- Service role can manage all transactions (for webhooks)
 CREATE POLICY "Service role can manage transactions" ON payment_transactions
     FOR ALL USING (auth.role() = 'service_role');
 
 -- Grant permissions
 GRANT SELECT ON subscription_plans TO authenticated;
-GRANT SELECT, UPDATE ON user_subscriptions TO authenticated;
+GRANT SELECT, UPDATE, INSERT ON user_subscriptions TO authenticated;
 GRANT SELECT, INSERT ON price_check_logs TO authenticated;
-GRANT SELECT ON payment_transactions TO authenticated;
+GRANT SELECT, INSERT ON payment_transactions TO authenticated;
 GRANT SELECT ON user_subscription_info TO authenticated;
 GRANT EXECUTE ON FUNCTION check_price_limit TO authenticated;
 GRANT EXECUTE ON FUNCTION log_price_check TO authenticated;
@@ -423,6 +431,12 @@ GRANT EXECUTE ON FUNCTION check_post_limit TO authenticated;
 GRANT EXECUTE ON FUNCTION log_post_creation TO authenticated;
 GRANT EXECUTE ON FUNCTION reset_monthly_usage TO service_role;
 GRANT EXECUTE ON FUNCTION create_pro_subscription TO service_role;
+GRANT EXECUTE ON FUNCTION create_pro_subscription TO authenticated;
+
+-- Make create_pro_subscription function run with elevated permissions to bypass RLS when needed
+ALTER FUNCTION create_pro_subscription(UUID, VARCHAR) 
+    SECURITY DEFINER
+    SET search_path = public;
 
 -- Note: Views cannot have RLS policies directly
 -- Security is handled through the underlying tables and our API endpoint

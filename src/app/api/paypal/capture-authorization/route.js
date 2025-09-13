@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const runtime = 'nodejs';
+
 // PayPal API base URLs
 // Prefer explicit PAYPAL_MODE to avoid coupling to NODE_ENV.
 // PAYPAL_MODE should be either 'live' or 'sandbox' (defaults to 'sandbox').
@@ -23,7 +25,7 @@ function getCredentials() {
 async function getPayPalAccessToken() {
   const { clientId, clientSecret } = getCredentials();
 
-  console.log('PayPal credentials check:', {
+  console.log('PayPal credentials check (capture-authorization):', {
     mode: PAYPAL_MODE,
     clientId: clientId ? 'Present' : 'Missing',
     clientSecret: clientSecret ? 'Present' : 'Missing'
@@ -32,13 +34,12 @@ async function getPayPalAccessToken() {
   if (!clientId) {
     throw new Error('PayPal Client ID not configured');
   }
-  
   if (!clientSecret) {
     throw new Error('PayPal Client Secret not configured');
   }
 
   const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-  
+
   const response = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
     method: 'POST',
     headers: {
@@ -62,14 +63,15 @@ async function getPayPalAccessToken() {
   return data.access_token;
 }
 
-// Capture PayPal order
-async function capturePayPalOrder(orderId, accessToken) {
-  const response = await fetch(`${PAYPAL_BASE}/v2/checkout/orders/${orderId}/capture`, {
+// Capture an authorization
+async function captureAuthorization(authorizationId, accessToken) {
+  const response = await fetch(`${PAYPAL_BASE}/v2/payments/authorizations/${authorizationId}/capture`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
+    body: JSON.stringify({}) // capture full authorized amount
   });
 
   if (!response.ok) {
@@ -99,11 +101,11 @@ async function safeJson(res) {
 
 export async function POST(request) {
   try {
-    const { orderId } = await request.json();
+    const { authorizationId } = await request.json();
 
-    if (!orderId) {
+    if (!authorizationId) {
       return NextResponse.json(
-        { error: 'Order ID is required' },
+        { error: 'authorizationId is required' },
         { status: 400 }
       );
     }
@@ -111,52 +113,37 @@ export async function POST(request) {
     // Get PayPal access token
     const accessToken = await getPayPalAccessToken();
 
-    // Capture the order
-    const result = await capturePayPalOrder(orderId, accessToken);
+    // Capture the authorization
+    const result = await captureAuthorization(authorizationId, accessToken);
 
-    // Check if capture was successful
     if (result.ok) {
       const captureData = result.data;
-      if (captureData.status === 'COMPLETED') {
-        console.log('PayPal capture successful:', captureData);
-      
-        // Extract payment details
-        const capture = captureData.purchase_units[0]?.payments?.captures?.[0];
-        const customerId = captureData.purchase_units[0]?.custom_id;
-        
-        return NextResponse.json({
-          success: true,
-          captureId: capture?.id,
-          amount: capture?.amount,
-          customerId,
-          captureData
-        });
-      }
-      // If PayPal responded ok but not COMPLETED
-      return NextResponse.json(
-        { error: 'Payment capture not completed', status: captureData.status, captureData },
-        { status: 400 }
-      );
+      const capture = captureData || {};
+      return NextResponse.json({
+        success: true,
+        status: capture?.status,
+        captureId: capture?.id || capture?.purchase_units?.[0]?.payments?.captures?.[0]?.id,
+        amount: capture?.amount || capture?.purchase_units?.[0]?.payments?.captures?.[0]?.amount,
+        captureData,
+      });
     }
 
-    // Propagate PayPal error details to client (e.g., 422 UNPROCESSABLE_ENTITY)
     const err = result.error || {};
     const debug_id = err?.debug_id;
     const details = err?.details;
     const name = err?.name;
     const message = err?.message;
-    console.error('PayPal capture failed', { status: result.status, name, message, debug_id, details });
+    console.error('PayPal capture-authorization failed', { status: result.status, name, message, debug_id, details });
     return NextResponse.json(
       { success: false, name, message, debug_id, details },
       { status: result.status || 500 }
     );
 
   } catch (error) {
-    console.error('PayPal capture error:', error);
+    console.error('PayPal capture-authorization error:', error);
     return NextResponse.json(
       { error: 'Internal server error', details: error.message },
       { status: 500 }
     );
   }
 }
-

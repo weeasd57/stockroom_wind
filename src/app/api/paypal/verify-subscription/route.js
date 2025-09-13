@@ -3,15 +3,25 @@ import { NextResponse } from 'next/server';
 // PayPal API base URLs
 // Prefer explicit PAYPAL_MODE to avoid coupling to NODE_ENV.
 // PAYPAL_MODE should be either 'live' or 'sandbox' (defaults to 'sandbox').
-const PAYPAL_MODE = (process.env.PAYPAL_MODE || 'sandbox').toLowerCase();
+const PAYPAL_MODE = ((process.env.PAYPAL_MODE || process.env.NEXT_PUBLIC_PAYPAL_MODE || 'sandbox').toLowerCase() === 'live') ? 'live' : 'sandbox';
 const PAYPAL_BASE = PAYPAL_MODE === 'live'
   ? 'https://api-m.paypal.com'
   : 'https://api-m.sandbox.paypal.com';
 
+function getCredentials() {
+  const isLive = PAYPAL_MODE === 'live';
+  const clientId = isLive
+    ? (process.env.PAYPAL_LIVE_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID_LIVE || process.env.PAYPAL_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID)
+    : (process.env.PAYPAL_SANDBOX_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID_SANDBOX || process.env.PAYPAL_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID);
+  const clientSecret = isLive
+    ? (process.env.PAYPAL_LIVE_CLIENT_SECRET || process.env.PAYPAL_CLIENT_SECRET)
+    : (process.env.PAYPAL_SANDBOX_CLIENT_SECRET || process.env.PAYPAL_CLIENT_SECRET);
+  return { clientId, clientSecret };
+}
+
 // Get PayPal access token (server credentials only)
 async function getPayPalAccessToken() {
-  const clientId = process.env.PAYPAL_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
-  const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+  const { clientId, clientSecret } = getCredentials();
 
   console.log('[VerifySubscription] PayPal credentials check:', {
     mode: PAYPAL_MODE,
