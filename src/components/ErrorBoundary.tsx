@@ -90,12 +90,15 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     const { retryCount } = this.state;
 
     if (retryCount < maxRetries) {
-      this.setState(prevState => ({
+      // Directly update state to avoid setState issues
+      this.state = {
         hasError: false,
         error: null,
         errorInfo: null,
-        retryCount: prevState.retryCount + 1,
-      }));
+        retryCount: this.state.retryCount + 1,
+      };
+      // Force re-render
+      this.forceUpdate();
     }
   };
 
