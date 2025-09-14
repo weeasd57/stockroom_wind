@@ -30,9 +30,9 @@ export function SubscriptionProvider({ children }) {
     plan_id: null,
     plan_name: 'free',
     plan_display_name: 'Free',
-    price_check_limit: 2,
+    price_check_limit: 50,
     price_checks_used: 0,
-    remaining_checks: 2,
+    remaining_checks: 50,
     post_creation_limit: 100,
     posts_created: 0,
     remaining_posts: 100,
@@ -132,9 +132,9 @@ export function SubscriptionProvider({ children }) {
           user_id: user.id,
           plan_name: 'free',
           plan_display_name: 'Free',
-          price_check_limit: 2,
+          price_check_limit: 50,
           price_checks_used: 0,
-          remaining_checks: 2,
+          remaining_checks: 50,
           post_creation_limit: 100,
           posts_created: 0,
           remaining_posts: 100,
@@ -153,9 +153,9 @@ export function SubscriptionProvider({ children }) {
         user_id: user.id,
         plan_name: 'free',
         plan_display_name: 'Free',
-        price_check_limit: 2,
+        price_check_limit: 50,
         price_checks_used: 0,
-        remaining_checks: 2,
+        remaining_checks: 50,
         post_creation_limit: 100,
         posts_created: 0,
         remaining_posts: 100,
@@ -210,41 +210,76 @@ export function SubscriptionProvider({ children }) {
     ]);
   }, [fetchSubscriptionInfo, fetchAnalytics]);
 
-  // Upgrade to Pro subscription
+  // Upgrade to Pro subscription with enhanced error handling
   const upgradeToProSubscription = useCallback(async (paymentDetails) => {
+    console.log('[SUBSCRIPTION] Starting upgradeToProSubscription with details:', paymentDetails);
+    
     if (!user?.id) {
-      return { success: false, error: 'No user logged in' };
+      console.error('[SUBSCRIPTION] No user logged in');
+      return { success: false, error: 'المستخدم غير مسجل دخول' };
+    }
+
+    if (!supabase) {
+      console.error('[SUBSCRIPTION] Supabase client not available');
+      return { success: false, error: 'اتصال قاعدة البيانات غير متاح' };
     }
 
     try {
-      // Use the existing create_pro_subscription function
-      const { data, error } = await supabase.rpc('create_pro_subscription', {
+      console.log('[SUBSCRIPTION] Calling create_pro_subscription RPC function');
+      
+      // Add timeout to RPC call to prevent hanging
+      const rpcPromise = supabase.rpc('create_pro_subscription', {
         p_user_id: user.id,
         p_paypal_order_id: paymentDetails.paypal_order_id || 'manual'
       });
 
-      if (error) throw error;
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('RPC timeout after 60 seconds')), 60000)
+      );
+
+      const { data, error } = await Promise.race([rpcPromise, timeoutPromise]);
+
+      console.log('[SUBSCRIPTION] RPC response:', { data, error });
+
+      if (error) {
+        console.error('[SUBSCRIPTION] RPC function failed:', error);
+        console.error('[SUBSCRIPTION] Error details:', JSON.stringify(error, null, 2));
+        
+        // Check if it's a permissions error
+        if (error.code === 'PGRST116' || error.message?.includes('permission')) {
+          throw new Error('ليس لديك صلاحية لترقية الاشتراك. تحقق من تسجيل الدخول.');
+        }
+        
+        throw new Error(`خطأ في قاعدة البيانات: ${error.message || error}`);
+      }
+
+      console.log('[SUBSCRIPTION] Subscription created with ID:', data);
 
       // Log payment transaction
+      console.log('[SUBSCRIPTION] Logging payment transaction');
       const { error: transactionError } = await supabase
         .from('payment_transactions')
         .insert({
           user_id: user.id,
-          amount: paymentDetails.amount || 1.00,
+          subscription_id: data,
+          amount: parseFloat(paymentDetails.amount) || 7.00,
           currency: paymentDetails.currency || 'USD',
           paypal_order_id: paymentDetails.paypal_order_id,
-          paypal_capture_id: paymentDetails.paypal_order_id,
+          paypal_capture_id: paymentDetails.paypal_capture_id,
           status: 'completed',
-          // Allow dynamic transaction type, default to 'payment' for backward compatibility
           transaction_type: paymentDetails.transaction_type || 'payment',
           metadata: paymentDetails
         });
 
       if (transactionError) {
-        console.warn('Failed to log transaction:', transactionError);
+        console.warn('[SUBSCRIPTION] Failed to log transaction:', transactionError);
+        // Don't fail the upgrade if transaction logging fails
+      } else {
+        console.log('[SUBSCRIPTION] Payment transaction logged successfully');
       }
 
       // Force refresh subscription state
+      console.log('[SUBSCRIPTION] Refreshing subscription info');
       await fetchSubscriptionInfo(true);
       
       return { success: true, subscriptionId: data };
@@ -311,7 +346,7 @@ export function SubscriptionProvider({ children }) {
     return {
       priceChecks: {
         used: subscriptionInfo.price_checks_used || 0,
-        limit: subscriptionInfo.price_check_limit || 2,
+        limit: subscriptionInfo.price_check_limit || 50,
         remaining: subscriptionInfo.remaining_checks || 0
       },
       posts: {

@@ -108,7 +108,7 @@ END $$;
 
 -- Insert default subscription plans
 INSERT INTO subscription_plans (name, display_name, price, price_check_limit, post_creation_limit, features) VALUES
-('free', 'Free', 0, 2, 100, '["2 price checks per month", "100 posts per month", "Basic features", "Community support"]'),
+('free', 'Free', 0, 50, 100, '["50 price checks per month", "100 posts per month", "Basic features", "Community support"]'),
 ('pro', 'Pro', 7.00, 300, 500, '["300 price checks per month", "500 posts per month", "Priority support"]')
 ON CONFLICT (name) DO UPDATE SET
     price = EXCLUDED.price,
@@ -126,7 +126,7 @@ DECLARE
 BEGIN
     -- Get user's current plan limits and usage
     SELECT 
-        COALESCE(p.price_check_limit, 2),
+        COALESCE(p.price_check_limit, 50),
         COALESCE(s.price_checks_used, 0)
     INTO v_limit, v_used
     FROM user_subscriptions s
@@ -135,7 +135,7 @@ BEGIN
     
     -- If no active subscription found, use free plan defaults
     IF v_limit IS NULL THEN
-        v_limit := 2;  -- Free plan default
+        v_limit := 50;  -- Free plan default
         v_used := 0;
     END IF;
     
@@ -250,9 +250,9 @@ SELECT
   s.plan_id,
   COALESCE(p.name, 'free') as plan_name,
   COALESCE(p.display_name, 'Free') as plan_display_name,
-  COALESCE(p.price_check_limit, 2) as price_check_limit,
+  COALESCE(p.price_check_limit, 50) as price_check_limit,
   COALESCE(s.price_checks_used, 0) as price_checks_used,
-  COALESCE(p.price_check_limit, 2) - COALESCE(s.price_checks_used, 0) as remaining_checks,
+  COALESCE(p.price_check_limit, 50) - COALESCE(s.price_checks_used, 0) as remaining_checks,
   COALESCE(p.post_creation_limit, 100) as post_creation_limit,
   COALESCE(s.posts_created, 0) as posts_created,
   COALESCE(p.post_creation_limit, 100) - COALESCE(s.posts_created, 0) as remaining_posts,

@@ -34,7 +34,7 @@ export async function POST(request) {
     const { orderId, captureId, amount } = body;
 
     // Validate payment amount
-    if (parseFloat(amount) !== 4.00) {
+    if (parseFloat(amount) !== 7.00) {
       return NextResponse.json({ error: 'Invalid payment amount' }, { status: 400 });
     }
 

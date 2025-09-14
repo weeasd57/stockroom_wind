@@ -32,8 +32,8 @@ export default function CheckoutPage() {
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorDetails, setErrorDetails] = useState('');
   // URL-driven params to avoid touching env
-  const [orderCurrency, setOrderCurrency] = useState('EUR');
-  const [orderAmount, setOrderAmount] = useState('4.00');
+  const [orderCurrency, setOrderCurrency] = useState('USD');
+  const [orderAmount, setOrderAmount] = useState('7.00');
   const [fundingParam, setFundingParam] = useState('');
   const [intentParam, setIntentParam] = useState('authorize');
   // Prevent rendering SDK before URL params are parsed
@@ -187,8 +187,8 @@ export default function CheckoutPage() {
 
         const captureData = capResult.captureData || {};
         const captureId = capResult.captureId || captureData?.id || captureData?.purchase_units?.[0]?.payments?.captures?.[0]?.id;
-        const amountValue = captureData?.amount?.value || captureData?.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.value || orderAmount || '4.00';
-        const currencyCode = captureData?.amount?.currency_code || captureData?.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.currency_code || orderCurrency || 'EUR';
+        const amountValue = captureData?.amount?.value || captureData?.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.value || orderAmount || '7.00';
+        const currencyCode = captureData?.amount?.currency_code || captureData?.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.currency_code || orderCurrency || 'USD';
 
         // 3) Upgrade to Pro
         console.log('Attempting to upgrade subscription with captureId:', captureId);
@@ -260,8 +260,8 @@ export default function CheckoutPage() {
         const unit = captureData?.purchase_units?.[0];
         const cap = unit?.payments?.captures?.[0] || captureData;
         const captureId = cap?.id;
-        const amountValue = cap?.amount?.value || orderAmount || '4.00';
-        const currencyCode = cap?.amount?.currency_code || orderCurrency || 'EUR';
+        const amountValue = cap?.amount?.value || orderAmount || '7.00';
+        const currencyCode = cap?.amount?.currency_code || orderCurrency || 'USD';
 
         console.log('CAPTURE flow: Attempting to upgrade subscription with captureId:', captureId);
         
@@ -525,8 +525,8 @@ export default function CheckoutPage() {
                     purchase_units: [
                       {
                         amount: {
-                          value: orderAmount || '4.00',
-                          currency_code: orderCurrency || 'EUR',
+                          value: orderAmount || '7.00',
+                          currency_code: orderCurrency || 'USD',
                         },
                         description: 'SharksZone Pro Plan - Monthly Subscription',
                       },

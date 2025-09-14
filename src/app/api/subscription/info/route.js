@@ -62,7 +62,7 @@ export async function GET(request) {
       plan_name: subscriptionData?.subscription_plans?.name || 'free',
       plan_display_name: subscriptionData?.subscription_plans?.display_name || 'Free',
       // price checks
-      price_check_limit: subscriptionData?.subscription_plans?.price_check_limit ?? 2,
+      price_check_limit: subscriptionData?.subscription_plans?.price_check_limit ?? 50,
       price_checks_used: subscriptionData?.price_checks_used ?? 0,
       // posts limits
       post_creation_limit: subscriptionData?.subscription_plans?.post_creation_limit ?? 100,

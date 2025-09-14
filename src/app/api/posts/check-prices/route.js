@@ -132,15 +132,15 @@ export async function GET(request) {
     const subscriptionInfo = subscriptionData && subscriptionData.length > 0 ? subscriptionData[0] : null;
 
     // Default to free plan limits if no subscription found
-    const maxDailyChecks = subscriptionInfo?.price_check_limit || 2;
+    const maxMonthlyChecks = subscriptionInfo?.price_check_limit || 50;
     const usedChecks = subscriptionInfo?.price_checks_used || 0;
-    const remainingChecks = Math.max(maxDailyChecks - usedChecks, 0);
+    const remainingChecks = Math.max(maxMonthlyChecks - usedChecks, 0);
 
     return NextResponse.json({ 
       success: true, 
       usageCount: usedChecks, 
       remainingChecks, 
-      maxDailyChecks,
+      maxMonthlyChecks,
       planName: subscriptionInfo?.plan_name || 'free'
     });
   } catch (error) {
@@ -269,7 +269,7 @@ export async function POST(request) {
       
       const subscriptionInfo = subscriptionData && subscriptionData.length > 0 ? subscriptionData[0] : null;
       
-      const maxChecks = subscriptionInfo?.price_check_limit || 2;
+      const maxChecks = subscriptionInfo?.price_check_limit || 50;
       const usedChecks = subscriptionInfo?.price_checks_used || 0;
       const planName = subscriptionInfo?.plan_name || 'free';
       
@@ -504,7 +504,7 @@ export async function POST(request) {
         
         // Insert before the code that processes price data
         if (DEBUG) console.log(`[DEBUG] Post ${post.id}: Processing price data for ${symbol}`);
-        if (DEBUG) console.log(`[DEBUG] - Target price: ${post.target_price}, Stop loss: ${post.stop_loss_price}`);
+        if (DEBUG) console.log(`[DEBUG] - Target price: ${post.target_price}, Stop-loss: ${post.stop_loss_price}`);
         
         // Check if we have valid historical data
         if (!Array.isArray(historicalData) || historicalData.length === 0) {
@@ -1079,11 +1079,11 @@ export async function POST(request) {
     
     const subscriptionInfo = subscriptionData && subscriptionData.length > 0 ? subscriptionData[0] : null;
     
-    const maxDailyChecks = subscriptionInfo?.price_check_limit || 2;
+    const maxMonthlyChecks = subscriptionInfo?.price_check_limit || 50;
     const usageCount = subscriptionInfo?.price_checks_used || 0;
-    const remainingChecks = Math.max(maxDailyChecks - usageCount, 0);
+    const remainingChecks = Math.max(maxMonthlyChecks - usageCount, 0);
     
-    if (DEBUG) console.log(`[DEBUG] Price check completed for ${posts.length} posts. Updated: ${updatedPosts.length}, Skipped: ${closedPostsCount}, Remaining checks today: ${remainingChecks}`);
+    if (DEBUG) console.log(`[DEBUG] Price check completed for ${posts.length} posts. Updated: ${updatedPosts.length}, Skipped: ${closedPostsCount}, Remaining checks this month: ${remainingChecks}`);
     
     return NextResponse.json({
       success: true,

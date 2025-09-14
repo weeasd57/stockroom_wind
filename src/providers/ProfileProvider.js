@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 
 import { 
@@ -53,6 +53,118 @@ export function ProfileProvider({ children }) {
   const lastPostRefreshTime = useRef(0);
   const REFRESH_THROTTLE_MS = 5000; // 5 seconds minimum between refreshes
   const POST_REFRESH_THROTTLE_MS = 2000; // 2 seconds for post-related operations
+
+  // Helper function to handle error objects consistently - defined early
+  const handleError = useCallback((err) => {
+    if (typeof err === 'object' && err !== null) {
+      // If error has message property, use it
+      if (err.message) {
+        console.error('Error object:', err);
+        return err.message;
+      } else {
+        // Otherwise stringify the object
+        console.error('Error object without message:', err);
+        return JSON.stringify(err);
+      }
+    }
+    return err;
+  }, []);
+
+  // Define refreshData early with useCallback to avoid temporal dead zone
+  const refreshData = useCallback(async (userId) => {
+    // Check if we're properly authenticated
+    if (!supabaseContextAvailable) {
+      console.error('Cannot refresh data: SupabaseProvider not available');
+      const error = new Error('SupabaseProvider not available');
+      setError(handleError(error));
+      return;
+    }
+    
+    // Don't refresh if already refreshing
+    if (isRefreshing) return;
+    
+    // Apply throttling to prevent excessive refreshes
+    const now = Date.now();
+    if (now - lastRefreshTime.current < REFRESH_THROTTLE_MS) {
+      return;
+    }
+    
+    try {
+      setIsRefreshing(true);
+      setError(null);
+      // Update the last refresh time
+      lastRefreshTime.current = now;
+      
+      // Fetch the current profile data - added to ensure experience score is up-to-date
+      const { data: profileData, error: profileError } = await getUserProfile(userId);
+      
+      if (profileError) {
+        console.error('Error fetching profile data:', profileError);
+      } else if (profileData) {
+        // Update profile with the latest data including experience score
+        // Fix: Ensure we're extracting the profile data correctly from the array
+        const updatedProfileData = Array.isArray(profileData) ? profileData[0] : profileData;
+        if (updatedProfileData) {
+          setProfile(updatedProfileData);
+        } else {
+          console.error('No profile data found in refreshData');
+        }
+      }
+      
+      // Similar fetch logic as initializeData
+      const { data: postsData, error: postsError } = await supabase
+        .from('posts')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+        
+      if (postsError) throw postsError;
+      
+      // Modified queries using more commonly used column names - using the same pattern as in initializeData
+      // Using follower_id/following_id structure for followers
+      let followersData, followingData;
+      
+      // First approach for followers - using follower_id/following_id structure
+      const followersResult = await supabase
+        .from('user_followings')
+        .select('follower_id, profiles!user_followings_follower_id_fkey(id, username, avatar_url)')
+        .eq('following_id', userId);
+        
+      if (followersResult.error) {
+        console.error('Followers query failed:', followersResult.error);
+        followersData = []; // Set empty array as fallback
+      } else {
+        followersData = followersResult.data || [];
+        console.log('Followers data fetched successfully:', followersData);
+      }
+      
+      // For following - users that the current user follows
+      const followingResult = await supabase
+        .from('user_followings')
+        .select('following_id, profiles!user_followings_following_id_fkey(id, username, avatar_url)')
+        .eq('follower_id', userId);
+        
+      if (followingResult.error) {
+        console.error('Following query failed:', followingResult.error);
+        followingData = []; // Set empty array as fallback
+      } else {
+        followingData = followingResult.data || [];
+        console.log('Following data fetched successfully:', followingData);
+      }
+      
+      // Update the data
+      setPosts(postsData || []);
+      setFollowers(followersData);
+      setFollowing(followingData);
+      setLastFetched(Date.now());
+      
+    } catch (error) {
+      console.error('Error refreshing profile data:', error);
+      setError(handleError(error));
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [supabaseContextAvailable, isRefreshing, REFRESH_THROTTLE_MS, supabase]);
 
   // Listen to post creation events from PostProvider
   useEffect(() => {
@@ -177,21 +289,6 @@ export function ProfileProvider({ children }) {
     };
   }, [lastFetched, isRefreshing]);
 
-  // Helper function to handle error objects consistently
-  const handleError = (err) => {
-    if (typeof err === 'object' && err !== null) {
-      // If error has message property, use it
-      if (err.message) {
-        console.error('Error object:', err);
-        return err.message;
-      } else {
-        // Otherwise stringify the object
-        console.error('Error object without message:', err);
-        return JSON.stringify(err);
-      }
-    }
-    return err;
-  };
 
   useEffect(() => {
     // Skip if SupabaseProvider is not available or user is not logged in
@@ -493,103 +590,6 @@ export function ProfileProvider({ children }) {
       setError(handleError(error));
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const refreshData = async (userId) => {
-    // Check if we're properly authenticated
-    if (!supabaseContextAvailable) {
-      console.error('Cannot refresh data: SupabaseProvider not available');
-      const error = new Error('SupabaseProvider not available');
-      setError(handleError(error));
-      return;
-    }
-    
-    // Don't refresh if already refreshing
-    if (isRefreshing) return;
-    
-    // Apply throttling to prevent excessive refreshes
-    const now = Date.now();
-    if (now - lastRefreshTime.current < REFRESH_THROTTLE_MS) {
-      
-      return;
-    }
-    
-    try {
-      setIsRefreshing(true);
-      setError(null);
-      // Update the last refresh time
-      lastRefreshTime.current = now;
-      
-      // Fetch the current profile data - added to ensure experience score is up-to-date
-      const { data: profileData, error: profileError } = await getUserProfile(userId);
-      
-      if (profileError) {
-        console.error('Error fetching profile data:', profileError);
-      } else if (profileData) {
-        // Update profile with the latest data including experience score
-        // Fix: Ensure we're extracting the profile data correctly from the array
-        const updatedProfileData = Array.isArray(profileData) ? profileData[0] : profileData;
-        if (updatedProfileData) {
-          
-          setProfile(updatedProfileData);
-        } else {
-          console.error('No profile data found in refreshData');
-        }
-      }
-      
-      // Similar fetch logic as initializeData
-      const { data: postsData, error: postsError } = await supabase
-        .from('posts')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-        
-      if (postsError) throw postsError;
-      
-      // Modified queries using more commonly used column names - using the same pattern as in initializeData
-      // Using follower_id/following_id structure for followers
-      let followersData, followingData;
-      
-      // First approach for followers - using follower_id/following_id structure
-      const followersResult = await supabase
-        .from('user_followings')
-        .select('follower_id, profiles!user_followings_follower_id_fkey(id, username, avatar_url)')
-        .eq('following_id', userId);
-        
-      if (followersResult.error) {
-        console.error('Followers query failed:', followersResult.error);
-        followersData = []; // Set empty array as fallback
-      } else {
-        followersData = followersResult.data || [];
-        console.log('Followers data fetched successfully:', followersData);
-      }
-      
-      // For following - users that the current user follows
-      const followingResult = await supabase
-        .from('user_followings')
-        .select('following_id, profiles!user_followings_following_id_fkey(id, username, avatar_url)')
-        .eq('follower_id', userId);
-        
-      if (followingResult.error) {
-        console.error('Following query failed:', followingResult.error);
-        followingData = []; // Set empty array as fallback
-      } else {
-        followingData = followingResult.data || [];
-        console.log('Following data fetched successfully:', followingData);
-      }
-      
-      // Update the data
-      setPosts(postsData || []);
-      setFollowers(followersData);
-      setFollowing(followingData);
-      setLastFetched(Date.now());
-      
-    } catch (error) {
-      console.error('Error refreshing profile data:', error);
-      setError(handleError(error));
-    } finally {
-      setIsRefreshing(false);
     }
   };
   

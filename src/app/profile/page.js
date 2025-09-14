@@ -1105,74 +1105,76 @@ export default function Profile() {
                 Subscription Details
               </h4>
               <div className={styles.detailsGrid}>
-                <div className={styles.detailsRow}>
-                  <span className={styles.detailsLabel}>Plan ID</span>
-                  <span className={`${styles.detailsValue} ${styles.mono}`}>
-                    {subscriptionInfo.plan_id || 'N/A'}
-                  </span>
-                </div>
+                {subscriptionInfo.plan_id && (
+                  <div className={styles.detailsRow}>
+                    <span className={styles.detailsLabel}>Plan ID</span>
+                    <span className={`${styles.detailsValue} ${styles.mono}`}>
+                      {subscriptionInfo.plan_id}
+                    </span>
+                  </div>
+                )}
                 
-                <div className={styles.detailsRow}>
-                  <span className={styles.detailsLabel}>User ID</span>
-                  <span className={`${styles.detailsValue} ${styles.mono}`}>
-                    {subscriptionInfo.user_id || 'N/A'}
-                  </span>
-                </div>
+                {subscriptionInfo.user_id && (
+                  <div className={styles.detailsRow}>
+                    <span className={styles.detailsLabel}>User ID</span>
+                    <span className={`${styles.detailsValue} ${styles.mono}`}>
+                      {subscriptionInfo.user_id}
+                    </span>
+                  </div>
+                )}
                 
                 <div className={styles.detailsRow}>
                   <span className={styles.detailsLabel}>Plan Name</span>
                   <span className={styles.detailsValue} style={{ color: isPro ? '#0f9d58' : undefined, textTransform: 'capitalize' }}>
-                    {subscriptionInfo.plan_display_name || subscriptionInfo.plan_name || 'N/A'}
+                    {subscriptionInfo.plan_display_name || subscriptionInfo.plan_name || 'Free'}
                   </span>
                 </div>
                 
                 <div className={styles.detailsRow}>
                   <span className={styles.detailsLabel}>Status</span>
                   <span className={`${styles.detailsValue} ${subscriptionInfo.subscription_status === 'active' ? styles.statusActive : styles.statusInactive}`} style={{ textTransform: 'capitalize' }}>
-                    {subscriptionInfo.subscription_status || 'N/A'}
+                    {subscriptionInfo.subscription_status || 'Active'}
                   </span>
                 </div>
                 
-                <div className={styles.detailsRow}>
-                  <span className={styles.detailsLabel}>Start Date</span>
-                  <span className={styles.detailsValue}>
-                    {subscriptionInfo.start_date 
-                      ? new Date(subscriptionInfo.start_date).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'short', 
-                          day: 'numeric'
-                        })
-                      : 'N/A'
-                    }
-                  </span>
-                </div>
+                {subscriptionInfo.start_date && (
+                  <div className={styles.detailsRow}>
+                    <span className={styles.detailsLabel}>Start Date</span>
+                    <span className={styles.detailsValue}>
+                      {new Date(subscriptionInfo.start_date).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short', 
+                        day: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                )}
                 
-                <div className={styles.detailsRow}>
-                  <span className={styles.detailsLabel}>End Date</span>
-                  <span className={styles.detailsValue}>
-                    {subscriptionInfo.end_date 
-                      ? new Date(subscriptionInfo.end_date).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'short', 
-                          day: 'numeric'
-                        })
-                      : 'N/A'
-                    }
-                  </span>
-                </div>
+                {subscriptionInfo.end_date && (
+                  <div className={styles.detailsRow}>
+                    <span className={styles.detailsLabel}>End Date</span>
+                    <span className={styles.detailsValue}>
+                      {new Date(subscriptionInfo.end_date).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short', 
+                        day: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                )}
 
                 {/* Price Checks Progress Bar */}
                 <div className={styles.progressBlock}>
                   <div className={styles.progressHeader}>
                     <span className={styles.progressLabel}>📊 Price Checks</span>
-                    <span className={styles.progressCount} style={{ color: (subscriptionInfo.price_checks_used || 0) >= (subscriptionInfo.price_check_limit || 2) ? '#dc2626' : undefined }}>
-                      {subscriptionInfo.price_checks_used || 0} / {subscriptionInfo.price_check_limit || 2}
+                    <span className={styles.progressCount} style={{ color: (subscriptionInfo.price_checks_used || 0) >= (subscriptionInfo.price_check_limit || 50) ? '#dc2626' : undefined }}>
+                      {subscriptionInfo.price_checks_used || 0} / {subscriptionInfo.price_check_limit || 50}
                     </span>
                   </div>
                   <div className={styles.progressTrack}>
                     <div
-                      className={`${styles.progressFill} ${ (subscriptionInfo.price_checks_used || 0) >= (subscriptionInfo.price_check_limit || 2) ? styles.fillRed : (isPro ? styles.fillGreen : styles.fillBlue) }`}
-                      style={{ width: `${((subscriptionInfo.price_checks_used || 0) / (subscriptionInfo.price_check_limit || 2)) * 100}%` }}
+                      className={`${styles.progressFill} ${ (subscriptionInfo.price_checks_used || 0) >= (subscriptionInfo.price_check_limit || 50) ? styles.fillRed : (isPro ? styles.fillGreen : styles.fillBlue) }`}
+                      style={{ width: `${((subscriptionInfo.price_checks_used || 0) / (subscriptionInfo.price_check_limit || 50)) * 100}%` }}
                     />
                   </div>
                 </div>

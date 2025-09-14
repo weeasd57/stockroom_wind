@@ -54,7 +54,7 @@ export default function PricingPage() {
           <span className="font-semibold">{subscriptionInfo.plan_display_name || 'Free'}</span>
           {!isPro && (
             <span className="text-muted-foreground">
-              ({subscriptionInfo.remaining_checks || 0}/{subscriptionInfo.price_check_limit || 2} price checks remaining)
+              ({subscriptionInfo.remaining_checks || 0}/{subscriptionInfo.price_check_limit || 50} price checks remaining)
             </span>
           )}
         </div>
@@ -82,7 +82,7 @@ export default function PricingPage() {
             <span className="text-sm text-muted-foreground">/ month</span>
           </div>
           <ul className="mt-6 space-y-2 text-sm">
-            <li className="flex items-start gap-2"><span>✅</span> <strong>2 price checks per month</strong></li>
+            <li className="flex items-start gap-2"><span>✅</span> <strong>50 price checks per month</strong></li>
             <li className="flex items-start gap-2"><span>✅</span> <strong>100 posts per month</strong></li>
             <li className="flex items-start gap-2"><span>✅</span> Basic features</li>
             <li className="flex items-start gap-2"><span>✅</span> Community support</li>
