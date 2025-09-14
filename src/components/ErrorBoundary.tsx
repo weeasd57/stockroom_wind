@@ -35,18 +35,17 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     return {
       hasError: true,
       error,
-      errorInfo: null, // Will be set in componentDidCatch
     };
   }
 
   componentDidCatch(error: Error, errorInfo: any) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
     
-    // Update state with errorInfo using proper setState
-    this.setState(prevState => ({
-      ...prevState,
+    // Store errorInfo directly (not using setState to avoid issues)
+    this.state = {
+      ...this.state,
       errorInfo,
-    }));
+    };
 
     // Call onError callback if provided
     if (this.props.onError) {
