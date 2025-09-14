@@ -4,13 +4,22 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useBackgroundPostCreation } from '@/providers/BackgroundPostCreationProvider';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
 import { toast } from 'sonner';
-import { X } from 'lucide-react';
 
 export default function BackgroundPostCreationFloatingIndicator() {
   const { tasks, cancelTask, clearAllCompleted, clearTask } = useBackgroundPostCreation();
   const [collapsed, setCollapsed] = useState(false);
-  const { setSubmitState, resetForm, openDialog, closeDialog, setGlobalStatus, setIsSubmitting } = useCreatePostForm();
+  const createPostFormContext = useCreatePostForm();
   const processedRef = useRef<Set<string>>(new Set());
+
+  // Safely extract functions with fallbacks
+  const {
+    setSubmitState,
+    resetForm,
+    openDialog,
+    closeDialog,
+    setGlobalStatus,
+    setIsSubmitting
+  } = createPostFormContext || {};
 
   const visibleTasks = tasks.slice(0, 5); // show latest 5
   const hasItems = tasks.length > 0;
@@ -27,21 +36,21 @@ export default function BackgroundPostCreationFloatingIndicator() {
       if (!processedRef.current.has(t.id) && (t.status === 'success' || t.status === 'error' || t.status === 'canceled')) {
         processedRef.current.add(t.id);
         if (t.status === 'success') {
-          try { setSubmitState('success'); } catch {}
-          try { setIsSubmitting(false); } catch {}
-          try { resetForm(); } catch {}
-          try { closeDialog(); } catch {}
+          setSubmitState?.('success');
+          setIsSubmitting?.(false);
+          resetForm?.();
+          closeDialog?.();
           toast.success(t.message || 'Post created successfully');
         } else if (t.status === 'error') {
-          try { setSubmitState('error'); } catch {}
-          try { setIsSubmitting(false); } catch {}
-          try { setGlobalStatus({ type: 'error', message: t.error || t.message || 'Failed to create post. Please review and try again.' }); } catch {}
-          try { openDialog(); } catch {}
+          setSubmitState?.('error');
+          setIsSubmitting?.(false);
+          setGlobalStatus?.({ type: 'error', message: t.error || t.message || 'Failed to create post. Please review and try again.' });
+          openDialog?.();
           toast.error(t.error || t.message || 'Failed to create post');
         } else if (t.status === 'canceled') {
-          try { setSubmitState('idle'); } catch {}
-          try { setIsSubmitting(false); } catch {}
-          try { openDialog(); } catch {}
+          setSubmitState?.('idle');
+          setIsSubmitting?.(false);
+          openDialog?.();
           toast.info(t.message || 'Posting cancelled');
         }
       }
@@ -102,7 +111,10 @@ export default function BackgroundPostCreationFloatingIndicator() {
                       className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500"
                       aria-label="Dismiss task"
                     >
-                      <X size={16} />
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="m18 6-12 12"/>
+                        <path d="m6 6 12 12"/>
+                      </svg>
                     </button>
                   </div>
                   <div className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
