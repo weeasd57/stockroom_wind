@@ -69,6 +69,7 @@ const ALLOWED_UPDATE_FIELDS = new Set([
   'target_hit_time',
   'stop_loss_triggered_date',
   'last_price_check',
+  'updated_at',  // Added to ensure timestamps are always updated
   'closed',
   'closed_date',
   'status',
@@ -511,6 +512,7 @@ export async function POST(request) {
           console.error(`No historical data available for ${symbol}`);
           
           // Update the post with the status flag
+          const currentTimestamp = new Date().toISOString();
           const updateResult = await adminSupabase
             .from('posts')
             .update({
@@ -518,7 +520,8 @@ export async function POST(request) {
               postaftermarketclose: false,
               nodataavailable: true,
               status_message: "No price data available",
-              last_price_check: new Date().toISOString()
+              last_price_check: currentTimestamp,
+              updated_at: currentTimestamp
               // Do not update these fields to preserve their original values
               // country: post.country,
               // initial_price: post.initial_price
@@ -577,6 +580,7 @@ export async function POST(request) {
             if (DEBUG) console.log(`[DEBUG] Post date: ${postDateOnly}, Last price date: ${lastPriceDateStr}`);
             
             // Update the post with the status flag
+            const currentTimestamp = new Date().toISOString();
             const { error: updateError } = await adminSupabase
               .from('posts')
               .update({
@@ -584,7 +588,8 @@ export async function POST(request) {
                 postaftermarketclose: false,
                 nodataavailable: false,
                 status_message: "Post created after latest price data - can't check target/stop loss",
-                last_price_check: new Date().toISOString()
+                last_price_check: currentTimestamp,
+                updated_at: currentTimestamp
                 // Do not update these fields to preserve their original values
                 // country: post.country,
                 // initial_price: post.initial_price
@@ -628,6 +633,7 @@ export async function POST(request) {
               if (DEBUG) console.log(`[DEBUG] Post created after market close on ${postDateOnly}, can't check prices accurately`);
               
               // Update the post with the status flag
+              const currentTimestamp = new Date().toISOString();
               const { error: updateError } = await adminSupabase
                 .from('posts')
                 .update({
@@ -635,7 +641,8 @@ export async function POST(request) {
                   postaftermarketclose: true,
                   nodataavailable: false,
                   status_message: "Post created after market close - recent price data not available",
-                  last_price_check: new Date().toISOString()
+                  last_price_check: currentTimestamp,
+                  updated_at: currentTimestamp
                   // Do not update these fields to preserve their original values
                   // country: post.country,
                   // initial_price: post.initial_price
@@ -743,12 +750,24 @@ export async function POST(request) {
         }
 
         const shouldUpdate = targetReached || stopLossTriggered || (post.current_price !== lastPrice) || shouldClosePost;
+        const currentTimestamp = new Date().toISOString();
+        
+        // Always update timestamps for all posts when checking prices
+        // This ensures all posts show they were checked even if no price changes occurred
+        const baseUpdateData = {
+          id: post.id,
+          user_id: userId,  // Include user_id to prevent null constraint violation
+          last_price_check: currentTimestamp,
+          updated_at: currentTimestamp,
+          postdateafterpricedate: false,
+          postaftermarketclose: false,
+          nodataavailable: false
+        };
         
         if (shouldUpdate) {
-          // Only include fields that must change; avoid overwriting other columns
+          // Include all changed fields along with timestamp updates
           updatedPosts.push({
-            id: post.id,
-            user_id: userId,  // Include user_id to prevent null constraint violation
+            ...baseUpdateData,
             current_price: lastPrice,
             high_price: highestPrice,
             target_high_price: highPrice,
@@ -757,14 +776,16 @@ export async function POST(request) {
             target_reached_date: targetReachedDate,
             target_hit_time: targetHitTime,
             stop_loss_triggered_date: stopLossTriggeredDate,
-            last_price_check: new Date().toISOString(),
             closed: shouldClosePost ? true : undefined,
             closed_date: closedDateValue,
             status: statusValue,
-            postdateafterpricedate: false,
-            postaftermarketclose: false,
-            nodataavailable: false,
             status_message: shouldClosePost ? "Post closed" : "Post still active"
+          });
+        } else {
+          // Even if no price changes, still update timestamps to show the post was checked
+          updatedPosts.push({
+            ...baseUpdateData,
+            status_message: "Post checked - no changes"
           });
         }
         
@@ -959,19 +980,31 @@ export async function POST(request) {
       if (updatedPosts.length > 0) {
         const samplePost = updatedPosts[0];
         try {
-          // Upsert in batches to avoid timeouts and large payloads
-          const UPSERT_BATCH = parseInt(process.env.PRICE_CHECK_UPSERT_BATCH || '100', 10);
+          // Update in batches to avoid timeouts and large payloads
+          const UPDATE_BATCH = parseInt(process.env.PRICE_CHECK_UPDATE_BATCH || '10', 10);
           let updateError = null;
-          for (let start = 0; start < updatedPosts.length; start += UPSERT_BATCH) {
-            const batch = updatedPosts.slice(start, start + UPSERT_BATCH).map(mapPostForDb);
-            const { error } = await adminSupabase
-              .from('posts')
-              .upsert(batch, { onConflict: 'id', returning: 'minimal' });
-            if (error) {
-              updateError = error;
-              console.error('Error updating posts batch:', error);
-              break;
+          for (let start = 0; start < updatedPosts.length; start += UPDATE_BATCH) {
+            const batch = updatedPosts.slice(start, start + UPDATE_BATCH);
+            
+            // Update each post individually to avoid constraint issues
+            for (const post of batch) {
+              const updateData = mapPostForDb(post);
+              const postId = updateData.id;
+              delete updateData.id; // Remove id from update data
+              
+              const { error } = await adminSupabase
+                .from('posts')
+                .update(updateData)
+                .eq('id', postId);
+                
+              if (error) {
+                updateError = error;
+                console.error('Error updating post:', postId, error);
+                break;
+              }
             }
+            
+            if (updateError) break;
           }
           const updateData = null; // not used
           
@@ -1037,6 +1070,7 @@ export async function POST(request) {
                 target_reached_date: post.target_reached_date,
                 stop_loss_triggered_date: post.stop_loss_triggered_date,
                 last_price_check: post.last_price_check,
+                updated_at: post.updated_at,  // Ensure updated_at is also included in fallback updates
                 closed: post.closed,
                 closed_date: post.closed_date,
                 status: post.status,

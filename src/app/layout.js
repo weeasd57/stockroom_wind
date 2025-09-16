@@ -62,7 +62,7 @@ export default function RootLayout({ children }) {
       </head>
       <body
         translate="no"
-        className="pt-[var(--navbar-height)] pb-[env(safe-area-inset-bottom)]"
+        className="pb-[env(safe-area-inset-bottom)]"
       >
         {/* Expose CSP nonce to client scripts (e.g., PayPal SDK expects data-csp-nonce for injected styles) */}
         <Script id="csp-nonce-init" strategy="beforeInteractive" nonce={cspNonce || undefined}>

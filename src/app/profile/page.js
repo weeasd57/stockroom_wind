@@ -18,6 +18,7 @@ import '@/styles/create-post-page.css';
 import { PostsFeed } from '@/components/home/PostsFeed';
 import CheckPostPricesButton from '@/components/profile/CheckPostPricesButton';
 import StrategyDetailsModal from '@/components/profile/StrategyDetailsModal';
+import SubscriptionManagement from '@/components/profile/SubscriptionManagement';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 import { DashboardSection } from '@/components/home/DashboardSection';
 import { useTheme } from '@/providers/theme-provider';
@@ -1239,6 +1240,12 @@ export default function Profile() {
         >
           Following
         </button>
+        <button 
+          className={`${styles.tabButton} ${activeTab === 'subscription' ? styles.activeTab : ''}`}
+          onClick={() => handleTabChange('subscription')}
+        >
+          Subscription
+        </button>
       </div>
 
       {/* Content Section */}
@@ -1520,6 +1527,10 @@ export default function Profile() {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'subscription' && (
+          <SubscriptionManagement />
         )}
 
         {activeTab === 'strategies' && (

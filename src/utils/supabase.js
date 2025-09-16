@@ -1609,7 +1609,7 @@ export const getFollowing = async (userId) => {
 export const getPostById = async (postId) => {
   try {
     const { data, error } = await supabase
-      .from('posts')
+      .from('posts_with_stats')
       .select('*')
       .eq('id', postId)
       .single();

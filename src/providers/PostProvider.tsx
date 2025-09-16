@@ -230,6 +230,11 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
             });
           }).catch(() => {});
         } else if (evt === 'UPDATE' && newRow) {
+          console.log('[PostProvider] Real-time UPDATE received:', newRow.id, {
+            last_price_check: newRow.last_price_check,
+            current_price: newRow.current_price,
+            symbol: newRow.symbol
+          });
           setPosts(prev => {
             const next = [...prev];
             const idx = next.findIndex(p => p.id === newRow.id);

@@ -39,6 +39,272 @@
 :global(.light) .detailsTitle { color: #111; border-bottom-color: #e9ecef; }
 :global(.dark) .detailsTitle { color: #fff; border-bottom-color: #444; }
 
+/* Subscription Management Styles */
+.subscriptionSection {
+  background: var(--card-background);
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.subscriptionSection h3 {
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--primary-color);
+  padding-bottom: 8px;
+}
+
+.planInfo {
+  background: var(--card-secondary);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-light);
+}
+
+.planHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.planHeader h4 {
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.planBadge {
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.planDetails {
+  display: grid;
+  gap: 12px;
+}
+
+.planDetail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.planDetail:last-child {
+  border-bottom: none;
+}
+
+.planDetail .label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.planDetail .value {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.usageStats {
+  background: var(--card-secondary);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-light);
+}
+
+.usageStats h4 {
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.statItem {
+  background: var(--card-background);
+  border-radius: 6px;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.statLabel {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.statValue {
+  display: block;
+  color: var(--primary-color);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.message {
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+
+.message.success {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.message.error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.subscriptionActions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.button {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.cancelButton {
+  background: #ef4444;
+  color: white;
+}
+
+.cancelButton:hover:not(:disabled) {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+.cancelButton:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.upgradeButton {
+  background: var(--primary-color);
+  color: white;
+}
+
+.upgradeButton:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.upgradePrompt {
+  text-align: center;
+  padding: 20px;
+  background: var(--card-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+}
+
+.upgradePrompt p {
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+.dialogOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.confirmDialog {
+  background: var(--card-background);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 500px;
+  width: 100%;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.confirmDialog h4 {
+  color: var(--text-primary);
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.confirmDialog p {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+.dialogActions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.cancelDialogButton {
+  background: var(--card-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.cancelDialogButton:hover:not(:disabled) {
+  background: var(--border-light);
+}
+
+.confirmButton {
+  background: #ef4444;
+  color: white;
+}
+
+.confirmButton:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+.loadingState {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary);
+}
+
 .detailsGrid {
   display: grid;
   gap: 8px;

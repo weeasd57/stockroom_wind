@@ -14,7 +14,7 @@ export default function CheckPostPricesButton({ userId }) {
   const [error, setError] = useState(null);
   const { refreshData } = useProfile();
   const { supabase } = useSupabase();
-  const { canPerformPriceCheck, refreshSubscriptionInfo, usageInfo } = useSubscription();
+  const { canPerformPriceCheck, refreshSubscription, usageInfo } = useSubscription();
   const [abortController, setAbortController] = useState(null);
   const [isCancelled, setIsCancelled] = useState(false);
   const [showStatsDialog, setShowStatsDialog] = useState(false);
@@ -103,10 +103,23 @@ export default function CheckPostPricesButton({ userId }) {
   
   // Function to actually perform the POST request after confirmation - using useCallback
   const handleProceedCheck = useCallback(async () => {
-    setShowConfirmDialog(false); // Close any open confirmation dialog
+    if (!userId) return;
+    
+    // Hide the confirmation dialog immediately
+    setShowConfirmDialog(false);
+    
+    console.log('[CHECK POST PRICES] Starting price check request:', {
+      timestamp: new Date().toISOString(),
+      userId: userId,
+      remainingChecks: usageInfo?.priceChecks?.remaining || 0,
+      canPerformCheck: canPerformPriceCheck()
+    });
     
     // Check if user can perform price check
     if (!canPerformPriceCheck()) {
+      console.log('[CHECK POST PRICES] Price check limit reached:', {
+        remaining: usageInfo?.priceChecks?.remaining || 0
+      });
       setError(`You have reached your price check limit. Remaining: ${usageInfo?.priceChecks?.remaining || 0}`);
       return;
     }
@@ -155,10 +168,19 @@ export default function CheckPostPricesButton({ userId }) {
       }
       
       // Received API response
+      console.log('[CHECK POST PRICES] Last check request completed:', {
+        timestamp: new Date().toISOString(),
+        usageCount: data.usageCount,
+        remainingChecks: data.remainingChecks,
+        checkedPosts: data.checkedPosts,
+        updatedPosts: data.updatedPosts,
+        closedPostsSkipped: data.closedPostsSkipped,
+        results: data.results
+      });
       
       setCheckStats({
         usageCount: data.usageCount,
-        remainingChecks: data.remainingChecks,
+        remainingChecks: usageInfo?.priceChecks?.remaining || 0, // Get from subscription provider
         checkedPosts: data.checkedPosts,
         updatedPosts: data.updatedPosts,
         closedPostsSkipped: data.closedPostsSkipped
@@ -170,7 +192,7 @@ export default function CheckPostPricesButton({ userId }) {
       }
       
       // Refresh subscription info after successful check
-      refreshSubscriptionInfo();
+      refreshSubscription();
       
       if (userId && !isCancelled) {
         refreshData(userId);
@@ -196,7 +218,7 @@ export default function CheckPostPricesButton({ userId }) {
       // Reset cancelled state
       setIsCancelled(false);
     }
-  }, [userId, refreshData, canPerformPriceCheck, usageInfo, refreshSubscriptionInfo]);
+  }, [userId, refreshData, canPerformPriceCheck, usageInfo, refreshSubscription]);
   
   const checkPostPrices = async () => {
     setCheckStats(null);

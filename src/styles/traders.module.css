@@ -3,7 +3,9 @@
 .tradersPage {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 1rem 1rem 2rem 1rem; /* Adjusted padding to avoid conflict with navbar height */
+  padding: 0 1rem 2rem 1rem;
+  min-height: 100vh;
+  background-color: hsl(var(--background));
   opacity: 0;
   transform: translateY(10px);
   transition: opacity 0.3s ease, transform 0.3s ease;

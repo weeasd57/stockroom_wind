@@ -15,13 +15,13 @@
   min-height: 100vh;
   width: 100%;
   max-width: 100vw;
-  padding: 0 1rem 1rem 0; /* Adjusted padding to avoid conflict with navbar height */
+  padding: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
   background-color: hsl(var(--background));
-  overflow-x: hidden!important;
+  overflow-x: hidden;
   position: relative;
   box-sizing: border-box;
 }
@@ -39,6 +39,7 @@
   box-sizing: border-box;
   overflow-x: hidden!important;
 }
+
 /* Create post container */
 .createPostContainer {
   display: flex;
@@ -49,10 +50,10 @@
   width: 90%;
   max-width: calc(100vw - 3rem);
   padding: 2rem;
-  background-color: hsl(var(--background));
+  background-color: hsl(var(--card));
   border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-  border: 1px solid hsla(var(--border)/0.2);
+  box-shadow: 0 10px 30px hsl(var(--muted) / 0.1);
+  border: 1px solid hsl(var(--border));
   animation: fadeIn 0.5s ease-out;
   box-sizing: border-box;
   margin: 0 auto;
@@ -79,7 +80,7 @@
 /* Responsive styles */
 @media (min-width: 640px) {
   .homePage {
-    padding: 1.5rem 1.5rem 1.5rem 0; /* Removed left padding */
+    padding: 0;
   }
   
   .emptyHomeContainer {
@@ -88,7 +89,7 @@
   
   .createPostContainer {
     width: 85%;
-    padding: 2rem;
+    padding: 2.5rem;
     border-radius: 20px;
   }
   
@@ -102,11 +103,15 @@
     margin-bottom: 1.75rem;
     max-width: 85%;
   }
+  
+  .homeContent {
+    padding: 1.5rem;
+  }
 }
 
 @media (min-width: 768px) {
   .homePage {
-    padding: 2rem 2rem 2rem 0; /* Removed left padding */
+    padding: 0;
   }
   
   .emptyHomeContainer {
@@ -115,8 +120,8 @@
   
   .createPostContainer {
     width: 80%;
-    padding: 2.5rem;
-    border-radius: 25px;
+    padding: 3rem;
+    border-radius: 24px;
   }
   
   .emptyHomeTitle {
@@ -127,16 +132,21 @@
     font-size: 1.125rem;
     max-width: 80%;
   }
+  
+  .homeContent {
+    padding: 2rem;
+  }
 }
 
 @media (min-width: 1024px) {
   .homePage {
-    padding: 2.5rem 2.5rem 2.5rem 0; /* Removed left padding */
+    padding: 0;
   }
   
   .createPostContainer {
     width: 70%;
     max-width: 900px;
+    padding: 3.5rem;
   }
   
   .emptyHomeTitle {
@@ -145,6 +155,10 @@
   
   .emptyHomeText {
     max-width: 70%;
+  }
+  
+  .homeContent {
+    padding: 2.5rem;
   }
 }
 
@@ -188,101 +202,19 @@
   }
 }
 
-/* Gold accent for dark mode */
-@media (prefers-color-scheme: dark) {
-  .homePage {
-    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
-  }
-  
-  .emptyHomeContainer {
-    @apply bg-gray-800 border-gray-700;
-  }
-  
-  .createPostContainer {
-    border-color: var(--gold-border);
-    box-shadow: 0 10px 30px var(--gold-shadow);
-  }
-  
-  .emptyHomeTitle {
-    color: var(--gold-primary);
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  }
-  
-  .emptyHomeText {
-    color: var(--gold-muted);
-  }
-  
-  /* Gold accented buttons */
-  .responsiveButton {
-    background: linear-gradient(to bottom right, var(--gold-gradient-start), var(--gold-gradient-end));
-    color: #2d3748;
-    font-weight: 600;
-    border: none;
-    box-shadow: 0 4px 12px var(--gold-shadow);
-  }
-  
-  .responsiveButton:hover {
-    background: linear-gradient(to bottom right, var(--gold-accent), var(--gold-secondary));
-    box-shadow: 0 6px 16px var(--gold-shadow);
-    transform: translateY(-2px);
-  }
-  
-  /* Gold stats section */
-  .statsContainer {
-    background-color: rgba(26, 32, 44, 0.7);
-    backdrop-filter: blur(10px);
-    border: 1px solid var(--gold-border);
-  }
-  
-  .statItem {
-    background: linear-gradient(to bottom, rgba(26, 32, 44, 0.8), rgba(45, 55, 72, 0.8));
-    border: 1px solid var(--gold-border);
-  }
-  
-  .statValue {
-    color: var(--gold-primary);
-  }
-  
-  .statLabel {
-    color: var(--gold-muted);
-  }
-  
-  /* Gold accented cards */
-  .card {
-    background-color: rgba(26, 32, 44, 0.8);
-    border: 1px solid var(--gold-border);
-    box-shadow: 0 4px 20px var(--gold-shadow);
-  }
-  
-  .card:hover {
-    border-color: var(--gold-muted);
-    box-shadow: 0 8px 30px var(--gold-shadow);
-  }
-  
-  .cardTitle {
-    color: var(--gold-primary);
-  }
-  
-  .cardDescription {
-    color: var(--gold-muted);
-  }
-  
-  /* Gold accent animations */
-  @keyframes goldPulse {
-    0% {
-      box-shadow: 0 0 0 0 var(--gold-shadow);
-    }
-    70% {
-      box-shadow: 0 0 0 10px rgba(245, 215, 110, 0);
-    }
-    100% {
-      box-shadow: 0 0 0 0 rgba(245, 215, 110, 0);
-    }
-  }
-  
-  .goldPulse {
-    animation: goldPulse 2s infinite;
-  }
+/* Dark theme specific styles - use class selector instead of media query */
+:global(.dark) .createPostContainer {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 10px 30px hsl(var(--muted) / 0.2);
+}
+
+:global(.dark) .emptyHomeTitle {
+  color: hsl(var(--primary));
+}
+
+:global(.dark) .emptyHomeText {
+  color: hsl(var(--muted-foreground));
 }
 
 /* Visibility animation */
@@ -295,7 +227,7 @@
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 1rem 1rem 1rem; /* Adjust padding to avoid conflict with navbar height */
+  padding: 1rem;
 }
 
 /* Create Post Section */

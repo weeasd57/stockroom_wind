@@ -64,29 +64,29 @@
 }
 
 .dark {
-  /* Black & Gold Theme */
+  /* Pure Black & Gold Theme */
   --background: 0 0% 0%;          /* pure black */
   --foreground: 0 0% 98%;         /* near white for readability */
-  --card: 0 0% 6%;                /* deep black card */
+  --card: 0 0% 3%;                /* very dark card */
   --card-foreground: 0 0% 98%;
-  --popover: 0 0% 6%;
+  --popover: 0 0% 3%;
   --popover-foreground: 0 0% 98%;
   --primary: 46 64% 52%;          /* gold */
   --primary-foreground: 0 0% 0%;  /* black text on gold */
-  --secondary: 0 0% 10%;
+  --secondary: 0 0% 8%;
   --secondary-foreground: 0 0% 98%;
-  --muted: 0 0% 10%;
+  --muted: 0 0% 8%;
   --muted-foreground: 0 0% 65%;
-  --accent: 0 0% 12%;
+  --accent: 0 0% 10%;
   --accent-foreground: 0 0% 98%;
   --destructive: 0 72% 40%;
   --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 15%;             /* subtle borders */
-  --input: 0 0% 15%;
+  --border: 0 0% 12%;             /* subtle borders */
+  --input: 0 0% 12%;
   --ring: 46 64% 52%;             /* gold focus ring */
   
   /* Navbar */
-  --navbar-bg: rgba(0, 0, 0, 1);
+  --navbar-bg: rgba(0, 0, 0, 0.95);
   --navbar-border: rgba(212, 175, 55, 0.15); /* soft gold */
   --navbar-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
@@ -112,6 +112,8 @@
     -moz-osx-font-smoothing: grayscale;
     /* Provide base safe-area padding for devices with home indicators and room for bottom nav */
     padding-bottom: calc(env(safe-area-inset-bottom) + var(--bottom-navbar-height));
+    /* Remove top padding - content will handle its own spacing */
+    padding-top: var(--navbar-height);
   }
 
   /* Better Selection */

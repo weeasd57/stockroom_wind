@@ -45,6 +45,19 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
   const avatarUrl = post?.profile?.avatar_url;
   const profileId = post?.profile?.id;
 
+  // Debug: log post data to check last_price_check field
+  if (post?.id && post.id === 'f2e20d85-c0b6-4e54-b723-4407bea26163') {
+    console.log(`[PostCard] Post ${post.id} data:`, {
+      id: post.id,
+      symbol: post.symbol,
+      last_price_check: post.last_price_check,
+      created_at: post.created_at,
+      current_price: post.current_price,
+      hasLastPriceCheck: !!post.last_price_check,
+      lastPriceCheckFormatted: post.last_price_check ? new Date(post.last_price_check).toISOString() : 'N/A'
+    });
+  }
+
   // Derive 2-letter ISO country code (lowercase) from country name/code or from symbol suffix
   const getCountryCode = (post) => {
     // Try explicit country
@@ -96,6 +109,11 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
                       {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
                     </p>
                   )}
+                  {post?.last_price_check && (
+                    <p className={styles.lastUpdate}>
+                      Last updated: {formatDistanceToNow(new Date(post.last_price_check), { addSuffix: true })}
+                    </p>
+                  )}
                 </div>
               </Link>
             ) : (
@@ -114,6 +132,11 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
                   {post?.created_at && (
                     <p className={styles.timestamp}>
                       {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                    </p>
+                  )}
+                  {post?.last_price_check && (
+                    <p className={styles.lastUpdate}>
+                      Last updated: {formatDistanceToNow(new Date(post.last_price_check), { addSuffix: true })}
                     </p>
                   )}
                 </div>
