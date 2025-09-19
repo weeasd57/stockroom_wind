@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useSubscription } from '@/providers/SubscriptionProvider';
+import { toast } from 'sonner';
 
 export default function PricingPage() {
   const router = useRouter();
@@ -13,9 +14,11 @@ export default function PricingPage() {
     subscriptionInfo, 
     isPro,
     loading: subscriptionLoading,
-    syncing 
+    syncing,
+    refreshSubscription
   } = useSubscription();
   const [loading, setLoading] = useState(false);
+  const [switchingToFree, setSwitchingToFree] = useState(false);
 
   const handleUpgradeToPro = async () => {
     if (!user) {
@@ -28,13 +31,54 @@ export default function PricingPage() {
     router.push('/checkout');
   };
 
-  const handleFreePlan = () => {
+  const handleFreePlan = async () => {
     if (!user) {
       // User not logged in - redirect to login page
       router.push('/login');
-    } else {
-      // User logged in - redirect to home page
+      return;
+    }
+
+    // If user is already on free plan, redirect to home
+    if (!isPro) {
       router.push('/home');
+      return;
+    }
+
+    // If user is on Pro plan, switch to free
+    setSwitchingToFree(true);
+    
+    try {
+      const response = await fetch('/api/subscription/switch-to-free', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          confirmCancellation: true,
+          reason: 'User switched to free plan from pricing page'
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to switch to free plan');
+      }
+
+      toast.success('Successfully switched to Free Plan! Your Pro subscription has been cancelled.');
+      
+      // Refresh subscription info
+      if (refreshSubscription) {
+        await refreshSubscription();
+      }
+
+      // Stay on pricing page to show the updated state
+    } catch (error) {
+      console.error('Error switching to free plan:', error);
+      toast.error(error.message || 'Failed to switch to free plan. Please try again.');
+    } finally {
+      setSwitchingToFree(false);
     }
   };
 
@@ -95,9 +139,10 @@ export default function PricingPage() {
             ) : (
               <button 
                 onClick={handleFreePlan}
-                className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:outline-none"
+                disabled={switchingToFree}
+                className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:outline-none disabled:opacity-50"
               >
-                {!user ? 'Get started free' : 'Switch to Free'}
+                {switchingToFree ? 'Switching...' : (!user ? 'Get started free' : 'Switch to Free')}
               </button>
             )}
           </div>

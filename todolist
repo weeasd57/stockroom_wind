@@ -1,20 +1,25 @@
 
 
 
-
-
-
-
-** need show live hours system used in app 
-
+working {
+     * cancel subscraption 
+     * add telegram features 
+}
 
 ** should when user select free plane can
      cancle thee pro plane subscraption
      and add this feature in plane section in profile page 
 
-** add telegram replace whatsapp
 
-** customize post details page
-
-** need add in profile page tap for settings whatsapp
+** need add in profile page tap for settings telegram
  (messages template and handle the list posts in one massege)
+
+-- 
+     need add the telegtam bot in this saas for users run notification in telegram if broker from telegram tap from profile page send to him followers list for  selection states posts 
+     so 
+     * in telegram tap in profile page should show all posts and show options for selecte and send and select followers too can select all or some followers
+
+     * and when  user choise run the telegram for broker can select from options run the create post notification and posts states 
+
+
+ ** customize post details page

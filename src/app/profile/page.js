@@ -18,10 +18,10 @@ import '@/styles/create-post-page.css';
 import { PostsFeed } from '@/components/home/PostsFeed';
 import CheckPostPricesButton from '@/components/profile/CheckPostPricesButton';
 import StrategyDetailsModal from '@/components/profile/StrategyDetailsModal';
-import SubscriptionManagement from '@/components/profile/SubscriptionManagement';
-import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
+import TelegramBotManagement from '@/components/telegram/TelegramBotManagement';
 import { DashboardSection } from '@/components/home/DashboardSection';
 import { useTheme } from '@/providers/theme-provider';
+import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useSupabase();
@@ -284,6 +284,12 @@ export default function Profile() {
 
   // Memoized handlers
   const handleTabChange = useCallback((tab) => {
+    // Block access to subscription tab (removed)
+    if (tab === 'subscription') {
+      console.warn('Subscription tab has been removed from profile');
+      return;
+    }
+    
     // If we're coming from strategies tab to posts tab,
     // and there's a selectedStrategyForDetails, use that as the strategy filter
     if (tab === 'posts' && activeTab === 'strategies' && selectedStrategyForDetails) {
@@ -1241,10 +1247,10 @@ export default function Profile() {
           Following
         </button>
         <button 
-          className={`${styles.tabButton} ${activeTab === 'subscription' ? styles.activeTab : ''}`}
-          onClick={() => handleTabChange('subscription')}
+          className={`${styles.tabButton} ${activeTab === 'telegram' ? styles.activeTab : ''}`}
+          onClick={() => handleTabChange('telegram')}
         >
-          Subscription
+          Telegram Bot
         </button>
       </div>
 
@@ -1529,9 +1535,6 @@ export default function Profile() {
           </div>
         )}
 
-        {activeTab === 'subscription' && (
-          <SubscriptionManagement />
-        )}
 
         {activeTab === 'strategies' && (
           <div className={styles.strategiesContainer}>
@@ -1614,6 +1617,10 @@ export default function Profile() {
               </>
             )}
           </div>
+        )}
+
+        {activeTab === 'telegram' && (
+          <TelegramBotManagement />
         )}
       </div>
       

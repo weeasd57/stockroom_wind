@@ -25,17 +25,28 @@
         "name": "next"
       }
     ],
-    "strictNullChecks": true
+    "strictNullChecks": true,
+    "types": ["node"],
+    "forceConsistentCasingInFileNames": true,
+    "maxNodeModuleJsDepth": 0
   },
   "include": [
     "next-env.d.ts",
     ".next/types/**/*.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "*.ts",
+    "*.tsx",
     "firebase.js",
-    "src/types/*.d.ts"
+    "src/types/*.d.ts",
+    "src/types/globals.d.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "**/node_modules",
+    "node_modules/**/*",
+    "node_modules/.pnpm/@supabase+auth-helpers-nextjs*/**/*.json",
+    "node_modules/.pnpm/@supabase+auth-helpers-nextjs*/tsconfig.json",
+    "**/@supabase/auth-helpers-nextjs/tsconfig.json"
   ]
 }

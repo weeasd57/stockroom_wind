@@ -1,0 +1,369 @@
+/* Floating Clock Styles */
+.floatingClock {
+  position: fixed;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 12px;
+  min-width: 200px;
+  max-width: 280px;
+  color: white;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  box-shadow: 
+    0 20px 40px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  will-change: transform;
+}
+
+.floatingClock:hover {
+  background: rgba(0, 0, 0, 0.9);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 25px 50px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.dragging {
+  transform: rotate(2deg) scale(1.02);
+  cursor: grabbing !important;
+  z-index: 10000;
+}
+
+/* Position Classes */
+.topLeft {
+  top: 20px;
+  left: 20px;
+}
+
+.topRight {
+  top: 20px;
+  right: 20px;
+}
+
+.bottomLeft {
+  bottom: 20px;
+  left: 20px;
+}
+
+.bottomRight {
+  bottom: 20px;
+  right: 20px;
+}
+
+/* Clock Header */
+.clockHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.clockIcon {
+  display: flex;
+  align-items: center;
+  color: #60a5fa;
+}
+
+.clockControls {
+  display: flex;
+  gap: 4px;
+}
+
+.controlButton {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 8px;
+  padding: 6px;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.controlButton:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  transform: scale(1.05);
+}
+
+/* Time Display */
+.timeDisplay {
+  text-align: center;
+  padding: 4px 0;
+}
+
+.time {
+  font-size: 1.5rem;
+  font-weight: 600;
+  font-feature-settings: 'tnum';
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #60a5fa, #3b82f6, #1d4ed8);
+  background-size: 200% 200%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradientShift 3s ease-in-out infinite;
+  margin-bottom: 4px;
+}
+
+.date {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.timezone {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
+}
+
+/* Settings Panel */
+.settings {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  animation: slideDown 0.3s ease-out;
+}
+
+.settingsHeader h4 {
+  margin: 0 0 12px 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  text-align: center;
+}
+
+.settingGroup {
+  margin-bottom: 8px;
+}
+
+.settingLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.settingLabel:hover {
+  color: white;
+}
+
+.settingLabel input[type="checkbox"] {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.settingLabel input[type="checkbox"]:checked {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.settingLabel input[type="checkbox"]:checked::after {
+  content: '✓';
+  position: absolute;
+  top: -2px;
+  left: 2px;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.positionSelect {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: white;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 100px;
+}
+
+.positionSelect:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.positionSelect option {
+  background: #1f2937;
+  color: white;
+}
+
+/* Show Button (when clock is hidden) */
+.showButton {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  background: rgba(59, 130, 246, 0.9);
+  border: none;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+}
+
+.showButton:hover {
+  background: rgba(59, 130, 246, 1);
+  transform: scale(1.1);
+  box-shadow: 0 12px 35px rgba(59, 130, 246, 0.4);
+}
+
+/* Animations */
+@keyframes gradientShift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .floatingClock {
+    min-width: 180px;
+    max-width: 240px;
+    padding: 10px;
+  }
+
+  .time {
+    font-size: 1.25rem;
+  }
+
+  .date {
+    font-size: 0.7rem;
+  }
+
+  .timezone {
+    font-size: 0.6rem;
+  }
+
+  .topLeft,
+  .topRight {
+    top: 10px;
+  }
+
+  .bottomLeft,
+  .bottomRight {
+    bottom: 10px;
+  }
+
+  .topLeft,
+  .bottomLeft {
+    left: 10px;
+  }
+
+  .topRight,
+  .bottomRight {
+    right: 10px;
+  }
+
+  .showButton {
+    width: 44px;
+    height: 44px;
+    bottom: 15px;
+    right: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .floatingClock {
+    min-width: 160px;
+    max-width: 200px;
+    padding: 8px;
+  }
+
+  .time {
+    font-size: 1.1rem;
+  }
+
+  .settingLabel {
+    font-size: 0.75rem;
+  }
+
+  .settingsHeader h4 {
+    font-size: 0.8rem;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .floatingClock {
+    background: rgba(0, 0, 0, 0.95);
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+
+  .time {
+    background: white;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .floatingClock,
+  .controlButton,
+  .showButton {
+    transition: none;
+  }
+
+  .time {
+    animation: none;
+  }
+
+  .settings {
+    animation: none;
+  }
+}
+
+/* Print styles */
+@media print {
+  .floatingClock,
+  .showButton {
+    display: none;
+  }
+}

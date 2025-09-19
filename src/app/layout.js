@@ -18,6 +18,7 @@ import { BackgroundPostCreationProvider } from '@/providers/BackgroundPostCreati
 import { SubscriptionProvider } from '@/providers/SubscriptionProvider';
 import BackgroundPostCreationFloatingIndicator from '@/components/background/BackgroundPostCreationFloatingIndicator';
 import { Toaster } from 'sonner';
+import FloatingClock from '@/components/ui/FloatingClock';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -296,6 +297,7 @@ export default function RootLayout({ children }) {
                               <FollowProvider> {/* Wrap children with FollowProvider */}
                                 {children}
                                 <BackgroundPostCreationFloatingIndicator />
+                                <FloatingClock />
                                 <Toaster richColors position="top-right" />
                               </FollowProvider>
                             </BackgroundPostCreationProvider>
