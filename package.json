@@ -8,8 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "setup-db": "node setup.js",
-    "clean": "rimraf .next && next clean",
-    "postinstall": "node scripts/fix-supabase-tsconfig.js"
+    "clean": "rimraf .next && next clean"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.3",
