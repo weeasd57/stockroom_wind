@@ -31,8 +31,8 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata = {
-  title: 'SharksZone - Stock Analysis Platform',
-  description: 'SharksZone helps you analyze stocks, track performance, and act with confidence using real-time insights.',
+  title: 'SharksZone — Social Trading Platform',
+  description: 'Share stock ideas, connect with traders, and build a community around trading insights. Discuss market opportunities and follow successful traders.',
 };
 
 export default function RootLayout({ children }) {

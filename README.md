@@ -1,35 +1,59 @@
-# SharksZone - Social Stock Analysis Platform
+# SharksZone — Stock Analysis & Social Trading
 
 ## Overview
-SharksZone is a modern web application that combines social networking with stock market analysis. It allows users to share insights, post trading ideas, track stocks, and interact with other traders in a community-focused environment.
+SharksZone is a social trading platform where traders can share stock ideas, connect with other investors, and build a community around trading insights. Share your analysis, follow successful traders, and discuss market opportunities in real-time.
 
-## Key Features
+## Current Features
 
-### Stock Analysis & Trading
-- 📊 Real-time stock data and price information
-- 🔍 Comprehensive stock search with company information and country data
-- 📈 Set and share target prices and stop loss levels
-- 📉 Track your favorite stocks and trading strategies
+### 📝 Social Trading Posts
+- Create detailed posts about your stock picks and market analysis
+- Share target prices, stop loss levels, and trading strategies
+- Add images and charts to support your analysis
+- Tag stocks with symbols and exchange information
 
-### Social Features
-- 📝 Create and share posts about your stock picks and analyses
-- 🖼️ Add images to your posts for technical chart analysis
-- 👥 Connect with other traders and investors
-- 💬 Comment on and discuss trading ideas
+### 👥 Community Interaction
+- Follow other traders and see their latest posts
+- Like, comment, and engage with trading ideas
+- Build your reputation through successful predictions
+- Connect with traders who share similar strategies
 
-### User Experience
+### 📊 Stock Information & Search
+- Search for stocks across global markets and exchanges
+- View real-time stock prices and company information
+- Support for multiple countries and stock exchanges
+- Display country flags and exchange details
+
+### 🔐 User Profiles & Authentication
+- Secure user registration and login system
+- Customizable profiles with avatar and background images
+- Track your posting history and trading ideas
+- Subscription management for premium features
+
+### 🎨 Modern User Experience
 - 🌓 Light/Dark mode toggle for comfortable viewing
-- 📱 Responsive design that works on all devices
-- 🔐 Secure authentication with email/password
-- ⚡ Fast, modern UI built with Next.js
+- 📱 Fully responsive design for all devices
+- ⚡ Fast, modern UI built with Next.js and React
+- 🎯 Clean, intuitive interface focused on trading content
+
+## Future Roadmap (Planned Features)
+- 🏆 Broker integration and ranking system
+- 🤖 Automated trading signals and bots
+- ⭐ Performance tracking and trust scores
+- 🛡️ Advanced risk management tools
+- 🔗 Multi-broker support and failover
+- 📜 Trading logs and detailed analytics
 
 ## Tech Stack
 - **Frontend**: Next.js 14, React 18
-- **Database**: Supabase
+- **Database**: Supabase (PostgreSQL)
 - **Authentication**: Supabase Auth
-- **Styling**: Custom CSS with theming support
-- **State Management**: React Hooks and Context
-- **API Integration**: Financial data from external APIs
+- **Styling**: CSS Modules with theming support
+- **State Management**: React Context + Zustand
+- **Real-time**: Supabase Realtime subscriptions
+- **File Storage**: Supabase Storage
+- **API Integration**: EODHD for stock data
+- **Notifications**: Sonner for toast notifications
+- **Icons**: Lucide React + Country flag icons
 
 ## Getting Started
 
