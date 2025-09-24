@@ -10,7 +10,6 @@ export default function TelegramBotManagement() {
   const [botInfo, setBotInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [setupMode, setSetupMode] = useState(false);
-  const [botToken, setBotToken] = useState('');
   const [botName, setBotName] = useState('');
   const [saving, setSaving] = useState(false);
   const [subscribers, setSubscribers] = useState([]);
@@ -56,7 +55,7 @@ export default function TelegramBotManagement() {
 
   const fetchUserPosts = async () => {
     try {
-      const response = await fetch(`/api/posts?userId=${user.id}&limit=20`);
+      const response = await fetch(`/api/posts?userId=${user.id}&limit=100`);
       const data = await response.json();
       setPosts(data.posts || []);
     } catch (error) {
@@ -80,8 +79,8 @@ export default function TelegramBotManagement() {
 
   const handleBotSetup = async (e) => {
     e.preventDefault();
-    if (!botToken || !botName) {
-      toast.error('يرجى إدخال token واسم البوت');
+    if (!botName) {
+      toast.error('Please enter a bot name');
       return;
     }
 
@@ -90,25 +89,24 @@ export default function TelegramBotManagement() {
       const response = await fetch('/api/telegram/bot-setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ botToken, botName })
+        body: JSON.stringify({ botName })
       });
 
       const data = await response.json();
       
       if (data.success) {
-        toast.success('تم إعداد البوت بنجاح!');
+        toast.success('Bot setup completed successfully');
         setBotInfo(data.bot);
         setSetupMode(false);
-        setBotToken('');
         setBotName('');
         fetchSubscribers();
         fetchStats();
       } else {
-        toast.error(data.message || 'حدث خطأ في إعداد البوت');
+        toast.error(data.message || 'Failed to setup bot');
       }
     } catch (error) {
       console.error('Error setting up bot:', error);
-      toast.error('حدث خطأ في الاتصال');
+      toast.error('Network error');
     } finally {
       setSaving(false);
     }
@@ -118,12 +116,12 @@ export default function TelegramBotManagement() {
     e.preventDefault();
     
     if (!broadcastTitle || !broadcastMessage) {
-      toast.error('يرجى إدخال العنوان والرسالة');
+      toast.error('Please enter both title and message');
       return;
     }
 
     if (selectedRecipients.length === 0) {
-      toast.error('يرجى اختيار مستقبلين للرسالة');
+      toast.error('Please select at least one recipient');
       return;
     }
 
@@ -144,7 +142,7 @@ export default function TelegramBotManagement() {
       const data = await response.json();
       
       if (data.success) {
-        toast.success('تم إرسال الإشعار بنجاح!');
+        toast.success('Broadcast sent successfully');
         setBroadcastTitle('');
         setBroadcastMessage('');
         setSelectedPosts([]);
@@ -152,11 +150,11 @@ export default function TelegramBotManagement() {
         setShowBroadcastForm(false);
         fetchStats();
       } else {
-        toast.error(data.error || 'حدث خطأ في إرسال الإشعار');
+        toast.error(data.error || 'Failed to send broadcast');
       }
     } catch (error) {
       console.error('Error sending broadcast:', error);
-      toast.error('حدث خطأ في الاتصال');
+      toast.error('Network error');
     } finally {
       setSendingBroadcast(false);
     }
@@ -167,7 +165,7 @@ export default function TelegramBotManagement() {
       <div className={styles.container}>
         <div className={styles.loading}>
           <div className={styles.spinner}></div>
-          <p>جاري التحميل...</p>
+          <p>Loading...</p>
         </div>
       </div>
     );
@@ -176,60 +174,49 @@ export default function TelegramBotManagement() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h2>🤖 إدارة بوت التليجرام</h2>
-        <p>أرسل إشعارات التداول لمتابعيك على التليجرام</p>
+        <h2>🤖 Telegram Bot Management</h2>
+        <p>Send trading notifications to your Telegram subscribers</p>
       </div>
 
       {!botInfo ? (
         <div className={styles.setupSection}>
           <div className={styles.emptyState}>
             <div className={styles.icon}>🤖</div>
-            <h3>لا يوجد بوت مُعد</h3>
-            <p>قم بإعداد بوت التليجرام الخاص بك لإرسال الإشعارات</p>
+            <h3>No bot configured</h3>
+            <p>Set up your Telegram bot to send notifications</p>
             <button 
               className={styles.setupButton}
               onClick={() => setSetupMode(true)}
               disabled={saving}
             >
-              إعداد البوت
+              Set up bot
             </button>
           </div>
 
           {setupMode && (
             <div className={styles.setupForm}>
-              <h3>إعداد بوت التليجرام</h3>
+              <h3>Set up Telegram Bot</h3>
               <form onSubmit={handleBotSetup}>
                 <div className={styles.formGroup}>
-                  <label>Bot Token:</label>
-                  <input
-                    type="text"
-                    value={botToken}
-                    onChange={(e) => setBotToken(e.target.value)}
-                    placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
-                    disabled={saving}
-                  />
-                  <small>احصل على الـ token من @BotFather في التليجرام</small>
-                </div>
-                <div className={styles.formGroup}>
-                  <label>اسم البوت:</label>
+                  <label>Bot Name:</label>
                   <input
                     type="text"
                     value={botName}
                     onChange={(e) => setBotName(e.target.value)}
-                    placeholder="بوت التداول"
+                    placeholder="My Trading Bot"
                     disabled={saving}
                   />
                 </div>
                 <div className={styles.formActions}>
                   <button type="submit" disabled={saving}>
-                    {saving ? 'جاري الإعداد...' : 'إعداد البوت'}
+                    {saving ? 'Setting up...' : 'Set up bot'}
                   </button>
                   <button 
                     type="button" 
                     onClick={() => setSetupMode(false)}
                     disabled={saving}
                   >
-                    إلغاء
+                    Cancel
                   </button>
                 </div>
               </form>
@@ -238,126 +225,137 @@ export default function TelegramBotManagement() {
         </div>
       ) : (
         <div className={styles.managementSection}>
-          {/* إحصائيات البوت */}
           <div className={styles.statsGrid}>
             <div className={styles.statCard}>
               <div className={styles.statIcon}>👥</div>
               <div className={styles.statInfo}>
                 <h3>{stats.totalSubscribers}</h3>
-                <p>إجمالي المشتركين</p>
+                <p>Total subscribers</p>
               </div>
             </div>
             <div className={styles.statCard}>
               <div className={styles.statIcon}>✅</div>
               <div className={styles.statInfo}>
                 <h3>{stats.activeSubscribers}</h3>
-                <p>مشترك نشط</p>
+                <p>Active subscribers</p>
               </div>
             </div>
             <div className={styles.statCard}>
               <div className={styles.statIcon}>📢</div>
               <div className={styles.statInfo}>
                 <h3>{stats.recentBroadcasts}</h3>
-                <p>إشعارات هذا الشهر</p>
+                <p>Broadcasts this month</p>
               </div>
             </div>
             <div className={styles.statCard}>
               <div className={styles.statIcon}>🆕</div>
               <div className={styles.statInfo}>
                 <h3>{stats.lastWeekNewSubscribers}</h3>
-                <p>مشترك جديد هذا الأسبوع</p>
+                <p>New subscribers this week</p>
               </div>
             </div>
           </div>
 
-          {/* معلومات البوت */}
           <div className={styles.botInfo}>
             <h3>🤖 {botInfo.name}</h3>
             <p>@{botInfo.username}</p>
             <span className={`${styles.status} ${botInfo.isActive ? styles.active : styles.inactive}`}>
-              {botInfo.isActive ? 'نشط' : 'غير نشط'}
+              {botInfo.isActive ? 'Active' : 'Inactive'}
             </span>
           </div>
 
-          {/* أزرار الأكشن */}
           <div className={styles.actionButtons}>
             <button 
               className={styles.broadcastButton}
               onClick={() => setShowBroadcastForm(true)}
               disabled={subscribers.length === 0}
             >
-              📢 إرسال إشعار جديد
+              📢 Send new broadcast
             </button>
             <button 
               className={styles.dangerButton}
               onClick={() => {
-                if (confirm('هل أنت متأكد من إلغاء البوت؟')) {
+                if (confirm('Are you sure you want to deactivate the bot?')) {
                   setBotInfo(null);
-                  toast.success('تم إلغاء البوت');
+                  toast.success('Bot deactivated');
                 }
               }}
             >
-              🗑️ إلغاء البوت
+              🗑️ Deactivate bot
             </button>
           </div>
 
-          {/* نموذج الإشعار */}
           {showBroadcastForm && (
             <div className={styles.broadcastForm}>
-              <h3>📢 إرسال إشعار جديد</h3>
+              <h3>📢 Send a new broadcast</h3>
               <form onSubmit={handleSendBroadcast}>
                 <div className={styles.formGroup}>
-                  <label>عنوان الإشعار:</label>
+                  <label>Notification title:</label>
                   <input
                     type="text"
                     value={broadcastTitle}
                     onChange={(e) => setBroadcastTitle(e.target.value)}
-                    placeholder="تحديث مهم حول التداول"
+                    placeholder="Important trading update"
                     disabled={sendingBroadcast}
                   />
                 </div>
                 <div className={styles.formGroup}>
-                  <label>نص الرسالة:</label>
+                  <label>Message:</label>
                   <textarea
                     value={broadcastMessage}
                     onChange={(e) => setBroadcastMessage(e.target.value)}
-                    placeholder="اكتب رسالتك هنا..."
+                    placeholder="Write your message here..."
                     rows={4}
                     disabled={sendingBroadcast}
                   />
                 </div>
 
-                {/* اختيار البوستات */}
                 <div className={styles.formGroup}>
-                  <label>البوستات المرفقة (اختياري):</label>
+                  <label>Attached posts (optional):</label>
                   <div className={styles.postsList}>
                     {posts.length === 0 ? (
-                      <p>لا توجد بوستات</p>
+                      <p>No posts available</p>
                     ) : (
-                      posts.slice(0, 5).map(post => (
-                        <div key={post.id} className={styles.postItem}>
-                          <input
-                            type="checkbox"
-                            checked={selectedPosts.includes(post.id)}
-                            onChange={() => {
-                              setSelectedPosts(prev => 
-                                prev.includes(post.id) 
-                                  ? prev.filter(id => id !== post.id)
-                                  : [...prev, post.id]
-                              );
+                      <>
+                        <div className={styles.selectAllButton}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (selectedPosts.length === posts.length) {
+                                setSelectedPosts([]);
+                              } else {
+                                setSelectedPosts(posts.map(p => p.id));
+                              }
                             }}
                             disabled={sendingBroadcast}
-                          />
-                          <span>{post.symbol} - {post.company_name}</span>
+                          >
+                            {selectedPosts.length === posts.length ? 'Unselect all posts' : 'Select all posts'}
+                          </button>
                         </div>
-                      ))
+                        {posts.map(post => (
+                          <div key={post.id} className={styles.postItem}>
+                            <input
+                              type="checkbox"
+                              checked={selectedPosts.includes(post.id)}
+                              onChange={() => {
+                                setSelectedPosts(prev => 
+                                  prev.includes(post.id) 
+                                    ? prev.filter(id => id !== post.id)
+                                    : [...prev, post.id]
+                                );
+                              }}
+                              disabled={sendingBroadcast}
+                            />
+                            <span>{post.symbol} - {post.company_name}</span>
+                          </div>
+                        ))}
+                      </>
                     )}
                   </div>
                 </div>
 
-                {/* اختيار المستقبلين */}
                 <div className={styles.formGroup}>
-                  <label>المستقبلين:</label>
+                  <label>Recipients:</label>
                   <div className={styles.recipientsList}>
                     <div className={styles.selectAllButton}>
                       <button
@@ -371,11 +369,11 @@ export default function TelegramBotManagement() {
                         }}
                         disabled={sendingBroadcast}
                       >
-                        {selectedRecipients.length === subscribers.length ? 'إلغاء تحديد الكل' : 'تحديد الكل'}
+                        {selectedRecipients.length === subscribers.length ? 'Unselect all' : 'Select all'}
                       </button>
                     </div>
                     {subscribers.length === 0 ? (
-                      <p>لا يوجد مشتركين</p>
+                      <p>No subscribers</p>
                     ) : (
                       subscribers.map(subscriber => (
                         <div key={subscriber.id} className={styles.recipientItem}>
@@ -403,24 +401,23 @@ export default function TelegramBotManagement() {
 
                 <div className={styles.formActions}>
                   <button type="submit" disabled={sendingBroadcast || selectedRecipients.length === 0}>
-                    {sendingBroadcast ? 'جاري الإرسال...' : `إرسال للـ ${selectedRecipients.length} مشترك`}
+                    {sendingBroadcast ? 'Sending...' : `Send to ${selectedRecipients.length} subscriber(s)`}
                   </button>
                   <button 
                     type="button" 
                     onClick={() => setShowBroadcastForm(false)}
                     disabled={sendingBroadcast}
                   >
-                    إلغاء
+                    Cancel
                   </button>
                 </div>
               </form>
             </div>
           )}
 
-          {/* قائمة المشتركين */}
           {subscribers.length > 0 && (
             <div className={styles.subscribersSection}>
-              <h3>👥 المشتركين ({subscribers.length})</h3>
+              <h3>👥 Subscribers ({subscribers.length})</h3>
               <div className={styles.subscribersList}>
                 {subscribers.slice(0, 10).map(subscriber => (
                   <div key={subscriber.id} className={styles.subscriberCard}>
@@ -429,12 +426,12 @@ export default function TelegramBotManagement() {
                       {subscriber.telegram_username && (
                         <span>@{subscriber.telegram_username}</span>
                       )}
-                      <small>انضم: {new Date(subscriber.subscribed_at).toLocaleDateString('ar-EG')}</small>
+                      <small>Joined: {new Date(subscriber.subscribed_at).toLocaleDateString('en-US')}</small>
                     </div>
                   </div>
                 ))}
                 {subscribers.length > 10 && (
-                  <p>و {subscribers.length - 10} مشتركين آخرين...</p>
+                  <p>and {subscribers.length - 10} more subscribers...</p>
                 )}
               </div>
             </div>

@@ -18,17 +18,26 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { botToken, botName } = body;
+    const { botName } = body;
 
-    if (!botToken || !botName) {
+    if (!botName) {
       return NextResponse.json(
-        { error: 'Missing required fields', message: 'Bot token and name are required' },
+        { error: 'Missing required fields', message: 'Bot name is required' },
         { status: 400 }
       );
     }
 
+    // Read token from environment only (do not accept from client)
+    const envToken = process.env.TELEGRAMBOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
+    if (!envToken) {
+      return NextResponse.json(
+        { error: 'Server misconfiguration', message: 'Telegram bot token not configured in environment' },
+        { status: 500 }
+      );
+    }
+
     // التحقق من صحة البوت
-    const botInfo = await validateTelegramBot(botToken);
+    const botInfo = await validateTelegramBot(envToken);
     if (!botInfo.ok) {
       return NextResponse.json(
         { error: 'Invalid bot token', message: botInfo.error },
@@ -51,7 +60,7 @@ export async function POST(request) {
       const { data, error } = await supabase
         .from('telegram_bots')
         .update({
-          bot_token: botToken,
+          bot_token: envToken,
           bot_username: botInfo.result.username,
           bot_name: botName,
           is_active: true,
@@ -76,7 +85,7 @@ export async function POST(request) {
         .from('telegram_bots')
         .insert({
           user_id: user.id,
-          bot_token: botToken,
+          bot_token: envToken,
           bot_username: botInfo.result.username,
           bot_name: botName,
           is_active: true,
@@ -96,14 +105,14 @@ export async function POST(request) {
     }
 
     // إعداد webhook مع تليجرام
-    const webhookSetup = await setupTelegramWebhook(botToken, webhookUrl);
+    const webhookSetup = await setupTelegramWebhook(envToken, webhookUrl);
     if (!webhookSetup.ok) {
       console.error('Webhook setup failed:', webhookSetup.error);
       // لا نتوقف هنا، يمكن إعداد الـ webhook لاحقاً
     }
 
     // إعداد أوامر البوت
-    await setupBotCommands(supabase, botData.id, botToken);
+    await setupBotCommands(supabase, botData.id, envToken);
 
     return NextResponse.json({
       success: true,

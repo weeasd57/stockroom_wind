@@ -70,7 +70,7 @@ export async function POST(request) {
     const broadcastId = broadcast;
 
     // بدء إرسال البرودكاست في background
-    processBroadcast(supabase, broadcastId, userBot.bot_token);
+    processBroadcast(supabase, broadcastId);
 
     return NextResponse.json({
       success: true,
@@ -88,7 +88,7 @@ export async function POST(request) {
 }
 
 // معالجة البرودكاست في الخلفية
-async function processBroadcast(supabase, broadcastId, botToken) {
+async function processBroadcast(supabase, broadcastId) {
   try {
     // تحديث حالة البرودكاست إلى "sending"
     await supabase
@@ -138,13 +138,19 @@ async function processBroadcast(supabase, broadcastId, botToken) {
     let sentCount = 0;
     let failedCount = 0;
 
+    // Read bot token from env for sending
+    const envToken = process.env.TELEGRAMBOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
+    if (!envToken) {
+      throw new Error('Telegram bot token is not configured');
+    }
+
     // إرسال الرسائل
     for (const recipient of recipients) {
       try {
         const telegramUserId = recipient.telegram_subscribers.telegram_user_id;
         const messageText = formatBroadcastMessage(broadcastData, broadcastPosts);
 
-        const result = await sendTelegramMessage(botToken, telegramUserId, messageText);
+        const result = await sendTelegramMessage(envToken, telegramUserId, messageText);
 
         if (result?.ok) {
           // تحديث حالة المستقبل إلى "sent"
@@ -230,25 +236,25 @@ function formatBroadcastMessage(broadcast, posts) {
   }
 
   if (posts && posts.length > 0) {
-    message += `📊 *البوستات المختارة:*\n\n`;
+    message += `📊 *Selected posts:*\n\n`;
     
     posts.forEach((postData, index) => {
       const post = postData.posts;
       message += `${index + 1}. *${post.symbol}* - ${post.company_name}\n`;
-      message += `💰 السعر الحالي: ${post.current_price}\n`;
-      message += `🎯 الهدف: ${post.target_price}\n`;
-      message += `🛑 وقف الخسارة: ${post.stop_loss_price}\n`;
+      message += `💰 Current price: ${post.current_price}\n`;
+      message += `🎯 Target: ${post.target_price}\n`;
+      message += `🛑 Stop loss: ${post.stop_loss_price}\n`;
       
       if (post.strategy) {
-        message += `📈 الاستراتيجية: ${post.strategy}\n`;
+        message += `📈 Strategy: ${post.strategy}\n`;
       }
       
       message += `\n`;
     });
   }
 
-  message += `\n👤 من: *${broadcast.sender_name}*`;
-  message += `\n🕒 ${new Date().toLocaleString('ar-EG')}`;
+  message += `\n👤 From: *${broadcast.sender_name}*`;
+  message += `\n🕒 ${new Date().toLocaleString('en-US')}`;
 
   return message;
 }
