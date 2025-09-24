@@ -434,9 +434,52 @@ GRANT EXECUTE ON FUNCTION create_pro_subscription TO service_role;
 GRANT EXECUTE ON FUNCTION create_pro_subscription TO authenticated;
 
 -- Make create_pro_subscription function run with elevated permissions to bypass RLS when needed
-ALTER FUNCTION create_pro_subscription(UUID, VARCHAR) 
+  ALTER FUNCTION create_pro_subscription(UUID, VARCHAR) 
     SECURITY DEFINER
     SET search_path = public;
 
--- Note: Views cannot have RLS policies directly
--- Security is handled through the underlying tables and our API endpoint
+  -- Note: Views cannot have RLS policies directly
+  -- Security is handled through the underlying tables and our API endpoint
+
+  -- =============================================
+  -- Optional: Subscription events audit table
+  -- =============================================
+
+  -- Create subscription_events table (if you want to log subscription lifecycle events)
+  CREATE TABLE IF NOT EXISTS subscription_events (
+      id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+      user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+      event_type TEXT NOT NULL,
+      event_data JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+  );
+
+  -- Helpful index for querying events by user/date
+  CREATE INDEX IF NOT EXISTS idx_subscription_events_user_id_created_at
+    ON subscription_events(user_id, created_at DESC);
+
+  -- Enable RLS on subscription_events
+  ALTER TABLE subscription_events ENABLE ROW LEVEL SECURITY;
+
+  -- Drop existing policies if they exist
+  DO $$ BEGIN
+    DROP POLICY IF EXISTS subscription_events_select_own ON subscription_events;
+    DROP POLICY IF EXISTS subscription_events_insert_own ON subscription_events;
+  EXCEPTION WHEN undefined_object THEN NULL; END $$;
+
+  -- Allow authenticated users to read their own events
+  CREATE POLICY subscription_events_select_own
+    ON subscription_events
+    FOR SELECT
+    TO authenticated
+    USING (user_id = auth.uid());
+
+  -- Allow authenticated users to insert their own events
+  CREATE POLICY subscription_events_insert_own
+    ON subscription_events
+    FOR INSERT
+    TO authenticated
+    WITH CHECK (user_id = auth.uid());
+
+  -- Grants
+  GRANT SELECT, INSERT ON subscription_events TO authenticated;

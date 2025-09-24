@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSupabase } from '@/providers/SupabaseProvider';
+import { supabase } from '@/utils/supabase';
 import { useSubscription } from '@/providers/SubscriptionProvider';
 import { toast } from 'sonner';
 
 export default function PricingPage() {
   const router = useRouter();
-  const { user, isAuthenticated } = useSupabase();
+  const { user, isAuthenticated, refreshSession } = useSupabase();
   const { 
     subscriptionInfo, 
     isPro,
@@ -48,21 +49,74 @@ export default function PricingPage() {
     setSwitchingToFree(true);
     
     try {
-      const response = await fetch('/api/subscription/switch-to-free', {
+      // Get current session token for Authorization header
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Add Authorization header if we have a session
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const response = await fetch('/api/subscription/manage', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         credentials: 'include',
         body: JSON.stringify({
+          action: 'switch_to_free',
           confirmCancellation: true,
-          reason: 'User switched to free plan from pricing page'
+          reason: 'User switched to free plan from pricing page',
+          metadata: { source: 'pricing_page' }
         })
       });
 
       const data = await response.json();
 
       if (!response.ok) {
+        // Handle unauthorized error - try a silent refresh once then retry
+        if (response.status === 401) {
+          try {
+            await refreshSession?.();
+            // Get refreshed session token
+            const { data: { session: refreshedSession } } = await supabase.auth.getSession();
+            const retryHeaders = {
+              'Content-Type': 'application/json',
+            };
+            
+            if (refreshedSession?.access_token) {
+              retryHeaders['Authorization'] = `Bearer ${refreshedSession.access_token}`;
+            }
+
+            const retry = await fetch('/api/subscription/manage', {
+              method: 'POST',
+              headers: retryHeaders,
+              credentials: 'include',
+              body: JSON.stringify({
+                action: 'switch_to_free',
+                confirmCancellation: true,
+                reason: 'User switched to free plan from pricing page',
+                metadata: { source: 'pricing_page_retry' }
+              })
+            });
+            const retryData = await retry.json();
+            if (!retry.ok) {
+              if (retry.status === 401) {
+                toast.error('Your session has expired. Please log in again.');
+                router.push('/login?redirect=/pricing');
+                return;
+              }
+              throw new Error(retryData.message || 'Failed to switch to free plan');
+            }
+            // Use retryData as successful path
+            toast.success('Successfully switched to Free Plan! Your Pro subscription has been cancelled.');
+            if (refreshSubscription) await refreshSubscription();
+            return;
+          } catch (e) {
+            throw e;
+          }
+        }
         throw new Error(data.message || 'Failed to switch to free plan');
       }
 

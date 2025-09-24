@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 
 function generateNonce(): string {
   const bytes = new Uint8Array(16)
@@ -17,7 +18,7 @@ function generateNonce(): string {
   return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const nonce = generateNonce()
   const isDev = process.env.NODE_ENV !== 'production'
 
@@ -55,6 +56,15 @@ export function middleware(req: NextRequest) {
   const csp = directives.join('; ')
 
   const res = NextResponse.next({ request: { headers: requestHeaders } })
+
+  // Ensure Supabase auth session cookies are kept in sync for server routes
+  try {
+    const supabase = createMiddlewareClient({ req, res })
+    // This call refreshes session cookies when needed so API routes can read them
+    await supabase.auth.getSession()
+  } catch (e) {
+    // Silent fail: do not block request if auth helper is unavailable
+  }
   res.headers.set('Content-Security-Policy', csp)
 
   return res

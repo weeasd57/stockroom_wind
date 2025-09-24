@@ -147,7 +147,7 @@ export default function LandingPage() {
               </h1>
             </div>
             <p className={styles.subtitle}>
-              Everything you need to research stocks, share ideas, and act fast — live data, community sentiment, alerts, and portfolio tracking in one place.
+              A social trading platform where traders can share stock ideas, connect with other investors, and build a community around trading insights. Share your analysis, follow successful traders, and discuss market opportunities in real-time.
             </p>
             
             <div className={styles.heroButtons}>

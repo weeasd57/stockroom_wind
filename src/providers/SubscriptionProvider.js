@@ -114,6 +114,12 @@ export function SubscriptionProvider({ children }) {
       console.log('[SUBSCRIPTION PROVIDER] API response received', { status: response.status, ok: response.ok });
 
       if (!response.ok) {
+        // Handle unauthorized error - redirect to login if session expired
+        if (response.status === 401) {
+          console.warn('[SUBSCRIPTION PROVIDER] Unauthorized - session may have expired');
+          // Don't redirect here as this is a provider, let the UI components handle it
+          throw new Error('Session expired. Please log in again.');
+        }
         throw new Error(`API Error: ${response.status}`);
       }
 

@@ -33,6 +33,12 @@ export default function SubscriptionManagement() {
       const data = await response.json();
 
       if (!response.ok) {
+        // Handle unauthorized error - this shouldn't happen from profile page, but handle gracefully
+        if (response.status === 401) {
+          toast.error('Your session has expired. Please log in again.');
+          window.location.href = '/login?redirect=/profile';
+          return;
+        }
         throw new Error(data.message || 'Failed to switch to free plan');
       }
 

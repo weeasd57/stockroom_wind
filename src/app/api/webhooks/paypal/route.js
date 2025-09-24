@@ -13,6 +13,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { cancelSubscription } from '@/utils/subscription-manager';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic'; // ensure no caching
@@ -118,6 +119,43 @@ async function resolveUserByCustomId(customId) {
     return data?.user || null;
   } catch (e) {
     console.warn('[PayPal] resolveUserByCustomId exception:', e?.message || e);
+    return null;
+  }
+}
+
+// Resolve user by email (Supabase JS v2 no longer provides getUserByEmail in admin API)
+// 1) Try admin.getUserByEmail if available (for compatibility with some versions)
+// 2) Fallback: query profiles table to get the auth user id by email
+async function resolveUserByEmail(email) {
+  try {
+    if (!email) return null;
+    const hasGetUserByEmail = !!(supabase?.auth?.admin && typeof supabase.auth.admin.getUserByEmail === 'function');
+    if (hasGetUserByEmail) {
+      const { data, error } = await supabase.auth.admin.getUserByEmail(email);
+      if (error) {
+        console.warn('[PayPal] resolveUserByEmail(admin) error:', error?.message);
+      }
+      return data?.user || null;
+    }
+  } catch (e) {
+    console.warn('[PayPal] resolveUserByEmail(admin) exception:', e?.message || e);
+  }
+
+  // Fallback via profiles table (some projects store email in profiles)
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .limit(1);
+    if (error) {
+      console.warn('[PayPal] resolveUserByEmail(profiles) error:', error?.message);
+      return null;
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    return row ? { id: row.id } : null;
+  } catch (e) {
+    console.warn('[PayPal] resolveUserByEmail(profiles) exception:', e?.message || e);
     return null;
   }
 }
@@ -331,9 +369,8 @@ async function handleEvent(event) {
 
           if (!userRecord) {
             // Fallback to payer email
-            const { data: userData, error: userError } = await supabase.auth.admin.getUserByEmail(payerEmail);
-            console.log('→ User lookup (email):', { found: !!userData?.user, error: userError?.message });
-            userRecord = userData?.user || null;
+            userRecord = await resolveUserByEmail(payerEmail);
+            console.log('→ User lookup (email):', { found: !!userRecord });
             resolvedBy = 'email';
           }
 
@@ -421,14 +458,21 @@ async function handleEvent(event) {
         const amount = event?.resource?.amount?.value;
         const currency = event?.resource?.amount?.currency_code;
         const payerEmail = event?.resource?.payer?.email_address;
+        const inlineCustomId = event?.resource?.custom_id 
+          || event?.resource?.purchase_units?.[0]?.custom_id 
+          || event?.resource?.supplementary_data?.custom_id;
         
-        console.log('→ Capture details:', { orderId, captureId, amount, currency, payerEmail });
+        console.log('→ Capture details:', { orderId, captureId, amount, currency, payerEmail, inlineCustomId });
         
         if (amount) {
           console.log('→ Processing capture with amount, resolving user...');
-          // Try resolve via custom_id from order details if possible
+          // Prefer resolve via inline custom_id when provided (useful for tests/simulator)
           let userRecord = null;
           let resolvedPayerEmail = payerEmail;
+          if (inlineCustomId) {
+            userRecord = await resolveUserByCustomId(inlineCustomId);
+            console.log('→ User resolved by inline custom_id in capture:', !!userRecord);
+          }
           
           if (orderId) {
             console.log('→ Fetching order details for orderId:', orderId);
@@ -455,8 +499,7 @@ async function handleEvent(event) {
           // Fallback: Find user by email
           if (!userRecord && resolvedPayerEmail) {
             console.log('→ Fallback to email lookup for:', resolvedPayerEmail);
-            const { data: userData } = await supabase.auth.admin.getUserByEmail(resolvedPayerEmail);
-            userRecord = userData?.user || null;
+            userRecord = await resolveUserByEmail(resolvedPayerEmail);
             console.log('→ User resolved by email:', !!userRecord);
           }
 
@@ -479,46 +522,63 @@ async function handleEvent(event) {
                 console.log('→ Capture already processed, skipping duplicate. captureId:', captureId);
                 break;
               }
-              // Cancel existing subscription
-              await supabase
-                .from('user_subscriptions')
-                .update({ 
-                  status: 'cancelled',
-                  cancelled_at: new Date().toISOString()
-                })
-                .eq('user_id', userRecord.id)
-                .eq('status', 'active');
               
-              // Create new pro subscription
-              const { data: subscription } = await supabase
+              // Check if user already has an active subscription
+              const { data: activeSubscription } = await supabase
                 .from('user_subscriptions')
-                .insert({
-                  user_id: userRecord.id,
-                  plan_id: proPlan.id,
-                  status: 'active',
-                  paypal_order_id: orderId,
-                  price_checks_used: 0,
-                  posts_created: 0,
-                  started_at: new Date().toISOString(),
-                  expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-                })
-                .select()
+                .select('id')
+                .eq('user_id', userRecord.id)
+                .eq('status', 'active')
                 .single();
+              
+              let subscriptionId;
+              
+              if (activeSubscription) {
+                console.log('→ User already has active subscription, using existing one');
+                subscriptionId = activeSubscription.id;
+              } else {
+                console.log('→ Creating new Pro subscription');
+                // Cancel any existing subscription first
+                await supabase
+                  .from('user_subscriptions')
+                  .update({ 
+                    status: 'cancelled',
+                    cancelled_at: new Date().toISOString()
+                  })
+                  .eq('user_id', userRecord.id)
+                  .eq('status', 'active');
+                
+                // Create new pro subscription
+                const { data: subscription } = await supabase
+                  .from('user_subscriptions')
+                  .insert({
+                    user_id: userRecord.id,
+                    plan_id: proPlan.id,
+                    status: 'active',
+                    paypal_order_id: orderId,
+                    price_checks_used: 0,
+                    posts_created: 0,
+                    started_at: new Date().toISOString(),
+                    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+                  })
+                  .select()
+                  .single();
+                
+                subscriptionId = subscription?.id;
+              }
               
               // Log transaction
               await supabase
                 .from('payment_transactions')
                 .insert({
                   user_id: userRecord.id,
-                  subscription_id: subscription?.id,
+                  subscription_id: subscriptionId,
                   amount: parseFloat(amount),
                   currency: currency || 'USD',
-                  payment_method: 'paypal',
-                  paypal_order_id: orderId,
                   paypal_capture_id: captureId,
-                  paypal_event_id: id,
+                  paypal_order_id: orderId,
                   status: 'completed',
-                  transaction_data: event
+                  transaction_type: 'payment'
                 });
               
               console.log(`→ Pro subscription activated for user ${userRecord.id}`);
@@ -542,8 +602,10 @@ async function handleEvent(event) {
         console.log('→ Payment sale completed:', { saleId, parentPayment, amount, currency });
         console.log('→ Full sale event resource:', JSON.stringify(event?.resource, null, 2));
         
-        // Try to get custom_id from the sale event itself (sometimes available)
-        const saleCustomId = event?.resource?.custom;
+        // Try to get custom/custom_id from the sale event itself (sometimes available)
+        const saleCustomId = event?.resource?.custom
+          || event?.resource?.custom_id
+          || event?.resource?.purchase_units?.[0]?.custom_id;
         let userRecord = null;
         let payerEmail = null;
         
@@ -609,9 +671,8 @@ async function handleEvent(event) {
 
         // Fallback to email if we still don't have a user
         if (!userRecord && payerEmail) {
-          const { data: userData, error: userError } = await supabase.auth.admin.getUserByEmail(payerEmail);
-          console.log('→ User lookup (email):', { found: !!userData?.user, error: userError?.message });
-          userRecord = userData?.user || null;
+          userRecord = await resolveUserByEmail(payerEmail);
+          console.log('→ User lookup (email):', { found: !!userRecord });
         }
           
         if (userRecord && amount) {
@@ -713,13 +774,27 @@ async function handleEvent(event) {
         const subscriptionId = event?.resource?.id;
         
         if (subscriptionId) {
-          await supabase
+          // العثور على المستخدم بواسطة PayPal subscription ID
+          const { data: userSub } = await supabase
             .from('user_subscriptions')
-            .update({
-              status: 'cancelled',
-              cancelled_at: new Date().toISOString()
-            })
-            .eq('paypal_subscription_id', subscriptionId);
+            .select('user_id')
+            .eq('paypal_subscription_id', subscriptionId)
+            .single();
+          
+          if (userSub) {
+            // استخدام الدالة الموحدة لإلغاء الاشتراك
+            await cancelSubscription({
+              userId: userSub.user_id,
+              reason: 'PayPal subscription cancelled',
+              source: 'paypal_webhook',
+              paypalSubscriptionId: subscriptionId,
+              shouldCancelPayPal: false, // لا نحتاج لإلغاء PayPal لأنه تم بالفعل
+              metadata: {
+                webhook_event_id: event?.id,
+                event_type: event?.event_type
+              }
+            });
+          }
         }
         break;
       }
@@ -728,13 +803,28 @@ async function handleEvent(event) {
         const subscriptionId = event?.resource?.id;
         
         if (subscriptionId) {
-          await supabase
+          // العثور على المستخدم بواسطة PayPal subscription ID
+          const { data: userSub } = await supabase
             .from('user_subscriptions')
-            .update({
-              status: 'expired',
-              expired_at: new Date().toISOString()
-            })
-            .eq('paypal_subscription_id', subscriptionId);
+            .select('user_id')
+            .eq('paypal_subscription_id', subscriptionId)
+            .single();
+          
+          if (userSub) {
+            // استخدام الدالة الموحدة لإلغاء الاشتراك
+            await cancelSubscription({
+              userId: userSub.user_id,
+              reason: 'PayPal subscription expired',
+              source: 'paypal_webhook',
+              paypalSubscriptionId: subscriptionId,
+              shouldCancelPayPal: false, // لا نحتاج لإلغاء PayPal لأنه انتهت صلاحيته
+              metadata: {
+                webhook_event_id: event?.id,
+                event_type: event?.event_type,
+                status: 'expired'
+              }
+            });
+          }
         }
         break;
       }
@@ -763,16 +853,22 @@ async function handleEvent(event) {
           if (originalTx) {
             console.log('→ Found original transaction for refund, updating subscription...');
             
-            // Cancel the user's subscription if they have one
-            await supabase
-              .from('user_subscriptions')
-              .update({ 
-                status: 'cancelled',
-                cancelled_at: new Date().toISOString(),
-                cancellation_reason: 'refunded'
-              })
-              .eq('user_id', originalTx.user_id)
-              .eq('status', 'active');
+            // استخدام الدالة الموحدة لإلغاء الاشتراك بسبب الاسترداد
+            await cancelSubscription({
+              userId: originalTx.user_id,
+              reason: 'Payment refunded',
+              source: 'paypal_webhook_refund',
+              shouldCancelPayPal: false, // الدفع تم استرداده بالفعل
+              metadata: {
+                webhook_event_id: event?.id,
+                event_type: event?.event_type,
+                refund_id: refundId,
+                capture_id: captureId,
+                refund_amount: refundAmount,
+                refund_currency: refundCurrency,
+                original_transaction_id: originalTx.id
+              }
+            });
             
             // Log the refund transaction
             await supabase
