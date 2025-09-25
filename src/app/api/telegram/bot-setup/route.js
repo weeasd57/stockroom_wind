@@ -157,9 +157,18 @@ export async function GET(request) {
       return NextResponse.json({ bot: null });
     }
 
-    return NextResponse.json({
-      bot: bot?.[0] || null
-    });
+    const raw = bot?.[0] || null;
+    const sanitized = raw
+      ? {
+          id: raw.bot_id,
+          username: raw.bot_username,
+          name: raw.bot_name,
+          isActive: raw.is_active,
+          subscriber_count: raw.subscriber_count
+        }
+      : null;
+
+    return NextResponse.json({ bot: sanitized });
 
   } catch (error) {
     console.error('Error getting bot info:', error);

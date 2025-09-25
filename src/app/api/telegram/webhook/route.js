@@ -337,7 +337,7 @@ async function sendTelegramMessage(chatId, text, options = {}) {
 // الرد على callback query
 async function answerCallbackQuery(callbackQueryId, text = '') {
   try {
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const botToken = process.env.TELEGRAMBOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
     const url = `https://api.telegram.org/bot${botToken}/answerCallbackQuery`;
     
     await fetch(url, {
