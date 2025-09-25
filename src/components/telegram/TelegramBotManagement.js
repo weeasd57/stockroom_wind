@@ -2,15 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
-import styles from './TelegramBotManagement.module.css';
+import styles from '@/styles/TelegramBotManagement.module.css';
 import { toast } from 'sonner';
 
 export default function TelegramBotManagement() {
   const { user } = useSupabase();
   const [botInfo, setBotInfo] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [setupMode, setSetupMode] = useState(false);
-  const [botName, setBotName] = useState('');
   const [saving, setSaving] = useState(false);
   const [subscribers, setSubscribers] = useState([]);
   const [selectedPosts, setSelectedPosts] = useState([]);
@@ -33,7 +31,14 @@ export default function TelegramBotManagement() {
 
   const fetchBotInfo = async () => {
     try {
-      const response = await fetch('/api/telegram/bot-setup');
+      const token = localStorage.getItem('sb-jyoeecprvhpqfirxmpkx-auth-token');
+      const parsed = JSON.parse(token);
+      
+      const response = await fetch('/api/telegram/bot-setup', {
+        headers: {
+          'Authorization': `Bearer ${parsed.access_token}`
+        }
+      });
       const data = await response.json();
       setBotInfo(data.bot);
     } catch (error) {
@@ -45,7 +50,14 @@ export default function TelegramBotManagement() {
 
   const fetchSubscribers = async () => {
     try {
-      const response = await fetch('/api/telegram/subscribers');
+      const token = localStorage.getItem('sb-jyoeecprvhpqfirxmpkx-auth-token');
+      const parsed = JSON.parse(token);
+      
+      const response = await fetch('/api/telegram/subscribers', {
+        headers: {
+          'Authorization': `Bearer ${parsed.access_token}`
+        }
+      });
       const data = await response.json();
       setSubscribers(data.subscribers || []);
     } catch (error) {
@@ -55,7 +67,14 @@ export default function TelegramBotManagement() {
 
   const fetchUserPosts = async () => {
     try {
-      const response = await fetch(`/api/posts?userId=${user.id}&limit=100`);
+      const token = localStorage.getItem('sb-jyoeecprvhpqfirxmpkx-auth-token');
+      const parsed = JSON.parse(token);
+      
+      const response = await fetch(`/api/posts?userId=${user.id}&limit=100`, {
+        headers: {
+          'Authorization': `Bearer ${parsed.access_token}`
+        }
+      });
       const data = await response.json();
       setPosts(data.posts || []);
     } catch (error) {
@@ -65,9 +84,15 @@ export default function TelegramBotManagement() {
 
   const fetchStats = async () => {
     try {
+      const token = localStorage.getItem('sb-jyoeecprvhpqfirxmpkx-auth-token');
+      const parsed = JSON.parse(token);
+      
       const response = await fetch('/api/telegram/subscribers', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${parsed.access_token}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ action: 'get_stats' })
       });
       const data = await response.json();
@@ -78,18 +103,17 @@ export default function TelegramBotManagement() {
   };
 
   const handleBotSetup = async (e) => {
-    e.preventDefault();
-    if (!botName) {
-      toast.error('Please enter a bot name');
-      return;
-    }
-
+    e?.preventDefault?.();
     setSaving(true);
     try {
+      const token = localStorage.getItem('sb-jyoeecprvhpqfirxmpkx-auth-token');
+      const parsed = JSON.parse(token);
+      
       const response = await fetch('/api/telegram/bot-setup', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ botName })
+        headers: { 
+          'Authorization': `Bearer ${parsed.access_token}`
+        }
       });
 
       const data = await response.json();
@@ -97,8 +121,6 @@ export default function TelegramBotManagement() {
       if (data.success) {
         toast.success('Bot setup completed successfully');
         setBotInfo(data.bot);
-        setSetupMode(false);
-        setBotName('');
         fetchSubscribers();
         fetchStats();
       } else {
@@ -127,9 +149,15 @@ export default function TelegramBotManagement() {
 
     setSendingBroadcast(true);
     try {
+      const token = localStorage.getItem('sb-jyoeecprvhpqfirxmpkx-auth-token');
+      const parsed = JSON.parse(token);
+      
       const response = await fetch('/api/telegram/send-broadcast', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${parsed.access_token}`
+        },
         body: JSON.stringify({
           title: broadcastTitle,
           message: broadcastMessage,
@@ -186,42 +214,12 @@ export default function TelegramBotManagement() {
             <p>Set up your Telegram bot to send notifications</p>
             <button 
               className={styles.setupButton}
-              onClick={() => setSetupMode(true)}
+              onClick={handleBotSetup}
               disabled={saving}
             >
               Set up bot
             </button>
           </div>
-
-          {setupMode && (
-            <div className={styles.setupForm}>
-              <h3>Set up Telegram Bot</h3>
-              <form onSubmit={handleBotSetup}>
-                <div className={styles.formGroup}>
-                  <label>Bot Name:</label>
-                  <input
-                    type="text"
-                    value={botName}
-                    onChange={(e) => setBotName(e.target.value)}
-                    placeholder="My Trading Bot"
-                    disabled={saving}
-                  />
-                </div>
-                <div className={styles.formActions}>
-                  <button type="submit" disabled={saving}>
-                    {saving ? 'Setting up...' : 'Set up bot'}
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={() => setSetupMode(false)}
-                    disabled={saving}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
         </div>
       ) : (
         <div className={styles.managementSection}>

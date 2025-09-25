@@ -2,22 +2,23 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Lazily initialize client at call-time to avoid build-time env access
-function getAdminClient() {
+function getSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const service = process.env.SUPABASE_SERVICE_ROLE_KEY; // prefer server key if available
-  const key = service || anon;
-  if (!url || !key) {
-    throw new Error('Missing Supabase env vars for setupDatabase. Ensure NEXT_PUBLIC_SUPABASE_URL and a key exist.');
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL for setupDatabase');
   }
-  return createClient(url, key);
+  if (!anonKey) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY for setupDatabase');
+  }
+  return createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 export default async function setupDatabase() {
   console.log('Setting up database schema and storage...');
 
   try {
-    const supabase = getAdminClient();
+    const supabase = getSupabaseClient();
     // Create posts storage bucket if it doesn't exist
     const { data: buckets, error: bucketsError } = await supabase
       .storage

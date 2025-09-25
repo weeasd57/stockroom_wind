@@ -94,7 +94,7 @@ export default function Login() {
         // Remember to redirect to profile after auth completes
         try { localStorage.setItem('postAuthRedirect', '/profile'); } catch (e) { /* ignore */ }
 
-        // Call our custom API route instead of the utility function
+        // Call our custom API route to create the user
         const response = await fetch('/api/signup', {
           method: 'POST',
           headers: {
@@ -117,11 +117,29 @@ export default function Login() {
         
         // Show success message
         setSuccess('Account created successfully!');
-        
-        // Auto sign-in was handled by the API; SupabaseProvider will redirect to postAuthRedirect
-        setTimeout(() => {
+
+        // IMPORTANT: Do a client-side sign-in to establish browser session
+        // The server API cannot set the browser's auth session cookie
+        try {
+          const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          if (signInErr) throw signInErr;
+
+          // Fade out and redirect to profile
           setVisible(false);
-        }, 1500);
+          router.push('/profile');
+          return;
+        } catch (e) {
+          // If email confirmation is required, inform the user
+          if (e?.message?.includes('Email not confirmed')) {
+            setError('Please check your email to confirm your account, then sign in.');
+          } else {
+            console.warn('Client sign-in after signup failed:', e);
+          }
+          setLoading(false);
+        }
       } else {
         // Use utility function for sign in
         const { data, error: signInError } = await signIn(email, password);

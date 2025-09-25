@@ -621,7 +621,29 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
     
     try {
       setIsLoggingOut(true);
-      await signOut();
+      // Attempt sign out with a safety timeout to avoid hanging
+      const timeoutMs = 5000;
+      try {
+        await Promise.race([
+          supabase.auth.signOut(),
+          new Promise<void>((resolve) => setTimeout(() => resolve(), timeoutMs))
+        ]);
+      } catch (_) {
+        // Ignore errors here; we'll proceed with local cleanup
+      }
+
+      // Extra safety: clear any lingering Supabase auth keys from localStorage
+      try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (!key) continue;
+          if (key.startsWith('sb-') || key.startsWith('supabase.auth.')) {
+            localStorage.removeItem(key);
+          }
+        }
+      } catch (_) {
+        // best-effort cleanup only
+      }
       
       // Get the current path
       const currentPath = window.location.pathname;

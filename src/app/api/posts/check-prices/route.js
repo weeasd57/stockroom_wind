@@ -4,8 +4,6 @@ import { NextResponse } from 'next/server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-// Use environment variables for service role key (server-only)
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 // Debug flag to reduce noisy logs in production
 const DEBUG = process.env.PRICE_CHECK_DEBUG === '1' || process.env.PRICE_CHECK_DEBUG === 'true';
 
@@ -13,27 +11,16 @@ const DEBUG = process.env.PRICE_CHECK_DEBUG === '1' || process.env.PRICE_CHECK_D
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing required Supabase environment variables:', {
     supabaseUrl: !!supabaseUrl,
-    supabaseAnonKey: !!supabaseAnonKey,
-    serviceRoleKey: !!serviceRoleKey
+    supabaseAnonKey: !!supabaseAnonKey
   });
 }
 
-// Create admin client function to be called when needed
-const createAdminClient = () => {
-  // Use service role key if available, otherwise fall back to anon key
-  const keyToUse = serviceRoleKey || supabaseAnonKey;
-  const isServiceRole = !!serviceRoleKey && serviceRoleKey !== supabaseAnonKey;
-  
-  return createClient(supabaseUrl || '', keyToUse, {
+// Create client function to be called when needed
+const createSupabaseClient = () => {
+  return createClient(supabaseUrl || '', supabaseAnonKey || '', {
     auth: {
       autoRefreshToken: false,
       persistSession: false
-    },
-    global: {
-      headers: isServiceRole ? {
-        'x-supabase-role': 'service_role',
-        'Authorization': `Bearer ${keyToUse}`
-      } : {}
     }
   });
 };
@@ -98,12 +85,7 @@ export async function GET(request) {
     if (!supabaseUrl || !supabaseAnonKey) {
       return NextResponse.json({ success: false, message: 'Database configuration not available', error: 'missing_database_config' }, { status: 503 });
     }
-    if (!serviceRoleKey) {
-      return NextResponse.json({ success: false, message: 'Server misconfigured: missing service role key', error: 'missing_service_role_key' }, { status: 503 });
-    }
-
-    const adminSupabase = createAdminClient();
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const supabase = createSupabaseClient();
 
     const { searchParams } = new URL(request.url);
     let userId = searchParams.get('userId') || '';
@@ -125,7 +107,7 @@ export async function GET(request) {
     }
 
     // Get user's subscription info (may not exist for new users)
-    const { data: subscriptionData, error: subError } = await adminSupabase
+    const { data: subscriptionData, error: subError } = await supabase
       .from('user_subscription_info')
       .select('*')
       .eq('user_id', userId);
@@ -163,16 +145,6 @@ export async function POST(request) {
       }, { status: 503 });
     }
 
-    // Ensure service role key is available for admin operations
-    if (!serviceRoleKey) {
-      console.error('[ERROR] Missing NEXT_PUBLIC_SUPABASE_URL environment variable');
-      return NextResponse.json({
-        success: false,
-        message: 'Server misconfigured: missing service role key',
-        error: 'missing_service_role_key'
-      }, { status: 503 });
-    }
-
     // Check if API key is configured
     if (!hasValidApiKey()) {
       console.error('[ERROR] EOD Historical Data API key is not configured');
@@ -186,11 +158,8 @@ export async function POST(request) {
       );
     }
 
-    // Lazily create admin client after verifying env configuration
-    const adminSupabase = createAdminClient();
-
-    // Create public/anon client after validation
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    // Create client after validation
+    const supabase = createSupabaseClient();
 
     const body = await request.json().catch(() => ({}));
     if (DEBUG) console.log(`[DEBUG] Request body:`, JSON.stringify(body));
@@ -246,7 +215,7 @@ export async function POST(request) {
     }
     
     // Check if user can perform price check using RPC function
-    const { data: canCheck, error: checkError } = await adminSupabase
+    const { data: canCheck, error: checkError } = await supabase
       .rpc('check_price_limit', { p_user_id: userId });
     
     if (checkError) {
@@ -263,7 +232,7 @@ export async function POST(request) {
     
     if (canCheck === false) {
       // Get subscription info for error message (may not exist for new users)
-      const { data: subscriptionData } = await adminSupabase
+      const { data: subscriptionData } = await supabase
         .from('user_subscription_info')
         .select('*')
         .eq('user_id', userId);
@@ -290,7 +259,7 @@ export async function POST(request) {
     }
     
     // Log the price check using RPC function
-    const { data: logResult, error: logError } = await adminSupabase
+    const { data: logResult, error: logError } = await supabase
       .rpc('log_price_check', { 
         p_user_id: userId,
         p_symbol: 'BATCH_CHECK', // Generic symbol for batch check
@@ -513,7 +482,7 @@ export async function POST(request) {
           
           // Update the post with the status flag
           const currentTimestamp = new Date().toISOString();
-          const updateResult = await adminSupabase
+          const updateResult = await supabase
             .from('posts')
             .update({
               postdateafterpricedate: false,
@@ -529,7 +498,7 @@ export async function POST(request) {
             .eq('id', post.id);
 
           // Log the update operation
-          await logStatusUpdate(adminSupabase, post.id, post.symbol, "No price data available", updateResult);
+          await logStatusUpdate(supabase, post.id, post.symbol, "No price data available", updateResult);
 
           if (updateResult.error) {
             console.error(`Error updating post status for ${symbol}:`, updateResult.error);
@@ -581,7 +550,7 @@ export async function POST(request) {
             
             // Update the post with the status flag
             const currentTimestamp = new Date().toISOString();
-            const { error: updateError } = await adminSupabase
+            const { error: updateError } = await supabase
               .from('posts')
               .update({
                 postdateafterpricedate: true,
@@ -634,7 +603,7 @@ export async function POST(request) {
               
               // Update the post with the status flag
               const currentTimestamp = new Date().toISOString();
-              const { error: updateError } = await adminSupabase
+              const { error: updateError } = await supabase
                 .from('posts')
                 .update({
                   postdateafterpricedate: false,
@@ -886,8 +855,8 @@ export async function POST(request) {
           const newSuccessPosts = (profileData.success_posts || 0) + successfulPosts;
           const newLossPosts = (profileData.loss_posts || 0) + lostPosts;
           
-          // Update the profile with new counts using shared adminSupabase
-          const { error: updateProfileError } = await adminSupabase
+          // Update the profile with new counts using shared supabase
+          const { error: updateProfileError } = await supabase
             .from('profiles')
             .update({
               success_posts: newSuccessPosts,
@@ -992,7 +961,7 @@ export async function POST(request) {
               const postId = updateData.id;
               delete updateData.id; // Remove id from update data
               
-              const { error } = await adminSupabase
+              const { error } = await supabase
                 .from('posts')
                 .update(updateData)
                 .eq('id', postId);
@@ -1029,7 +998,7 @@ export async function POST(request) {
             
             // Verify the updates by checking a sample of posts
             const sampleIds = updatedPosts.slice(0, 3).map(p => p.id); // Check up to 3 posts
-            const { data: verifyData, error: verifyError } = await adminSupabase
+            const { data: verifyData, error: verifyError } = await supabase
               .from('posts')
               .select('id, target_reached, stop_loss_triggered, closed, postdateafterpricedate, postaftermarketclose, nodataavailable')
               .in('id', sampleIds);
@@ -1061,7 +1030,7 @@ export async function POST(request) {
         // Try updating posts one by one
         for (const post of updatedPosts) {
           try {
-            const { error: singleUpdateError } = await adminSupabase
+            const { error: singleUpdateError } = await supabase
               .from('posts')
               .update({
                 current_price: post.current_price,
@@ -1106,7 +1075,7 @@ export async function POST(request) {
     }
     
     // Get user's subscription limits from Supabase (may not exist for new users)
-    const { data: subscriptionData } = await adminSupabase
+    const { data: subscriptionData } = await supabase
       .from('user_subscription_info')
       .select('*')
       .eq('user_id', userId);

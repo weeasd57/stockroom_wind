@@ -47,7 +47,6 @@ export const useAuth = (): UseAuthReturn => {
       }
     } catch (error) {
       console.error('Sign in error:', error);
-      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -60,6 +59,13 @@ export const useAuth = (): UseAuthReturn => {
       if (userData.password !== userData.confirmPassword) {
         throw new Error('Passwords do not match');
       }
+
+      // Ask SupabaseProvider to redirect to /profile after auth completes
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('postAuthRedirect', '/profile');
+        }
+      } catch {}
 
       const { data, error } = await supabase.auth.signUp({
         email: userData.email,

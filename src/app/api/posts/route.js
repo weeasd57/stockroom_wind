@@ -20,11 +20,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
   };
 }
 
-// Server-side client that can bypass RLS when using the service role key
-const serviceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-// Define a service-role client if available (server-only). This fixes usage of an undefined supabaseServer.
-const supabaseServer = serviceRoleKey && supabaseUrl
-  ? createClient(supabaseUrl, serviceRoleKey)
+// Create standard client using anon key
+const supabaseServer = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
   : null;
 
 // Minimal payload sanitizer to avoid non-existent columns errors (PGRST204)
@@ -141,9 +139,10 @@ export async function POST(request) {
     try {
       console.debug('[API /posts] POST payload keys:', Object.keys(postPayload));
     } catch {}
-    // Log auth header for RLS debugging
+    // Log only the presence of Authorization header (avoid leaking tokens)
     try {
-      console.debug('[API /posts] Authorization header:', request.headers.get('authorization'));
+      const hasAuth = !!request.headers.get('authorization');
+      console.debug('[API /posts] Authorization header present:', hasAuth);
     } catch (e) {
       console.debug('[API /posts] Failed to read authorization header', e);
     }
@@ -209,35 +208,25 @@ export async function POST(request) {
       }
     }
 
-    // Determine DB client to use:
-    // - prefer service role client (bypasses RLS) if configured
-    // - otherwise, if request includes Authorization Bearer <token>, create a per-request client
-    //   that forwards that token so RLS policies evaluate as the authenticated user
-    let dbClient = supabase;
-    if (supabaseServer) {
-      console.debug('[API /posts] using service role client for insert');
-      dbClient = supabaseServer;
-    } else {
-      const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        try {
-          // Create a temporary client that forwards the user's JWT in requests
-          dbClient = createClient(supabaseUrl || '', supabaseAnonKey || '', {
-            global: {
-              headers: {
-                Authorization: authHeader,
-              },
+    // Determine DB client to use for writes: require user token (never use service role for user content)
+    let dbClient;
+    const authHeaderForDb = request.headers.get('authorization') || request.headers.get('Authorization');
+    if (authHeaderForDb && authHeaderForDb.startsWith('Bearer ')) {
+      try {
+        dbClient = createClient(supabaseUrl || '', supabaseAnonKey || '', {
+          global: {
+            headers: {
+              Authorization: authHeaderForDb,
             },
-          });
-          console.debug('[API /posts] created per-request client using user token');
-        } catch (e) {
-          console.debug('[API /posts] failed to create per-request client with token', e);
-          dbClient = supabase; // fallback
-        }
-      } else {
-        console.debug('[API /posts] no service role and no user token provided; using anon client');
-        dbClient = supabase; // ensure dbClient is always defined
+          },
+        });
+        console.debug('[API /posts] per-request client created with user token');
+      } catch (e) {
+        console.debug('[API /posts] failed to create per-request client with token', e);
+        return NextResponse.json({ error: 'Authentication error' }, { status: 401 });
       }
+    } else {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     const { data: post, error } = await dbClient

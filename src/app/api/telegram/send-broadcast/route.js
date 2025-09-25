@@ -69,8 +69,8 @@ export async function POST(request) {
 
     const broadcastId = broadcast;
 
-    // بدء إرسال البرودكاست في background
-    processBroadcast(supabase, broadcastId);
+    // بدء إرسال البرودكاست في background باستخدام توكن البوت الخاص بالمستخدم
+    processBroadcast(supabase, broadcastId, userBot.bot_token);
 
     return NextResponse.json({
       success: true,
@@ -88,7 +88,7 @@ export async function POST(request) {
 }
 
 // معالجة البرودكاست في الخلفية
-async function processBroadcast(supabase, broadcastId) {
+async function processBroadcast(supabase, broadcastId, botToken) {
   try {
     // تحديث حالة البرودكاست إلى "sending"
     await supabase
@@ -137,11 +137,10 @@ async function processBroadcast(supabase, broadcastId) {
 
     let sentCount = 0;
     let failedCount = 0;
-
-    // Read bot token from env for sending
-    const envToken = process.env.TELEGRAMBOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
-    if (!envToken) {
-      throw new Error('Telegram bot token is not configured');
+    
+    // Use bot token passed from the user's configured bot
+    if (!botToken) {
+      throw new Error('Telegram bot token is missing for this user bot');
     }
 
     // إرسال الرسائل
@@ -150,7 +149,7 @@ async function processBroadcast(supabase, broadcastId) {
         const telegramUserId = recipient.telegram_subscribers.telegram_user_id;
         const messageText = formatBroadcastMessage(broadcastData, broadcastPosts);
 
-        const result = await sendTelegramMessage(envToken, telegramUserId, messageText);
+        const result = await sendTelegramMessage(botToken, telegramUserId, messageText);
 
         if (result?.ok) {
           // تحديث حالة المستقبل إلى "sent"

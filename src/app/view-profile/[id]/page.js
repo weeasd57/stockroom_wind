@@ -5,9 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
 import styles from '@/styles/view-profile.module.css';
-import { useFollow } from '@/providers/FollowProvider'; // Import useFollow
+import { useFollow } from '@/providers/FollowProvider';
 import PostCard from '@/components/posts/PostCard';
 import PostsFeed from '@/components/home/PostsFeed';
+import TelegramSubscribeButton from '@/components/telegram/TelegramSubscribeButton';
+
+// Local cache for profile data
+const profileCache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export default function ViewProfile({ params }) {
   const { supabase, isAuthenticated, user } = useSupabase();
@@ -29,12 +34,15 @@ export default function ViewProfile({ params }) {
   console.log("[VIEW-PROFILE] Component loaded with params:", params);
   console.log("[VIEW-PROFILE] Extracted userId:", userId);
   
-  const [loading, setLoading] = useState(true);
+  // Progressive loading states
+  const [basicDataLoading, setBasicDataLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [profileData, setProfileData] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState('/default-avatar.svg');
   const [backgroundUrl, setBackgroundUrl] = useState('https://images.unsplash.com/photo-1579546929662-711aa81148cf?q=80&w=1200&auto=format&fit=crop');
   const [error, setError] = useState(null);
   const [avatarError, setAvatarError] = useState(false);
+  const [showSkeleton, setShowSkeleton] = useState(true);
 
   // Fetch profile data
   useEffect(() => {
@@ -65,7 +73,20 @@ export default function ViewProfile({ params }) {
     const fetchProfileData = async () => {
       try {
         console.log('[VIEW-PROFILE] Starting to fetch profile data for userId:', userId);
-        setLoading(true);
+        
+        // Check cache first
+        const cacheKey = `profile_${userId}`;
+        const cached = profileCache.get(cacheKey);
+        if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
+          console.log('[VIEW-PROFILE] Using cached profile data');
+          setProfileData(cached.data);
+          setAvatarUrl(cached.data.avatar_url || '/default-avatar.svg');
+          setBackgroundUrl(cached.data.background_url || 'https://images.unsplash.com/photo-1579546929662-711aa81148cf?q=80&w=1200&auto=format&fit=crop');
+          setBasicDataLoading(false);
+          setShowSkeleton(false);
+          // Still fetch fresh data in background
+        }
+        
         setError(null);
         const TIMEOUT_MS = 25000;
         const withTimeoutAbort = async (fn, ms = TIMEOUT_MS) => {
@@ -131,19 +152,38 @@ export default function ViewProfile({ params }) {
           throw new Error('Profile not found');
         }
         
-        safeSetState(() => setProfileData(profile));
+        // Set basic profile data immediately
+        safeSetState(() => {
+          setProfileData(profile);
+          setBasicDataLoading(false);
+          setShowSkeleton(false);
+        });
+        
+        // Cache the basic profile data
+        profileCache.set(cacheKey, {
+          data: profile,
+          timestamp: Date.now()
+        });
 
-        // Compute posts_count dynamically since it's not a DB column
-        try {
-          const { count: postsCount } = await supabase
-            .from('posts')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', userId);
-          safeSetState(() => setProfileData(prev => prev ? { ...prev, posts_count: postsCount || 0 } : prev));
-        } catch (e) {
-          // If counting fails, leave posts_count as 0
-          safeSetState(() => setProfileData(prev => prev ? { ...prev, posts_count: prev.posts_count || 0 } : prev));
-        }
+        // Fetch additional stats in background (non-blocking)
+        setTimeout(async () => {
+          try {
+            const { count: postsCount } = await supabase
+              .from('posts')
+              .select('id', { count: 'exact', head: true })
+              .eq('user_id', userId);
+            safeSetState(() => {
+              setProfileData(prev => prev ? { ...prev, posts_count: postsCount || 0 } : prev);
+              setStatsLoading(false);
+            });
+          } catch (e) {
+            console.log('[VIEW-PROFILE] Failed to fetch posts count:', e);
+            safeSetState(() => {
+              setProfileData(prev => prev ? { ...prev, posts_count: 0 } : prev);
+              setStatsLoading(false);
+            });
+          }
+        }, 100);
         
         // Try to get avatar and background images
         if (profile.avatar_url) {
@@ -182,10 +222,12 @@ export default function ViewProfile({ params }) {
         
       } catch (error) {
         console.error('[VIEW-PROFILE] Error fetching profile:', error);
-        safeSetState(() => setError(error.message));
-      } finally {
-        console.log('[VIEW-PROFILE] Setting loading to false');
-        safeSetState(() => setLoading(false));
+        safeSetState(() => {
+          setError(error.message);
+          setBasicDataLoading(false);
+          setStatsLoading(false);
+          setShowSkeleton(false);
+        });
       }
     };
 
@@ -269,15 +311,41 @@ export default function ViewProfile({ params }) {
     setAvatarUrl('/default-avatar.svg');
   };
 
-  // Only show loading if profile data is still loading
-  // Don't block on follow loading since that's a secondary operation
-  if (loading) {
-    return (
-      <div className={styles.loadingContainer}>
-        <div className={styles.loadingSpinner}></div>
-        <p>Loading profile...</p>
+  // Skeleton Loading Component
+  const ProfileSkeleton = () => (
+    <div className={styles.profileContainer}>
+      <button className={styles.backButton}>Back</button>
+      
+      <div className={`${styles.profileBackground} ${styles.skeletonGradient}`}></div>
+      
+      <div className={styles.profileHeader}>
+        <div className={`${styles.profileAvatar} ${styles.skeletonCircle}`}></div>
+        
+        <div className={styles.profileInfo}>
+          <div className={`${styles.skeletonText} ${styles.skeletonTitle}`}></div>
+          <div className={`${styles.skeletonText} ${styles.skeletonSubtitle}`}></div>
+          <div className={`${styles.skeletonText} ${styles.skeletonBio}`}></div>
+          
+          <div className={styles.profileActions}>
+            <div className={`${styles.skeletonButton}`}></div>
+          </div>
+        </div>
       </div>
-    );
+      
+      <div className={styles.profileStats}>
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className={styles.statItem}>
+            <div className={`${styles.skeletonText} ${styles.skeletonStatValue}`}></div>
+            <div className={`${styles.skeletonText} ${styles.skeletonStatLabel}`}></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Show skeleton while loading basic data
+  if (showSkeleton && basicDataLoading && !profileData) {
+    return <ProfileSkeleton />;
   }
 
   if (error) {
@@ -293,7 +361,7 @@ export default function ViewProfile({ params }) {
   }
 
   // Guard against rendering placeholders if data failed to load silently
-  if (!loading && !error && !profileData) {
+  if (!basicDataLoading && !error && !profileData) {
     return (
       <div className={styles.errorContainer}>
         <h2>Profile not found</h2>
@@ -341,41 +409,56 @@ export default function ViewProfile({ params }) {
           <p className={styles.username}>@{profileData?.username?.toLowerCase() || 'user'}</p>
           <p className={styles.bio}>{profileData?.bio || 'No bio available'}</p>
           
-          {isAuthenticated ? (
-            user?.id !== userId && (
-              <button 
-                onClick={handleFollowClick} 
-                className={isFollowing ? styles.unfollowButton : styles.followButton}
-                disabled={followLoading} // Disable button during follow/unfollow operation
-              >
-                {followLoading ? (isFollowing ? 'Unfollowing...' : 'Following...') : (isFollowing ? 'Unfollow' : 'Follow')}
-              </button>
-            )
-          ) : (
-            <button 
-              onClick={() => router.push('/login')} 
-              className={styles.loginToFollowButton}
-            >
-              Login to follow
-            </button>
-          )}
+          <div className={styles.profileActions}>
+            {isAuthenticated ? (
+              user?.id !== userId && (
+                <>
+                  <button 
+                    onClick={handleFollowClick} 
+                    className={isFollowing ? styles.unfollowButton : styles.followButton}
+                    disabled={followLoading} // Disable button during follow/unfollow operation
+                  >
+                    {followLoading ? (isFollowing ? 'Unfollowing...' : 'Following...') : (isFollowing ? 'Unfollow' : 'Follow')}
+                  </button>
+                  <TelegramSubscribeButton 
+                    userId={userId} 
+                    username={profileData?.username || 'User'} 
+                  />
+                </>
+              )
+            ) : (
+              <>
+                <button 
+                  onClick={() => router.push('/login')} 
+                  className={styles.loginToFollowButton}
+                >
+                  Login to follow
+                </button>
+                <TelegramSubscribeButton 
+                  userId={userId} 
+                  username={profileData?.username || 'User'} 
+                />
+              </>
+            )}
+          </div>
           {followError && (
             <p className={styles.followErrorText}>{followError}</p>
           )}
         </div>
       </div>
-      
       <div className={styles.profileStats}>
         <div className={styles.statItem}>
-          <span className={styles.statValue}>{profileData?.posts_count || 0}</span>
+          <span className={`${styles.statValue} ${statsLoading ? styles.skeletonText : ''}`}>
+            {statsLoading ? '...' : (profileData?.posts_count || 0)}
+          </span>
           <span className={styles.statLabel}>Posts</span>
         </div>
         <div className={styles.statItem}>
-          <span className={styles.statValue}>{profileData?.followers || 0}</span>{/* Use profileData.followers */}
+          <span className={styles.statValue}>{profileData?.followers || 0}</span>
           <span className={styles.statLabel}>Followers</span>
         </div>
         <div className={styles.statItem}>
-          <span className={styles.statValue}>{profileData?.following || 0}</span>{/* Use profileData.following */}
+          <span className={styles.statValue}>{profileData?.following || 0}</span>
           <span className={styles.statLabel}>Following</span>
         </div>
         <div className={styles.statItem}>

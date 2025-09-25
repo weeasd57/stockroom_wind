@@ -1,0 +1,530 @@
+/* TelegramSubscribeButton Styles */
+.placeholderButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  min-width: 180px;
+  width: 100%;
+  max-width: 300px;
+  opacity: 0.7;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.4; }
+}
+
+.telegramButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #1a73e8, #4285f4);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(26, 115, 232, 0.3);
+  min-width: 180px;
+  width: 100%;
+  max-width: 300px;
+  position: relative;
+  overflow: hidden;
+}
+
+.telegramButton:hover {
+  background: linear-gradient(135deg, #1557b0, #3367d6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), 0 2px 4px rgba(26, 115, 232, 0.4);
+}
+
+.telegramButton:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.telegramIcon {
+  width: 20px;
+  height: 20px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+  flex-shrink: 0;
+}
+
+.buttonText {
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+/* Dialog Styles */
+.dialogOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2147483647; /* Maximum z-index value */
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.3s ease;
+}
+
+/* Theme Support */
+.lightTheme {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.darkTheme {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.dialog {
+  border-radius: 16px;
+  padding: 0;
+  max-width: 420px;
+  width: 90%;
+  max-height: 85vh;
+  overflow: hidden;
+  animation: slideUp 0.3s ease;
+  position: relative;
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Light Theme Dialog */
+.lightDialog {
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.15), 0 0 0 1px hsl(var(--border));
+  color: hsl(var(--foreground));
+}
+
+/* Dark Theme Dialog */
+.darkDialog {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.dialogHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+}
+
+.lightDialog .dialogHeader {
+  border-bottom: 1px solid hsl(var(--border));
+  background: linear-gradient(135deg, hsl(var(--muted)), hsl(var(--background)));
+}
+
+.darkDialog .dialogHeader {
+  border-bottom: 1px solid #333;
+  background: linear-gradient(135deg, #2a2a2a, #1e1e1e);
+}
+
+.dialogHeader h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lightDialog .dialogHeader h3 {
+  color: hsl(var(--foreground));
+}
+
+.darkDialog .dialogHeader h3 {
+  color: #ffffff;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.lightDialog .closeButton {
+  color: hsl(var(--muted-foreground));
+}
+
+.lightDialog .closeButton:hover {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.darkDialog .closeButton {
+  color: #999;
+}
+
+.darkDialog .closeButton:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.dialogContent {
+  padding: 24px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: calc(85vh - 120px); /* Reserve space for header and buttons */
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+}
+
+.dialogContent::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dialogContent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dialogContent::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.dialogContent::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.lightDialog .dialogContent {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+.lightDialog .dialogContent::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+}
+
+.lightDialog .dialogContent::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+.darkDialog .dialogContent {
+  background: #1e1e1e;
+  color: #ffffff;
+}
+
+.darkDialog .dialogContent::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.darkDialog .dialogContent::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.botInfo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: linear-gradient(135deg, #2c5aa0, #1e4080);
+  border-radius: 12px;
+  margin-bottom: 20px;
+  border: 1px solid #4285f4;
+}
+
+.botIcon {
+  font-size: 32px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 8px;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.botInfo h4 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.botInfo p {
+  margin: 0 0 4px 0;
+  color: #e3f2fd;
+  font-weight: 500;
+}
+
+.botInfo small {
+  color: #bbdefb;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.description {
+  font-size: 15px;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.lightDialog .description {
+  color: hsl(var(--foreground));
+}
+
+.darkDialog .description {
+  color: #ffffff;
+}
+
+.featuresList {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px 0;
+}
+
+.featuresList li {
+  padding: 8px 0;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lightDialog .featuresList li {
+  color: hsl(var(--muted-foreground));
+}
+
+.darkDialog .featuresList li {
+  color: #e0e0e0;
+}
+
+.note {
+  font-size: 13px;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border-left: 3px solid #4285f4;
+}
+
+.lightDialog .note {
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
+}
+
+.darkDialog .note {
+  color: #e0e0e0;
+  background: #2a2a2a;
+}
+
+.dialogActions {
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+  padding: 20px 24px;
+  background: rgba(0, 0, 0, 0.02);
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  flex-shrink: 0; /* Prevent shrinking */
+  position: sticky;
+  bottom: 0;
+  backdrop-filter: blur(8px);
+}
+
+.darkDialog .dialogActions {
+  background: rgba(0, 0, 0, 0.8);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lightDialog .dialogActions {
+  background: rgba(255, 255, 255, 0.9);
+  border-top: 1px solid hsl(var(--border));
+}
+
+.confirmButton {
+  background: linear-gradient(135deg, #1a73e8, #4285f4);
+  color: white;
+  border: none;
+  padding: 14px 28px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 140px;
+  box-shadow: 0 3px 6px rgba(26, 115, 232, 0.3);
+}
+
+.buttonIcon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.confirmButton:hover {
+  background: linear-gradient(135deg, #1557b0, #3367d6);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(26, 115, 232, 0.4);
+}
+
+.confirmButton:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 6px rgba(26, 115, 232, 0.3);
+}
+
+.confirmButton:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.2);
+}
+
+.cancelButton:active {
+  transform: translateY(0);
+}
+
+.cancelButton:focus {
+  outline: none;
+}
+
+.lightCancelButton:focus {
+  box-shadow: 0 0 0 2px hsl(var(--ring));
+}
+
+.darkCancelButton:focus {
+  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.5);
+}
+
+.cancelButton {
+  padding: 14px 24px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lightCancelButton {
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.lightCancelButton:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--ring));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.darkCancelButton {
+  background: #333;
+  color: #ccc;
+  border: 1px solid #444;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.darkCancelButton:hover {
+  background: #444;
+  color: #ffffff;
+  border-color: #555;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+  .telegramButton {
+    min-width: 160px;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  
+  .buttonText {
+    display: none;
+  }
+  
+  .telegramIcon {
+    font-size: 20px;
+  }
+  
+  .dialog {
+    width: 95%;
+    margin: 10px;
+    max-height: 90vh;
+  }
+  
+  .dialogContent {
+    padding: 20px;
+    max-height: calc(90vh - 140px); /* Adjust for mobile */
+  }
+  
+  .dialogActions {
+    flex-direction: column-reverse;
+    gap: 12px;
+    padding: 16px 20px;
+  }
+  
+  .confirmButton,
+  .cancelButton {
+    width: 100%;
+    justify-content: center;
+    min-height: 48px;
+    font-size: 16px;
+  }
+  
+  .confirmButton {
+    order: 1;
+  }
+  
+  .cancelButton {
+    order: 2;
+  }
+}
