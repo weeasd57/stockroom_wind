@@ -69,11 +69,11 @@ async function handleTelegramMessage(supabase, message) {
 
   // رسالة افتراضية
   await sendTelegramMessage(telegramUserId, 
-    'مرحباً! استخدم الأوامر التالية:\n' +
-    '/start - البدء\n' +
-    '/subscribe - الاشتراك في الإشعارات\n' +
-    '/unsubscribe - إلغاء الاشتراك\n' +
-    '/settings - إعدادات الإشعارات'
+    'Hello! Use the following commands:\n' +
+    '/start - Start\n' +
+    '/subscribe - Subscribe to notifications\n' +
+    '/unsubscribe - Unsubscribe from notifications\n' +
+    '/settings - Notification settings'
   );
 }
 
@@ -108,25 +108,25 @@ async function handleStartCommand(supabase, message) {
 
   if (error) {
     console.error('Error fetching bots:', error);
-    await sendTelegramMessage(telegramUserId, 'حدث خطأ، حاول مرة أخرى لاحقاً.');
+    await sendTelegramMessage(telegramUserId, 'An error occurred, please try again later.');
     return;
   }
 
   if (!bots || bots.length === 0) {
-    await sendTelegramMessage(telegramUserId, 'لا توجد بوتات متاحة حالياً.');
+    await sendTelegramMessage(telegramUserId, 'No bots are available right now.');
     return;
   }
 
   // إرسال قائمة البوتات المتاحة
-  let messageText = 'مرحباً! اختر البوت الذي تريد الاشتراك به:\n\n';
+  let messageText = 'Hello! Choose the bot you want to subscribe to:\n\n';
   const keyboard = [];
 
   for (const bot of bots) {
     messageText += `📊 ${bot.bot_name}\n`;
-    messageText += `👤 المُدير: ${bot.profiles?.full_name || bot.profiles?.username}\n\n`;
+    messageText += `👤 Owner: ${bot.profiles?.full_name || bot.profiles?.username}\n\n`;
     
     keyboard.push([{
-      text: `🔔 اشترك في ${bot.bot_name}`,
+      text: `🔔 Subscribe to ${bot.bot_name}`,
       callback_data: `subscribe_${bot.id}`
     }]);
   }
@@ -161,7 +161,7 @@ async function handleUnsubscribeCommand(supabase, message) {
 
   if (error) {
     console.error('Error fetching subscriptions:', error);
-    await sendTelegramMessage(telegramUserId, 'حدث خطأ، حاول مرة أخرى لاحقاً.');
+    await sendTelegramMessage(telegramUserId, 'An error occurred, please try again later.');
     return;
   }
 
@@ -170,14 +170,14 @@ async function handleUnsubscribeCommand(supabase, message) {
     return;
   }
 
-  let messageText = 'اختر البوت الذي تريد إلغاء الاشتراك منه:\n\n';
+  let messageText = 'Choose the bot you want to unsubscribe from:\n\n';
   const keyboard = [];
 
   for (const sub of subscriptions) {
     messageText += `📊 ${sub.telegram_bots.bot_name}\n`;
     
     keyboard.push([{
-      text: `🔕 إلغاء الاشتراك من ${sub.telegram_bots.bot_name}`,
+      text: `🔕 Unsubscribe from ${sub.telegram_bots.bot_name}`,
       callback_data: `unsubscribe_${sub.bot_id}`
     }]);
   }
@@ -194,12 +194,12 @@ async function handleSettingsCommand(supabase, message) {
   const telegramUserId = message.from.id;
   
   await sendTelegramMessage(telegramUserId, 
-    '⚙️ إعدادات الإشعارات:\n\n' +
-    '🔔 إشعارات البوستات الجديدة\n' +
-    '📈 إشعارات تحديث الأسعار\n' +
-    '🎯 إشعارات الوصول للهدف\n' +
-    '🛑 إشعارات وقف الخسارة\n\n' +
-    'يمكنك إدارة هذه الإعدادات من الموقع.'
+    '⚙️ Notification settings:\n\n' +
+    '🔔 New post notifications\n' +
+    '📈 Price update notifications\n' +
+    '🎯 Target reached notifications\n' +
+    '🛑 Stop loss notifications\n\n' +
+    'You can manage these settings from the website.'
   );
 }
 
@@ -216,7 +216,7 @@ async function subscribeToBot(supabase, telegramUserId, botId, telegramUser) {
 
     if (existingSub) {
       if (existingSub.is_subscribed) {
-        await sendTelegramMessage(telegramUserId, '✅ أنت مشترك بالفعل في هذا البوت!');
+        await sendTelegramMessage(telegramUserId, '✅ You are already subscribed to this bot!');
         return;
       } else {
         // إعادة تفعيل الاشتراك
@@ -259,17 +259,17 @@ async function subscribeToBot(supabase, telegramUserId, botId, telegramUser) {
     }
 
     await sendTelegramMessage(telegramUserId, 
-      '🎉 تم الاشتراك بنجاح!\n' +
-      'ستتلقى إشعارات حول:\n' +
-      '• البوستات الجديدة\n' +
-      '• تحديثات الأسعار\n' +
-      '• الوصول للأهداف\n' +
-      '• وقف الخسائر'
+      '🎉 Subscribed successfully!\n' +
+      'You will receive notifications about:\n' +
+      '• New posts\n' +
+      '• Price updates\n' +
+      '• Target reached\n' +
+      '• Stop loss'
     );
 
   } catch (error) {
     console.error('Error subscribing to bot:', error);
-    await sendTelegramMessage(telegramUserId, 'حدث خطأ أثناء الاشتراك، حاول مرة أخرى.');
+    await sendTelegramMessage(telegramUserId, 'An error occurred while subscribing, please try again.');
   }
 }
 
@@ -287,24 +287,24 @@ async function unsubscribeFromBot(supabase, telegramUserId, botId) {
 
     if (error) {
       console.error('Error unsubscribing:', error);
-      await sendTelegramMessage(telegramUserId, 'حدث خطأ أثناء إلغاء الاشتراك.');
+    await sendTelegramMessage(telegramUserId, 'An error occurred while unsubscribing.');
       return;
     }
 
-    await sendTelegramMessage(telegramUserId, '✅ تم إلغاء الاشتراك بنجاح!');
+  await sendTelegramMessage(telegramUserId, '✅ Unsubscribed successfully!');
 
   } catch (error) {
     console.error('Error unsubscribing from bot:', error);
-    await sendTelegramMessage(telegramUserId, 'حدث خطأ أثناء إلغاء الاشتراك، حاول مرة أخرى.');
+    await sendTelegramMessage(telegramUserId, 'An error occurred while unsubscribing, please try again.');
   }
 }
 
 // إرسال رسالة تليجرام
 async function sendTelegramMessage(chatId, text, options = {}) {
   try {
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const botToken = process.env.TELEGRAMBOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
     if (!botToken) {
-      console.error('TELEGRAM_BOT_TOKEN not found');
+      console.error('Telegram bot token not found in env');
       return;
     }
 
