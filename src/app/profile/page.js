@@ -738,8 +738,21 @@ export default function Profile() {
     setSaveError(null);
     setAvatarUploadError(null);
     setBackgroundUploadError(null);
+    
+    // Close modal immediately and show optimistic UI
+    setShowEditModal(false);
+    
+    // Show background saving indicator
     setIsSaving(true);
     setIsUploading(true);
+    
+    // Optimistically update profile data in UI
+    if (profile) {
+      setProfile(prev => ({
+        ...prev,
+        ...formData
+      }));
+    }
     
     try {
       // Upload avatar and background images if selected
@@ -869,14 +882,28 @@ export default function Profile() {
       // Just update the context data without refreshing images
       await refreshData(user.id);
       
-      // Only close modal if there were no errors
-      if (!avatarUploadError && !backgroundUploadError && !saveError) {
-        setShowEditModal(false);
+      console.log('Profile updated successfully in background');
+      
+      // Show success notification
+      if (typeof window !== 'undefined') {
+        // You can implement a toast notification here
+        console.log('✅ Profile updated successfully!');
       }
       
     } catch (error) {
       console.error('Error in handleSaveProfile:', error);
+      
+      // Revert optimistic update if failed
+      if (profile) {
+        await refreshData(user.id);
+      }
+      
       setSaveError(error.message || 'An unexpected error occurred. Please try again.');
+      
+      // Show error notification
+      if (typeof window !== 'undefined') {
+        console.error('❌ Failed to update profile:', error.message);
+      }
     } finally {
       setIsSaving(false);
       setIsUploading(false);
@@ -1068,6 +1095,23 @@ export default function Profile() {
               )}
             </div>
           </div>
+          
+          {/* Social Icons */}
+          {profile?.show_facebook && profile?.facebook_url && (
+            <div className={styles.socialIcons}>
+              <a 
+                href={profile.facebook_url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className={styles.socialIcon}
+                aria-label="Facebook Profile"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                </svg>
+              </a>
+            </div>
+          )}
         </div>
       </div>
       {/* Subscription Info Section */}
@@ -1707,6 +1751,34 @@ export default function Profile() {
                   disabled={isSaving}
                   placeholder="Tell us about yourself"
                 />
+              </div>
+              
+              <div className={editStyles.formGroup}>
+                <div className={editStyles.facebookSection}>
+                  <div className={editStyles.checkboxGroup}>
+                    <input
+                      type="checkbox"
+                      id="show_facebook"
+                      name="show_facebook"
+                      checked={formData.show_facebook}
+                      onChange={handleInputChange}
+                      disabled={isSaving}
+                    />
+                    <label htmlFor="show_facebook">Show Facebook icon on profile</label>
+                  </div>
+                  <div className={editStyles.facebookInput}>
+                    <label htmlFor="facebook_url">Facebook URL</label>
+                    <input
+                      type="url"
+                      id="facebook_url"
+                      name="facebook_url"
+                      value={formData.facebook_url}
+                      onChange={handleInputChange}
+                      disabled={isSaving}
+                      placeholder="https://facebook.com/your-profile"
+                    />
+                  </div>
+                </div>
               </div>
               
               <div className={editStyles.formGroup}>
