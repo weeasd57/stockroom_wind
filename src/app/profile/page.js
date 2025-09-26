@@ -106,6 +106,8 @@ export default function Profile() {
     username: '',
     full_name: '',
     bio: '',
+    facebook_url: '',
+    show_facebook: false,
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -169,6 +171,8 @@ export default function Profile() {
         username: profile.username || '',
         full_name: profile.full_name || '',
         bio: profile.bio || '',
+        facebook_url: profile.facebook_url || '',
+        show_facebook: profile.show_facebook || false,
       });
       setAvatarUrl(contextAvatarUrl || '/default-avatar.svg');
       setBackgroundUrl(contextBackgroundUrl || '/profile-bg.jpg');
@@ -278,6 +282,8 @@ export default function Profile() {
         username: profile.username || '',
         full_name: profile.full_name || '',
         bio: profile.bio || '',
+        facebook_url: profile.facebook_url || '',
+        show_facebook: profile.show_facebook || false,
       });
     }
   }, [profile]);
@@ -319,6 +325,8 @@ export default function Profile() {
       username: profile?.username || '',
       full_name: profile?.full_name || '',
       bio: profile?.bio || '',
+      facebook_url: profile?.facebook_url || '',
+      show_facebook: profile?.show_facebook || false,
     });
   }, [profile]);
 
@@ -403,8 +411,11 @@ export default function Profile() {
   }
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({ 
+      ...prev, 
+      [name]: type === 'checkbox' ? checked : value 
+    }));
   };
 
   const handleAvatarClick = () => {
