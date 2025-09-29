@@ -12,7 +12,7 @@ type PostsContextType = {
   myPosts: Post[];
   loading: boolean;
   error: string | null;
-  fetchPosts: (mode?: 'following' | 'all' | 'trending', opts?: { excludeCurrentUser?: boolean }) => Promise<void>;
+  fetchPosts: (mode?: 'following' | 'all' | 'trending', opts?: { excludeCurrentUser?: boolean; userId?: string }) => Promise<void>;
   loadMore: () => Promise<void>;
   hasMore: boolean;
   loadingMore: boolean;
@@ -33,6 +33,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
   const nextCursorRef = useRef<string | null>(null); // created_at cursor for keyset pagination
   const modeRef = useRef<'following' | 'all' | 'trending' | undefined>(undefined);
   const followingIdsRef = useRef<string[] | null>(null);
+  const userIdFilterRef = useRef<string | null>(null); // Track userId filter for view-profile
   const PAGE_SIZE = 20;
   // Whether to exclude current user's posts for the consumer feed (Home)
   const [excludeSelf, setExcludeSelf] = useState<boolean>(false);
@@ -97,10 +98,15 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       let data: any[] | null = null;
       modeRef.current = mode;
       followingIdsRef.current = null;
+      userIdFilterRef.current = opts?.userId || null;
       // Store consumer preference for excluding current user's posts in the feed
       setExcludeSelf(Boolean(opts?.excludeCurrentUser));
 
-      if (mode === 'following') {
+      // If userId is provided (view-profile mode), fetch only that user's posts
+      if (opts?.userId) {
+        console.log('[PostProvider] Fetching posts for userId:', opts.userId);
+        data = await getPostsPage({ limit: PAGE_SIZE, before: null, userIds: [opts.userId] });
+      } else if (mode === 'following') {
         if (!user?.id) {
           setPosts([]);
           setLoading(false);
@@ -161,8 +167,12 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     setLoadingMore(true);
     try {
       const mode = modeRef.current;
+      const userId = userIdFilterRef.current;
       let page: any[] = [];
-      if (mode === 'following') {
+      if (userId) {
+        // View-profile mode: load more posts from specific user
+        page = await getPostsPage({ limit: PAGE_SIZE, before, userIds: [userId] });
+      } else if (mode === 'following') {
         const ids = followingIdsRef.current || [];
         if (ids.length === 0) { setHasMore(false); return; }
         page = await getPostsPage({ limit: PAGE_SIZE, before, userIds: ids });
@@ -197,15 +207,44 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
   // Subscribe to realtime updates for posts (price checks, status changes)
   useEffect(() => {
     if (!supabase) return;
+    
+    // Throttle real-time updates to prevent excessive re-renders
+    let updateTimeout: NodeJS.Timeout | null = null;
+    const pendingUpdates = new Map<string, any>();
+
+    const processUpdates = () => {
+      if (pendingUpdates.size === 0) return;
+      
+      setPosts(prev => {
+        let next = [...prev];
+        let hasChanges = false;
+        
+        pendingUpdates.forEach((updateData, postId) => {
+          const idx = next.findIndex(p => p.id === postId);
+          if (idx !== -1) {
+            next[idx] = { ...next[idx], ...updateData };
+            hasChanges = true;
+          }
+        });
+        
+        return hasChanges ? next : prev;
+      });
+      
+      pendingUpdates.clear();
+    };
+
     const channel = supabase
       .channel('posts-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload: any) => {
-        console.log('Real-time post update:', payload);
         const evt = payload.eventType;
         const newRow = payload.new;
         const oldRow = payload.old;
 
         if (evt === 'INSERT' && newRow) {
+          // Respect userId filter: in view-profile mode, only include posts by that user
+          const userId = userIdFilterRef.current;
+          if (userId && newRow.user_id !== userId) return;
+          
           // Respect mode: in 'following' only include posts by followed users
           const mode = modeRef.current;
           if (mode === 'following') {
@@ -230,36 +269,25 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
             });
           }).catch(() => {});
         } else if (evt === 'UPDATE' && newRow) {
-          console.log('[PostProvider] Real-time UPDATE received:', newRow.id, {
-            last_price_check: newRow.last_price_check,
-            current_price: newRow.current_price,
-            symbol: newRow.symbol
-          });
-          setPosts(prev => {
-            const next = [...prev];
-            const idx = next.findIndex(p => p.id === newRow.id);
-            if (idx !== -1) {
-              const updatedPost: any = { ...next[idx], ...newRow };
-              if (newRow.price_checks) {
-                try {
-                  updatedPost.price_checks = typeof newRow.price_checks === 'string'
-                    ? JSON.parse(newRow.price_checks)
-                    : newRow.price_checks;
-                } catch (e) {
-                  console.warn('Failed to parse price_checks:', e);
-                }
-              }
-              next[idx] = updatedPost;
-              if (modeRef.current === 'trending') {
-                next.sort((a: any, b: any) => {
-                  const aEng = (a.comment_count || 0) + (a.buy_count || 0) + (a.sell_count || 0);
-                  const bEng = (b.comment_count || 0) + (b.buy_count || 0) + (b.sell_count || 0);
-                  return bEng - aEng;
-                });
-              }
+          // Throttle UPDATE events by batching them
+          const updateData: any = { ...newRow };
+          if (newRow.price_checks) {
+            try {
+              updateData.price_checks = typeof newRow.price_checks === 'string'
+                ? JSON.parse(newRow.price_checks)
+                : newRow.price_checks;
+            } catch (e) {
+              console.warn('Failed to parse price_checks:', e);
             }
-            return next;
-          });
+          }
+          
+          // Add to pending updates
+          pendingUpdates.set(newRow.id, updateData);
+          
+          // Debounce the actual update
+          if (updateTimeout) clearTimeout(updateTimeout);
+          updateTimeout = setTimeout(processUpdates, 300);
+          
         } else if (evt === 'DELETE' && oldRow) {
           setPosts(prev => prev.filter(p => p.id !== oldRow.id));
         }
@@ -267,7 +295,10 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       .subscribe();
 
     return () => {
-      try { channel.unsubscribe(); } catch {}
+      try { 
+        channel.unsubscribe(); 
+        if (updateTimeout) clearTimeout(updateTimeout);
+      } catch {}
     };
   }, [supabase, fetchPostWithStats]);
 

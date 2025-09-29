@@ -15,10 +15,13 @@ import { headers } from 'next/headers';
 import { FollowProvider } from '@/providers/FollowProvider'; // Import FollowProvider
 import { PostProvider } from '@/providers/PostProvider';
 import { BackgroundPostCreationProvider } from '@/providers/BackgroundPostCreationProvider';
+import { BackgroundProfileUpdateProvider } from '@/providers/BackgroundProfileUpdateProvider';
 import { SubscriptionProvider } from '@/providers/SubscriptionProvider';
 import BackgroundPostCreationFloatingIndicator from '@/components/background/BackgroundPostCreationFloatingIndicator';
+import BackgroundProfileUpdateIndicator from '@/components/background/BackgroundProfileUpdateIndicator';
 import { Toaster } from 'sonner';
 import FloatingClock from '@/components/ui/FloatingClock';
+import { setupGlobalErrorHandler } from '@/utils/errorHandler';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -78,6 +81,70 @@ export default function RootLayout({ children }) {
           `}
         </Script>
         
+        <Script id="error-handler-init" strategy="beforeInteractive" nonce={cspNonce || undefined}>
+          {`
+            // Initialize global error handlers early (based on StackOverflow solutions)
+            if (typeof window !== 'undefined') {
+              // Store original console methods
+              const originalError = console.error;
+              const originalWarn = console.warn;
+              
+              // Override console.error to filter protocol handler errors
+              console.error = function(...args) {
+                const message = args.join(' ');
+                
+                // Suppress protocol handler errors
+                if (message.includes('Failed to launch') && 
+                    (message.includes('tg://') || message.includes('registered handler'))) {
+                  return; // Silently ignore
+                }
+                
+                // Suppress SVG path errors from jQuery/extensions
+                if (message.includes('Expected number') && message.includes('path')) {
+                  return; // Silently ignore
+                }
+                
+                // Call original console.error for other messages
+                originalError.apply(console, args);
+              };
+              
+              window.addEventListener('error', (event) => {
+                // Suppress SVG parsing errors (usually from browser extensions)
+                if (event.message && (event.message.includes('SVG') || 
+                    event.message.includes('path') || 
+                    event.message.includes('Expected number'))) {
+                  event.preventDefault();
+                  return false;
+                }
+
+                // Suppress Telegram protocol errors
+                if (event.message && (event.message.includes('tg://') || 
+                    event.message.includes('does not have a registered handler') ||
+                    event.message.includes('Failed to launch'))) {
+                  event.preventDefault();
+                  return false;
+                }
+              });
+
+              window.addEventListener('unhandledrejection', (event) => {
+                if (event.reason && typeof event.reason === 'string') {
+                  if (event.reason.includes('tg://') || 
+                      event.reason.includes('registered handler') ||
+                      event.reason.includes('Failed to launch')) {
+                    event.preventDefault();
+                    return;
+                  }
+                }
+              });
+              
+              // Restore original console methods on page unload
+              window.addEventListener('beforeunload', () => {
+                console.error = originalError;
+                console.warn = originalWarn;
+              });
+            }
+          `}
+        </Script>
         <Script id="console-suppressor" strategy="beforeInteractive" nonce={cspNonce || undefined}>
           {`
             if (${isProd}) {
@@ -294,12 +361,15 @@ export default function RootLayout({ children }) {
                           <ClientImagePreloader />
                           <PostProvider>
                             <BackgroundPostCreationProvider>
-                              <FollowProvider> {/* Wrap children with FollowProvider */}
-                                {children}
-                                <BackgroundPostCreationFloatingIndicator />
-                                <FloatingClock />
-                                <Toaster richColors position="top-right" />
-                              </FollowProvider>
+                              <BackgroundProfileUpdateProvider>
+                                <FollowProvider> {/* Wrap children with FollowProvider */}
+                                  {children}
+                                  <BackgroundPostCreationFloatingIndicator />
+                                  <BackgroundProfileUpdateIndicator />
+                                  <FloatingClock />
+                                  <Toaster richColors position="top-right" />
+                                </FollowProvider>
+                              </BackgroundProfileUpdateProvider>
                             </BackgroundPostCreationProvider>
                           </PostProvider>
                         </AuthGuard>

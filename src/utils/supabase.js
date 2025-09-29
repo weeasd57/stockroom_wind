@@ -221,7 +221,7 @@ export const getUserProfile = async (userId) => {
     // First, get the user profile data
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, username, full_name, email, avatar_url, background_url, bio, success_posts, loss_posts, experience_score, followers, following, created_at')
+      .select('id, username, full_name, email, avatar_url, background_url, bio, facebook_url, telegram_url, youtube_url, success_posts, loss_posts, experience_score, followers, following, created_at')
       .eq('id', userId);
 
     if (error) throw error;
@@ -291,6 +291,9 @@ export const getUserProfile = async (userId) => {
         full_name: `User ${userId.substring(0, 8)}`,
         avatar_url: '/default-avatar.svg',
         bio: '',
+        facebook_url: null,
+        telegram_url: null,
+        youtube_url: null,
         website: '',
         favorite_markets: [],
         created_at: now,
@@ -380,7 +383,57 @@ export const updateUserProfile = async (userId, updates) => {
     // Map form fields to database columns
     if (updates.username) dbUpdates.username = updates.username;
     if (updates.full_name) dbUpdates.full_name = updates.full_name;
-    if (updates.bio) dbUpdates.bio = updates.bio;
+    if (updates.bio !== undefined) dbUpdates.bio = updates.bio; // Handle empty bio
+    // Handle Facebook URL with validation
+    if (updates.facebook_url !== undefined) {
+      const facebookUrl = updates.facebook_url ? updates.facebook_url.trim() : '';
+      if (facebookUrl) {
+        // Basic URL validation
+        try {
+          new URL(facebookUrl);
+          dbUpdates.facebook_url = facebookUrl;
+        } catch (e) {
+          console.warn('Invalid Facebook URL provided:', facebookUrl);
+          dbUpdates.facebook_url = null;
+        }
+      } else {
+        dbUpdates.facebook_url = null; // Empty string becomes null
+      }
+    }
+    
+    // Handle Telegram URL with validation
+    if (updates.telegram_url !== undefined) {
+      const telegramUrl = updates.telegram_url ? updates.telegram_url.trim() : '';
+      if (telegramUrl) {
+        // Basic URL validation
+        try {
+          new URL(telegramUrl);
+          dbUpdates.telegram_url = telegramUrl;
+        } catch (e) {
+          console.warn('Invalid Telegram URL provided:', telegramUrl);
+          dbUpdates.telegram_url = null;
+        }
+      } else {
+        dbUpdates.telegram_url = null; // Empty string becomes null
+      }
+    }
+    
+    // Handle YouTube URL with validation
+    if (updates.youtube_url !== undefined) {
+      const youtubeUrl = updates.youtube_url ? updates.youtube_url.trim() : '';
+      if (youtubeUrl) {
+        // Basic URL validation
+        try {
+          new URL(youtubeUrl);
+          dbUpdates.youtube_url = youtubeUrl;
+        } catch (e) {
+          console.warn('Invalid YouTube URL provided:', youtubeUrl);
+          dbUpdates.youtube_url = null;
+        }
+      } else {
+        dbUpdates.youtube_url = null; // Empty string becomes null
+      }
+    }
     
     // Handle avatarUrl (from form) or avatar_url (directly provided)
     if (updates.avatarUrl) {
@@ -400,7 +453,7 @@ export const updateUserProfile = async (userId, updates) => {
       // console.log('Setting background_url in database to:', dbUpdates.background_url);
     }
     
-    // console.log('Final database updates:', dbUpdates);
+    console.log('[updateUserProfile] Final database updates:', dbUpdates);
     
     const { data, error } = await supabase
       .from('profiles')
@@ -1610,14 +1663,43 @@ export const getPostById = async (postId) => {
   try {
     const { data, error } = await supabase
       .from('posts_with_stats')
-      .select('*')
+      .select(`
+        id,
+        user_id,
+        symbol,
+        company_name,
+        country,
+        exchange,
+        initial_price,
+        current_price,
+        last_price,
+        last_price_check,
+        target_price,
+        target_reached,
+        target_reached_date,
+        stop_loss_price,
+        stop_loss_triggered,
+        stop_loss_triggered_date,
+        description,
+        strategy,
+        sentiment,
+        image_url,
+        price_checks,
+        status,
+        closed,
+        closed_date,
+        created_at,
+        updated_at,
+        buy_count,
+        sell_count,
+        comment_count
+      `)
       .eq('id', postId)
       .single();
       
     if (error) throw error;
     return { data, error: null };
   } catch (error) {
-
     return { data: null, error };
   }
 };

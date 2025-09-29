@@ -7,6 +7,214 @@
   overflow-x: hidden;
 }
 
+/* ===================================================================
+   SKELETON LOADING STYLES
+   ===================================================================*/
+@keyframes skeleton {
+  0% { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+
+.skeletonGradient {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--background)) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200px 100%;
+  animation: skeleton 1.2s ease-in-out infinite;
+}
+
+.skeletonCircle {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--background)) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200px 100%;
+  animation: skeleton 1.2s ease-in-out infinite;
+  border-radius: 50%;
+}
+
+.skeletonText {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--background)) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200px 100%;
+  animation: skeleton 1.2s ease-in-out infinite;
+  border-radius: 6px;
+  color: transparent !important;
+}
+
+.skeletonButton {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--background)) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200px 100%;
+  animation: skeleton 1.2s ease-in-out infinite;
+  border-radius: 6px;
+  height: 40px;
+  width: 120px;
+  border: none;
+  cursor: default;
+}
+
+/* Skeleton Text Variants */
+.skeletonTitle {
+  height: 32px;
+  width: 200px;
+  margin-bottom: 8px;
+}
+
+.skeletonSubtitle {
+  height: 20px;
+  width: 150px;
+  margin-bottom: 8px;
+}
+
+.skeletonBio {
+  height: 16px;
+  width: 300px;
+  margin-bottom: 16px;
+}
+
+.skeletonPlanBadge {
+  height: 24px;
+  width: 80px;
+  margin-bottom: 8px;
+}
+
+.skeletonDetailsTitle {
+  height: 20px;
+  width: 160px;
+  margin-bottom: 16px;
+}
+
+.skeletonLabel {
+  height: 16px;
+  width: 80px;
+}
+
+.skeletonValue {
+  height: 16px;
+  width: 120px;
+}
+
+.skeletonProgressLabel {
+  height: 16px;
+  width: 100px;
+}
+
+.skeletonProgressCount {
+  height: 16px;
+  width: 60px;
+}
+
+.skeletonSectionTitle {
+  height: 28px;
+  width: 180px;
+  margin-bottom: 16px;
+}
+
+.skeletonCardTitle {
+  height: 18px;
+  width: 140px;
+  margin-bottom: 8px;
+}
+
+.skeletonCardValue {
+  height: 24px;
+  width: 80px;
+}
+
+.skeletonTab {
+  height: 36px;
+  width: 80px;
+  margin-right: 8px;
+}
+
+/* Skeleton specific overrides for profile header */
+.profileHeader.skeletonGradient {
+  background-size: 200px 100%;
+  min-height: 300px;
+}
+
+/* ===================================================================
+   END SKELETON LOADING STYLES
+   ===================================================================*/
+
+/* ===================================================================
+   LOADING INDICATORS
+   ===================================================================*/
+.syncingIndicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background-color: hsl(var(--muted) / 0.1);
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.refreshingIndicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background-color: hsl(var(--primary) / 0.1);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  color: hsl(var(--primary));
+  border: 1px solid hsl(var(--primary) / 0.2);
+}
+
+.syncingSpinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loadingSpinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid hsl(var(--muted));
+  border-top: 2px solid hsl(var(--primary));
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  text-align: center;
+  color: hsl(var(--muted-foreground));
+}
+
+/* ===================================================================
+   END LOADING INDICATORS
+   ===================================================================*/
+
 /* Social Icons Styles */
 .socialIcons {
   position: absolute;
@@ -25,7 +233,7 @@
   height: 44px;
   background-color: rgba(255, 255, 255, 0.9);
   border-radius: 50%;
-  color: #1877f2; /* Facebook blue */
+  color: #1877f2; /* Default Facebook blue */
   text-decoration: none;
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -36,18 +244,62 @@
 .socialIcon:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-  background-color: #1877f2;
   color: white;
+}
+
+/* Facebook specific styles */
+.socialIcon[aria-label="Facebook Profile"] {
+  color: #1877f2;
+}
+.socialIcon[aria-label="Facebook Profile"]:hover {
+  background-color: #1877f2;
+}
+
+/* Telegram specific styles */
+.socialIcon[aria-label="Telegram Channel"] {
+  color: #0088cc;
+}
+.socialIcon[aria-label="Telegram Channel"]:hover {
+  background-color: #0088cc;
+}
+
+/* YouTube specific styles */
+.socialIcon[aria-label="YouTube Channel"] {
+  color: #ff0000;
+}
+.socialIcon[aria-label="YouTube Channel"]:hover {
+  background-color: #ff0000;
 }
 
 :global(.dark) .socialIcon {
   background-color: rgba(45, 45, 45, 0.9);
-  color: #1877f2;
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-:global(.dark) .socialIcon:hover {
+/* Dark mode Facebook */
+:global(.dark) .socialIcon[aria-label="Facebook Profile"] {
+  color: #1877f2;
+}
+:global(.dark) .socialIcon[aria-label="Facebook Profile"]:hover {
   background-color: #1877f2;
+  color: white;
+}
+
+/* Dark mode Telegram */
+:global(.dark) .socialIcon[aria-label="Telegram Channel"] {
+  color: #0088cc;
+}
+:global(.dark) .socialIcon[aria-label="Telegram Channel"]:hover {
+  background-color: #0088cc;
+  color: white;
+}
+
+/* Dark mode YouTube */
+:global(.dark) .socialIcon[aria-label="YouTube Channel"] {
+  color: #ff0000;
+}
+:global(.dark) .socialIcon[aria-label="YouTube Channel"]:hover {
+  background-color: #ff0000;
   color: white;
 }
 

@@ -41,8 +41,8 @@ async function setupBotCommands(_supabase, _botId, botToken) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         commands: [
-          { command: 'start', description: 'Start interacting with the bot' },
-          { command: 'help', description: 'Get help information' }
+          { command: 'start', description: 'Welcome message and setup instructions' },
+          { command: 'help', description: 'Show available commands and help' }
         ]
       })
     });

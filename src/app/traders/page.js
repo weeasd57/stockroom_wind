@@ -326,8 +326,8 @@ export default function TradersPage() {
                           />
                         </div>
                         <div className={styles.traderInfo}>
-                          <h3>{trader.full_name || trader.username || 'Trader'}</h3>
-                          <p className={styles.username}>@{trader.username || 'username'}</p>
+                          <h3>{trader.username || 'username'}</h3>
+                          <p className={styles.username}>{trader.full_name || (trader.username ? `@${trader.username}` : 'User')}</p>
                         </div>
                       </div>
                       
@@ -403,8 +403,8 @@ export default function TradersPage() {
                         />
                       </div>
                       <div className={styles.traderInfo}>
-                        <h3>{trader.full_name || trader.username || 'Trader'}</h3>
-                        <p className={styles.username}>@{trader.username || 'username'}</p>
+                        <h3>{trader.username || 'username'}</h3>
+                        <p className={styles.username}>{trader.full_name || (trader.username ? `@${trader.username}` : 'User')}</p>
                       </div>
                     </div>
                     

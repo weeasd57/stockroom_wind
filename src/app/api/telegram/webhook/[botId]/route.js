@@ -82,14 +82,14 @@ async function handleMessage(supabase, bot, message) {
   const chatId = message.chat.id;
   const text = (message.text || '').trim();
 
-  if (text === '/start' || text === '/subscribe') {
+  if (text.startsWith('/start') || text.startsWith('/subscribe')) {
     await upsertSubscription(supabase, bot.id, message.from);
     await sendTelegramMessage(bot.bot_token, chatId,
       `✅ Subscribed to ${bot.bot_name}.\nUse /unsubscribe to stop notifications.`
     );
     return;
   }
-  if (text === '/unsubscribe') {
+  if (text.startsWith('/unsubscribe')) {
     await setSubscription(supabase, bot.id, message.from.id, false);
     await sendTelegramMessage(bot.bot_token, chatId,
       `🛑 Unsubscribed from ${bot.bot_name}.`

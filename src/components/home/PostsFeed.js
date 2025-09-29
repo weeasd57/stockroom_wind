@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { usePosts } from '@/providers/PostProvider'; // Add PostProvider for real-time updates
 import PostCard from '@/components/posts/PostCard';
 import styles from '@/styles/home/PostsFeed.module.css';
@@ -77,22 +77,59 @@ export function PostsFeed({
 
   // Local following list removed to prevent double-filtering and races
 
+  // Throttle fetch posts to prevent excessive calls
+  const lastFetchRef = useRef(null);
+  const fetchTimeoutRef = useRef(null);
+  const abortControllerRef = useRef(null);
+
   // Fetch posts with the appropriate filter when filter changes
   useEffect(() => {
-    console.log(`[PostsFeed] useEffect for fetching posts fired. Filter: ${filter}, FetchPosts changed: ${typeof fetchPosts === 'function'}`);
-    if (userId) {
-      // Profile/View-Profile: do not exclude current user's posts
-      fetchPosts();
-    } else if (filter === 'following') {
-      // Following feed: normally won't include self; keep explicit mode
-      fetchPosts('following', { excludeCurrentUser: false });
-    } else if (filter === 'trending') {
-      // Home Trending: exclude current user's posts
-      fetchPosts('trending', { excludeCurrentUser: true });
-    } else {
-      // Home All: exclude current user's posts
-      fetchPosts('all', { excludeCurrentUser: true });
+    // Abort any pending fetch
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
+    abortControllerRef.current = new AbortController();
+
+    const now = Date.now();
+    if (lastFetchRef.current && (now - lastFetchRef.current) < 1000) {
+      // Throttle to prevent rapid successive calls
+      if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
+      fetchTimeoutRef.current = setTimeout(() => {
+        performFetch();
+      }, 500);
+      return;
+    }
+    
+    performFetch();
+
+    function performFetch() {
+      lastFetchRef.current = Date.now();
+      console.log(`[PostsFeed] Fetching posts. Filter: ${filter}, userId: ${userId || 'none'}`);
+      
+      if (userId) {
+        // Profile/View-Profile: fetch only this user's posts
+        fetchPosts(undefined, { userId });
+      } else if (filter === 'following') {
+        // Following feed: normally won't include self; keep explicit mode
+        fetchPosts('following', { excludeCurrentUser: false });
+      } else if (filter === 'trending') {
+        // Home Trending: exclude current user's posts
+        fetchPosts('trending', { excludeCurrentUser: true });
+      } else {
+        // Home All: exclude current user's posts
+        fetchPosts('all', { excludeCurrentUser: true });
+      }
+    }
+
+    // Cleanup timeout and abort controller on unmount
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [filter, fetchPosts, userId]);
 
   // Update loading and error states from PostProvider
@@ -103,14 +140,23 @@ export function PostsFeed({
     setError(providerError);
   }, [providerLoading, providerError, providerPosts]);
 
+  // Memoize posts array length to prevent unnecessary re-renders
+  const postsLength = useMemo(() => providerPosts?.length || 0, [providerPosts]);
+  const postsDataHash = useMemo(() => 
+    providerPosts?.map(p => `${p.id}-${p.updated_at || p.created_at}`).join(',') || '',
+    [providerPosts]
+  );
+
   // Filter and sort posts based on current settings
   const filteredAndSortedPosts = useMemo(() => {
+    if (!Array.isArray(providerPosts) || providerPosts.length === 0) {
+      return [];
+    }
+
     let filtered = [...providerPosts];
 
-    // Apply user-specific filter first when userId is provided
-    if (userId) {
-      filtered = filtered.filter(post => post.user_id === userId);
-    }
+    // Skip client-side user filtering when userId provided - PostProvider already filtered
+    // This prevents unnecessary re-filtering that was causing lag
 
     // Apply main filter
     // Note: When filter === 'following', PostProvider already fetched posts for followed users.
@@ -168,12 +214,25 @@ export function PostsFeed({
     }
 
     return filtered; // No client-side limit; pagination handled via PostProvider + Load More
-  }, [providerPosts, filter, sortBy, categoryFilter, userId, selectedStrategy, selectedStatus, selectedCountry, selectedSymbol]);
+  }, [postsDataHash, filter, sortBy, categoryFilter, userId, selectedStrategy, selectedStatus, selectedCountry, selectedSymbol]);
 
   // Use filtered posts instead of local posts state
   const posts = filteredAndSortedPosts;
 
-  console.log(`[PostsFeed] Rendering with ${posts.length} posts. Loading: ${loading}, Filter: ${filter}`);
+  // Throttled console logging to prevent spam
+  const lastLogRef = useRef(null);
+  const logStateRef = useRef({ lastPostsLength: 0, lastFilter: '', lastLoading: false });
+
+  if (posts.length !== logStateRef.current.lastPostsLength || 
+      filter !== logStateRef.current.lastFilter || 
+      loading !== logStateRef.current.lastLoading) {
+    const now = Date.now();
+    if (!lastLogRef.current || (now - lastLogRef.current) > 2000) {
+      console.log(`[PostsFeed] Rendering with ${posts.length} posts. Loading: ${loading}, Filter: ${filter}`);
+      lastLogRef.current = now;
+    }
+    logStateRef.current = { lastPostsLength: posts.length, lastFilter: filter, lastLoading: loading };
+  }
 
   // (refactor) helpers moved into PostCard
 

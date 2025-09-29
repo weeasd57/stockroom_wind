@@ -4,8 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
 import { useSubscription } from '@/providers/SubscriptionProvider';
-// No longer needed since we're using the ProfileProvider
-// import useProfileStore from '@/store/profileStore';
+import { useBackgroundProfileUpdate } from '@/providers/BackgroundProfileUpdateProvider';
 import Link from 'next/link';
 import styles from '@/styles/profile.module.css';
 import editStyles from '@/styles/editProfile.module.css';
@@ -23,6 +22,7 @@ import { DashboardSection } from '@/components/home/DashboardSection';
 import { useTheme } from '@/providers/theme-provider';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 
+// FIXED: Removed setProfile error - using background profile update system
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useSupabase();
   const { theme } = useTheme();
@@ -64,6 +64,14 @@ export default function Profile() {
   
   // Get dialog state at the component level - MUST be before any conditions
   const { isOpen, closeDialog } = useCreatePostForm();
+  
+  // Background profile update system
+  const { startBackgroundProfileUpdate, tasks } = useBackgroundProfileUpdate();
+  
+  // Check if there's an active profile update task
+  const hasActiveProfileUpdate = tasks.some(task => 
+    task.status !== 'success' && task.status !== 'error' && task.status !== 'canceled'
+  );
 
   // Debug authentication on mount
   useEffect(() => {
@@ -96,18 +104,17 @@ export default function Profile() {
         loss_posts: profile.loss_posts
       });
     } else {
-      console.log("[PROFILE] No profile data available");
     }
   }, [isAuthenticated, user, authLoading, profileLoading, profile, subscriptionInfo, subscriptionLoading]);
 
-  
   const [showEditModal, setShowEditModal] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     full_name: '',
     bio: '',
     facebook_url: '',
-    show_facebook: false,
+    telegram_url: '',
+    youtube_url: '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -135,57 +142,62 @@ export default function Profile() {
   const [discoveredCountries, setDiscoveredCountries] = useState([]);
   const [discoveredSymbols, setDiscoveredSymbols] = useState([]);
 
-  // Initialize data once when authenticated
+  // Initialize data once when authenticated - Fixed infinite loop
+  const initializationRef = useRef(false);
+  const lastProfileIdRef = useRef(null);
+  
   useEffect(() => {
     if (!isAuthenticated || !user) return;
     
     // Initialize profile store if not already done
-    if (!isInitialized) {
+    if (!isInitialized && !initializationRef.current) {
       console.log('Initializing profile data');
       initializeData(user.id);
-    } else {
-      console.log('Profile data already initialized');
+      initializationRef.current = true;
     }
+  }, [user?.id, isAuthenticated, isInitialized, initializeData]);
+
+  // Separate effect for profile data updates to prevent loops
+  useEffect(() => {
+    if (!profile || profileLoading) return;
     
-    // Force an immediate refresh to get latest experience data - only if not recently refreshed
-    const getLatestExperienceData = async () => {
-      // Check if we've already forced a refresh recently
-      // const { lastFetched } = useProfile.getState(); // Removed: Violates Rules of Hooks
-      const now = Date.now();
-      const oneMinuteAgo = now - 60 * 1000; // 1 minute ago
-      
-      // Only refresh if no data or data is older than 1 minute
-      if (!lastFetched || lastFetched < oneMinuteAgo) {
-        console.log('Forcing refresh to get latest experience data');
-        await refreshData(user.id);
-      } else {
-        console.log('Skipping initial refresh - data was recently fetched');
-      }
-    };
-    
-    getLatestExperienceData();
-    
-    // Update form data with profile details when they become available
-    if (profile && !profileLoading) {
+    // Only update form data if profile ID changed (new profile loaded)
+    if (lastProfileIdRef.current !== profile.id) {
+      console.log('Profile data loaded - updating form:', profile.username);
       setFormData({
         username: profile.username || '',
         full_name: profile.full_name || '',
         bio: profile.bio || '',
         facebook_url: profile.facebook_url || '',
-        show_facebook: profile.show_facebook || false,
+        telegram_url: profile.telegram_url || '',
+        youtube_url: profile.youtube_url || '',
       });
       setAvatarUrl(contextAvatarUrl || '/default-avatar.svg');
       setBackgroundUrl(contextBackgroundUrl || '/profile-bg.jpg');
-      
-      // Debug profile data for username display
-      console.log('[DEBUG] Profile username:', profile.username);
-      console.log('[DEBUG] Profile data for display:', {
-        username: profile.username,
-        userId: profile.id,
-        dataAvailable: !!profile
-      });
+      lastProfileIdRef.current = profile.id;
     }
-  }, [user?.id, isAuthenticated, isInitialized, lastFetched, refreshData, profile, profileLoading, contextAvatarUrl, contextBackgroundUrl]);
+  }, [profile?.id, contextAvatarUrl, contextBackgroundUrl]);
+
+  // Single refresh effect separated from form updates
+  useEffect(() => {
+    if (!isAuthenticated || !user || !profile?.id) return;
+    
+    const performRefreshIfNeeded = async () => {
+      const now = Date.now();
+      const fiveMinutesAgo = now - 5 * 60 * 1000; // 5 minutes ago
+      
+      // Force refresh if no social URLs in profile yet
+      const needsSocialRefresh = !profile?.facebook_url && !profile?.telegram_url && !profile?.youtube_url;
+      
+      // Only refresh if data is older than 5 minutes or we need social URLs  
+      if (!lastFetched || lastFetched < fiveMinutesAgo || needsSocialRefresh) {
+        console.log('Refreshing profile data');
+        await refreshData(user.id);
+      }
+    };
+    
+    performRefreshIfNeeded();
+  }, [user?.id, isAuthenticated, profile?.id]); // Minimal dependencies
 
   // Derive discovered countries and symbols from posts when posts update
   useEffect(() => {
@@ -235,58 +247,9 @@ export default function Profile() {
     }
   }, [posts]);
 
-  // Set up background refresh interval with reduced frequency
-  useEffect(() => {
-    if (user && isAuthenticated) {
-      // Don't refresh immediately if data is less than 5 minutes old
-      // const { lastFetched, isRefreshing } = useProfile.getState(); // Removed: Violates Rules of Hooks
-      const now = Date.now();
-      const fiveMinutesAgo = now - 5 * 60 * 1000; // 5 minutes in milliseconds
-      
-      if (!lastFetched || lastFetched < fiveMinutesAgo) {
-        // Only refresh if data is stale
-        console.log('Initial background refresh - data is stale or not loaded yet');
-        refreshData(user.id);
-      } else {
-        console.log('Skipping initial refresh - data is recent');
-      }
+  // Background refresh is handled in the refresh effect above - removed duplicate interval
 
-      // Set up interval for background refresh (every 5 minutes instead of 2 minutes)
-      refreshInterval.current = setInterval(() => {
-        // Get the latest lastFetched value
-        // const { lastFetched, isRefreshing } = useProfile.getState(); // Removed: Violates Rules of Hooks
-        const now = Date.now();
-        const fiveMinutesAgo = now - 5 * 60 * 1000;
-        
-        // Only refresh if not already refreshing and data is older than 5 minutes
-        if (!isRefreshing && (!lastFetched || lastFetched < fiveMinutesAgo)) {
-          console.log('Background refresh triggered');
-          refreshData(user.id);
-        } else {
-          console.log('Skipping background refresh - data is recent or refresh in progress');
-        }
-      }, 300000); // 5 minutes interval instead of 2 minutes
-    }
-
-    return () => {
-      if (refreshInterval.current) {
-        clearInterval(refreshInterval.current);
-      }
-    };
-  }, [user?.id, isAuthenticated, lastFetched, isRefreshing, refreshData]); // Depend on lastFetched and isRefreshing directly from hook
-
-  // Update form data when profile changes
-  useEffect(() => {
-    if (profile) {
-      setFormData({
-        username: profile.username || '',
-        full_name: profile.full_name || '',
-        bio: profile.bio || '',
-        facebook_url: profile.facebook_url || '',
-        show_facebook: profile.show_facebook || false,
-      });
-    }
-  }, [profile]);
+  // Form data is already updated in the profile data effect above - removed duplicate
 
   // Memoized handlers
   const handleTabChange = useCallback((tab) => {
@@ -326,7 +289,8 @@ export default function Profile() {
       full_name: profile?.full_name || '',
       bio: profile?.bio || '',
       facebook_url: profile?.facebook_url || '',
-      show_facebook: profile?.show_facebook || false,
+      telegram_url: profile?.telegram_url || '',
+      youtube_url: profile?.youtube_url || '',
     });
   }, [profile]);
 
@@ -370,9 +334,122 @@ export default function Profile() {
     setLocalSelectedStrategy(selectedStrategy);
   }, [selectedStrategy]);
 
-  // Only show loading state during initial load
-  if (authLoading || (profileLoading && !isInitialized)) {
-    return <div className={styles.loading}>Loading...</div>;
+  // Profile Skeleton Loading Component
+  const ProfileSkeleton = () => (
+    <div className={styles.profileContainer}>
+      {/* Profile Header Skeleton */}
+      <div className={`${styles.profileHeader} ${styles.skeletonGradient}`}>
+        <div className={styles.profileHeaderOverlay}>
+          <div className={styles.profileInfo}>
+            {/* Avatar Skeleton */}
+            <div className={`${styles.profileAvatar} ${styles.skeletonCircle}`}></div>
+            
+            {/* User info skeleton */}
+            <div className={styles.nameSection}>
+              <div className={`${styles.skeletonText} ${styles.skeletonTitle}`}></div>
+              <div className={`${styles.skeletonText} ${styles.skeletonSubtitle}`}></div>
+              
+              <div className={styles.profileButtons}>
+                <div className={`${styles.skeletonButton}`}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Subscription Info Skeleton */}
+      <div className={styles.subscriptionInfo}>
+        <div className={styles.subscriptionCard}>
+          <div className={styles.planHeader}>
+            <div className={`${styles.skeletonText} ${styles.skeletonPlanBadge}`}></div>
+          </div>
+          <div className={styles.modernCard}>
+            <div className={`${styles.skeletonText} ${styles.skeletonDetailsTitle}`}></div>
+            <div className={styles.detailsGrid}>
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className={styles.detailsRow}>
+                  <div className={`${styles.skeletonText} ${styles.skeletonLabel}`}></div>
+                  <div className={`${styles.skeletonText} ${styles.skeletonValue}`}></div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Progress bars skeleton */}
+            {[...Array(2)].map((_, i) => (
+              <div key={i} className={styles.progressBlock}>
+                <div className={styles.progressHeader}>
+                  <div className={`${styles.skeletonText} ${styles.skeletonProgressLabel}`}></div>
+                  <div className={`${styles.skeletonText} ${styles.skeletonProgressCount}`}></div>
+                </div>
+                <div className={styles.progressTrack}>
+                  <div className={`${styles.progressFill} ${styles.skeletonGradient}`} style={{ width: '60%' }}></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Dashboard Section Skeleton */}
+      <div style={{ margin: '2rem 0' }}>
+        <div className={`${styles.skeletonText} ${styles.skeletonSectionTitle}`}></div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+          {[...Array(4)].map((_, i) => (
+            <div key={i} style={{ 
+              padding: '1rem', 
+              borderRadius: '8px', 
+              border: '1px solid hsl(var(--border))', 
+              backgroundColor: 'hsl(var(--background))' 
+            }}>
+              <div className={`${styles.skeletonText} ${styles.skeletonCardTitle}`}></div>
+              <div className={`${styles.skeletonText} ${styles.skeletonCardValue}`}></div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Create Post Section Skeleton */}
+      <div className={styles.emptyHomeContainer}>
+        <div className={styles.createPostContainer}>
+          <div className={`${styles.skeletonText} ${styles.skeletonTitle}`}></div>
+          <div className={`${styles.skeletonText} ${styles.skeletonSubtitle}`}></div>
+          <div className={`${styles.skeletonButton}`}></div>
+        </div>
+      </div>
+
+      {/* Tabs Skeleton */}
+      <div className={styles.contentTabs}>
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className={`${styles.skeletonButton} ${styles.skeletonTab}`}></div>
+        ))}
+      </div>
+
+      {/* Content Skeleton */}
+      <div style={{ marginTop: '2rem' }}>
+        {[...Array(3)].map((_, i) => (
+          <div key={i} style={{ 
+            padding: '1rem', 
+            marginBottom: '1rem',
+            borderRadius: '8px', 
+            border: '1px solid hsl(var(--border))', 
+            backgroundColor: 'hsl(var(--background))' 
+          }}>
+            <div className={`${styles.skeletonText} ${styles.skeletonTitle}`}></div>
+            <div className={`${styles.skeletonText} ${styles.skeletonSubtitle}`}></div>
+            <div className={`${styles.skeletonText} ${styles.skeletonBio}`}></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Progressive Loading Logic
+  const showSkeleton = authLoading || (profileLoading && !isInitialized && !profile);
+  const showOptimisticData = profile && (isLoading || subscriptionLoading);
+  
+  // Show skeleton during initial load
+  if (showSkeleton) {
+    return <ProfileSkeleton />;
   }
 
   if (!isAuthenticated) {
@@ -732,6 +809,64 @@ export default function Profile() {
     }
   };
 
+  // NEW: Background Profile Update Handler (using modern background processing)
+  const handleSaveProfileBackground = async (e) => {
+    e.preventDefault();
+    setSaveError(null);
+    setAvatarUploadError(null);
+    setBackgroundUploadError(null);
+    
+    // OPTIMISTIC UPDATE: Update profile immediately for real-time UI
+    if (updateProfile && formData) {
+      console.log('🔄 Applying optimistic updates...');
+      updateProfile({
+        username: formData.username,
+        full_name: formData.full_name,
+        bio: formData.bio,
+        facebook_url: formData.facebook_url,
+        telegram_url: formData.telegram_url,
+        youtube_url: formData.youtube_url,
+      });
+    }
+    
+    // Close modal immediately for better UX
+    setShowEditModal(false);
+    
+    // Clear preview files
+    if (avatarPreview) {
+      URL.revokeObjectURL(avatarPreview);
+      setAvatarPreview(null);
+    }
+    if (backgroundPreview) {
+      URL.revokeObjectURL(backgroundPreview);
+      setBackgroundPreview(null);
+    }
+    
+    console.log('🚀 Starting background profile update...');
+    
+    // Start background profile update
+    const taskId = startBackgroundProfileUpdate({
+      profileData: formData,
+      avatarFile: avatarFile,
+      backgroundFile: backgroundFile,
+      title: "Updating Profile",
+      onSuccess: () => {
+        console.log('✅ Profile updated successfully in background!');
+        // Reset file states
+        setAvatarFile(null);
+        setBackgroundFile(null);
+        // Don't reset form data to prevent loops - the profile provider will handle updates
+      },
+      onError: (error) => {
+        console.error('❌ Profile update failed:', error);
+        setSaveError(error);
+        // Profile provider will revert changes automatically - no manual revert needed
+      }
+    });
+    
+    console.log(`📋 Background profile update task started with ID: ${taskId}`);
+  };
+
   // Update handleSaveProfile to handle image changes directly and display errors clearly
   const handleSaveProfile = async (e) => {
     e.preventDefault();
@@ -741,17 +876,14 @@ export default function Profile() {
     
     // Close modal immediately and show optimistic UI
     setShowEditModal(false);
-    
     // Show background saving indicator
     setIsSaving(true);
     setIsUploading(true);
     
-    // Optimistically update profile data in UI
-    if (profile) {
-      setProfile(prev => ({
-        ...prev,
-        ...formData
-      }));
+    // Optimistically update profile data in UI using ProfileProvider
+    if (profile && updateProfile) {
+      updateProfile({ ...formData });
+      console.log('Optimistically updated profile data in UI using ProfileProvider');
     }
     
     try {
@@ -1097,19 +1229,47 @@ export default function Profile() {
           </div>
           
           {/* Social Icons */}
-          {profile?.show_facebook && profile?.facebook_url && (
+          {(profile?.facebook_url || profile?.telegram_url || profile?.youtube_url) && (
             <div className={styles.socialIcons}>
-              <a 
-                href={profile.facebook_url} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className={styles.socialIcon}
-                aria-label="Facebook Profile"
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                </svg>
-              </a>
+              {profile?.facebook_url && (
+                <a 
+                  href={profile.facebook_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className={styles.socialIcon}
+                  aria-label="Facebook Profile"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                </a>
+              )}
+              {profile?.telegram_url && (
+                <a 
+                  href={profile.telegram_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className={styles.socialIcon}
+                  aria-label="Telegram Channel"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                  </svg>
+                </a>
+              )}
+              {profile?.youtube_url && (
+                <a 
+                  href={profile.youtube_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className={styles.socialIcon}
+                  aria-label="YouTube Channel"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                  </svg>
+                </a>
+              )}
             </div>
           )}
         </div>
@@ -1126,10 +1286,15 @@ export default function Profile() {
             )}
           </div>
           
-          {subscriptionLoading ? (
+          {subscriptionLoading && !subscriptionInfo ? (
             <div className={styles.loadingContainer}>
               <div className={styles.loadingSpinner} />
               <p>Loading subscription info...</p>
+            </div>
+          ) : subscriptionLoading && subscriptionInfo ? (
+            <div className={styles.syncingIndicator}>
+              <div className={styles.syncingSpinner} />
+              <span>Updating...</span>
             </div>
           ) : null}
           
@@ -1313,7 +1478,7 @@ export default function Profile() {
       <div className={styles.contentSection}>
         {activeTab === 'posts' && (
           <>
-            {/* زر التحقق من أسعار المنشورات */}
+            {/* Check Post Prices Button */}
             <CheckPostPricesButton userId={user?.id} />
             
             <div className={styles.filterControls}>
@@ -1590,88 +1755,78 @@ export default function Profile() {
           </div>
         )}
 
-
         {activeTab === 'strategies' && (
-          <div className={styles.strategiesContainer}>
-            {isLoading ? (
-              <div className={styles.loadingContainer}>
-                <div className={styles.loadingSpinner} />
-                <p>Loading strategies...</p>
-              </div>
-            ) : (
-              <>
-                {/* Get unique strategies from posts */}
-                {(() => {
-                  // Extract all strategies from posts and count their occurrences
-                  const strategyCounts = posts.reduce((acc, post) => {
-                    if (post.strategy) {
-                      acc[post.strategy] = (acc[post.strategy] || 0) + 1;
-                    }
-                    return acc;
-                  }, {});
-                  
-                  // Convert to array and sort by count (descending)
-                  const sortedStrategies = Object.entries(strategyCounts)
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([strategy, count]) => ({ strategy, count }));
-                  
-                  if (sortedStrategies.length === 0) {
-                    return (
-                      <div className={styles.emptyStateContainer}>
-                        <div className={styles.emptyState}>
-                          <h3>No strategies used yet</h3>
-                          <p>Create posts with trading strategies to see them here</p>
-                          <CreatePostButton />
-                        </div>
-                      </div>
-                    );
-                  }
-                  
-                  return (
-                    <div className={styles.strategiesGrid}>
-                      {sortedStrategies.map(({ strategy, count }) => (
-                        <div key={strategy} className={styles.strategyCard}>
-                          <div className={styles.strategyHeader}>
-                            <h3 className={styles.strategyName}>{strategy}</h3>
-                            <span className={styles.strategyCount}>{count} post{count !== 1 ? 's' : ''}</span>
-                          </div>
-                          <div className={styles.strategyActions}>
-                            <button 
-                              className={styles.viewPostsButton}
-                              onClick={() => {
-                                // Set the strategy filter
-                                handleStrategyChange({ target: { value: strategy } });
-                                
-                                // Switch to posts tab if not already there
-                                if (activeTab !== 'posts') {
-                                  setActiveTab('posts');
-                                }
-                                
-                                // Reset other filters for a cleaner view
-                                setSelectedStatus('');
-                                setSelectedCountry('');
-                              }}
-                            >
-                              View Posts
-                            </button>
-                            <button 
-                              className={styles.detailsButton}
-                              onClick={() => {
-                                setSelectedStrategyForDetails(strategy);
-                                setIsStrategyModalOpen(true);
-                              }}
-                            >
-                              Show Details
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+          <>
+            {/* Get unique strategies from posts */}
+            {(() => {
+              // Extract all strategies from posts and count their occurrences
+              const strategyCounts = posts.reduce((acc, post) => {
+                if (post.strategy) {
+                  acc[post.strategy] = (acc[post.strategy] || 0) + 1;
+                }
+                return acc;
+              }, {});
+              
+              // Convert to array and sort by count (descending)
+              const sortedStrategies = Object.entries(strategyCounts)
+                .sort((a, b) => b[1] - a[1])
+                .map(([strategy, count]) => ({ strategy, count }));
+              
+              if (sortedStrategies.length === 0) {
+                return (
+                  <div className={styles.emptyStateContainer}>
+                    <div className={styles.emptyState}>
+                      <h3>No strategies used yet</h3>
+                      <p>Create posts with trading strategies to see them here</p>
+                      <CreatePostButton />
                     </div>
-                  );
+                  </div>
+                );
+              }
+              
+              return (
+                <div className={styles.strategiesGrid}>
+                  {sortedStrategies.map(({ strategy, count }) => (
+                    <div key={strategy} className={styles.strategyCard}>
+                      <div className={styles.strategyHeader}>
+                        <h3 className={styles.strategyName}>{strategy}</h3>
+                        <span className={styles.strategyCount}>{count} post{count !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div className={styles.strategyActions}>
+                        <button 
+                          className={styles.viewPostsButton}
+                          onClick={() => {
+                            // Set the strategy filter
+                            handleStrategyChange({ target: { value: strategy } });
+                            
+                            // Switch to posts tab if not already there
+                            if (activeTab !== 'posts') {
+                              setActiveTab('posts');
+                            }
+                            
+                            // Reset other filters for a cleaner view
+                            setSelectedStatus('');
+                            setSelectedCountry('');
+                          }}
+                        >
+                          View Posts
+                        </button>
+                        <button 
+                          className={styles.detailsButton}
+                          onClick={() => {
+                            setSelectedStrategyForDetails(strategy);
+                            setIsStrategyModalOpen(true);
+                          }}
+                        >
+                          Show Details
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
                 })()} 
-              </>
-            )}
-          </div>
+          </>
         )}
 
         {activeTab === 'telegram' && (
@@ -1697,7 +1852,7 @@ export default function Profile() {
           <div className={editStyles.modalContent}>
             <div className={editStyles.modalHeader}>
               <h2 className={editStyles.modalTitle}>Edit Profile</h2>
-              <button className={editStyles.closeButton} onClick={handleCloseModal} disabled={isSaving}>×</button>
+              <button className={editStyles.closeButton} onClick={handleCloseModal} disabled={hasActiveProfileUpdate}>×</button>
             </div>
             
             {saveError && (
@@ -1712,7 +1867,7 @@ export default function Profile() {
               </div>
             )}
             
-            <form onSubmit={handleSaveProfile} className={editStyles.editForm}>
+            <form onSubmit={handleSaveProfileBackground} className={editStyles.editForm}>
               <div className={editStyles.formGroup}>
                 <label htmlFor="username">Username</label>
                 <input
@@ -1722,7 +1877,7 @@ export default function Profile() {
                   value={formData.username}
                   onChange={handleInputChange}
                   required
-                  disabled={isSaving}
+                  disabled={hasActiveProfileUpdate}
                   placeholder="Enter your username"
                 />
               </div>
@@ -1735,7 +1890,7 @@ export default function Profile() {
                   name="full_name"
                   value={formData.full_name}
                   onChange={handleInputChange}
-                  disabled={isSaving}
+                  disabled={hasActiveProfileUpdate}
                   placeholder="Enter your full name"
                 />
               </div>
@@ -1748,37 +1903,57 @@ export default function Profile() {
                   value={formData.bio}
                   onChange={handleInputChange}
                   rows={4}
-                  disabled={isSaving}
+                  disabled={hasActiveProfileUpdate}
                   placeholder="Tell us about yourself"
                 />
               </div>
               
               <div className={editStyles.formGroup}>
-                <div className={editStyles.facebookSection}>
-                  <div className={editStyles.checkboxGroup}>
-                    <input
-                      type="checkbox"
-                      id="show_facebook"
-                      name="show_facebook"
-                      checked={formData.show_facebook}
-                      onChange={handleInputChange}
-                      disabled={isSaving}
-                    />
-                    <label htmlFor="show_facebook">Show Facebook icon on profile</label>
-                  </div>
-                  <div className={editStyles.facebookInput}>
-                    <label htmlFor="facebook_url">Facebook URL</label>
-                    <input
-                      type="url"
-                      id="facebook_url"
-                      name="facebook_url"
-                      value={formData.facebook_url}
-                      onChange={handleInputChange}
-                      disabled={isSaving}
-                      placeholder="https://facebook.com/your-profile"
-                    />
-                  </div>
-                </div>
+                <label htmlFor="facebook_url">Facebook URL</label>
+                <input
+                  type="url"
+                  id="facebook_url"
+                  name="facebook_url"
+                  value={formData.facebook_url}
+                  onChange={handleInputChange}
+                  disabled={hasActiveProfileUpdate}
+                  placeholder="https://facebook.com/your-profile"
+                />
+                <small style={{color: 'hsl(var(--muted-foreground))', fontSize: '0.875rem', marginTop: '0.25rem', display: 'block'}}>
+                  Add your Facebook profile link to display it on your profile page
+                </small>
+              </div>
+              
+              <div className={editStyles.formGroup}>
+                <label htmlFor="telegram_url">Telegram URL</label>
+                <input
+                  type="url"
+                  id="telegram_url"
+                  name="telegram_url"
+                  value={formData.telegram_url}
+                  onChange={handleInputChange}
+                  disabled={hasActiveProfileUpdate}
+                  placeholder="https://t.me/your-channel"
+                />
+                <small style={{color: 'hsl(var(--muted-foreground))', fontSize: '0.875rem', marginTop: '0.25rem', display: 'block'}}>
+                  Add your Telegram channel/profile link to display it on your profile page
+                </small>
+              </div>
+              
+              <div className={editStyles.formGroup}>
+                <label htmlFor="youtube_url">YouTube URL</label>
+                <input
+                  type="url"
+                  id="youtube_url"
+                  name="youtube_url"
+                  value={formData.youtube_url}
+                  onChange={handleInputChange}
+                  disabled={hasActiveProfileUpdate}
+                  placeholder="https://youtube.com/@your-channel"
+                />
+                <small style={{color: 'hsl(var(--muted-foreground))', fontSize: '0.875rem', marginTop: '0.25rem', display: 'block'}}>
+                  Add your YouTube channel link to display it on your profile page
+                </small>
               </div>
               
               <div className={editStyles.formGroup}>
@@ -1814,9 +1989,9 @@ export default function Profile() {
                     type="button" 
                     className={editStyles.changeAvatarButton}
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={isSaving || avatarUploadProgress > 0}
+                    disabled={hasActiveProfileUpdate}
                   >
-                    {avatarUploadProgress > 0 ? `Uploading (${Math.round(avatarUploadProgress)}%)` : 'Change Avatar'}
+                    Change Avatar
                   </button>
                   <input
                     type="file"
@@ -1824,7 +1999,7 @@ export default function Profile() {
                     onChange={handleAvatarChange}
                     accept="image/*"
                     style={{ display: 'none' }}
-                    disabled={isSaving || avatarUploadProgress > 0}
+                    disabled={hasActiveProfileUpdate}
                   />
                 </div>
               </div>
@@ -1839,7 +2014,7 @@ export default function Profile() {
                     backgroundPosition: 'center',
                     position: 'relative'
                   }}
-                  onClick={() => backgroundUploadProgress === 0 && !isSaving && document.getElementById('background-file-input').click()}
+                  onClick={() => !hasActiveProfileUpdate && document.getElementById('background-file-input').click()}
                 >
                   {backgroundUploadProgress > 0 && (
                     <div className={editStyles.imageLoadingOverlay}>
@@ -1874,60 +2049,37 @@ export default function Profile() {
                   id="background-file-input"
                   onChange={handleBackgroundChange}
                   style={{ display: 'none' }}
-                  disabled={isSaving || backgroundUploadProgress > 0}
+                  disabled={hasActiveProfileUpdate}
                 />
                 <button 
                   type="button" 
                   className={editStyles.changeBackgroundButton}
                   onClick={() => document.getElementById('background-file-input').click()}
-                  disabled={isSaving || backgroundUploadProgress > 0}
+                  disabled={hasActiveProfileUpdate}
                 >
-                  {backgroundUploadProgress > 0 ? `Uploading (${Math.round(backgroundUploadProgress)}%)` : 'Change Background'}
+                  Change Background
                 </button>
               </div>
               
+              {/* Form Actions */}
               <div className={editStyles.formActions}>
                 <button 
                   type="button" 
                   className={editStyles.cancelButton}
                   onClick={handleCloseModal}
-                  disabled={isSaving}
+                  disabled={hasActiveProfileUpdate}
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit" 
                   className={editStyles.saveButton}
-                  disabled={isSaving}
+                  disabled={hasActiveProfileUpdate || isSaving}
                 >
-                  {isSaving ? 'Saving...' : 'Save Changes'}
+                  {hasActiveProfileUpdate || isSaving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-      
-      {/* Create Post Dialog - rendered directly in the component */}
-      {isOpen && (
-        <div className="dialog-overlay">
-          <div className="dialog-content">
-            <div className="dialog-header">
-              <h2>Create Post</h2>
-              <button 
-                className="dialog-close-button" 
-                onClick={closeDialog}
-                aria-label="Close dialog"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            </div>
-            <div className="dialog-body">
-              <CreatePostForm />
-            </div>
           </div>
         </div>
       )}

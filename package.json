@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "setup-db": "node setup.js",
-    "clean": "rimraf .next && next clean"
+    "clean": "rimraf .next && next clean",
+    "telegram:update-webhook": "node scripts/update-telegram-webhook.js"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.3",

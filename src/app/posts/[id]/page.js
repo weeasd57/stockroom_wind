@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { getPostById } from '@/utils/supabase';
 import styles from '@/styles/PostDetails.module.css';
@@ -33,6 +33,10 @@ function formatDate(dateString) {
   });
 }
 
+// Local cache for post data
+const postCache = new Map();
+const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
+
 export default function PostDetailsPage() {
   const { id } = useParams();
   const [post, setPost] = useState(null);
@@ -42,6 +46,8 @@ export default function PostDetailsPage() {
   const [showAllHistory, setShowAllHistory] = useState(false);
   const { user } = useSupabase();
   const { profile } = useProfile();
+  const hasFetchedRef = useRef(false);
+  const controllerRef = useRef(null);
   
   // Get country code for flag display
   const getCountryCode = (post) => {
@@ -202,8 +208,28 @@ export default function PostDetailsPage() {
   };
   
   useEffect(() => {
+    // Prevent double-fetch in React Strict Mode
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
+
+    // Cancel previous request if any
+    if (controllerRef.current) {
+      controllerRef.current.abort();
+    }
+    controllerRef.current = new AbortController();
+
     async function fetchPost() {
       try {
+        // Check cache first
+        const cacheKey = `post_${id}`;
+        const cached = postCache.get(cacheKey);
+        if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
+          console.log('[POST-DETAILS] Using cached post data');
+          setPost(cached.data);
+          setLoading(false);
+          return;
+        }
+
         setLoading(true);
         const { data, error } = await getPostById(id);
         
@@ -226,12 +252,19 @@ export default function PostDetailsPage() {
             data.price_checks = [];
           }
           
+          // Cache the post data
+          postCache.set(cacheKey, {
+            data,
+            timestamp: Date.now()
+          });
+          
           console.log('Fetched post data:', data);
           setPost(data);
         } else {
           setError('Post not found');
         }
       } catch (err) {
+        if (err.name === 'AbortError') return; // Ignore aborted requests
         console.error('Error fetching post:', err);
         setError(err.message || 'Failed to load post');
       } finally {
@@ -242,9 +275,15 @@ export default function PostDetailsPage() {
     if (id) {
       fetchPost();
     }
+
+    return () => {
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+      }
+    };
   }, [id]);
   
-  if (loading) {
+  if (loading && !post) {
     return (
       <div className={styles.container}>
         <div className={styles.loadingContainer}>
@@ -287,10 +326,16 @@ export default function PostDetailsPage() {
     }
   }
   
-  const countryCode = getCountryCode(post);
-  const priceChange = calculatePriceChange(post.initial_price || post.current_price, post.last_price);
-  const progress = calculateProgress(post);
-  const priceHistory = formatPriceHistory(post.price_checks);
+  // Memoize expensive calculations
+  const countryCode = useMemo(() => getCountryCode(post), [post?.symbol, post?.country, post?.exchange]);
+  const priceChange = useMemo(() => 
+    calculatePriceChange(post?.initial_price || post?.current_price, post?.last_price),
+    [post?.initial_price, post?.current_price, post?.last_price]
+  );
+  const progress = useMemo(() => calculateProgress(post), 
+    [post?.initial_price, post?.current_price, post?.last_price, post?.target_price]
+  );
+  const priceHistory = useMemo(() => formatPriceHistory(post?.price_checks), [post?.price_checks]);
   
   console.log('Price history:', priceHistory);
   
@@ -570,7 +615,7 @@ export default function PostDetailsPage() {
             <Comments 
               postId={post.id}
               initialCommentCount={post.comment_count || 0}
-              autoFetchOnMount={true}
+              autoFetchOnMount={false}
             />
           </CommentProvider>
         </div>

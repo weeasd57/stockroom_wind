@@ -18,6 +18,20 @@
   animation: pulse 2s infinite;
 }
 
+/* Short-height screens (small laptops) */
+@media (max-height: 700px) {
+  .dialog {
+    max-height: 78vh;
+  }
+  .dialogContent {
+    max-height: calc(78vh - 120px);
+    padding: 16px 20px;
+  }
+  .dialogActions {
+    padding: 16px 20px;
+  }
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 0.7; }
   50% { opacity: 0.4; }
@@ -56,11 +70,63 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
+.telegramButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Unsubscribe Button */
+.unsubscribeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(220, 38, 38, 0.3);
+  min-width: 180px;
+  width: 100%;
+  max-width: 300px;
+  position: relative;
+  overflow: hidden;
+}
+
+.unsubscribeButton:hover {
+  background: linear-gradient(135deg, #b91c1c, #dc2626);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), 0 2px 4px rgba(220, 38, 38, 0.4);
+}
+
+.unsubscribeButton:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.unsubscribeButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .telegramIcon {
   width: 20px;
   height: 20px;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
   flex-shrink: 0;
+}
+
+.dangerButton {
+  background: linear-gradient(135deg, #dc2626, #ef4444) !important;
+}
+
+.dangerButton:hover {
+  background: linear-gradient(135deg, #b91c1c, #dc2626) !important;
 }
 
 .buttonText {
@@ -338,12 +404,12 @@
 
 .dialogActions {
   display: flex;
-  gap: 16px;
-  justify-content: flex-end;
-  padding: 20px 24px;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
   background: rgba(0, 0, 0, 0.02);
   border-top: 1px solid rgba(0, 0, 0, 0.1);
-  flex-shrink: 0; /* Prevent shrinking */
+  flex-shrink: 0;
   position: sticky;
   bottom: 0;
   backdrop-filter: blur(8px);
@@ -360,103 +426,50 @@
 }
 
 .confirmButton {
-  background: linear-gradient(135deg, #1a73e8, #4285f4);
+  background: linear-gradient(135deg, #0088cc, #00a0e9);
   color: white;
   border: none;
-  padding: 14px 28px;
-  border-radius: 10px;
-  font-size: 15px;
+  padding: 16px 32px;
+  border-radius: 12px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-width: 140px;
-  box-shadow: 0 3px 6px rgba(26, 115, 232, 0.3);
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  box-shadow: 0 4px 12px rgba(0, 136, 204, 0.4);
+  position: relative;
+  overflow: hidden;
 }
 
 .buttonIcon {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   flex-shrink: 0;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
 }
 
 .confirmButton:hover {
-  background: linear-gradient(135deg, #1557b0, #3367d6);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(26, 115, 232, 0.4);
+  background: linear-gradient(135deg, #006ba6, #0088cc);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 20px rgba(0, 136, 204, 0.5);
 }
 
 .confirmButton:active {
-  transform: translateY(0);
-  box-shadow: 0 3px 6px rgba(26, 115, 232, 0.3);
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 8px rgba(0, 136, 204, 0.4);
 }
 
 .confirmButton:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.2);
+  box-shadow: 0 0 0 4px rgba(0, 136, 204, 0.3), 0 4px 12px rgba(0, 136, 204, 0.4);
 }
 
-.cancelButton:active {
-  transform: translateY(0);
-}
-
-.cancelButton:focus {
-  outline: none;
-}
-
-.lightCancelButton:focus {
-  box-shadow: 0 0 0 2px hsl(var(--ring));
-}
-
-.darkCancelButton:focus {
-  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.5);
-}
-
-.cancelButton {
-  padding: 14px 24px;
-  border-radius: 10px;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-width: 100px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.lightCancelButton {
-  background: hsl(var(--secondary));
-  color: hsl(var(--secondary-foreground));
-  border: 1px solid hsl(var(--border));
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.lightCancelButton:hover {
-  background: hsl(var(--muted));
-  color: hsl(var(--foreground));
-  border-color: hsl(var(--ring));
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-.darkCancelButton {
-  background: #333;
-  color: #ccc;
-  border: 1px solid #444;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.darkCancelButton:hover {
-  background: #444;
-  color: #ffffff;
-  border-color: #555;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
-}
+/* Cancel button removed - using only X button in header */
 
 /* Animations */
 @keyframes fadeIn {
@@ -480,6 +493,38 @@
 }
 
 /* Responsive Design */
+@media (max-width: 1024px) {
+  .dialog {
+    max-width: 560px;
+    width: 95%;
+  }
+  .dialogActions {
+    gap: 14px;
+  }
+  .confirmButton {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .dialog {
+    max-width: 480px;
+    width: 95%;
+  }
+  .botInfo {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .dialogActions {
+    gap: 12px;
+    padding: 20px;
+  }
+  .confirmButton {
+    width: 100%;
+    min-height: 52px;
+  }
+}
+
 @media (max-width: 480px) {
   .telegramButton {
     min-width: 160px;
@@ -507,24 +552,15 @@
   }
   
   .dialogActions {
-    flex-direction: column-reverse;
     gap: 12px;
-    padding: 16px 20px;
-  }
-  
-  .confirmButton,
-  .cancelButton {
-    width: 100%;
-    justify-content: center;
-    min-height: 48px;
-    font-size: 16px;
+    padding: 16px;
   }
   
   .confirmButton {
-    order: 1;
-  }
-  
-  .cancelButton {
-    order: 2;
+    width: 100%;
+    justify-content: center;
+    min-height: 52px;
+    font-size: 15px;
+    padding: 14px 24px;
   }
 }

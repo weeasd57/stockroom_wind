@@ -23,10 +23,18 @@ CREATE TABLE profiles (
     background_url TEXT NOT NULL,
     experience_score INTEGER NOT NULL,
     followers INTEGER NOT NULL,
-    following INTEGER NOT NULL
+    following INTEGER NOT NULL,
+    facebook_url TEXT,
+    telegram_url TEXT,
+    youtube_url TEXT
 );
 
 CREATE INDEX idx_profiles_created_at ON profiles(created_at DESC);
+
+-- Add comments for documentation  
+COMMENT ON COLUMN profiles.facebook_url IS 'Facebook profile URL for the user';
+COMMENT ON COLUMN profiles.telegram_url IS 'Telegram profile URL for the user';
+COMMENT ON COLUMN profiles.youtube_url IS 'YouTube channel URL for the user';
 
 -- ===================================================================
 -- Table: POSTS (2 rows)
@@ -177,6 +185,181 @@ CREATE TABLE notifications (
 
 CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+
+-- ===================================================================
+-- Table: TELEGRAM_BOTS (Telegram Bot Configuration)
+-- ===================================================================
+-- Each user can have one Telegram bot for their subscribers
+CREATE TABLE telegram_bots (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+    bot_token TEXT NOT NULL, -- Telegram bot token
+    bot_username VARCHAR(255) NOT NULL, -- @username of the bot
+    bot_name VARCHAR(255) NOT NULL, -- Display name of the bot
+    webhook_url TEXT, -- Webhook URL for receiving messages
+    description TEXT, -- Bot description
+    welcome_message TEXT DEFAULT 'Welcome to our trading insights! You will receive notifications when new posts are published.',
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    UNIQUE(user_id), -- One bot per user
+    UNIQUE(bot_token), -- Each bot token is unique
+    UNIQUE(bot_username) -- Each bot username is unique
+);
+
+CREATE INDEX idx_telegram_bots_user_id ON telegram_bots(user_id);
+CREATE INDEX idx_telegram_bots_active ON telegram_bots(is_active);
+
+-- ===================================================================
+-- Table: TELEGRAM_SUBSCRIBERS (Telegram Bot Subscribers)
+-- ===================================================================
+-- Users who subscribed to a broker's Telegram bot
+CREATE TABLE telegram_subscribers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    bot_id UUID REFERENCES telegram_bots(id) ON DELETE CASCADE NOT NULL,
+    telegram_user_id BIGINT NOT NULL, -- Telegram user ID (from Telegram API)
+    telegram_username VARCHAR(255), -- Telegram @username (optional)
+    telegram_first_name VARCHAR(255), -- First name from Telegram
+    telegram_last_name VARCHAR(255), -- Last name from Telegram
+    platform_user_id UUID REFERENCES profiles(id) ON DELETE SET NULL, -- Link to platform user (if registered)
+    language_code VARCHAR(10) DEFAULT 'en', -- User's language preference
+    is_active BOOLEAN DEFAULT TRUE,
+    subscribed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    last_activity TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    UNIQUE(bot_id, telegram_user_id) -- One subscription per Telegram user per bot
+);
+
+CREATE INDEX idx_telegram_subscribers_bot_id ON telegram_subscribers(bot_id);
+CREATE INDEX idx_telegram_subscribers_telegram_user_id ON telegram_subscribers(telegram_user_id);
+CREATE INDEX idx_telegram_subscribers_platform_user_id ON telegram_subscribers(platform_user_id);
+CREATE INDEX idx_telegram_subscribers_active ON telegram_subscribers(is_active);
+
+-- ===================================================================
+-- Table: TELEGRAM_NOTIFICATION_SETTINGS (Notification Preferences)
+-- ===================================================================
+-- Notification preferences for each subscriber
+CREATE TABLE telegram_notification_settings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subscriber_id UUID REFERENCES telegram_subscribers(id) ON DELETE CASCADE NOT NULL,
+    notify_new_posts BOOLEAN DEFAULT TRUE,
+    notify_price_updates BOOLEAN DEFAULT TRUE,
+    notify_target_reached BOOLEAN DEFAULT TRUE,
+    notify_stop_loss BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    UNIQUE(subscriber_id)
+);
+
+CREATE INDEX idx_telegram_notification_settings_subscriber_id ON telegram_notification_settings(subscriber_id);
+
+-- ===================================================================
+-- Table: TELEGRAM_BROADCASTS (Broadcast Campaigns)
+-- ===================================================================
+-- Broadcast campaigns sent by brokers to their subscribers
+CREATE TABLE telegram_broadcasts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    bot_id UUID REFERENCES telegram_bots(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL, -- The broker sending the broadcast
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    broadcast_type VARCHAR(50) DEFAULT 'manual' CHECK (broadcast_type IN ('manual', 'auto_new_post', 'auto_price_update')),
+    target_audience VARCHAR(50) DEFAULT 'all' CHECK (target_audience IN ('all', 'followers', 'selected')),
+    status VARCHAR(50) DEFAULT 'draft' CHECK (status IN ('draft', 'sending', 'completed', 'failed')),
+    total_recipients INTEGER DEFAULT 0,
+    successful_sends INTEGER DEFAULT 0,
+    failed_sends INTEGER DEFAULT 0,
+    scheduled_at TIMESTAMP WITH TIME ZONE,
+    started_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    CONSTRAINT check_user_owns_bot CHECK (
+        EXISTS (SELECT 1 FROM telegram_bots tb WHERE tb.id = bot_id AND tb.user_id = telegram_broadcasts.user_id)
+    )
+);
+
+CREATE INDEX idx_telegram_broadcasts_bot_id ON telegram_broadcasts(bot_id);
+CREATE INDEX idx_telegram_broadcasts_user_id ON telegram_broadcasts(user_id);
+CREATE INDEX idx_telegram_broadcasts_status ON telegram_broadcasts(status);
+CREATE INDEX idx_telegram_broadcasts_created_at ON telegram_broadcasts(created_at DESC);
+
+-- ===================================================================
+-- Table: TELEGRAM_BROADCAST_POSTS (Posts in Broadcasts)
+-- ===================================================================
+-- Posts included in a broadcast campaign
+CREATE TABLE telegram_broadcast_posts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    broadcast_id UUID REFERENCES telegram_broadcasts(id) ON DELETE CASCADE NOT NULL,
+    post_id UUID REFERENCES posts(id) ON DELETE CASCADE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    UNIQUE(broadcast_id, post_id) -- Each post can only be included once per broadcast
+);
+
+CREATE INDEX idx_telegram_broadcast_posts_broadcast_id ON telegram_broadcast_posts(broadcast_id);
+CREATE INDEX idx_telegram_broadcast_posts_post_id ON telegram_broadcast_posts(post_id);
+
+-- ===================================================================
+-- Table: TELEGRAM_BROADCAST_RECIPIENTS (Selected Recipients)
+-- ===================================================================
+-- Specific recipients selected for a broadcast (when target_audience = 'selected')
+CREATE TABLE telegram_broadcast_recipients (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    broadcast_id UUID REFERENCES telegram_broadcasts(id) ON DELETE CASCADE NOT NULL,
+    subscriber_id UUID REFERENCES telegram_subscribers(id) ON DELETE CASCADE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    UNIQUE(broadcast_id, subscriber_id) -- Each subscriber can only be selected once per broadcast
+);
+
+CREATE INDEX idx_telegram_broadcast_recipients_broadcast_id ON telegram_broadcast_recipients(broadcast_id);
+CREATE INDEX idx_telegram_broadcast_recipients_subscriber_id ON telegram_broadcast_recipients(subscriber_id);
+
+-- ===================================================================
+-- Table: TELEGRAM_NOTIFICATIONS (Sent Notifications Log)
+-- ===================================================================
+-- Log of all notifications sent via Telegram
+CREATE TABLE telegram_notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    bot_id UUID REFERENCES telegram_bots(id) ON DELETE CASCADE NOT NULL,
+    subscriber_id UUID REFERENCES telegram_subscribers(id) ON DELETE CASCADE NOT NULL,
+    broadcast_id UUID REFERENCES telegram_broadcasts(id) ON DELETE SET NULL, -- NULL for individual notifications
+    post_id UUID REFERENCES posts(id) ON DELETE SET NULL, -- Related post if applicable
+    notification_type VARCHAR(50) NOT NULL CHECK (notification_type IN ('new_post', 'price_update', 'target_reached', 'stop_loss', 'broadcast')),
+    message TEXT NOT NULL,
+    telegram_message_id BIGINT, -- Message ID returned by Telegram API
+    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed', 'delivered')),
+    error_message TEXT, -- Error message if sending failed
+    sent_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    INDEX idx_telegram_notifications_bot_id (bot_id),
+    INDEX idx_telegram_notifications_subscriber_id (subscriber_id),
+    INDEX idx_telegram_notifications_status (status),
+    INDEX idx_telegram_notifications_sent_at (sent_at DESC),
+    INDEX idx_telegram_notifications_type (notification_type)
+);
+
+-- ===================================================================
+-- Table: TELEGRAM_BOT_COMMANDS (Available Bot Commands)
+-- ===================================================================
+-- Commands available in each Telegram bot
+CREATE TABLE telegram_bot_commands (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    bot_id UUID REFERENCES telegram_bots(id) ON DELETE CASCADE NOT NULL,
+    command VARCHAR(50) NOT NULL, -- e.g., 'start', 'help', 'subscribe', 'unsubscribe'
+    description TEXT NOT NULL,
+    response_message TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    UNIQUE(bot_id, command) -- Each command is unique per bot
+);
+
+CREATE INDEX idx_telegram_bot_commands_bot_id ON telegram_bot_commands(bot_id);
+CREATE INDEX idx_telegram_bot_commands_active ON telegram_bot_commands(is_active);
 
 
 
@@ -437,7 +620,7 @@ SELECT
     COALESCE(sell_counts.sell_count, 0) as sell_count,
     COALESCE(comment_counts.comment_count, 0) as comment_count
 FROM public.posts p
-LEFT JOIN (
+LEFT JOIN (`
     SELECT 
         post_id,
         COUNT(CASE WHEN action_type = 'buy' THEN 1 END) as buy_count

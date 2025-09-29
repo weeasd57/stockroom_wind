@@ -266,6 +266,50 @@ export function ProfileProvider({ children }) {
     }
   }, [user?.id, refreshData]);
 
+  // Realtime: keep profile data in sync with DB updates
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const profileChannel = supabase
+        .channel(`profile-data-${user.id}`)
+        // UPDATE profile data (including social URLs)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`
+        }, (payload) => {
+          console.log('[PROFILE] Profile updated in real-time:', payload.new);
+          const updatedProfile = payload.new;
+          
+          // Update profile state immediately
+          setProfile(prev => {
+            if (!prev) return updatedProfile;
+            return { ...prev, ...updatedProfile };
+          });
+          
+          // Update avatar and background URLs if changed
+          if (updatedProfile.avatar_url && updatedProfile.avatar_url !== avatarUrl) {
+            setAvatarUrl(updatedProfile.avatar_url);
+            if (typeof window !== 'undefined' && window.imageCacheManager) {
+              window.imageCacheManager.setAvatarUrl(user.id, updatedProfile.avatar_url);
+            }
+          }
+          
+          if (updatedProfile.background_url && updatedProfile.background_url !== backgroundUrl) {
+            setBackgroundUrl(updatedProfile.background_url);
+          }
+        })
+        .subscribe();
+
+      return () => {
+        try { profileChannel.unsubscribe(); } catch {}
+      };
+    } catch (e) {
+      console.warn('[PROFILE] Failed to subscribe to realtime profile updates:', e);
+    }
+  }, [user?.id, avatarUrl, backgroundUrl]);
+
   // Update global state when local state changes
   useEffect(() => {
     globalProfileState.lastFetched = lastFetched;

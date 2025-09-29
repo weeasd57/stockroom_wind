@@ -132,19 +132,112 @@
   padding: 2rem 1rem;
 }
 
+/* Social Icons Overlay (bottom-right over background) */
+.socialIcons {
+  position: absolute;
+  bottom: clamp(8px, 1.5vw, 16px);
+  right: clamp(8px, 1.5vw, 16px);
+  display: flex;
+  gap: clamp(6px, 1.2vw, 12px);
+  z-index: 50; /* Make sure they're above everything */
+  pointer-events: auto; /* Ensure they're clickable */
+}
+
+.socialIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(36px, 5vw, 48px);
+  height: clamp(36px, 5vw, 48px);
+  background-color: rgba(255, 255, 255, 0.95); /* More opaque */
+  border-radius: 50%;
+  color: #1877f2; /* Default Facebook blue */
+  text-decoration: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); /* Stronger shadow */
+  backdrop-filter: blur(12px);
+  border: 3px solid rgba(255, 255, 255, 0.4); /* Stronger border */
+  cursor: pointer;
+}
+
+.socialIcon svg {
+  width: 60%;
+  height: 60%;
+}
+
+.socialIcon:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  color: white;
+}
+
+/* Facebook specific styles */
+.socialIcon[aria-label="Facebook Profile"] {
+  color: #1877f2;
+}
+.socialIcon[aria-label="Facebook Profile"]:hover {
+  background-color: #1877f2;
+}
+
+/* Telegram specific styles */
+.socialIcon[aria-label="Telegram Channel"] {
+  color: #0088cc;
+}
+.socialIcon[aria-label="Telegram Channel"]:hover {
+  background-color: #0088cc;
+}
+
+/* YouTube specific styles */
+.socialIcon[aria-label="YouTube Channel"] {
+  color: #ff0000;
+}
+.socialIcon[aria-label="YouTube Channel"]:hover {
+  background-color: #ff0000;
+}
+
+:global(.dark) .socialIcon {
+  background-color: rgba(45, 45, 45, 0.9);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Dark mode Facebook */
+:global(.dark) .socialIcon[aria-label="Facebook Profile"] {
+  color: #1877f2;
+}
+:global(.dark) .socialIcon[aria-label="Facebook Profile"]:hover {
+  background-color: #1877f2;
+  color: white;
+}
+
+/* Dark mode Telegram */
+:global(.dark) .socialIcon[aria-label="Telegram Channel"] {
+  color: #0088cc;
+}
+:global(.dark) .socialIcon[aria-label="Telegram Channel"]:hover {
+  background-color: #0088cc;
+  color: white;
+}
+
+/* Dark mode YouTube */
+:global(.dark) .socialIcon[aria-label="YouTube Channel"] {
+  color: #ff0000;
+}
+:global(.dark) .socialIcon[aria-label="YouTube Channel"]:hover {
+  background-color: #ff0000;
+  color: white;
+}
+
 /* Background Image */
 .profileBackground {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 250px;
+  width: 100%;
+  height: 280px;
   background-size: cover;
   background-position: center;
-  border-radius: 0 0 15px 15px;
-  z-index: 0;
-  box-shadow: inset 0 -10px 10px -10px rgba(0, 0, 0, 0.1);
+  background-repeat: no-repeat;
+  border-radius: 24px;
+  margin-bottom: 0; /* Remove gap between background and content */
   background-color: hsl(var(--muted));
+  position: relative; /* Make it relative for social icons positioning */
 }
 
 .profileBackground.skeletonGradient {
@@ -184,7 +277,7 @@
 /* Profile Header */
 .profileHeader {
   position: relative;
-  margin-top: 180px;
+  margin-top: -40px; /* Overlap with background to reduce gap */
   padding: 2rem;
   padding-top: 5rem;
   background-color: hsl(var(--card));
@@ -558,6 +651,7 @@
 /* Media Queries */
 @media (max-width: 768px) {
   .profileHeader {
+    margin-top: -30px; /* Adjust for tablet */
     padding: 1.5rem;
     padding-top: 4.5rem;
   }
@@ -583,14 +677,13 @@
   }
   
   .profileHeader {
-    margin-top: 150px;
+    margin-top: -20px; /* Adjust for mobile */
     padding: 1.25rem;
     padding-top: 4rem;
   }
   
   .profileAvatar {
     width: 100px;
-    height: 100px;
     top: -50px;
     border-width: 3px;
   }
