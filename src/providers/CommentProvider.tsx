@@ -26,6 +26,7 @@ interface CommentContextType {
   toggleSellVote: (postId: string, currentAction?: 'buy' | 'sell' | null) => Promise<void>;
   startPolling: (postId: string) => void;
   stopPolling: () => void;
+  subscribeToPost: (postId: string) => void;
 }
 
 const CommentContext = createContext<CommentContextType | null>(null);
@@ -43,79 +44,81 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
 
   // Subscribe to real-time updates for a specific post
   const subscribeToPost = useCallback((postId: string) => {
-    if (subscriptions[postId] || !supabase) return;
+    if (!supabase) return;
     if (!isValidUUID(postId) || isTempId(postId)) return;
 
-    // Use a single channel per post for both comments and votes
-    const channel = supabase
-      .channel(`post-${postId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'comments',
-          filter: `post_id=eq.${postId}`
-        },
-        async (payload) => {
-          console.log('Comments change:', payload);
-          // Always refresh counts; refresh comment list only if already loaded to avoid heavy fetches in feeds
-          await updatePostStats(postId);
-          if (loadedCommentsPosts.has(postId)) {
-            await fetchCommentsForPost(postId);
+    // Check if already subscribed using a closure-safe check
+    setSubscriptions(prev => {
+      if (prev[postId]) {
+        console.log('[CommentProvider] Already subscribed to post:', postId);
+        return prev;
+      }
+
+      console.log('[CommentProvider] Creating new subscription for post:', postId);
+      
+      // Use a single channel per post for both comments and votes
+      const channel = supabase
+        .channel(`post-${postId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'comments',
+            filter: `post_id=eq.${postId}`
+          },
+          async (payload) => {
+            console.log('Comments change:', payload);
+            // Always refresh counts; refresh comment list only if already loaded to avoid heavy fetches in feeds
+            await updatePostStats(postId);
+            setLoadedCommentsPosts(loaded => {
+              if (loaded.has(postId)) {
+                fetchCommentsForPost(postId);
+              }
+              return loaded;
+            });
           }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'post_actions',
-          filter: `post_id=eq.${postId}`
-        },
-        async (payload) => {
-          console.log('Post actions change:', payload);
-          await updatePostStats(postId);
-        }
-      )
-      .subscribe();
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'post_actions',
+            filter: `post_id=eq.${postId}`
+          },
+          async (payload) => {
+            console.log('Post actions change:', payload);
+            await updatePostStats(postId);
+          }
+        )
+        .subscribe();
 
-    setSubscriptions(prev => ({
-      ...prev,
-      [postId]: { channel }
-    }));
-  }, [supabase, subscriptions, loadedCommentsPosts]);
+      return {
+        ...prev,
+        [postId]: { channel }
+      };
+    });
+  }, [supabase]);
 
-  // Update post statistics
+  // Update post statistics (single lightweight query against posts_with_stats)
   const updatePostStats = useCallback(async (postId: string) => {
     if (!supabase || !isValidUUID(postId) || isTempId(postId)) return;
 
     try {
-      const [commentsResponse, buyVotesResponse, sellVotesResponse] = await Promise.all([
-        supabase
-          .from('comments')
-          .select('id', { count: 'exact', head: true })
-          .eq('post_id', postId),
-        supabase
-          .from('post_actions')
-          .select('id', { count: 'exact', head: true })
-          .eq('post_id', postId)
-          .eq('action_type', 'buy'),
-        supabase
-          .from('post_actions')
-          .select('id', { count: 'exact', head: true })
-          .eq('post_id', postId)
-          .eq('action_type', 'sell')
-      ]);
+      const { data, error } = await supabase
+        .from('posts_with_stats')
+        .select('buy_count, sell_count, comment_count')
+        .eq('id', postId)
+        .single();
+
+      if (error) throw error;
 
       const stats: PostStats = {
-        commentCount: (commentsResponse.count as number) || 0,
-        buyCount: (buyVotesResponse.count as number) || 0,
-        sellCount: (sellVotesResponse.count as number) || 0
+        commentCount: Number(data?.comment_count) || 0,
+        buyCount: Number(data?.buy_count) || 0,
+        sellCount: Number(data?.sell_count) || 0
       };
-
-      // Stats updated silently
 
       setPostStats(prev => ({
         ...prev,
@@ -131,19 +134,82 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
     if (!supabase || !isValidUUID(postId) || isTempId(postId)) return;
 
     try {
-      const { data, error } = await supabase
+      console.log('[CommentProvider] Fetching comments for post:', postId);
+      
+      // Try to fetch from view first
+      let { data, error } = await supabase
         .from('comments_with_user_info')
         .select('*')
         .eq('post_id', postId)
         .order('created_at', { ascending: true });
 
-      console.debug("Comments fetched for post:", postId, data);
+      console.log('[CommentProvider] Comments fetched from view:', {
+        postId,
+        count: data?.length || 0,
+        comments: data,
+        error: error?.message
+      });
 
-      if (error) throw error;
+      // If view fails or returns no data but we know there should be comments,
+      // try fetching directly from comments table with manual profile join
+      if (error || (!data || data.length === 0)) {
+        console.log('[CommentProvider] Trying direct fetch from comments table...');
+        
+        const { data: directData, error: directError } = await supabase
+          .from('comments')
+          .select(`
+            *,
+            profiles!user_id (
+              username,
+              avatar_url,
+              full_name
+            )
+          `)
+          .eq('post_id', postId)
+          .order('created_at', { ascending: true });
+
+        if (directError) {
+          console.error('[CommentProvider] Direct fetch error:', directError);
+          throw directError;
+        }
+
+        // Map the data to match the view structure
+        data = directData?.map((comment: any) => ({
+          ...comment,
+          username: comment.profiles?.username || 'Unknown User',
+          avatar_url: comment.profiles?.avatar_url,
+          full_name: comment.profiles?.full_name || 'Unknown User'
+        })) || [];
+
+        console.log('[CommentProvider] Direct fetch successful:', {
+          postId,
+          count: data.length
+        });
+      }
+
+      if (error) {
+        console.error('[CommentProvider] Error fetching comments:', error);
+        throw error;
+      }
+
+      // Handle empty data array
+      if (!data || data.length === 0) {
+        console.log('[CommentProvider] No comments found for post:', postId);
+        // Clear comments for this post
+        setComments(prev => prev.filter(c => c.post_id !== postId));
+        // Update stats to reflect zero comments
+        await updatePostStats(postId);
+        return;
+      }
 
       // Group comments by parent_comment_id for nested structure
       const topLevelComments = data.filter(comment => !comment.parent_comment_id);
       const replies = data.filter(comment => comment.parent_comment_id);
+      
+      console.log('[CommentProvider] Grouped comments:', {
+        topLevel: topLevelComments.length,
+        replies: replies.length
+      });
       
       // Add replies to their parent comments
       const formattedComments = topLevelComments.map(comment => ({
@@ -151,18 +217,15 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
         replies: replies.filter(reply => reply.parent_comment_id === comment.id)
       }));
 
-      // Comments fetched silently
+      console.log('[CommentProvider] Formatted comments:', formattedComments.length);
 
       // Update comments state, replacing existing comments for this post
       setComments(prev => {
         const filtered = prev.filter(c => c.post_id !== postId);
         const newComments = [...filtered, ...formattedComments];
-        // Comments state updated silently
+        console.log('[CommentProvider] Updated comments state, total comments:', newComments.length);
         return newComments;
       });
-
-      // Ensure realtime subscription is active for this post
-      subscribeToPost(postId);
 
       // Mark this post's comments as loaded to allow realtime refreshes
       setLoadedCommentsPosts(prev => {
@@ -177,7 +240,7 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
       console.error('Error fetching comments:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch comments');
     }
-  }, [supabase, updatePostStats, subscribeToPost]);
+  }, [supabase, updatePostStats]);
 
   const addComment = async (postId: string, content: string): Promise<Comment> => {
     if (!supabase || !user) throw new Error('Not authenticated');
@@ -366,22 +429,19 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
         clearInterval(currentInterval);
       }
       
-      // Set up new polling every 10 seconds
-      console.log(`⏰ Setting up interval for post: ${postId} (10s)`);
+      // Set up new polling every 15 seconds for lightweight stats only
+      console.log(`⏰ Setting up interval for post: ${postId} (15s, stats only)`);
       const newInterval = setInterval(async () => {
-        console.log(`🔄 Polling cycle for post: ${postId}`);
         try {
-          await fetchCommentsForPost(postId);
           await updatePostStats(postId);
-          console.log(`✅ Polling cycle completed for post: ${postId}`);
         } catch (error) {
           console.error(`❌ Polling error for post ${postId}:`, error);
         }
-      }, 10000);
+      }, 15000);
       
       return newInterval;
     });
-  }, [supabase, fetchCommentsForPost, updatePostStats]);
+  }, [supabase, updatePostStats]);
 
   const stopPolling = useCallback(() => {
     if (pollingInterval) {
@@ -519,7 +579,8 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
       toggleBuyVote,
       toggleSellVote,
       startPolling,
-      stopPolling
+      stopPolling,
+      subscribeToPost
     }}>
       {children}
     </CommentContext.Provider>

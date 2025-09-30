@@ -84,6 +84,17 @@ ALTER TABLE posts
 ALTER TABLE posts
   ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'open';
 
+-- Add constraint to prevent both target_reached and stop_loss_triggered from being true at the same time
+ALTER TABLE posts
+  ADD CONSTRAINT chk_target_or_stoploss 
+  CHECK (
+    NOT (target_reached = TRUE AND stop_loss_triggered = TRUE)
+  );
+
+-- Add a comment explaining the constraint
+COMMENT ON CONSTRAINT chk_target_or_stoploss ON posts IS 
+'Ensures that a post cannot have both target_reached and stop_loss_triggered set to true simultaneously. Only one outcome can occur.';
+
 -- ===================================================================
 -- Table: USER_STRATEGIES (0 rows)
 -- ===================================================================

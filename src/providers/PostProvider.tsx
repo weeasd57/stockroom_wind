@@ -367,8 +367,11 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     posts,
     feedPosts: useMemo(() => {
       if (excludeSelf && user?.id) {
-        return posts.filter((p: any) => p?.user_id !== user.id);
+        const filtered = posts.filter((p: any) => p?.user_id !== user.id);
+        console.log(`[PostProvider] Filtering out current user posts. Total: ${posts.length}, After filter: ${filtered.length}, User ID: ${user.id}`);
+        return filtered;
       }
+      console.log(`[PostProvider] Not filtering posts. ExcludeSelf: ${excludeSelf}, Total: ${posts.length}`);
       return posts;
     }, [posts, excludeSelf, user?.id]),
     myPosts: useMemo(() => {

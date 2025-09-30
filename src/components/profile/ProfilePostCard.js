@@ -175,11 +175,11 @@ export const ProfilePostCard = ({ post = {} }) => {
           </div>
         )}
         
-        {/* Text-based progress indicator with percentage difference */}
-        {!post.closed && post.last_price && post.target_price && !post.target_reached && (() => {
+        {/* Text-based progress indicator with percentage difference (use current_price) */}
+        {!post.closed && post.current_price && post.target_price && !post.target_reached && (() => {
           // Parse values as numbers to ensure correct calculation
           const initialPrice = parseFloat(post.initial_price || post.current_price);
-          const currentPrice = parseFloat(post.last_price);
+          const currentPrice = parseFloat(post.current_price);
           const targetPrice = parseFloat(post.target_price);
           const isUpwardTarget = targetPrice > initialPrice;
           
@@ -224,12 +224,7 @@ export const ProfilePostCard = ({ post = {} }) => {
             </div>
           );
         })()}
-      </div>
       
-      {/* Status indicator for closed posts */}
-      {post.closed && (
-        <div className={`${styles.postStatus} ${post.target_reached ? styles.successStatus : styles.dangerStatus}`}>
-          {post.target_reached ? 'Target Reached' : 'Stop Loss Triggered'}
           <span className={styles.statusDate}>
             {post.target_reached 
               ? `on ${formatDate(post.target_reached_date)} (UTC)`

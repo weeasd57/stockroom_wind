@@ -131,7 +131,7 @@ export default function PostDetailsPage() {
     }
     
     const initialPrice = parseFloat(post.initial_price || post.current_price);
-    const currentPrice = parseFloat(post.last_price);
+    const currentPrice = parseFloat(post.current_price);
     const targetPrice = parseFloat(post.target_price);
     
     if (isNaN(initialPrice) || isNaN(currentPrice) || isNaN(targetPrice)) {
@@ -283,6 +283,18 @@ export default function PostDetailsPage() {
     };
   }, [id]);
   
+  // Precompute derived values with safe fallbacks to keep hooks order consistent across renders
+  const safePost = post || {};
+  const countryCode = useMemo(() => getCountryCode(safePost), [safePost?.symbol, safePost?.country, safePost?.exchange]);
+  const priceChange = useMemo(
+    () => calculatePriceChange(safePost?.initial_price || safePost?.current_price, safePost?.current_price),
+    [safePost?.initial_price, safePost?.current_price]
+  );
+  const progress = useMemo(() => calculateProgress(safePost), 
+    [safePost?.initial_price, safePost?.current_price, safePost?.target_price]
+  );
+  const priceHistory = useMemo(() => formatPriceHistory(safePost?.price_checks), [safePost?.price_checks]);
+  
   if (loading && !post) {
     return (
       <div className={styles.container}>
@@ -316,26 +328,7 @@ export default function PostDetailsPage() {
     );
   }
   
-  // Process price_checks before using it
-  if (post.price_checks && typeof post.price_checks === 'string') {
-    try {
-      post.price_checks = JSON.parse(post.price_checks);
-    } catch (e) {
-      console.error('Error parsing price_checks in render:', e);
-      post.price_checks = [];
-    }
-  }
-  
-  // Memoize expensive calculations
-  const countryCode = useMemo(() => getCountryCode(post), [post?.symbol, post?.country, post?.exchange]);
-  const priceChange = useMemo(() => 
-    calculatePriceChange(post?.initial_price || post?.current_price, post?.last_price),
-    [post?.initial_price, post?.current_price, post?.last_price]
-  );
-  const progress = useMemo(() => calculateProgress(post), 
-    [post?.initial_price, post?.current_price, post?.last_price, post?.target_price]
-  );
-  const priceHistory = useMemo(() => formatPriceHistory(post?.price_checks), [post?.price_checks]);
+  // priceHistory already handles string/array formats via formatPriceHistory
   
   console.log('Price history:', priceHistory);
   
@@ -382,19 +375,13 @@ export default function PostDetailsPage() {
               <span className={styles.priceLabel}>Current Price:</span>
               <span className={styles.priceValue}>
                 {(() => {
-                  // أولوية للسعر الأخير إذا كان متاحاً ومحدثاً
-                  if (post.last_price && post.last_price_check) {
-                    return post.last_price;
-                  }
-                  // ثم السعر الحالي إذا كان متاحاً
+                  // Use current_price as the primary display value, then fallback to initial_price
                   if (post.current_price) {
                     return post.current_price;
                   }
-                  // وأخيراً السعر الابتدائي
                   if (post.initial_price) {
                     return post.initial_price;
                   }
-                  // إذا لم يكن هناك أي سعر
                   return 'N/A';
                 })()}
               </span>
@@ -450,7 +437,7 @@ export default function PostDetailsPage() {
             </div>
           )}
           
-          {post.last_price && (post.initial_price || post.current_price) && (
+          {post.current_price && (post.initial_price || post.current_price) && (
             <div className={styles.priceChangeContainer}>
               <span className={styles.priceChangeLabel}>Price Change:</span>
               <span className={`${styles.priceChangeValue} ${priceChange.isPositive ? styles.positive : styles.negative}`}>
@@ -459,7 +446,7 @@ export default function PostDetailsPage() {
             </div>
           )}
           
-          {!post.closed && post.last_price && post.target_price && !post.target_reached && (
+          {!post.closed && post.current_price && post.target_price && !post.target_reached && (
             <div className={styles.progressContainer}>
               <div className={styles.progressHeader}>
                 <span className={styles.progressLabel}>Progress to Target:</span>

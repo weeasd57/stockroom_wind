@@ -10,9 +10,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 2147483646; /* Just below the portal container but still on top of everything else */
   padding: 20px;
   animation: fadeIn 0.2s ease-out;
+  pointer-events: auto; /* Ensure overlay is interactive */
 }
 
 @keyframes fadeIn {

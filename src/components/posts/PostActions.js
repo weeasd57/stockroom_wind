@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useComments } from '@/providers/CommentProvider';
 import { isValidUUID, isTempId } from '@/lib/utils';
@@ -20,12 +20,14 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
   const sellCount = postStats.sellCount || initialSellCount;
 
   // Bootstrap real-time subscriptions for this post even if comments are not opened
+  const subscribedRef = useRef(false);
   useEffect(() => {
     if (!autoSubscribe) return;
-    if (postId && isRealId) {
-      fetchCommentsForPost(postId);
-    }
-  }, [postId, fetchCommentsForPost, isRealId, autoSubscribe]);
+    if (!postId || !isRealId) return;
+    if (subscribedRef.current) return; // guard against re-running due to function identity changes
+    subscribedRef.current = true;
+    fetchCommentsForPost(postId);
+  }, [postId, isRealId, autoSubscribe]);
 
   // Check user's current vote status
   useEffect(() => {

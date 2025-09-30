@@ -227,7 +227,7 @@ function CommentItem({
 }
 
 export default function CommentsDialog({ postId, isOpen, onClose, initialCommentCount = 0 }) {
-  const { user } = useSupabase();
+  const { user, supabase } = useSupabase();
   const { 
     fetchCommentsForPost, 
     startPolling, 
@@ -236,7 +236,8 @@ export default function CommentsDialog({ postId, isOpen, onClose, initialComment
     editComment,
     getPostComments,
     getPostStats,
-    addComment
+    addComment,
+    subscribeToPost
   } = useComments();
   
   // Use provider's real-time data instead of local state
@@ -254,18 +255,41 @@ export default function CommentsDialog({ postId, isOpen, onClose, initialComment
   const [editText, setEditText] = useState('');
   const dialogRef = useRef(null);
   const commentInputRef = useRef(null);
+  const hasFetchedRef = useRef(false);
   
   // Component rendered silently
 
   // Fetch comments and start polling when dialog opens
   useEffect(() => {
+    if (!isOpen) {
+      // Reset fetch flag when dialog closes
+      hasFetchedRef.current = false;
+      setLoading(false);
+      return;
+    }
+    
     if (isOpen && postId) {
-      // Start polling when dialog opens  
+      console.log('[CommentsDialog] Dialog opened for post:', postId);
+      console.log('[CommentsDialog] Current comments in provider:', comments.length);
+      
+      // Subscribe to real-time updates for this post
+      subscribeToPost(postId);
+      
+      // Start polling for stats updates
       startPolling(postId);
       
-      // Load comments for this post if not already loaded
-      if (!getPostComments(postId) || getPostComments(postId).length === 0) {
-        fetchCommentsForPost(postId);
+      // Load comments for this post only once per dialog open
+      if (!hasFetchedRef.current) {
+        console.log('[CommentsDialog] Starting fetch for post:', postId);
+        setLoading(true);
+        hasFetchedRef.current = true;
+        
+        fetchCommentsForPost(postId).finally(() => {
+          console.log('[CommentsDialog] Fetch completed for post:', postId);
+          setLoading(false);
+        });
+      } else {
+        console.log('[CommentsDialog] Already fetched, skipping');
       }
 
       // Focus on comment input after a brief delay
@@ -275,12 +299,11 @@ export default function CommentsDialog({ postId, isOpen, onClose, initialComment
 
       // Return cleanup function that will run when dialog closes or unmounts
       return () => {
+        console.log('[CommentsDialog] Cleaning up, stopping polling');
         stopPolling();
       };
-    } else if (!isOpen) {
-      // Explicitly stop polling when dialog closes
-      stopPolling();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, postId]);
 
   // Handle click outside to close dialog
@@ -424,7 +447,14 @@ export default function CommentsDialog({ postId, isOpen, onClose, initialComment
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    console.log('[CommentsDialog] Dialog is closed, not rendering');
+    return null;
+  }
+
+  console.log('[CommentsDialog] Rendering dialog for post:', postId);
+  console.log('[CommentsDialog] Comments count:', comments.length);
+  console.log('[CommentsDialog] Comment stats:', postStats);
 
   const commentInputDirection = detectTextDirection(newComment);
 

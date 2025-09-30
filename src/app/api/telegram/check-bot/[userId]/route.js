@@ -9,6 +9,8 @@ const supabase = createClient(
 export async function GET(request, { params }) {
   try {
     const { userId } = params;
+    const url = new URL(request.url);
+    const currentUserId = url.searchParams.get('currentUserId');
 
     if (!userId) {
       return NextResponse.json(
@@ -56,6 +58,19 @@ export async function GET(request, { params }) {
       console.log('Could not fetch subscriber count:', countError);
     }
 
+    // Helper to base64url-pack UUID (36-chars -> 22-chars)
+    const packUuid = (uuid) => {
+      try {
+        const hex = String(uuid || '').replace(/-/g, '');
+        if (!/^[0-9a-fA-F]{32}$/.test(hex)) return null;
+        const bytes = new Uint8Array(hex.match(/.{1,2}/g).map((b) => parseInt(b, 16)));
+        return Buffer.from(bytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+      } catch (_) { return null; }
+    };
+
+    const b = packUuid(userId) || userId;
+    const u = currentUserId ? (packUuid(currentUserId) || currentUserId) : null;
+    const startPayload = `subscribe_${b}${u ? `_${u}` : ''}`;
     return NextResponse.json({
       hasTelegramBot: true,
       botInfo: {
@@ -63,7 +78,7 @@ export async function GET(request, { params }) {
         username: botData.bot_username,
         name: botData.bot_name,
         subscriberCount: subscriberCount,
-        subscribeLink: `https://t.me/${botData.bot_username}?start=subscribe_${userId}`
+        subscribeLink: `https://t.me/${botData.bot_username}?start=${startPayload}`
       }
     });
 

@@ -1672,7 +1672,6 @@ export const getPostById = async (postId) => {
         exchange,
         initial_price,
         current_price,
-        last_price,
         last_price_check,
         target_price,
         target_reached,
@@ -1682,10 +1681,8 @@ export const getPostById = async (postId) => {
         stop_loss_triggered_date,
         description,
         strategy,
-        sentiment,
         image_url,
         price_checks,
-        status,
         closed,
         closed_date,
         created_at,
@@ -1704,10 +1701,11 @@ export const getPostById = async (postId) => {
   }
 };
 
-// Monitor all fetch requests for performance tracking
-const originalFetch = global.fetch;
+// Monitor all fetch requests for performance tracking (install once)
+if (!global.fetch.__SUPABASE_MONITOR__) {
+  const originalFetch = global.fetch;
 
-global.fetch = async function monitoredFetch(url, options) {
+  global.fetch = async function monitoredFetch(url, options) {
   // Only monitor Supabase API calls, and exclude local Next.js API routes
   if (url && url.toString().includes('supabase.co') && !url.toString().includes('/api/')) {
     const startTime = performance.now();
@@ -1774,7 +1772,10 @@ global.fetch = async function monitoredFetch(url, options) {
   
   // For non-Supabase URLs, proceed normally without monitoring
   return originalFetch(url, options);
-};
+  };
+  // mark as installed to avoid multiple wrappings during HMR
+  try { global.fetch.__SUPABASE_MONITOR__ = true; } catch {}
+}
 
 /**
  * Debug wrapper for Supabase functions

@@ -657,29 +657,63 @@ export async function POST(request) {
           const high = parseFloat(dayData.high);
           const low = parseFloat(dayData.low);
           const close = parseFloat(dayData.close);
+          const open = parseFloat(dayData.open);
           
-          // First check if target is reached - this has priority
-          if (!targetReached && high >= targetPrice) {
+          // Check if both target and stop loss were hit on the same day
+          const targetHitToday = high >= targetPrice;
+          const stopLossHitToday = low <= stopLossPrice;
+          
+          // If both were hit on the same day, determine which happened first
+          // based on distance from open price (closer distance = hit first)
+          if (!targetReached && !stopLossTriggered && targetHitToday && stopLossHitToday) {
+            const distanceToTarget = Math.abs(targetPrice - open);
+            const distanceToStopLoss = Math.abs(stopLossPrice - open);
+            
+            if (distanceToStopLoss < distanceToTarget) {
+              // Stop loss was closer to open, so it was hit first
+              stopLossTriggered = true;
+              stopLossTriggeredDate = date;
+              if (DEBUG) console.log(`[DEBUG] Post ${post.id}: Both target and stop loss hit on ${date}, stop loss hit first (closer to open: ${open})`);
+            } else {
+              // Target was closer to open, so it was hit first
+              targetReached = true;
+              targetReachedDate = date;
+              highPrice = high;
+              
+              if (date.includes('T')) {
+                try {
+                  const dateObj = new Date(date);
+                  targetHitTime = dateObj.toTimeString().split(' ')[0];
+                } catch (e) {
+                  // If date parsing fails, leave targetHitTime as null
+                }
+              }
+              if (DEBUG) console.log(`[DEBUG] Post ${post.id}: Both target and stop loss hit on ${date}, target hit first (closer to open: ${open})`);
+            }
+            continue;
+          }
+          
+          // Check target only if not already triggered
+          if (!targetReached && targetHitToday) {
             targetReached = true;
             targetReachedDate = date;
-            highPrice = high; // Store the high price that reached the target
+            highPrice = high;
             
-            // Try to extract time if it's included in the date string
             if (date.includes('T')) {
               try {
                 const dateObj = new Date(date);
-                targetHitTime = dateObj.toTimeString().split(' ')[0]; // Format as HH:MM:SS
+                targetHitTime = dateObj.toTimeString().split(' ')[0];
               } catch (e) {
                 // If date parsing fails, leave targetHitTime as null
               }
             }
             
-            // Do not check for stop loss once target is reached
+            // Once target is reached, stop checking (success takes priority over future losses)
             continue;
           }
           
-          // Only check for stop loss if target hasn't been reached
-          if (!targetReached && !stopLossTriggered && low <= stopLossPrice) {
+          // Check stop loss only if target hasn't been reached yet
+          if (!targetReached && !stopLossTriggered && stopLossHitToday) {
             stopLossTriggered = true;
             stopLossTriggeredDate = date;
           }

@@ -24,18 +24,45 @@ async function sendTelegramMessage(chatId, text, options = {}) {
   return res.json();
 }
 
-// Extract brokerId (traderId) from commands like:
-// /start <id> OR /start subscribe_<id>
-// /subscribe <id> OR /subscribe subscribe_<id>
-function parseBrokerIdFromText(text) {
+// Extract brokerId and platformUserId from commands, supporting formats:
+// /start <id>
+// /start subscribe_<id>
+// /start subscribe_<brokerId>_<platformUserId>
+// /subscribe <...> (same formats)
+function parseStartParams(text) {
   try {
     const parts = String(text || '').trim().split(/\s+/);
     const payload = parts[1] || '';
-    if (!payload) return null;
+    if (!payload) return { brokerId: null, platformUserId: null };
     const m = payload.match(/^subscribe_(.+)$/i);
-    return m ? m[1] : payload;
+    const token = m ? m[1] : payload; // token may be "brokerId" or "brokerId_platformUserId"
+    // Split from last underscore to allow underscores inside base64url strings
+    const idx = token.lastIndexOf('_');
+    const rawBroker = idx >= 0 ? token.slice(0, idx) : token;
+    const rawUser = idx >= 0 ? token.slice(idx + 1) : null;
+
+    const decodeMaybeUuid = (s) => {
+      try {
+        const v = String(s || '').trim();
+        if (/^[0-9a-fA-F-]{36}$/.test(v)) return v.toLowerCase();
+        // try base64url 16-byte -> uuid
+        let b64 = v.replace(/-/g, '+').replace(/_/g, '/');
+        const pad = b64.length % 4 ? '='.repeat(4 - (b64.length % 4)) : '';
+        const buf = Buffer.from(b64 + pad, 'base64');
+        if (buf.length !== 16) return null;
+        const hex = [...buf].map((b) => b.toString(16).padStart(2, '0')).join('');
+        return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+      } catch (_) { return null; }
+    };
+
+    const brokerId = decodeMaybeUuid(rawBroker) || rawBroker || null;
+    const platformUserId = rawUser ? (decodeMaybeUuid(rawUser) || rawUser) : null;
+    return {
+      brokerId,
+      platformUserId
+    };
   } catch (_) {
-    return null;
+    return { brokerId: null, platformUserId: null };
   }
 }
 
@@ -83,9 +110,9 @@ async function handleMessage(supabase, message) {
   const chatId = message.chat.id;
   const text = (message.text || '').trim();
 
-  // /start <brokerId>
+  // /start <payload>
   if (text.startsWith('/start')) {
-    const brokerId = parseBrokerIdFromText(text);
+    const { brokerId, platformUserId } = parseStartParams(text);
     if (!brokerId) {
       // Generic welcome message when no broker ID provided
       const welcomeMsg = `🦈 **Welcome to SharksZone Bot!**
@@ -111,7 +138,7 @@ Happy trading! 🚀`;
       await sendTelegramMessage(chatId, '❌ Broker not found or bot not configured.\n\nPlease make sure you\'re using the correct subscription link from the website.');
       return;
     }
-    await upsertSubscription(supabase, bot.id, message.from, brokerId);
+    await upsertSubscription(supabase, bot.id, message.from, platformUserId);
     await sendTelegramMessage(chatId, `✅ **Successfully subscribed to ${bot.bot_name}!**
 
 You'll now receive notifications about:
@@ -126,9 +153,9 @@ Happy trading! 🚀`);
     return;
   }
 
-  // /subscribe <brokerId>
+  // /subscribe <payload>
   if (text.startsWith('/subscribe')) {
-    const brokerId = parseBrokerIdFromText(text);
+    const { brokerId, platformUserId } = parseStartParams(text);
     if (!brokerId) {
       await sendTelegramMessage(chatId, 'Usage: /subscribe <brokerId> (open link from the website).');
       return;
@@ -138,7 +165,7 @@ Happy trading! 🚀`);
       await sendTelegramMessage(chatId, 'Broker not found or bot not configured.');
       return;
     }
-    await upsertSubscription(supabase, bot.id, message.from, brokerId);
+    await upsertSubscription(supabase, bot.id, message.from, platformUserId);
     await sendTelegramMessage(chatId, `✅ Subscribed to ${bot.bot_name}.`);
     return;
   }

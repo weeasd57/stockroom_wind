@@ -7,7 +7,7 @@ import styles from '@/styles/Comments.module.css';
 import { createPortal } from 'react-dom';
 
 export default function Comments({ postId, initialCommentCount = 0, autoFetchOnMount = false }) {
-  const { getPostStats, fetchCommentsForPost } = useComments();
+  const { getPostStats, fetchCommentsForPost, getPostComments } = useComments();
   const [showDialog, setShowDialog] = useState(false);
   const [portalContainer, setPortalContainer] = useState(null);
 
@@ -34,9 +34,16 @@ export default function Comments({ postId, initialCommentCount = 0, autoFetchOnM
       container.style.left = '0';
       container.style.width = '100%';
       container.style.height = '100%';
-      container.style.zIndex = '10000';
+      // Ensure on top of any page overlays
+      container.style.zIndex = '2147483647';
       container.style.pointerEvents = 'none';
       document.body.appendChild(container);
+    } else {
+      // In case existing container has lower z-index from older versions
+      const currentZ = parseInt(container.style.zIndex || '0', 10);
+      if (Number.isNaN(currentZ) || currentZ < 2147483647) {
+        container.style.zIndex = '2147483647';
+      }
     }
     setPortalContainer(container);
 
@@ -67,9 +74,19 @@ export default function Comments({ postId, initialCommentCount = 0, autoFetchOnM
   }, [showDialog, portalContainer]);
 
   const handleOpenDialog = () => {
+    console.log('[Comments] Opening dialog for post:', postId);
+    console.log('[Comments] Portal container:', portalContainer);
+    console.log('[Comments] Current showDialog state:', showDialog);
     setShowDialog(true);
-    // Fetch latest comments when opening dialog
-    if (postId) {
+    if (!postId) {
+      console.warn('[Comments] No postId provided!');
+      return;
+    }
+    // Fetch only if not already loaded to avoid duplicate requests
+    const existing = getPostComments(postId);
+    console.log('[Comments] Existing comments:', existing?.length || 0);
+    if (!existing || existing.length === 0) {
+      console.log('[Comments] Fetching comments for post:', postId);
       fetchCommentsForPost(postId);
     }
   };

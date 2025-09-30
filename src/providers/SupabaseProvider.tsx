@@ -377,7 +377,31 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
     try {
       let query = supabase
         .from('posts_with_stats')
-        .select('*')
+        .select(`
+          id,
+          user_id,
+          symbol,
+          company_name,
+          country,
+          exchange,
+          initial_price,
+          current_price,
+          last_price_check,
+          target_price,
+          stop_loss_price,
+          strategy,
+          created_at,
+          updated_at,
+          description,
+          target_reached,
+          stop_loss_triggered,
+          closed,
+          closed_date,
+          image_url,
+          buy_count,
+          sell_count,
+          comment_count
+        `)
         .order('created_at', { ascending: false })
         .limit(limit);
 

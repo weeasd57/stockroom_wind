@@ -27,11 +27,13 @@ export function PostsFeed({
 } = {}) {
   
   // Get posts from PostProvider for real-time updates
-  const { feedPosts: providerPosts, fetchPosts, loadMore, hasMore, loadingMore, loading: providerLoading, error: providerError } = usePosts();
+  // Use feedPosts which respects excludeCurrentUser flag
+  const { feedPosts, fetchPosts, loadMore, hasMore, loadingMore, loading: providerLoading, error: providerError } = usePosts();
+  const providerPosts = feedPosts; // Alias for consistency with existing code
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState('following'); // following, all, trending
+  const [filter, setFilter] = useState('all'); // following, all, trending
   const [sortBy, setSortBy] = useState('date_desc'); // date_desc, date_asc, engagement, price_change
   const [categoryFilter, setCategoryFilter] = useState('all'); // all, buy, sell, analysis
   // Removed local following cache; PostProvider handles 'following' filtering
@@ -130,7 +132,8 @@ export function PostsFeed({
         abortControllerRef.current.abort();
       }
     };
-  }, [filter, fetchPosts, userId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, userId]); // Remove fetchPosts from deps to prevent infinite loop
 
   // Update loading and error states from PostProvider
   // Show skeleton only if we have no posts yet; otherwise keep rendering while background refreshes
@@ -228,7 +231,7 @@ export function PostsFeed({
       loading !== logStateRef.current.lastLoading) {
     const now = Date.now();
     if (!lastLogRef.current || (now - lastLogRef.current) > 2000) {
-      console.log(`[PostsFeed] Rendering with ${posts.length} posts. Loading: ${loading}, Filter: ${filter}`);
+      console.log(`[PostsFeed] Rendering with ${posts.length} posts. Loading: ${loading}, Filter: ${filter}, Mode: ${mode || 'home'}, UserId: ${userId || 'none'}`);
       lastLogRef.current = now;
     }
     logStateRef.current = { lastPostsLength: posts.length, lastFilter: filter, lastLoading: loading };

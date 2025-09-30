@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useTheme } from '@/providers/theme-provider';
 import { toast } from 'sonner';
@@ -17,6 +17,9 @@ export default function TelegramSubscribeButton({ userId, username, language = '
   const [mounted, setMounted] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscriptionChecked, setSubscriptionChecked] = useState(false);
+  const [awaitingSubscription, setAwaitingSubscription] = useState(false);
+  const pollRef = useRef(null);
+  const botCheckRetried = useRef(false);
   
   // Text based on language
   const texts = {
@@ -77,28 +80,39 @@ export default function TelegramSubscribeButton({ userId, username, language = '
     setMounted(true);
   }, []);
 
+  // Clear polling interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, []);
+
   // تحميل البوت بشكل آمن مع fallback
   useEffect(() => {
     if (userId && !checked) {
       // تأخير أطول لضمان تحميل الصفحة أولاً
       const timer = setTimeout(() => {
         checkTelegramBot();
-      }, 2000);
+      }, 1000);
       
       return () => clearTimeout(timer);
     }
   }, [userId, checked]);
 
-  const checkTelegramBot = async () => {
+  const checkTelegramBot = async (timeoutMs = 12000) => {
     try {
       setLoading(true);
       setChecked(true);
       
-      // timeout للـ fetch
+      // fetch timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       
-      const response = await fetch(`/api/telegram/check-bot/${userId}`, {
+      const q = user?.id ? `?currentUserId=${encodeURIComponent(user.id)}` : '';
+      const response = await fetch(`/api/telegram/check-bot/${userId}${q}`, {
         signal: controller.signal
       });
       
@@ -122,8 +136,15 @@ export default function TelegramSubscribeButton({ userId, username, language = '
         setBotInfo(null);
       }
     } catch (error) {
-      // لا نعرض error للمستخدم، فقط نخفي الزر
-      console.log('Telegram check failed (this is ok):', error.name);
+      // Handle aborts silently and retry once with longer timeout
+      if (error?.name === 'AbortError') {
+        if (!botCheckRetried.current) {
+          botCheckRetried.current = true;
+          setTimeout(() => checkTelegramBot(20000), 1000);
+        }
+        return;
+      }
+      console.warn('[Telegram] check-bot failed:', error);
       setBotInfo(null);
     } finally {
       setLoading(false);
@@ -131,6 +152,7 @@ export default function TelegramSubscribeButton({ userId, username, language = '
   };
 
   const checkSubscriptionStatus = async () => {
+    let subscribed = false;
     try {
       const response = await fetch('/api/telegram/subscription-status', {
         method: 'POST',
@@ -143,13 +165,34 @@ export default function TelegramSubscribeButton({ userId, username, language = '
       
       if (response.ok) {
         const data = await response.json();
-        setIsSubscribed(data.isSubscribed || false);
+        subscribed = !!data.isSubscribed;
+        setIsSubscribed(subscribed);
       }
     } catch (error) {
       console.log('Subscription status check failed:', error);
     } finally {
       setSubscriptionChecked(true);
     }
+    return subscribed;
+  };
+
+  // Start short polling after user opens Telegram to auto-refresh UI
+  const startSubscriptionPolling = () => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    setAwaitingSubscription(true);
+    let attempts = 0;
+    pollRef.current = setInterval(async () => {
+      attempts += 1;
+      const subscribed = await checkSubscriptionStatus();
+      if (subscribed || attempts >= 12) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+        setAwaitingSubscription(false);
+      }
+    }, 1000);
   };
 
   const handleUnsubscribe = async () => {
@@ -235,11 +278,12 @@ export default function TelegramSubscribeButton({ userId, username, language = '
       toast.message(`${t.openTelegramWeb}: ${tgWebDeepLink}`);
     }
     setShowDialog(false);
+    startSubscriptionPolling();
   };
 
   const handleConfirmSubscribe = async () => {
     if (botInfo?.subscribeLink) {
-      const { webLink, tgWebDeepLink, tgAppLink } = buildTelegramHelpers(botInfo.subscribeLink);
+      const { webLink, tgWebDeepLink, tgAppLink, startCommand } = buildTelegramHelpers(botInfo.subscribeLink);
       const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       const isWindows = /Windows/i.test(navigator.userAgent);
       const isMac = /Mac/i.test(navigator.userAgent);
@@ -247,6 +291,10 @@ export default function TelegramSubscribeButton({ userId, username, language = '
       if (!isMobile && (isWindows || isMac)) {
         // Desktop: Try to open Telegram Desktop app first
         toast.info(t.opening);
+        // Copy start command as fallback in case payload is lost
+        if (startCommand) {
+          try { await navigator.clipboard?.writeText(startCommand); } catch (_) {}
+        }
         
         // Direct window.location for better app detection
         window.location.href = tgAppLink;
@@ -286,6 +334,10 @@ export default function TelegramSubscribeButton({ userId, username, language = '
       } else {
         // Mobile: open direct link (OS will handle app/web)
         const newWin = window.open(webLink, '_blank', 'noopener,noreferrer');
+        // Copy start command as fallback in case payload is lost
+        if (startCommand) {
+          try { await navigator.clipboard?.writeText(startCommand); } catch (_) {}
+        }
         if (newWin) {
           toast.success(t.openedBrowser);
         } else {
@@ -294,12 +346,20 @@ export default function TelegramSubscribeButton({ userId, username, language = '
       }
       
       setShowDialog(false);
+      startSubscriptionPolling();
     }
   };
 
-  // لا تظهر الزر إذا تم التحقق ولا يوجد بوت
+  // لا تخفي الزر إذا تم التحقق ولا يوجد بوت
   if (checked && !botInfo) {
-    return null;
+    return (
+      <div className={styles.noBotMessage}>
+        <svg className={styles.telegramIcon} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+        </svg>
+        <span className={styles.buttonText}>{t.botNotAvailable}</span>
+      </div>
+    );
   }
 
   // إظهار زر placeholder أثناء التحميل

@@ -4,11 +4,15 @@ scripts\update-telegram-webhook.js *** for telegram bot 🔥
 
 working {
      * add telegram features 
+        - test telegram chek post and create post 
+        - test telegram send post to followers
 }
 
-** fix vote system
-* add telegram bot in landing page
-** when create post if search with out sekect country has error
-** need add grid view for my posts 
+** when create post if search with out select country has error
+** add im telegram tap in profile tap for my subscribtions
 
+* fix vote system
+* add send the post state to my telegram followers in detal post page 
+* need add grid view for my posts 
+* add telegram bot in landing page
 * the comments cant showing from home , users page but showing in details page 

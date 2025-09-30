@@ -254,17 +254,16 @@ export default function CheckPostPricesButton({ userId }) {
     setShowConfirmDialog(true);
   };
   
-  // Calculate price change percentage and direction between initial and last price
+  // Calculate price change percentage and direction between initial and current price
   const getPriceChangeStatus = (post) => {
-    if (!post.last_price || (!post.initial_price && !post.current_price)) return null;
-    
+    if (!post?.current_price) return null;
     const initial = parseFloat(post.initial_price || post.current_price);
-    const last = parseFloat(post.last_price);
-    
-    if (last < initial) {
-      return { change: 'decrease', percent: (((initial - last) / initial) * 100).toFixed(2) };
-    } else if (last > initial) {
-      return { change: 'increase', percent: (((last - initial) / initial) * 100).toFixed(2) };
+    const current = parseFloat(post.current_price);
+    if (isNaN(initial) || isNaN(current) || initial === 0) return null;
+    if (current < initial) {
+      return { change: 'decrease', percent: (((initial - current) / initial) * 100).toFixed(2) };
+    } else if (current > initial) {
+      return { change: 'increase', percent: (((current - initial) / initial) * 100).toFixed(2) };
     }
     return { change: 'none', percent: 0 };
   };

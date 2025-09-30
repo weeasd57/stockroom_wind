@@ -2,12 +2,37 @@
 // Usage: node scripts/update-telegram-webhook.js
 
 // ⚠️ IMPORTANT: Update these values when they change
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAMBOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '8209141381:AAGrzcLQ2297PL0Fv9u_NXfTEiPnuwGepVw';
-const NEW_WEBHOOK_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://7db363997b9b.ngrok-free.app') + '/api/telegram/webhook';
-const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || 'NXfTEiPnuwGepVwzzAAGrzcLQ2297PL0Fv9u';
+
+// npm run telegram:update-webhook
+// Minimal .env.local loader (no external deps)
+(() => {
+  try {
+    if (!process.env.TELEGRAMBOT_TOKEN || !process.env.NEXT_PUBLIC_APP_URL || !process.env.TELEGRAM_WEBHOOK_SECRET) {
+      const fs = require('fs');
+      const path = require('path');
+      const envPath = path.resolve(__dirname, '../.env.local');
+      if (fs.existsSync(envPath)) {
+        const content = fs.readFileSync(envPath, 'utf8');
+        content.split(/\r?\n/).forEach((line) => {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) return;
+          const eqIndex = trimmed.indexOf('=');
+          if (eqIndex === -1) return;
+          const key = trimmed.slice(0, eqIndex).trim();
+          const value = trimmed.slice(eqIndex + 1).trim();
+          if (!process.env[key]) process.env[key] = value;
+        });
+      }
+    }
+  } catch {}
+})();
+
+const TELEGRAMBOT_TOKEN = process.env.TELEGRAMBOT_TOKEN;
+const NEW_WEBHOOK_URL = (process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')}` : undefined) + '/api/telegram/webhook';
+const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 
 console.log('🔑 Configuration:');
-console.log('   Bot Token:', TELEGRAM_BOT_TOKEN ? `${TELEGRAM_BOT_TOKEN.substring(0, 20)}...` : 'NOT SET');
+console.log('   Bot Token:', TELEGRAMBOT_TOKEN ? `${TELEGRAMBOT_TOKEN.substring(0, 20)}...` : 'NOT SET');
 console.log('   Webhook Secret:', WEBHOOK_SECRET ? '***SET***' : 'NOT SET');
 console.log('');
 
@@ -19,6 +44,7 @@ async function updateWebhook() {
     // Test if webhook endpoint is accessible
     console.log('\n🔍 Testing webhook endpoint accessibility...');
     try {
+      if (!NEW_WEBHOOK_URL || !/^https:\/\/\S+/.test(NEW_WEBHOOK_URL)) throw new Error('Invalid or missing NEXT_PUBLIC_APP_URL');
       const testResponse = await fetch(NEW_WEBHOOK_URL, { method: 'GET' });
       const testResult = await testResponse.json();
       console.log('✅ Webhook endpoint is accessible:', testResult);
@@ -30,7 +56,7 @@ async function updateWebhook() {
     // Set new webhook
     console.log('\n🔄 Setting webhook URL...');
     const setResponse = await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook`,
+      `https://api.telegram.org/bot${TELEGRAMBOT_TOKEN}/setWebhook`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48,7 +74,7 @@ async function updateWebhook() {
     // Get webhook info to verify
     console.log('\n📊 Getting webhook info...');
     const infoResponse = await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo`
+      `https://api.telegram.org/bot${TELEGRAMBOT_TOKEN}/getWebhookInfo`
     );
     
     const infoResult = await infoResponse.json();
@@ -79,7 +105,7 @@ async function updateWebhook() {
 async function deleteWebhook() {
   console.log('🗑️  Deleting webhook...');
   const response = await fetch(
-    `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/deleteWebhook`,
+    `https://api.telegram.org/bot${TELEGRAMBOT_TOKEN}/deleteWebhook`,
     { method: 'POST' }
   );
   const result = await response.json();
