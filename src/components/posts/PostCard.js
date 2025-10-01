@@ -167,13 +167,48 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
           )}
         </div>
 
+        {/* Target Reached Performance Section */}
+        {post?.target_reached && post?.initial_price && post?.target_price && (
+          <div className={styles.performanceSection}>
+            <div className={styles.performanceHeader}>
+              <span className={styles.performanceIcon}>🎯</span>
+              <span className={styles.performanceTitle}>Target Achieved!</span>
+            </div>
+            <div className={styles.performanceStats}>
+              <div className={styles.performanceStat}>
+                <span className={styles.performanceLabel}>Gain</span>
+                <span className={styles.performanceValue}>
+                  +{(((post.target_price - post.initial_price) / post.initial_price) * 100).toFixed(2)}%
+                </span>
+              </div>
+              <div className={styles.performanceStat}>
+                <span className={styles.performanceLabel}>Profit</span>
+                <span className={styles.performanceValue}>
+                  +{formatPrice(post.target_price - post.initial_price)}
+                </span>
+              </div>
+              {post?.target_reached_date && (
+                <div className={styles.performanceStat}>
+                  <span className={styles.performanceLabel}>Date</span>
+                  <span className={styles.performanceDate}>
+                    {formatDistanceToNow(new Date(post.target_reached_date), { addSuffix: true })}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Price Analysis */}
         <div className={styles.priceAnalysis}>
           <div className={styles.priceGrid}>
             <div className={styles.priceItem}>
               <span className={styles.priceLabel}>Current</span>
-              <span className={styles.priceValue}>
-                {formatPrice(post?.current_price)}
+              <div className={styles.priceValueContainer}>
+                <span className={styles.priceValue}>
+                  {formatPrice(post?.current_price)}
+                </span>
+                {/* Price Update Indicator below the current price */}
                 {post?.last_price_check && (
                   <PriceUpdateIndicator
                     isUpdating={false}
@@ -182,7 +217,7 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
                     previousPrice={post.initial_price}
                   />
                 )}
-              </span>
+              </div>
             </div>
             <div className={styles.priceItem}>
               <span className={styles.priceLabel}>Target</span>
@@ -208,19 +243,20 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
           </div>
         )}
 
-        {/* Strategy Tag */}
-        {post?.strategy && (
-          <div className={styles.strategy}>
-            <span className={styles.strategyTag}>📈 {post.strategy}</span>
-          </div>
-        )}
-
-        {/* Buy/Sell Actions */}
-        <PostActions 
-          postId={post.id}
-          initialBuyCount={post.buy_count || 0}
-          initialSellCount={post.sell_count || 0}
-        />
+        {/* Buy/Sell Actions with Strategy Tag */}
+        <div className={styles.actionsWithStrategy}>
+          <PostActions 
+            postId={post.id}
+            initialBuyCount={post.buy_count || 0}
+            initialSellCount={post.sell_count || 0}
+          />
+          {/* Strategy Tag on the right */}
+          {post?.strategy && (
+            <div className={styles.strategyInline}>
+              <span className={styles.strategyTag}>📈 {post.strategy}</span>
+            </div>
+          )}
+        </div>
 
         {/* Market Sentiment */}
         <PostSentiment 

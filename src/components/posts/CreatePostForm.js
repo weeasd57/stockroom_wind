@@ -199,7 +199,6 @@ export default function CreatePostForm() {
   const handleOpenSymbolSearch = () => {
     setIsSymbolSearchOpen(true);
   };
-
   const handleCloseSymbolSearch = () => {
     setIsSymbolSearchOpen(false);
   };
@@ -216,6 +215,10 @@ export default function CreatePostForm() {
     // Update form state; price fetch will be triggered by useEffect on selectedStock
     updateField('selectedStock', normalized);
     updateField('stockSearch', normalized.symbol);
+    // Update selectedCountry to match the stock's country for accurate price fetching
+    if (normalized.country && normalized.country !== 'all') {
+      updateField('selectedCountry', normalized.country);
+    }
   }, [updateField]);
 
   // الاستراتيجيات الافتراضية

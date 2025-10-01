@@ -515,7 +515,7 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
         .select()
         .single();
 
-      const timeoutMs = 10000; // 10s safety timeout
+      const timeoutMs = 15000; // 15s safety timeout (increased for slower connections)
       let data: any = null;
       let error: any = null;
       try {
@@ -532,21 +532,44 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
       // If timed out, attempt a best-effort fallback fetch by unique tuple
       if (error && error.message === 'Insert timeout') {
         console.warn('[SupabaseProvider] Insert timed out, attempting fallback fetch by created_at/content/user_id');
-        const { data: fallback, error: fallbackErr } = await supabase
-          .from('posts')
-          .select('*')
-          .eq('user_id', (cleanPost as any).user_id)
-          .eq('created_at', (cleanPost as any).created_at)
-          .eq('content', (cleanPost as any).content)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (fallback) {
-          console.warn('[SupabaseProvider] Fallback fetch succeeded. Proceeding with returned row.');
-          data = fallback;
-          error = null;
-        } else if (fallbackErr) {
-          console.warn('[SupabaseProvider] Fallback fetch failed:', fallbackErr?.message);
+        console.log('[SupabaseProvider] Searching for post with:', {
+          user_id: (cleanPost as any).user_id,
+          created_at: (cleanPost as any).created_at,
+          content_length: ((cleanPost as any).content || '').length
+        });
+        
+        try {
+          // Add timeout to fallback fetch (5 seconds)
+          const fallbackPromise = supabase
+            .from('posts')
+            .select('*')
+            .eq('user_id', (cleanPost as any).user_id)
+            .eq('created_at', (cleanPost as any).created_at)
+            .eq('content', (cleanPost as any).content)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          const fallbackTimeout = new Promise((resolve) => 
+            setTimeout(() => resolve({ data: null, error: { message: 'Fallback timeout' } }), 5000)
+          );
+          
+          const fallbackResult: any = await Promise.race([fallbackPromise, fallbackTimeout]);
+          const fallback = fallbackResult?.data ?? null;
+          const fallbackErr = fallbackResult?.error ?? null;
+          
+          if (fallback) {
+            console.warn('[SupabaseProvider] ✅ Fallback fetch succeeded. Post was created successfully, ID:', fallback.id);
+            data = fallback;
+            error = null;
+          } else if (fallbackErr) {
+            console.error('[SupabaseProvider] ❌ Fallback fetch failed:', fallbackErr?.message);
+            // Don't override original timeout error - keep it for proper error handling
+          } else {
+            console.error('[SupabaseProvider] ❌ Post not found. Insert may have failed completely.');
+          }
+        } catch (fallbackException) {
+          console.error('[SupabaseProvider] ❌ Fallback fetch exception:', fallbackException);
         }
       }
       
@@ -558,7 +581,17 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
         error: error?.message
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('[SupabaseProvider] ❌ Insert failed with error:', error.message);
+        throw error;
+      }
+      
+      if (!data) {
+        const noDataError = new Error('Post insert returned no data');
+        console.error('[SupabaseProvider] ❌ No data returned from insert');
+        throw noDataError;
+      }
+      
       return data;
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to create post'));

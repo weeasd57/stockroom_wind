@@ -204,11 +204,21 @@
   background-color: #e0e0e0;
   border-radius: 4px;
   overflow: hidden;
+  position: relative;
 }
 
 .progressFill {
   height: 100%;
   transition: width 0.3s ease;
+  border-radius: 4px;
+}
+
+.progressFill.positive {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.progressFill.negative {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
 }
 
 .descriptionContainer {
@@ -731,7 +741,15 @@
 
 /* Dark mode styles */
 :global(.dark) .progressBar {
-  background-color: #444;
+  background-color: #2d2d2d;
+}
+
+:global(.dark) .progressFill.positive {
+  background: linear-gradient(90deg, #059669, #047857);
+}
+
+:global(.dark) .progressFill.negative {
+  background: linear-gradient(90deg, #dc2626, #b91c1c);
 }
 :global(.dark) .priceHistoryContainer {
   border-color: #555;

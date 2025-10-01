@@ -61,32 +61,33 @@ export default function LandingPage() {
     },
     {
       id: 3,
+      title: 'Telegram Bot Integration',
+      description:
+        'Receive instant notifications for new posts, target achievements, and price updates directly in Telegram. Stay connected to the market wherever you are.',
+      icon: '📱',
+    },
+    {
+      id: 4,
       title: 'Signal Trust Score',
       description:
         'Weights author track record and post performance to prioritize higher-confidence ideas for the bot.',
       icon: '⭐',
     },
     {
-      id: 4,
+      id: 5,
       title: 'Risk Controls & Limits',
       description:
         'Configurable max allocation, cool-downs, and stop-loss/take-profit presets to protect capital.',
       icon: '🛡️',
     },
     {
-      id: 5,
+      id: 6,
       title: 'Multi‑Broker Fallback',
       description:
         'Supports multiple brokers with health checks and automatic failover when a provider is degraded.',
       icon: '🔗',
     },
-    {
-      id: 6,
-      title: 'Transparent Logs & Alerts',
-      description:
-        'Full audit trail with notifications for executed actions, rejects, and risk breaches.',
-      icon: '📜',
-    },
+   
   ];
 
   const login = () => {

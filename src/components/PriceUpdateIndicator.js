@@ -11,10 +11,9 @@ export default function PriceUpdateIndicator({ isUpdating, lastUpdate, currentPr
     if (isUpdating) {
       setShowIndicator(true);
     } else if (lastUpdate) {
-      // Show indicator for a few seconds after update
+      // Keep indicator visible permanently after update
       setShowIndicator(true);
-      const timer = setTimeout(() => setShowIndicator(false), 3000);
-      return () => clearTimeout(timer);
+      // Removed auto-hide timer - indicator stays visible
     }
   }, [isUpdating, lastUpdate]);
 

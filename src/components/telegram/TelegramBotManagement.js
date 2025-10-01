@@ -149,15 +149,13 @@ export default function TelegramBotManagement() {
 
     setSendingBroadcast(true);
     try {
-      const token = localStorage.getItem('sb-jyoeecprvhpqfirxmpkx-auth-token');
-      const parsed = JSON.parse(token);
-      
+      // The API route uses createRouteHandlerClient which reads auth from cookies automatically
       const response = await fetch('/api/telegram/send-broadcast', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${parsed.access_token}`
+          'Content-Type': 'application/json'
         },
+        credentials: 'include', // Ensure cookies are sent
         body: JSON.stringify({
           title: broadcastTitle,
           message: broadcastMessage,

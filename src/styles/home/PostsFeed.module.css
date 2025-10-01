@@ -291,6 +291,66 @@
     margin: 0;
   }
   
+  /* Performance Section for Target Reached */
+  .performanceSection {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.08));
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+  }
+  
+  .performanceHeader {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  
+  .performanceIcon {
+    font-size: 1.25rem;
+  }
+  
+  .performanceTitle {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #065f46;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+  
+  .performanceStats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 12px;
+  }
+  
+  .performanceStat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .performanceLabel {
+    font-size: 0.75rem;
+    color: #059669;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+  
+  .performanceValue {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #065f46;
+  }
+  
+  .performanceDate {
+    font-size: 0.875rem;
+    color: #059669;
+    font-weight: 500;
+  }
+  
   /* Price Analysis */
   .priceAnalysis {
     margin-bottom: 16px;
@@ -316,6 +376,13 @@
     letter-spacing: 0.025em;
   }
   
+  .priceValueContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  
   .priceValue {
     display: block;
     font-size: 1rem;
@@ -339,7 +406,22 @@
     margin: 0;
   }
   
-  /* Strategy */
+  /* Actions with Strategy */
+  .actionsWithStrategy {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  
+  .strategyInline {
+    display: flex;
+    align-items: center;
+    margin-left: auto; /* Push strategy to the far right */
+  }
+  
+  /* Strategy (legacy - keep for backward compatibility) */
   .strategy {
     margin-bottom: 16px;
   }
@@ -348,7 +430,7 @@
     display: inline-block;
     background: var(--primary-light, #dbeafe);
     color: var(--primary-color, #3b82f6);
-    padding: 4px 8px;
+    padding: 6px 12px;
     border-radius: 6px;
     font-size: 0.75rem;
     font-weight: 500;

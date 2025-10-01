@@ -8,7 +8,6 @@ working {
         - test telegram send post to followers
 }
 
-** when create post if search with out select country has error
 ** add im telegram tap in profile tap for my subscribtions
 
 * fix vote system
