@@ -4,50 +4,19 @@ import { NextResponse } from 'next/server';
 
 export async function GET(request) {
   try {
-    const cookieStore = cookies();
-    let supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    let user = null;
-    let authError = null;
+    const supabase = createRouteHandlerClient({ cookies });
     
-    // التحقق من المصادقة - جرب cookies أولاً
-    const cookieAuth = await supabase.auth.getUser();
-    user = cookieAuth.data?.user;
-    authError = cookieAuth.error;
+    const { data: { session }, error: authError } = await supabase.auth.getSession();
     
-    // إذا فشلت cookies، جرب Authorization header
-    if (authError || !user) {
-      const authHeader = request.headers.get('Authorization');
-      if (authHeader?.startsWith('Bearer ')) {
-        const token = authHeader.substring(7);
-        try {
-          const { createClient } = await import('@supabase/supabase-js');
-          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-          const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-          
-          if (supabaseUrl && supabaseAnonKey) {
-            const tokenSupabase = createClient(supabaseUrl, supabaseAnonKey, {
-              global: { headers: { Authorization: `Bearer ${token}` } }
-            });
-            const tokenAuth = await tokenSupabase.auth.getUser();
-            
-            if (tokenAuth.data?.user && !tokenAuth.error) {
-              user = tokenAuth.data.user;
-              authError = null;
-              supabase = tokenSupabase;
-            }
-          }
-        } catch (tokenError) {
-          console.error('Token auth error:', tokenError);
-        }
-      }
-    }
-    
-    if (authError || !user) {
+    if (authError || !session?.user) {
+      console.error('[SUBSCRIBERS GET] Auth error:', authError?.message || 'No session');
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
+    
+    const user = session.user;
 
     // الحصول على بوت المستخدم
     const { data: userBot, error: botError } = await supabase
@@ -124,51 +93,20 @@ export async function GET(request) {
 // إحصائيات المشتركين
 export async function POST(request) {
   try {
-    const cookieStore = cookies();
-    let supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    let user = null;
-    let authError = null;
+    const supabase = createRouteHandlerClient({ cookies });
     
-    // التحقق من المصادقة - جرب cookies أولاً
-    const cookieAuth = await supabase.auth.getUser();
-    user = cookieAuth.data?.user;
-    authError = cookieAuth.error;
+    const { data: { session }, error: authError } = await supabase.auth.getSession();
     
-    // إذا فشلت cookies، جرب Authorization header
-    if (authError || !user) {
-      const authHeader = request.headers.get('Authorization');
-      if (authHeader?.startsWith('Bearer ')) {
-        const token = authHeader.substring(7);
-        try {
-          const { createClient } = await import('@supabase/supabase-js');
-          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-          const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-          
-          if (supabaseUrl && supabaseAnonKey) {
-            const tokenSupabase = createClient(supabaseUrl, supabaseAnonKey, {
-              global: { headers: { Authorization: `Bearer ${token}` } }
-            });
-            const tokenAuth = await tokenSupabase.auth.getUser();
-            
-            if (tokenAuth.data?.user && !tokenAuth.error) {
-              user = tokenAuth.data.user;
-              authError = null;
-              supabase = tokenSupabase;
-            }
-          }
-        } catch (tokenError) {
-          console.error('Token auth error:', tokenError);
-        }
-      }
-    }
-    
-    if (authError || !user) {
+    if (authError || !session?.user) {
+      console.error('[SUBSCRIBERS POST] Auth error:', authError?.message || 'No session');
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
-
+    
+    const user = session.user;
+    
     const { action } = await request.json();
 
     if (action === 'get_stats') {

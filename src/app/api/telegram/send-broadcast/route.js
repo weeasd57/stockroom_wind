@@ -4,17 +4,19 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const supabase = createRouteHandlerClient({ cookies });
     
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { session }, error: authError } = await supabase.auth.getSession();
     
-    if (authError || !user) {
+    if (authError || !session?.user) {
+      console.error('[SEND-BROADCAST] Auth error:', authError?.message || 'No session');
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
+    
+    const user = session.user;
 
     const body = await request.json();
     const { 
@@ -47,6 +49,46 @@ export async function POST(request) {
       );
     }
 
+    // تحديد المستلمين بناءً على اختيار المستخدم
+    let recipientIds = Array.isArray(selectedRecipients) ? selectedRecipients.filter(Boolean) : [];
+
+    if (recipientType === 'followers') {
+      const { data: followers, error: followersError } = await supabase
+        .rpc('get_follower_telegram_subscribers', {
+          p_user_id: user.id,
+          p_bot_id: userBot.id,
+        });
+      if (followersError) {
+        console.error('Error fetching follower subscribers:', followersError);
+        return NextResponse.json(
+          { error: 'Failed to resolve followers recipients' },
+          { status: 500 }
+        );
+      }
+      recipientIds = (followers || []).map((r) => r.subscriber_id).filter(Boolean);
+    } else if (recipientType === 'all_subscribers') {
+      const { data: allSubs, error: allSubsError } = await supabase
+        .from('telegram_subscribers')
+        .select('id')
+        .eq('bot_id', userBot.id)
+        .eq('is_subscribed', true);
+      if (allSubsError) {
+        console.error('Error fetching all subscribers:', allSubsError);
+        return NextResponse.json(
+          { error: 'Failed to resolve subscribers' },
+          { status: 500 }
+        );
+      }
+      recipientIds = (allSubs || []).map((r) => r.id).filter(Boolean);
+    } // 'manual' => keep selectedRecipients as provided
+
+    if (!recipientIds || recipientIds.length === 0) {
+      return NextResponse.json(
+        { error: 'No recipients found for the selected filter. Please select at least one recipient.' },
+        { status: 400 }
+      );
+    }
+
     // إنشاء البرودكاست
     const { data: broadcast, error: broadcastError } = await supabase
       .rpc('create_telegram_broadcast', {
@@ -55,8 +97,8 @@ export async function POST(request) {
         p_title: title,
         p_message: message,
         p_post_ids: selectedPosts,
-        p_recipient_ids: selectedRecipients,
-        p_broadcast_type: 'post_selection'
+        p_recipient_ids: recipientIds,
+        p_broadcast_type: recipientType || 'post_selection',
       });
 
     if (broadcastError) {
@@ -120,20 +162,42 @@ async function processBroadcast(supabase, broadcastId, botToken) {
       `)
       .eq('broadcast_id', broadcastId);
 
-    // الحصول على المستقبلين
-    const { data: recipients } = await supabase
+    // Fetch recipients (do not rely on DB default status; some rows may have NULL)
+    const { data: recipientsRaw, error: recipientsError } = await supabase
       .from('telegram_broadcast_recipients')
       .select(`
         id,
         subscriber_id,
+        status,
         telegram_subscribers(
           telegram_user_id,
           telegram_first_name,
           telegram_username
         )
       `)
-      .eq('broadcast_id', broadcastId)
-      .eq('status', 'pending');
+      .eq('broadcast_id', broadcastId);
+
+    if (recipientsError) {
+      console.error('Error fetching recipients:', recipientsError);
+      throw new Error('Unable to fetch recipients for broadcast');
+    }
+
+    const recipients = (recipientsRaw || []).filter(r => !r.status || r.status === 'pending');
+
+    if (!recipients || recipients.length === 0) {
+      console.warn(`No pending recipients found for broadcast ${broadcastId}.`);
+      await supabase
+        .from('telegram_broadcasts')
+        .update({ 
+          status: 'completed',
+          sent_count: 0,
+          failed_count: 0,
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', broadcastId);
+      console.log(`Broadcast ${broadcastId} completed: 0 sent, 0 failed (no recipients).`);
+      return;
+    }
 
     let sentCount = 0;
     let failedCount = 0;

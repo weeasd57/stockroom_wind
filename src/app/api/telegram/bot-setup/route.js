@@ -55,41 +55,17 @@ async function setupBotCommands(_supabase, _botId, botToken) {
 
 export async function POST(request) {
   try {
-    // Auth via cookies first
-    const cookieStore = cookies();
-    let supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    let user = null;
-    let authError = null;
-
-    const cookieAuth = await supabase.auth.getUser();
-    user = cookieAuth.data?.user;
-    authError = cookieAuth.error;
-
-    // Fallback to Authorization: Bearer token
-    if (authError || !user) {
-      const authHeader = request.headers.get('Authorization');
-      if (authHeader?.startsWith('Bearer ')) {
-        const token = authHeader.substring(7);
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-        if (supabaseUrl && supabaseAnonKey) {
-          const tokenSupabase = createClient(supabaseUrl, supabaseAnonKey, {
-            global: { headers: { Authorization: `Bearer ${token}` } }
-          });
-          const tokenAuth = await tokenSupabase.auth.getUser();
-          if (tokenAuth.data?.user && !tokenAuth.error) {
-            user = tokenAuth.data.user;
-            authError = null;
-            supabase = tokenSupabase;
-          }
-        }
-      }
-    }
-
-    if (authError || !user) {
+    // Auth via cookies
+    const supabase = createRouteHandlerClient({ cookies });
+    
+    const { data: { session }, error: authError } = await supabase.auth.getSession();
+    
+    if (authError || !session?.user) {
+      console.error('[BOT-SETUP POST] Auth error:', authError?.message || 'No session');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    
+    const user = session.user;
 
     // Plan A: read bot token from environment (single platform bot)
     const botToken = process.env.TELEGRAMBOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
@@ -189,41 +165,17 @@ export async function POST(request) {
 
 export async function GET(request) {
   try {
-    // Auth via cookies first
-    const cookieStore = cookies();
-    let supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    let user = null;
-    let authError = null;
-
-    const cookieAuth = await supabase.auth.getUser();
-    user = cookieAuth.data?.user;
-    authError = cookieAuth.error;
-
-    // Fallback to Authorization: Bearer token
-    if (authError || !user) {
-      const authHeader = request.headers.get('Authorization');
-      if (authHeader?.startsWith('Bearer ')) {
-        const token = authHeader.substring(7);
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-        if (supabaseUrl && supabaseAnonKey) {
-          const tokenSupabase = createClient(supabaseUrl, supabaseAnonKey, {
-            global: { headers: { Authorization: `Bearer ${token}` } }
-          });
-          const tokenAuth = await tokenSupabase.auth.getUser();
-          if (tokenAuth.data?.user && !tokenAuth.error) {
-            user = tokenAuth.data.user;
-            authError = null;
-            supabase = tokenSupabase;
-          }
-        }
-      }
-    }
-
-    if (authError || !user) {
+    // Auth via cookies
+    const supabase = createRouteHandlerClient({ cookies });
+    
+    const { data: { session }, error: authError } = await supabase.auth.getSession();
+    
+    if (authError || !session?.user) {
+      console.error('[BOT-SETUP GET] Auth error:', authError?.message || 'No session');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    
+    const user = session.user;
 
     const { data: bot } = await supabase
       .from('telegram_bots')

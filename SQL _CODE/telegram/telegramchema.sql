@@ -346,3 +346,33 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER update_telegram_subscribers_last_interaction 
     BEFORE UPDATE ON telegram_subscribers
     FOR EACH ROW EXECUTE PROCEDURE update_subscriber_last_interaction();
+
+-- ===================================================================
+-- PUBLIC SAFE FUNCTION: list users with active telegram bots (no tokens)
+-- ===================================================================
+
+-- This function exposes minimal, non-sensitive bot info for UI badges.
+-- It bypasses RLS via SECURITY DEFINER but does NOT return bot_token.
+-- Ensure the function owner is a role with proper access (e.g., postgres).
+CREATE OR REPLACE FUNCTION public_get_users_with_active_bots(
+  p_user_ids UUID[]
+)
+RETURNS TABLE(
+  user_id UUID,
+  bot_username TEXT,
+  is_active BOOLEAN
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT tb.user_id, tb.bot_username::text AS bot_username, tb.is_active
+  FROM telegram_bots tb
+  WHERE tb.is_active = TRUE
+    AND (p_user_ids IS NULL OR tb.user_id = ANY (p_user_ids));
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Optional: restrict search_path for safety (if your environment supports it)
+-- ALTER FUNCTION public_get_users_with_active_bots(UUID[]) SET search_path = public;
+
+-- Grant execute to web roles
+GRANT EXECUTE ON FUNCTION public_get_users_with_active_bots(UUID[]) TO anon, authenticated;

@@ -2,6 +2,9 @@
 🔥 *** when change domain should run this 
 scripts\update-telegram-webhook.js *** for telegram bot 🔥
 
+** add custom telegram bot in pro palne
+   for have the user create has bot and return set the bot token 
+
 working {
      * add telegram features 
         - test telegram chek post and create post 
@@ -13,5 +16,4 @@ working {
 * fix vote system
 * add send the post state to my telegram followers in detal post page 
 * need add grid view for my posts 
-* add telegram bot in landing page
 * the comments cant showing from home , users page but showing in details page 

@@ -328,6 +328,29 @@ export default function TradersPage() {
                         <div className={styles.traderInfo}>
                           <h3>{trader.username || 'username'}</h3>
                           <p className={styles.username}>{trader.full_name || (trader.username ? `@${trader.username}` : 'User')}</p>
+                          {/* Telegram bot badge (list view) */}
+                          {trader.hasTelegramBot && trader.botUsername && (
+                            <a
+                              href={`https://t.me/${String(trader.botUsername).replace(/^@/, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={styles.telegramBadge}
+                              onClick={(e) => e.stopPropagation()}
+                              title={`Open ${String(trader.botUsername).replace(/^@/, '')} on Telegram`}
+                            >
+                              <svg
+                                className={styles.telegramIcon}
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                width="16"
+                                height="16"
+                                aria-hidden="true"
+                              >
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.37 6.79l-1.7 8.02c-.13.6-.48.75-.97.47l-2.67-1.97-1.29 1.25c-.14.14-.26.26-.53.26l.19-2.74 4.99-4.51c.22-.19-.05-.3-.34-.11l-6.16 3.88-2.66-.83c-.58-.18-.59-.58.12-.85l10.38-4c.48-.18.9.11.74.83z" />
+                              </svg>
+                              <span>Telegram bot</span>
+                            </a>
+                          )}
                         </div>
                       </div>
                       
@@ -405,6 +428,29 @@ export default function TradersPage() {
                       <div className={styles.traderInfo}>
                         <h3>{trader.username || 'username'}</h3>
                         <p className={styles.username}>{trader.full_name || (trader.username ? `@${trader.username}` : 'User')}</p>
+                        {/* Telegram bot badge (grid view) */}
+                        {trader.hasTelegramBot && trader.botUsername && (
+                          <a
+                            href={`https://t.me/${String(trader.botUsername).replace(/^@/, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={styles.telegramBadge}
+                            onClick={(e) => e.stopPropagation()}
+                            title={`Open ${String(trader.botUsername).replace(/^@/, '')} on Telegram`}
+                          >
+                            <svg
+                              className={styles.telegramIcon}
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              width="16"
+                              height="16"
+                              aria-hidden="true"
+                            >
+                              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.37 6.79l-1.7 8.02c-.13.6-.48.75-.97.47l-2.67-1.97-1.29 1.25c-.14.14-.26.26-.53.26l.19-2.74 4.99-4.51c.22-.19-.05-.3-.34-.11l-6.16 3.88-2.66-.83c-.58-.18-.59-.58.12-.85l10.38-4c.48-.18.9.11.74.83z" />
+                            </svg>
+                            <span>Telegram bot</span>
+                          </a>
+                        )}
                       </div>
                     </div>
                     

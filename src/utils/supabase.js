@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 // import logger from '@/utils/logger';
 import imageCompression from 'browser-image-compression';
 
@@ -6,14 +6,8 @@ import imageCompression from 'browser-image-compression';
 let _supabaseClient = null;
 
 function initSupabaseClient() {
-  // Read env at call-time (runtime) instead of at module load (build-time)
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    // Throw at runtime if actually used without proper config
-    throw new Error('Supabase client missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
-  }
-  return createClient(url, anonKey);
+  // Use auth-helpers browser client so auth persists in cookies (required for API routes)
+  return createClientComponentClient();
 }
 
 export function getSupabaseClient() {

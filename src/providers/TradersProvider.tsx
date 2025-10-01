@@ -27,6 +27,9 @@ interface Trader {
   isLoading?: boolean;
   hasError?: boolean;
   countryCounts?: Record<string, number>;
+  // Telegram bot badge fields
+  hasTelegramBot?: boolean;
+  botUsername?: string | null;
 }
 
 interface TradersContextType {
@@ -282,16 +285,42 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
 
       console.log(`[TRADERS PROVIDER] Processed ${processedTraders.length} traders`);
 
+      // Fetch telegram bot badges for these users (no tokens exposed)
+      let mergedTraders: Trader[] = processedTraders;
+      try {
+        const userIds = processedTraders.map((t: Trader) => t.id);
+        const { data: botsData, error: botsError } = await supabase
+          .rpc('public_get_users_with_active_bots', { p_user_ids: userIds });
+
+        if (botsError) {
+          console.warn('[TRADERS PROVIDER] Failed to fetch telegram bots info:', botsError);
+        } else {
+          const botMap = new Map<string, { user_id: string; bot_username: string; is_active: boolean }>(
+            (botsData || []).map((b: any) => [b.user_id, b])
+          );
+          mergedTraders = processedTraders.map((t: Trader) => {
+            const bot = botMap.get(t.id);
+            return {
+              ...t,
+              hasTelegramBot: !!bot?.is_active,
+              botUsername: bot?.bot_username || null,
+            } as Trader;
+          });
+        }
+      } catch (e) {
+        console.warn('[TRADERS PROVIDER] Error merging telegram bot badges:', e);
+      }
+
       // Cache the results
       tradersCache.set(cacheKey, {
-        data: processedTraders,
+        data: mergedTraders,
         timestamp: Date.now()
       });
 
       if (isLoadMore) {
-        setTraders(prev => [...prev, ...processedTraders]);
+        setTraders(prev => [...prev, ...mergedTraders]);
       } else {
-        setTraders(processedTraders);
+        setTraders(mergedTraders);
       }
       
       // Check if there are more items
