@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { SupabaseClient, User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { supabase as globalSupabase } from '@/utils/supabase'; // Import the shared instance
@@ -454,7 +455,7 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
       const postToInsert = {
         ...postData,
         user_id: postData.user_id || user?.id,
-        created_at: postData.created_at || new Date().toISOString()
+        // created_at will be set by DB default to avoid equality issues on fallback
       } as any;
 
       const isValidHttpUrl = (u: any) => {
@@ -480,7 +481,10 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
       });
 
       // Create clean object with only valid fields that exist in database
+      // Generate a client-side UUID to make the operation idempotent and allow reliable fallback fetch
+      const clientId = postToInsert.id || uuidv4();
       const cleanPost = {
+        id: clientId,
         user_id: postToInsert.user_id,
         content: postToInsert.content || '',
         image_url: postToInsert.image_url || null,
@@ -497,7 +501,6 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
         high_price: postToInsert.high_price ?? null,
         target_high_price: postToInsert.target_high_price ?? null,
         status_message: postToInsert.status_message ?? 'Active', // Required field
-        created_at: postToInsert.created_at,
         // Optional flags if provided
         is_public: typeof postToInsert.is_public === 'boolean' ? postToInsert.is_public : true,
         status: postToInsert.status || 'open'
@@ -507,13 +510,12 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
       console.log('[SupabaseProvider] image_url in clean object:', cleanPost.image_url);
       
       // Perform insert with array payload (more compatible across PostgREST versions)
+      // Avoid .select() here to reduce latency/hanging; we'll fetch the row by id after insert
       // Also guard with a timeout to avoid potential hangs
       console.log('[SupabaseProvider] Performing insert into posts...');
       const insertPromise = supabase
         .from('posts')
-        .insert([cleanPost])
-        .select()
-        .single();
+        .insert([cleanPost]);
 
       const timeoutMs = 15000; // 15s safety timeout (increased for slower connections)
       let data: any = null;
@@ -529,48 +531,11 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
         error = e;
       }
 
-      // If timed out, attempt a best-effort fallback fetch by unique tuple
+      // If timed out, fail fast to allow UI to stop loading and offer Retry
       if (error && error.message === 'Insert timeout') {
-        console.warn('[SupabaseProvider] Insert timed out, attempting fallback fetch by created_at/content/user_id');
-        console.log('[SupabaseProvider] Searching for post with:', {
-          user_id: (cleanPost as any).user_id,
-          created_at: (cleanPost as any).created_at,
-          content_length: ((cleanPost as any).content || '').length
-        });
-        
-        try {
-          // Add timeout to fallback fetch (5 seconds)
-          const fallbackPromise = supabase
-            .from('posts')
-            .select('*')
-            .eq('user_id', (cleanPost as any).user_id)
-            .eq('created_at', (cleanPost as any).created_at)
-            .eq('content', (cleanPost as any).content)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          
-          const fallbackTimeout = new Promise((resolve) => 
-            setTimeout(() => resolve({ data: null, error: { message: 'Fallback timeout' } }), 5000)
-          );
-          
-          const fallbackResult: any = await Promise.race([fallbackPromise, fallbackTimeout]);
-          const fallback = fallbackResult?.data ?? null;
-          const fallbackErr = fallbackResult?.error ?? null;
-          
-          if (fallback) {
-            console.warn('[SupabaseProvider] ✅ Fallback fetch succeeded. Post was created successfully, ID:', fallback.id);
-            data = fallback;
-            error = null;
-          } else if (fallbackErr) {
-            console.error('[SupabaseProvider] ❌ Fallback fetch failed:', fallbackErr?.message);
-            // Don't override original timeout error - keep it for proper error handling
-          } else {
-            console.error('[SupabaseProvider] ❌ Post not found. Insert may have failed completely.');
-          }
-        } catch (fallbackException) {
-          console.error('[SupabaseProvider] ❌ Fallback fetch exception:', fallbackException);
-        }
+        console.warn('[SupabaseProvider] Insert timed out, attempting fallback fetch by id');
+        console.warn('[SupabaseProvider] Fail-fast on insert timeout -> throwing to UI for retry', { clientId, timeoutMs });
+        throw error;
       }
       
       console.log('[SupabaseProvider] Insert result:', {
@@ -586,13 +551,35 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
         throw error;
       }
       
-      if (!data) {
-        const noDataError = new Error('Post insert returned no data');
-        console.error('[SupabaseProvider] ❌ No data returned from insert');
+      // Ensure we return enriched row from posts_with_stats with profile
+      const fetchWithRetry = async (): Promise<any> => {
+        for (let attempt = 1; attempt <= 8; attempt++) {
+          const { data: fullRow, error: viewErr } = await supabase
+            .from('posts_with_stats')
+            .select('*')
+            .eq('id', clientId)
+            .maybeSingle();
+          if (fullRow) return fullRow;
+          // fall back to base table if view not ready
+          const { data: baseRow } = await supabase
+            .from('posts')
+            .select('*')
+            .eq('id', clientId)
+            .maybeSingle();
+          if (baseRow) return baseRow;
+          await new Promise(res => setTimeout(res, 400));
+        }
+        return null;
+      };
+
+      const finalRow = await fetchWithRetry();
+      if (!finalRow) {
+        const noDataError = new Error('Post insert succeeded but could not fetch created row');
+        console.error('[SupabaseProvider] ❌ Could not fetch created post by id:', clientId);
         throw noDataError;
       }
       
-      return data;
+      return finalRow;
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to create post'));
       throw err;

@@ -187,6 +187,60 @@ CREATE POLICY "Users can manage their own broadcasts" ON telegram_broadcasts
 
 -- Policies for other tables follow similar pattern...
 
+-- Policies for telegram_broadcast_recipients: allow bot owners to select/update
+CREATE POLICY "Bot owners can view their broadcast recipients" ON telegram_broadcast_recipients
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1
+      FROM telegram_broadcasts b
+      JOIN telegram_bots tb ON tb.id = b.bot_id
+      WHERE b.id = telegram_broadcast_recipients.broadcast_id
+        AND tb.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Bot owners can update their broadcast recipients" ON telegram_broadcast_recipients
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1
+      FROM telegram_broadcasts b
+      JOIN telegram_bots tb ON tb.id = b.bot_id
+      WHERE b.id = telegram_broadcast_recipients.broadcast_id
+        AND tb.user_id = auth.uid()
+    )
+  );
+
+-- Policies for telegram_broadcast_posts: allow bot owners to read
+CREATE POLICY "Bot owners can view their broadcast posts" ON telegram_broadcast_posts
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1
+      FROM telegram_broadcasts b
+      JOIN telegram_bots tb ON tb.id = b.bot_id
+      WHERE b.id = telegram_broadcast_posts.broadcast_id
+        AND tb.user_id = auth.uid()
+    )
+  );
+
+-- Policies for telegram_notifications: allow bot owners to insert and read their notifications
+CREATE POLICY "Bot owners can insert notifications" ON telegram_notifications
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM telegram_bots tb
+      WHERE tb.id = telegram_notifications.bot_id
+        AND tb.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Bot owners can view their notifications" ON telegram_notifications
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM telegram_bots tb
+      WHERE tb.id = telegram_notifications.bot_id
+        AND tb.user_id = auth.uid()
+    )
+  );
+
 -- ===================================================================
 -- USEFUL FUNCTIONS
 -- ===================================================================

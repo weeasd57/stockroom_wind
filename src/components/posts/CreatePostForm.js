@@ -59,7 +59,7 @@ export default function CreatePostForm() {
   const { profile, getEffectiveAvatarUrl } = useProfile();
   const { canCreatePost, incrementPostUsage, getRemainingPosts } = useSubscription();
   const router = useRouter();
-  const { tasks, startBackgroundPostCreation, cancelTask } = useBackgroundPostCreation();
+  const { tasks, startBackgroundPostCreation, cancelTask, clearTask } = useBackgroundPostCreation();
   const [initialPrice, setInitialPrice] = useState(null); // Added initialPrice state
   
   // Refs
@@ -185,6 +185,19 @@ export default function CreatePostForm() {
   const handleOpenCountrySelect = () => {
     setIsCountrySelectOpen(true);
   };
+
+  // Allow retrying the last failed task with current form data
+  const handleRetry = useCallback(() => {
+    try {
+      if (currentTask?.status === 'error' && typeof clearTask === 'function') {
+        clearTask(currentTask.id);
+      }
+    } catch {}
+    try { if (setSubmitState) setSubmitState('idle'); } catch {}
+    try { setIsSubmitting(false); } catch {}
+    // Invoke submit again with a synthetic event
+    try { handleSubmit({ preventDefault: () => {} }); } catch (e) { console.error('[CreatePostForm] handleRetry failed', e); }
+  }, [currentTask, clearTask, setSubmitState, setIsSubmitting]);
 
   const handleCloseCountrySelect = () => {
     setIsCountrySelectOpen(false);
@@ -1341,7 +1354,6 @@ export default function CreatePostForm() {
       try { setIsSubmitting(false); } catch {}
       try { if (setGlobalStatus) setGlobalStatus({ type: 'error', message: currentTask.error || 'Failed to create post. Please review and try again.' }); } catch {}
       try { if (openDialog) openDialog(); } catch {}
-      try { setCurrentTaskId(null); } catch {}
       toast.error(currentTask.error || 'Failed to create post');
     } else if (s === 'canceled') {
       // Canceled: reopen dialog so user can adjust and resubmit
@@ -1349,6 +1361,13 @@ export default function CreatePostForm() {
       try { setIsSubmitting(false); } catch {}
       try { if (openDialog) openDialog(); } catch {}
       try { setCurrentTaskId(null); } catch {}
+      toast.info('Posting canceled');
+    } else if (s === 'in_progress') {
+      // In progress: keep task visible and allow cancel
+      try { if (setSubmitState) setSubmitState('in_progress'); } catch {}
+      try { setIsSubmitting(true); } catch {}
+      try { if (openDialog) openDialog(); } catch {}
+      toast.info('Posting in progress...');
       toast.info('Posting cancelled');
     }
   }, [currentTask]);
@@ -2656,10 +2675,25 @@ export default function CreatePostForm() {
                 <span className="bg-task-text" style={{ fontSize: 12, color: '#6b7280' }}>
                   {currentTask.status === 'uploading' ? 'Uploading image' : currentTask.status === 'creating' ? 'Creating post' : currentTask.status}
                 </span>
-                {currentTask.canCancel && (
-                  <button className="btn btn-cancel" onClick={cancelPosting} style={{ fontSize: 12 }}>
-                    Cancel
-                  </button>
+                {currentTask.status === 'error' ? (
+                  <>
+                    <button className="btn btn-primary" onClick={handleRetry} style={{ fontSize: 12 }}>
+                      Retry
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => { try { if (clearTask) clearTask(currentTask.id); } catch {}; try { setCurrentTaskId(null); } catch {} }}
+                      style={{ fontSize: 12 }}
+                    >
+                      Dismiss
+                    </button>
+                  </>
+                ) : (
+                  currentTask.canCancel && (
+                    <button className="btn btn-cancel" onClick={cancelPosting} style={{ fontSize: 12 }}>
+                      Cancel
+                    </button>
+                  )
                 )}
               </div>
             )}

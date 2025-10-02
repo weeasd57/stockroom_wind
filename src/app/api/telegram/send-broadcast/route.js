@@ -19,6 +19,16 @@ export async function POST(request) {
     const user = session.user;
 
     const body = await request.json();
+    try {
+      console.log('[SEND-BROADCAST] Incoming request', {
+        hasSession: Boolean(session?.user?.id),
+        userId: session?.user?.id,
+        title: body?.title,
+        messageLen: (body?.message || '').length,
+        selectedPostsCount: Array.isArray(body?.selectedPosts) ? body.selectedPosts.length : 0,
+        recipientType: body?.recipientType
+      });
+    } catch {}
     const { 
       title, 
       message, 
@@ -48,6 +58,12 @@ export async function POST(request) {
         { status: 400 }
       );
     }
+    try {
+      console.log('[SEND-BROADCAST] Active bot resolved', {
+        botId: userBot?.id,
+        botName: userBot?.bot_name
+      });
+    } catch {}
 
     // تحديد المستلمين بناءً على اختيار المستخدم
     let recipientIds = Array.isArray(selectedRecipients) ? selectedRecipients.filter(Boolean) : [];
@@ -66,6 +82,7 @@ export async function POST(request) {
         );
       }
       recipientIds = (followers || []).map((r) => r.subscriber_id).filter(Boolean);
+      try { console.log('[SEND-BROADCAST] Followers recipients resolved', { count: recipientIds.length }); } catch {}
     } else if (recipientType === 'all_subscribers') {
       const { data: allSubs, error: allSubsError } = await supabase
         .from('telegram_subscribers')
@@ -80,6 +97,7 @@ export async function POST(request) {
         );
       }
       recipientIds = (allSubs || []).map((r) => r.id).filter(Boolean);
+      try { console.log('[SEND-BROADCAST] All-subs recipients resolved', { count: recipientIds.length }); } catch {}
     } // 'manual' => keep selectedRecipients as provided
 
     if (!recipientIds || recipientIds.length === 0) {
@@ -110,9 +128,11 @@ export async function POST(request) {
     }
 
     const broadcastId = broadcast;
+    try { console.log('[SEND-BROADCAST] Broadcast created', { broadcastId }); } catch {}
 
     // بدء إرسال البرودكاست في background باستخدام توكن البوت الخاص بالمستخدم
     processBroadcast(supabase, broadcastId, userBot.bot_token);
+    try { console.log('[SEND-BROADCAST] Background processing started', { broadcastId }); } catch {}
 
     return NextResponse.json({
       success: true,
@@ -132,6 +152,7 @@ export async function POST(request) {
 // معالجة البرودكاست في الخلفية
 async function processBroadcast(supabase, broadcastId, botToken) {
   try {
+    try { console.log('[PROCESS-BROADCAST] Start', { broadcastId, hasBotToken: Boolean(botToken) }); } catch {}
     // تحديث حالة البرودكاست إلى "sending"
     await supabase
       .from('telegram_broadcasts')
@@ -183,6 +204,13 @@ async function processBroadcast(supabase, broadcastId, botToken) {
     }
 
     const recipients = (recipientsRaw || []).filter(r => !r.status || r.status === 'pending');
+    try {
+      console.log('[PROCESS-BROADCAST] Context', {
+        postsCount: (broadcastPosts || []).length,
+        pendingRecipients: recipients.length,
+        title: broadcastData?.title
+      });
+    } catch {}
 
     if (!recipients || recipients.length === 0) {
       console.warn(`No pending recipients found for broadcast ${broadcastId}.`);
@@ -212,10 +240,17 @@ async function processBroadcast(supabase, broadcastId, botToken) {
       try {
         const telegramUserId = recipient.telegram_subscribers.telegram_user_id;
         const messageText = formatBroadcastMessage(broadcastData, broadcastPosts);
+        try {
+          console.log('[PROCESS-BROADCAST] Sending to recipient', {
+            telegramUserId,
+            preview: messageText.slice(0, 120)
+          });
+        } catch {}
 
         const result = await sendTelegramMessage(botToken, telegramUserId, messageText);
 
         if (result?.ok) {
+          try { console.log('[PROCESS-BROADCAST] Sent OK', { telegramUserId, messageId: result.result?.message_id }); } catch {}
           // تحديث حالة المستقبل إلى "sent"
           await supabase
             .from('telegram_broadcast_recipients')
@@ -299,21 +334,37 @@ function formatBroadcastMessage(broadcast, posts) {
   }
 
   if (posts && posts.length > 0) {
-    message += `📊 *Selected posts:*\n\n`;
-    
-    posts.forEach((postData, index) => {
-      const post = postData.posts;
-      message += `${index + 1}. *${post.symbol}* - ${post.company_name}\n`;
+    if (posts.length === 1) {
+      const post = posts[0].posts;
+      message += `📊 *Details:*\n\n`;
       message += `💰 Current price: ${post.current_price}\n`;
       message += `🎯 Target: ${post.target_price}\n`;
       message += `🛑 Stop loss: ${post.stop_loss_price}\n`;
-      
       if (post.strategy) {
         message += `📈 Strategy: ${post.strategy}\n`;
       }
-      
       message += `\n`;
-    });
+    } else {
+      message += `📊 *Selected posts:*\n\n`;
+      posts.forEach((postData, index) => {
+        const post = postData.posts;
+        message += `${index + 1}. *${post.symbol}* - ${post.company_name}\n`;
+        message += `💰 Current price: ${post.current_price}\n`;
+        message += `🎯 Target: ${post.target_price}\n`;
+        message += `🛑 Stop loss: ${post.stop_loss_price}\n`;
+        if (post.strategy) {
+          message += `📈 Strategy: ${post.strategy}\n`;
+        }
+        // Include the user's comment only in multi-post items to provide context per item
+        if (post.description) {
+          const desc = String(post.description).trim();
+          if (desc) {
+            message += `📝 ${desc}\n`;
+          }
+        }
+        message += `\n`;
+      });
+    }
   }
 
   message += `\n👤 From: *${broadcast.sender_name}*`;
@@ -324,26 +375,55 @@ function formatBroadcastMessage(broadcast, posts) {
 
 // إرسال رسالة تليجرام
 async function sendTelegramMessage(botToken, chatId, text, options = {}) {
-  try {
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    const payload = {
-      chat_id: chatId,
-      text: text,
-      parse_mode: 'Markdown',
-      disable_web_page_preview: true,
-      ...options
-    };
+  const base = process.env.TELEGRAM_API_BASE || 'https://api.telegram.org';
+  const url = `${base}/bot${botToken}/sendMessage`;
+  const payload = {
+    chat_id: chatId,
+    text: text,
+    parse_mode: 'Markdown',
+    disable_web_page_preview: true,
+    ...options
+  };
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+  const maxAttempts = Math.max(1, Number(process.env.TELEGRAM_SEND_RETRIES || 3));
+  const timeoutMs = Math.max(1000, Number(process.env.TELEGRAM_SEND_TIMEOUT_MS || 10000));
 
-    const result = await response.json();
-    return result;
-  } catch (error) {
-    console.error('Error sending telegram message:', error);
-    return { ok: false, error: error.message };
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+
+      const raw = await response.text().catch(() => '');
+      let result = {};
+      try { result = raw ? JSON.parse(raw) : {}; } catch {}
+
+      if (!response.ok || (result && result.ok === false)) {
+        const status = response.status;
+        console.warn('[PROCESS-BROADCAST] Telegram API returned non-ok', { attempt, status, raw: raw?.slice(0, 300) });
+        // Retry on 429/5xx
+        if (attempt < maxAttempts && (status === 429 || status >= 500)) {
+          const backoff = 500 * attempt;
+          await new Promise(r => setTimeout(r, backoff));
+          continue;
+        }
+      }
+      return result;
+    } catch (error) {
+      clearTimeout(timer);
+      console.error('[PROCESS-BROADCAST] Telegram fetch error', { attempt, message: error?.message });
+      if (attempt < maxAttempts) {
+        const backoff = 800 * attempt;
+        await new Promise(r => setTimeout(r, backoff));
+        continue;
+      }
+      return { ok: false, error: error?.message || 'fetch failed' };
+    }
   }
 }

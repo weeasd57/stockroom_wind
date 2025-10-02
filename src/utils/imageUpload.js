@@ -122,13 +122,28 @@ export async function uploadPostImageEnhanced(file, userId, options = {}) {
           }, 250);
         }
 
-        const { data, error } = await supabase.storage
+        // Wrap upload with timeout and abort race to avoid indefinite hangs
+        const uploadPromise = supabase.storage
           .from(strategy.bucket)
           .upload(strategy.path, compressedFile, {
             cacheControl: '3600',
             upsert: true,
             ...options.uploadOptions
           });
+
+        const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 20000; // 20s default
+        let abortRaceHandler = null;
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve({ data: null, error: new Error('Upload timeout') }), timeoutMs));
+        const abortPromise = (signal && typeof signal.addEventListener === 'function')
+          ? new Promise((resolve) => {
+              abortRaceHandler = () => resolve({ data: null, error: new DOMException('Upload aborted', 'AbortError') });
+              try { signal.addEventListener('abort', abortRaceHandler, { once: true }); } catch {}
+            })
+          : new Promise(() => {});
+
+        const raceResult = await Promise.race([uploadPromise, timeoutPromise, abortPromise]);
+        if (signal && abortRaceHandler) { try { signal.removeEventListener('abort', abortRaceHandler); } catch {} }
+        const { data, error } = raceResult || {};
 
         if (error) {
           lastError = error;

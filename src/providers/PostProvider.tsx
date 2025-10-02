@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { sendTelegramBroadcastForPost } from '@/services/telegram';
 import { useSupabase } from '@/providers/SupabaseProvider';
 
 type Post = any;
@@ -342,6 +343,22 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
         return [saved, ...withoutTemp];
       });
       notifyCreated(saved);
+
+      // Fire-and-forget: send Telegram broadcast to all subscribers for this user
+      try {
+        sendTelegramBroadcastForPost(saved, { recipientType: 'all_subscribers' })
+          .then((res) => {
+            if (!res?.success) {
+              console.warn('[PostProvider] Telegram broadcast failed:', res?.error);
+            } else {
+              console.log('[PostProvider] Telegram broadcast started. Broadcast ID:', res?.broadcastId);
+            }
+          })
+          .catch((e) => console.warn('[PostProvider] Telegram broadcast error:', e?.message || e));
+      } catch (e) {
+        // Ensure no throw from notification flow
+      }
+
       return saved;
     } catch (e: any) {
       setPosts(prev => prev.filter(p => p.id !== tempId));

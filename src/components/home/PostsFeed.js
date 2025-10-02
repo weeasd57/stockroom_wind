@@ -33,7 +33,7 @@ export function PostsFeed({
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState('all'); // following, all, trending
+  const [filter, setFilter] = useState('following'); // following, all, trending
   const [sortBy, setSortBy] = useState('date_desc'); // date_desc, date_asc, engagement, price_change
   const [categoryFilter, setCategoryFilter] = useState('all'); // all, buy, sell, analysis
   // Removed local following cache; PostProvider handles 'following' filtering

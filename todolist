@@ -5,15 +5,10 @@ scripts\update-telegram-webhook.js *** for telegram bot 🔥
 ** add custom telegram bot in pro palne
    for have the user create has bot and return set the bot token 
 
-working {
-     * add telegram features 
-        - test telegram chek post and create post 
-        - test telegram send post to followers
-}
+
 
 ** add im telegram tap in profile tap for my subscribtions
 
 * fix vote system
 * add send the post state to my telegram followers in detal post page 
 * need add grid view for my posts 
-* the comments cant showing from home , users page but showing in details page 
