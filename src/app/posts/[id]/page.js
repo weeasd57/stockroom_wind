@@ -208,8 +208,8 @@ export default function PostDetailsPage() {
   };
   
   useEffect(() => {
-    // Prevent double-fetch in React Strict Mode
-    if (hasFetchedRef.current) return;
+    // Wait until we have a valid id, then guard against double-fetch
+    if (!id || hasFetchedRef.current) return;
     hasFetchedRef.current = true;
 
     // Cancel previous request if any
@@ -272,9 +272,8 @@ export default function PostDetailsPage() {
       }
     }
     
-    if (id) {
-      fetchPost();
-    }
+    // id is guaranteed truthy here
+    fetchPost();
 
     return () => {
       if (controllerRef.current) {

@@ -992,3 +992,460 @@ WITH (security_invoker = on) AS
            FROM post_actions
           WHERE post_actions.action_type::text = 'sell'::text
           GROUP BY post_actions.post_id) sell_counts ON posts.id = sell_counts.post_id;
+
+-- ===================================================================
+-- Table: USER_PRICE_CHECKS (Price Check Usage Tracking)
+-- ===================================================================
+-- This table tracks price check usage for subscription limits
+CREATE TABLE IF NOT EXISTS user_price_checks (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    symbol TEXT,
+    exchange TEXT,
+    country TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create indexes for performance
+CREATE INDEX IF NOT EXISTS idx_user_price_checks_user_id ON user_price_checks(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_price_checks_created_at ON user_price_checks(created_at);
+CREATE INDEX IF NOT EXISTS idx_user_price_checks_user_month ON user_price_checks(user_id, DATE_TRUNC('month', created_at));
+
+-- Enable RLS
+ALTER TABLE user_price_checks ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies
+CREATE POLICY "Users can view their own price checks" 
+ON user_price_checks FOR SELECT 
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own price checks" 
+ON user_price_checks FOR INSERT 
+WITH CHECK (auth.uid() = user_id);
+
+-- ===================================================================
+-- SUBSCRIPTION PLANS AND USER SUBSCRIPTIONS TABLES
+-- ===================================================================
+-- Create subscription plans table if not exists
+CREATE TABLE IF NOT EXISTS subscription_plans (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(50) NOT NULL UNIQUE,
+    display_name VARCHAR(100) NOT NULL,
+    price_check_limit INTEGER DEFAULT 50,
+    post_creation_limit INTEGER DEFAULT 100,
+    monthly_price DECIMAL(10,2) DEFAULT 0,
+    yearly_price DECIMAL(10,2) DEFAULT 0,
+    features JSONB DEFAULT '[]',
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Insert default plans if not exist
+INSERT INTO subscription_plans (name, display_name, price_check_limit, post_creation_limit, monthly_price, yearly_price)
+VALUES 
+    ('free', 'Free', 50, 100, 0, 0),
+    ('pro', 'Pro', 500, 1000, 9.99, 99.99),
+    ('premium', 'Premium', 2000, 5000, 19.99, 199.99)
+ON CONFLICT (name) DO NOTHING;
+
+-- Create user subscriptions table if not exists
+CREATE TABLE IF NOT EXISTS user_subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    plan_id UUID NOT NULL REFERENCES subscription_plans(id),
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'cancelled', 'expired', 'pending')),
+    start_date TIMESTAMPTZ DEFAULT NOW(),
+    end_date TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, plan_id)
+);
+
+-- Create or update the user_subscription_info view to include price check usage
+CREATE OR REPLACE VIEW user_subscription_info AS
+SELECT 
+    u.id as user_id,
+    s.id as subscription_id,
+    s.plan_id,
+    COALESCE(p.name, 'free') as plan_name,
+    COALESCE(p.display_name, 'Free') as plan_display_name,
+    COALESCE(p.price_check_limit, 50) as price_check_limit,
+    
+    -- Count price checks for current month
+    COALESCE(
+        (SELECT COUNT(*) 
+         FROM user_price_checks pc 
+         WHERE pc.user_id = u.id 
+           AND DATE_TRUNC('month', pc.created_at) = DATE_TRUNC('month', CURRENT_DATE)
+        ), 0
+    ) as price_checks_used,
+    
+    -- Calculate remaining checks
+    GREATEST(
+        COALESCE(p.price_check_limit, 50) - COALESCE(
+            (SELECT COUNT(*) 
+             FROM user_price_checks pc 
+             WHERE pc.user_id = u.id 
+               AND DATE_TRUNC('month', pc.created_at) = DATE_TRUNC('month', CURRENT_DATE)
+            ), 0
+        ), 0
+    ) as remaining_checks,
+    
+    COALESCE(p.post_creation_limit, 100) as post_creation_limit,
+    COALESCE(
+        (SELECT COUNT(*) 
+         FROM posts po 
+         WHERE po.user_id = u.id 
+           AND DATE_TRUNC('month', po.created_at) = DATE_TRUNC('month', CURRENT_DATE)
+        ), 0
+    ) as posts_created,
+    
+    GREATEST(
+        COALESCE(p.post_creation_limit, 100) - COALESCE(
+            (SELECT COUNT(*) 
+             FROM posts po 
+             WHERE po.user_id = u.id 
+               AND DATE_TRUNC('month', po.created_at) = DATE_TRUNC('month', CURRENT_DATE)
+            ), 0
+        ), 0
+    ) as remaining_posts,
+    
+    COALESCE(s.status, 'active') as subscription_status,
+    s.start_date,
+    s.end_date
+FROM profiles u
+LEFT JOIN user_subscriptions s ON u.id = s.user_id 
+    AND s.status = 'active'
+    AND (s.end_date IS NULL OR s.end_date > CURRENT_DATE)
+LEFT JOIN subscription_plans p ON s.plan_id = p.id;
+
+-- Grant permissions on the view
+GRANT SELECT ON user_subscription_info TO authenticated;
+GRANT SELECT ON user_subscription_info TO anon;
+
+-- ===================================================================
+-- RPC FUNCTIONS FOR PRICE CHECK MANAGEMENT
+-- ===================================================================
+
+-- RPC function to check if user can perform price check
+CREATE OR REPLACE FUNCTION check_price_limit(p_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_current_month DATE;
+    v_current_count INTEGER;
+    v_limit INTEGER;
+BEGIN
+    -- Get the current month (first day)
+    v_current_month := DATE_TRUNC('month', CURRENT_DATE);
+    
+    -- Get current usage count for this month
+    SELECT COALESCE(COUNT(*), 0) INTO v_current_count
+    FROM user_price_checks 
+    WHERE user_id = p_user_id 
+      AND DATE_TRUNC('month', created_at) = v_current_month;
+    
+    -- Get user's price check limit from subscription or use default
+    SELECT 
+        CASE 
+            WHEN s.id IS NOT NULL THEN COALESCE(p.price_check_limit, 50)
+            ELSE 50  -- Default free plan limit
+        END INTO v_limit
+    FROM profiles u
+    LEFT JOIN user_subscriptions s ON u.id = s.user_id 
+        AND s.status = 'active'
+        AND (s.end_date IS NULL OR s.end_date > CURRENT_DATE)
+    LEFT JOIN subscription_plans p ON s.plan_id = p.id
+    WHERE u.id = p_user_id;
+    
+    -- If no user found or no limit set, use default
+    IF v_limit IS NULL THEN
+        v_limit := 50;
+    END IF;
+    
+    -- Return TRUE if user can still make price checks
+    RETURN v_current_count < v_limit;
+    
+EXCEPTION
+    WHEN OTHERS THEN
+        -- On error, be conservative and return FALSE
+        RAISE WARNING 'Error in check_price_limit: %', SQLERRM;
+        RETURN FALSE;
+END;
+$$;
+
+-- RPC function to log price check usage and increment counter
+CREATE OR REPLACE FUNCTION log_price_check(
+    p_user_id UUID,
+    p_symbol TEXT DEFAULT NULL,
+    p_exchange TEXT DEFAULT NULL,
+    p_country TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_current_month DATE;
+    v_current_count INTEGER;
+    v_limit INTEGER;
+BEGIN
+    -- Get the current month (first day)
+    v_current_month := DATE_TRUNC('month', CURRENT_DATE);
+    
+    -- Get current usage count for this month
+    SELECT COALESCE(COUNT(*), 0) INTO v_current_count
+    FROM user_price_checks 
+    WHERE user_id = p_user_id 
+      AND DATE_TRUNC('month', created_at) = v_current_month;
+    
+    -- Get user's price check limit from subscription or use default
+    SELECT 
+        CASE 
+            WHEN s.id IS NOT NULL THEN COALESCE(p.price_check_limit, 50)
+            ELSE 50  -- Default free plan limit
+        END INTO v_limit
+    FROM profiles u
+    LEFT JOIN user_subscriptions s ON u.id = s.user_id 
+        AND s.status = 'active'
+        AND (s.end_date IS NULL OR s.end_date > CURRENT_DATE)
+    LEFT JOIN subscription_plans p ON s.plan_id = p.id
+    WHERE u.id = p_user_id;
+    
+    -- If no limit found, use default
+    IF v_limit IS NULL THEN
+        v_limit := 50;
+    END IF;
+    
+    -- Check if user has exceeded limit
+    IF v_current_count >= v_limit THEN
+        RETURN FALSE; -- Cannot log, limit exceeded
+    END IF;
+    
+    -- Insert the price check log
+    INSERT INTO user_price_checks (
+        user_id,
+        symbol,
+        exchange,
+        country,
+        created_at
+    ) VALUES (
+        p_user_id,
+        COALESCE(p_symbol, 'PRICE_CHECK_API'),
+        p_exchange,
+        p_country,
+        NOW()
+    );
+    
+    RETURN TRUE; -- Successfully logged
+    
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Log error but don't fail completely
+        RAISE WARNING 'Error in log_price_check: %', SQLERRM;
+        RETURN FALSE;
+END;
+$$;
+
+-- ===================================================================
+-- UPDATED PRICE CHECK SYSTEM WITH USER_SUBSCRIPTIONS
+-- ===================================================================
+
+-- Add price check usage columns to user_subscriptions table if not exist
+ALTER TABLE user_subscriptions 
+ADD COLUMN IF NOT EXISTS price_checks_used INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS last_price_check_reset TIMESTAMPTZ DEFAULT DATE_TRUNC('month', NOW());
+
+-- Drop existing functions and create updated versions
+DROP FUNCTION IF EXISTS check_price_limit;
+DROP FUNCTION IF EXISTS log_price_check;
+DROP VIEW IF EXISTS user_subscription_info;
+
+-- RPC function to check if user can perform price check (UPDATED VERSION)
+CREATE FUNCTION check_price_limit(p_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_current_count INTEGER := 0;
+    v_limit INTEGER := 50;
+    v_current_month DATE;
+BEGIN
+    v_current_month := DATE_TRUNC('month', CURRENT_DATE);
+    
+    -- Get user's subscription info and current usage
+    SELECT 
+        COALESCE(s.price_checks_used, 0),
+        COALESCE(sp.price_check_limit, 50)
+    INTO v_current_count, v_limit
+    FROM profiles u
+    LEFT JOIN user_subscriptions s ON u.id = s.user_id 
+        AND s.status = 'active'
+    LEFT JOIN subscription_plans sp ON s.plan_id = sp.id
+    WHERE u.id = p_user_id;
+    
+    -- If no subscription found, use free plan defaults
+    IF v_limit IS NULL THEN
+        v_limit := 50;
+    END IF;
+    
+    -- Return TRUE if user can still make price checks
+    RETURN v_current_count < v_limit;
+    
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE WARNING 'Error in check_price_limit: %', SQLERRM;
+        RETURN FALSE;
+END;
+$$;
+
+-- RPC function to log price check usage and increment counter (UPDATED VERSION)
+CREATE FUNCTION log_price_check(
+    p_user_id UUID,
+    p_symbol TEXT DEFAULT NULL,
+    p_exchange TEXT DEFAULT NULL,
+    p_country TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_subscription_id UUID;
+    v_current_count INTEGER := 0;
+    v_limit INTEGER := 50;
+    v_current_month DATE;
+    v_last_reset DATE;
+BEGIN
+    v_current_month := DATE_TRUNC('month', CURRENT_DATE);
+    
+    -- Get user's active subscription
+    SELECT 
+        s.id,
+        COALESCE(s.price_checks_used, 0),
+        COALESCE(sp.price_check_limit, 50),
+        COALESCE(DATE_TRUNC('month', s.last_price_check_reset), v_current_month)
+    INTO v_subscription_id, v_current_count, v_limit, v_last_reset
+    FROM user_subscriptions s
+    LEFT JOIN subscription_plans sp ON s.plan_id = sp.id
+    WHERE s.user_id = p_user_id 
+        AND s.status = 'active'
+    LIMIT 1;
+    
+    -- If no subscription found, create a default free subscription
+    IF v_subscription_id IS NULL THEN
+        -- Get free plan ID
+        DECLARE v_free_plan_id UUID;
+        BEGIN
+            SELECT id INTO v_free_plan_id 
+            FROM subscription_plans 
+            WHERE name = 'free' 
+            LIMIT 1;
+            
+            -- Create free subscription if plan exists
+            IF v_free_plan_id IS NOT NULL THEN
+                INSERT INTO user_subscriptions (user_id, plan_id, status, price_checks_used, last_price_check_reset)
+                VALUES (p_user_id, v_free_plan_id, 'active', 0, v_current_month)
+                RETURNING id INTO v_subscription_id;
+                
+                v_current_count := 0;
+                v_limit := 50;
+            ELSE
+                RETURN FALSE; -- No free plan available
+            END IF;
+        END;
+    END IF;
+    
+    -- Reset counter if it's a new month
+    IF v_last_reset < v_current_month THEN
+        UPDATE user_subscriptions 
+        SET price_checks_used = 0, 
+            last_price_check_reset = v_current_month
+        WHERE id = v_subscription_id;
+        v_current_count := 0;
+    END IF;
+    
+    -- Check if user has exceeded limit
+    IF v_current_count >= v_limit THEN
+        RETURN FALSE; -- Cannot log, limit exceeded
+    END IF;
+    
+    -- Increment the usage counter
+    UPDATE user_subscriptions 
+    SET price_checks_used = price_checks_used + 1
+    WHERE id = v_subscription_id;
+    
+    RETURN TRUE; -- Successfully logged
+    
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE WARNING 'Error in log_price_check: %', SQLERRM;
+        RETURN FALSE;
+END;
+$$;
+
+-- Create updated user_subscription_info view using user_subscriptions data
+CREATE VIEW user_subscription_info AS
+SELECT 
+    u.id as user_id,
+    s.id as subscription_id,
+    s.plan_id,
+    COALESCE(p.name, 'free') as plan_name,
+    COALESCE(p.display_name, 'Free') as plan_display_name,
+    COALESCE(p.price_check_limit, 50) as price_check_limit,
+    
+    -- Get price checks used from subscription (reset monthly)
+    CASE 
+        WHEN s.last_price_check_reset IS NULL OR 
+             DATE_TRUNC('month', s.last_price_check_reset) < DATE_TRUNC('month', CURRENT_DATE)
+        THEN 0
+        ELSE COALESCE(s.price_checks_used, 0)
+    END as price_checks_used,
+    
+    -- Calculate remaining checks
+    GREATEST(
+        COALESCE(p.price_check_limit, 50) - 
+        CASE 
+            WHEN s.last_price_check_reset IS NULL OR 
+                 DATE_TRUNC('month', s.last_price_check_reset) < DATE_TRUNC('month', CURRENT_DATE)
+            THEN 0
+            ELSE COALESCE(s.price_checks_used, 0)
+        END, 0
+    ) as remaining_checks,
+    
+    COALESCE(p.post_creation_limit, 100) as post_creation_limit,
+    COALESCE(
+        (SELECT COUNT(*) 
+         FROM posts po 
+         WHERE po.user_id = u.id 
+           AND DATE_TRUNC('month', po.created_at) = DATE_TRUNC('month', CURRENT_DATE)
+        ), 0
+    ) as posts_created,
+    
+    GREATEST(
+        COALESCE(p.post_creation_limit, 100) - COALESCE(
+            (SELECT COUNT(*) 
+             FROM posts po 
+             WHERE po.user_id = u.id 
+               AND DATE_TRUNC('month', po.created_at) = DATE_TRUNC('month', CURRENT_DATE)
+            ), 0
+        ), 0
+    ) as remaining_posts,
+    
+    COALESCE(s.status, 'active') as subscription_status,
+    s.created_at as start_date,
+    NULL as end_date
+FROM profiles u
+LEFT JOIN user_subscriptions s ON u.id = s.user_id 
+    AND s.status = 'active'
+LEFT JOIN subscription_plans p ON s.plan_id = p.id;
+
+-- Grant execute permissions (UPDATED)
+GRANT EXECUTE ON FUNCTION check_price_limit TO authenticated;
+GRANT EXECUTE ON FUNCTION check_price_limit TO anon;
+GRANT EXECUTE ON FUNCTION log_price_check TO authenticated;
+GRANT EXECUTE ON FUNCTION log_price_check TO anon;
+GRANT SELECT ON user_subscription_info TO authenticated;
+GRANT SELECT ON user_subscription_info TO anon;

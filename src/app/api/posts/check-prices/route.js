@@ -258,20 +258,7 @@ export async function POST(request) {
       );
     }
     
-    // Log the price check using RPC function
-    const { data: logResult, error: logError } = await supabase
-      .rpc('log_price_check', { 
-        p_user_id: userId,
-        p_symbol: 'BATCH_CHECK', // Generic symbol for batch check
-        p_exchange: null,
-        p_country: null
-      });
-    
-    if (logError) {
-      console.error('[ERROR] Error logging price check:', logError);
-    } else {
-      if (DEBUG) console.log(`[DEBUG] Successfully logged price check`);
-    }
+    // Price check logging is now handled at the end of the API call
     
     if (DEBUG) console.log(`[DEBUG] Fetching all posts to count closed posts`);
     const { data: allPosts, error: allPostsError } = await supabase
@@ -1108,19 +1095,72 @@ export async function POST(request) {
       results.updateSuccess = updateSuccess;
     }
     
-    // Get user's subscription limits from Supabase (may not exist for new users)
-    const { data: subscriptionData } = await supabase
+    // Log the price check using the RPC function to update usage counter
+    console.log(`[LOG_PRICE_CHECK] Attempting to log price check usage for user ${userId}`);
+    try {
+      const { data: logData, error: logError } = await supabase
+        .rpc('log_price_check', { 
+          p_user_id: userId,
+          p_symbol: 'PRICE_CHECK_API',
+          p_exchange: null,
+          p_country: null
+        });
+      
+      if (logError) {
+        console.error('[LOG_PRICE_CHECK] Failed to log price check usage:', {
+          error: logError,
+          code: logError.code,
+          message: logError.message,
+          details: logError.details,
+          hint: logError.hint
+        });
+        // Don't fail the whole operation, just log the error
+      } else {
+        console.log(`[LOG_PRICE_CHECK] Price check usage logged successfully for user ${userId}`, {
+          logData,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (logPriceCheckError) {
+      console.error('[LOG_PRICE_CHECK] Exception in log_price_check:', {
+        error: logPriceCheckError,
+        message: logPriceCheckError?.message,
+        stack: logPriceCheckError?.stack
+      });
+    }
+
+    // Get updated subscription limits after logging the usage
+    console.log(`[SUBSCRIPTION_INFO] Fetching updated subscription info for user ${userId}`);
+    const { data: subscriptionData, error: subscriptionError } = await supabase
       .from('user_subscription_info')
       .select('*')
       .eq('user_id', userId);
     
+    if (subscriptionError) {
+      console.error('[SUBSCRIPTION_INFO] Error fetching subscription info:', subscriptionError);
+    }
+    
     const subscriptionInfo = subscriptionData && subscriptionData.length > 0 ? subscriptionData[0] : null;
+    console.log(`[SUBSCRIPTION_INFO] Current subscription data:`, {
+      userId,
+      subscriptionInfo,
+      hasData: !!subscriptionInfo,
+      dataLength: subscriptionData?.length || 0
+    });
     
     const maxMonthlyChecks = subscriptionInfo?.price_check_limit || 50;
     const usageCount = subscriptionInfo?.price_checks_used || 0;
     const remainingChecks = Math.max(maxMonthlyChecks - usageCount, 0);
     
-    if (DEBUG) console.log(`[DEBUG] Price check completed for ${posts.length} posts. Updated: ${updatedPosts.length}, Skipped: ${closedPostsCount}, Remaining checks this month: ${remainingChecks}`);
+    console.log(`[SUBSCRIPTION_INFO] Usage calculation:`, {
+      maxMonthlyChecks,
+      usageCount,
+      remainingChecks,
+      priceCheckLimit: subscriptionInfo?.price_check_limit,
+      priceChecksUsed: subscriptionInfo?.price_checks_used
+    });
+    
+    if (DEBUG) console.log(`[DEBUG] Price check completed for ${posts.length} posts. Updated: ${updatedPosts.length}, Skipped: ${closedPostsCount}, Usage: ${usageCount}, Remaining checks this month: ${remainingChecks}`);
     
     return NextResponse.json({
       success: true,

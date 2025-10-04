@@ -37,9 +37,9 @@ export async function POST(request) {
       recipientType = 'followers' // 'followers', 'all_subscribers', 'manual'
     } = body;
 
-    if (!title || !message) {
+    if (!title) {
       return NextResponse.json(
-        { error: 'Title and message are required' },
+        { error: 'Title is required' },
         { status: 400 }
       );
     }
@@ -329,46 +329,57 @@ async function processBroadcast(supabase, broadcastId, botToken) {
 function formatBroadcastMessage(broadcast, posts) {
   let message = `📢 *${broadcast.title}*\n\n`;
   
-  if (broadcast.message) {
-    message += `${broadcast.message}\n\n`;
+  if (broadcast.message && broadcast.message.trim()) {
+    message += `${broadcast.message.trim()}\n\n`;
   }
 
   if (posts && posts.length > 0) {
-    if (posts.length === 1) {
-      const post = posts[0].posts;
-      message += `📊 *Details:*\n\n`;
-      message += `💰 Current price: ${post.current_price}\n`;
-      message += `🎯 Target: ${post.target_price}\n`;
-      message += `🛑 Stop loss: ${post.stop_loss_price}\n`;
-      if (post.strategy) {
-        message += `📈 Strategy: ${post.strategy}\n`;
+    const changedCount = posts.length;
+    message += `📊 *Summary:*\n`;
+    message += `✅ ${changedCount} post${changedCount > 1 ? 's' : ''} updated\n\n`;
+    
+    posts.forEach((postData, index) => {
+      const post = postData.posts;
+      
+      // Symbol and Status header
+      message += `${index + 1}. *${post.symbol}*`;
+      if (post.company_name) {
+        message += ` - ${post.company_name}`;
       }
       message += `\n`;
-    } else {
-      message += `📊 *Selected posts:*\n\n`;
-      posts.forEach((postData, index) => {
-        const post = postData.posts;
-        message += `${index + 1}. *${post.symbol}* - ${post.company_name}\n`;
-        message += `💰 Current price: ${post.current_price}\n`;
-        message += `🎯 Target: ${post.target_price}\n`;
-        message += `🛑 Stop loss: ${post.stop_loss_price}\n`;
-        if (post.strategy) {
-          message += `📈 Strategy: ${post.strategy}\n`;
-        }
-        // Include the user's comment only in multi-post items to provide context per item
-        if (post.description) {
-          const desc = String(post.description).trim();
-          if (desc) {
-            message += `📝 ${desc}\n`;
-          }
-        }
-        message += `\n`;
-      });
-    }
+      
+      // Status based on conditions
+      if (post.target_reached) {
+        message += `🎯 *Target Reached*\n`;
+      } else if (post.stop_loss_triggered) {
+        message += `🛑 *Stop Loss Triggered*\n`;
+      } else if (post.status === 'closed') {
+        message += `🔒 *Position Closed*\n`;
+      } else {
+        message += `📈 *Price Updated*\n`;
+      }
+      
+      message += `💰 Current: $${post.current_price}\n`;
+      message += `🎯 Target: $${post.target_price}\n`;
+      message += `🛑 Stop Loss: $${post.stop_loss_price}\n`;
+      
+      if (post.strategy) {
+        message += `📊 Strategy: ${post.strategy}\n`;
+      }
+      
+      // Add post link
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://stockroom-saas.vercel.app';
+      message += `🔗 [View Post](${baseUrl}/posts/${post.id})\n\n`;
+    });
   }
 
-  message += `\n👤 From: *${broadcast.sender_name}*`;
-  message += `\n🕒 ${new Date().toLocaleString('en-US')}`;
+  message += `👤 From: *${broadcast.sender_name}*\n`;
+  message += `🕒 ${new Date().toLocaleString('en-US', { 
+    month: 'short', 
+    day: 'numeric', 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  })}`;
 
   return message;
 }

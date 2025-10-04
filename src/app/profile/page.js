@@ -6,6 +6,7 @@ import { useProfile } from '@/providers/ProfileProvider';
 import { useSubscription } from '@/providers/SubscriptionProvider';
 import { useBackgroundProfileUpdate } from '@/providers/BackgroundProfileUpdateProvider';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import styles from '@/styles/profile.module.css';
 import editStyles from '@/styles/editProfile.module.css';
 import { CreatePostButton } from '@/components/posts/CreatePostButton';
@@ -25,6 +26,7 @@ import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 // FIXED: Removed setProfile error - using background profile update system
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useSupabase();
+  const searchParams = useSearchParams();
   const { theme } = useTheme();
   const { 
     subscriptionInfo,
@@ -106,6 +108,18 @@ export default function Profile() {
     } else {
     }
   }, [isAuthenticated, user, authLoading, profileLoading, profile, subscriptionInfo, subscriptionLoading]);
+
+  // Initialize active tab from query param (e.g., /profile?tab=telegram)
+  useEffect(() => {
+    try {
+      const tab = searchParams?.get('tab');
+      const allowed = ['posts', 'followers', 'following', 'strategies', 'telegram'];
+      if (tab && allowed.includes(tab) && tab !== activeTab) {
+        setActiveTab(tab);
+      }
+    } catch {}
+    // We intentionally depend on searchParams so this reacts to URL changes
+  }, [searchParams, activeTab, setActiveTab]);
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [formData, setFormData] = useState({

@@ -2659,6 +2659,77 @@
   gap: 1rem;
 }
 
+/* Telegram Broadcast Section */
+.telegramBroadcastSection {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 2px solid var(--border);
+}
+
+.postSelectionActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.selectChangedButton {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+}
+
+.selectChangedButton:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+}
+
+.clearSelectionButton {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+}
+
+.clearSelectionButton:hover {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(245, 158, 11, 0.3);
+}
+
+.postSelectionItem:hover {
+  background: var(--muted);
+}
+
+.postStatusBadge {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 .closeStatsButton {
   background-color: var(--gold-button, #f9ca24);
   color: #000;

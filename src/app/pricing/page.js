@@ -182,6 +182,7 @@ export default function PricingPage() {
           <ul className="mt-6 space-y-2 text-sm">
             <li className="flex items-start gap-2"><span>✅</span> <strong>50 price checks per month</strong></li>
             <li className="flex items-start gap-2"><span>✅</span> <strong>100 posts per month</strong></li>
+            <li className="flex items-start gap-2"><span>✅</span> Telegram notifications: subscribe to traders you follow</li>
             <li className="flex items-start gap-2"><span>✅</span> Basic features</li>
             <li className="flex items-start gap-2"><span>✅</span> Community support</li>
           </ul>
@@ -224,6 +225,7 @@ export default function PricingPage() {
           <ul className="mt-6 space-y-2 text-sm">
             <li className="flex items-start gap-2"><span>🚀</span> <strong>300 price checks per month</strong></li>
             <li className="flex items-start gap-2"><span>🚀</span> <strong>500 posts per month</strong></li>
+            <li className="flex items-start gap-2"><span>🚀</span> Telegram notifications: subscribe to traders you follow</li>
             <li className="flex items-start gap-2"><span>🚀</span> Priority support</li>
           </ul>
           <div className="mt-6 grid grid-cols-1 gap-2">

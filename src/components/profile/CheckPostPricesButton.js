@@ -7,6 +7,7 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { useSubscription } from '@/providers/SubscriptionProvider';
 import dialogStyles from '@/styles/ProfilePostCard.module.css';
 import ConfirmActionDialog from '@/components/common/ConfirmActionDialog'; // Import the new dialog
+import { toast } from 'sonner';
 
 export default function CheckPostPricesButton({ userId }) {
   const [isChecking, setIsChecking] = useState(false);
@@ -24,6 +25,94 @@ export default function CheckPostPricesButton({ userId }) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false); // New state for confirm dialog
   const [confirmDialogContent, setConfirmDialogContent] = useState({ title: '', message: '', confirmAction: () => {}, confirmText: 'Confirm', cancelText: 'Cancel', showCancelButton: true });
   const [isPreflight, setIsPreflight] = useState(false);
+  // Telegram broadcast controls
+  const [sendToTelegram, setSendToTelegram] = useState(false);
+  const [tgTitle, setTgTitle] = useState('Price Check Report');
+  const [tgComment, setTgComment] = useState('');
+  const [selectedForBroadcast, setSelectedForBroadcast] = useState([]);
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
+
+  // Default-select changed posts when the stats dialog opens
+  useEffect(() => {
+    if (!showStatsDialog) return;
+    try {
+      const defaults = (detailedResults || [])
+        .filter(r => r && r.id && (r.targetReached || r.stopLossTriggered || r.closed))
+        .map(r => r.id);
+      setSelectedForBroadcast(defaults);
+      // Build a helpful default title
+      const changedCount = defaults.length;
+      const total = (detailedResults || []).length;
+      if (changedCount > 0) {
+        setTgTitle(`Price Check Report · ${changedCount}/${total} changed`);
+      } else {
+        setTgTitle('Price Check Report');
+      }
+    } catch (_) {}
+  }, [showStatsDialog, detailedResults]);
+
+  // Auto-toggle Telegram section when selection changes
+  useEffect(() => {
+    if ((selectedForBroadcast || []).length > 0) {
+      setSendToTelegram(true);
+    } else {
+      setSendToTelegram(false);
+    }
+  }, [selectedForBroadcast]);
+
+  const toggleSelectPost = (postId) => {
+    if (!postId) return;
+    setSelectedForBroadcast(prev => {
+      const next = prev.includes(postId) ? prev.filter(id => id !== postId) : [...prev, postId];
+      if (next.length > 0) setSendToTelegram(true);
+      return next;
+    });
+  };
+
+  const selectAllChanged = () => {
+    const ids = (detailedResults || [])
+      .filter(r => r && r.id && (r.targetReached || r.stopLossTriggered || r.closed))
+      .map(r => r.id);
+    setSelectedForBroadcast(ids);
+    setSendToTelegram(ids.length > 0);
+  };
+
+  const clearAllSelected = () => { setSelectedForBroadcast([]); setSendToTelegram(false); };
+
+  const handleSendTelegram = async () => {
+    try {
+      if (!sendToTelegram) {
+        toast.error('Enable "Send to Telegram followers" first');
+        return;
+      }
+      if (!selectedForBroadcast || selectedForBroadcast.length === 0) {
+        toast.error('Select at least one post to include');
+        return;
+      }
+      setSendingBroadcast(true);
+      const res = await fetch('/api/telegram/send-broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          title: tgTitle || 'Price Check Report',
+          message: tgComment || '',
+          selectedPosts: selectedForBroadcast,
+          selectedRecipients: [],
+          recipientType: 'followers'
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || data?.message || 'Failed to send broadcast');
+      }
+      toast.success('Report sent to Telegram followers');
+    } catch (e) {
+      toast.error(e?.message || 'Failed to send to Telegram');
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
   
   // Real-time subscription for price updates
   useEffect(() => {
@@ -191,7 +280,7 @@ export default function CheckPostPricesButton({ userId }) {
         setDetailedResults(data.results);
       }
       
-      // Refresh subscription info after successful check
+      // Refresh subscription info after successful check (usage is updated by API)
       refreshSubscription();
       
       if (userId && !isCancelled) {
@@ -332,7 +421,7 @@ export default function CheckPostPricesButton({ userId }) {
               <h3>Check Post Prices Information</h3>
               <button className={dialogStyles.closeButton} onClick={() => setShowInfoDialog(false)}>Close</button>
             </div>
-            <div className={dialogStyles.dialogContent}>
+            <div className={dialogStyles.dialogContent} style={{ paddingBottom: '96px' }}>
               <div className={styles.infoContent}>
                 <h4>What does "Check Post Prices" do?</h4>
                 <p>This feature checks the current prices of stocks in your posts and updates their status based on your target and stop-loss prices.</p>
@@ -370,96 +459,313 @@ export default function CheckPostPricesButton({ userId }) {
       {/* Enhanced API Response Dialog */}
       {showStatsDialog && checkStats && (
         <div className={dialogStyles.dialogOverlay} onClick={() => setShowStatsDialog(false)} style={{ zIndex: 9999 }}>
-          <div className={dialogStyles.statusDialog} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
+          <div className={dialogStyles.statusDialog} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', background: 'hsl(var(--background))', color: 'hsl(var(--foreground))', border: '1px solid var(--gold-border, rgba(245, 215, 110, 0.3))' }}>
             <div className={dialogStyles.dialogHeader}>
               <h3>Price Check Results</h3>
               <button className={dialogStyles.closeButton} onClick={() => setShowStatsDialog(false)}>Close</button>
             </div>
-            <div className={dialogStyles.dialogContent}>
-              {/* Summary Section */}
-              <div className={styles.resultsSummary}>
-                <div className={dialogStyles.dialogItem}>
-                  <span className={dialogStyles.dialogLabel}>Checks Today:</span>
-                  <span className={dialogStyles.dialogValue}>{checkStats.usageCount}</span>
+            <div className={dialogStyles.dialogContent} style={{ paddingBottom: '120px' }}>
+              {/* Main Content Background */}
+              <div style={{
+                backgroundColor: 'hsl(var(--card))',
+                borderRadius: '12px',
+                padding: '20px',
+                marginBottom: '16px',
+                border: '1px solid var(--border)',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
+                color: 'hsl(var(--foreground))'
+              }}>
+                {/* Summary Section */}
+                <div className={styles.resultsSummary}>
+                <div className={dialogStyles.dialogItem} style={{ color: 'hsl(var(--foreground))' }}>
+                  <span className={dialogStyles.dialogLabel} style={{ color: 'hsl(var(--muted-foreground))', fontWeight: 600 }}>Checks Today:</span>
+                  <span className={dialogStyles.dialogValue} style={{ color: 'hsl(var(--foreground))', fontWeight: 700 }}>{checkStats.usageCount}</span>
                 </div>
                 {typeof checkStats.remainingChecks !== 'undefined' && checkStats.remainingChecks !== null && (
-                  <div className={dialogStyles.dialogItem}>
-                    <span className={dialogStyles.dialogLabel}>Remaining:</span>
-                    <span className={dialogStyles.dialogValue}>{checkStats.remainingChecks}</span>
+                  <div className={dialogStyles.dialogItem} style={{ color: 'hsl(var(--foreground))' }}>
+                    <span className={dialogStyles.dialogLabel} style={{ color: 'hsl(var(--muted-foreground))', fontWeight: 600 }}>Remaining:</span>
+                    <span className={dialogStyles.dialogValue} style={{ color: 'hsl(var(--foreground))', fontWeight: 700 }}>{checkStats.remainingChecks}</span>
                   </div>
                 )}
                 
-                <div className={dialogStyles.dialogItem}>
-                  <span className={dialogStyles.dialogLabel}>Checked Posts:</span>
-                  <span className={dialogStyles.dialogValue}>{checkStats.checkedPosts}</span>
+                <div className={dialogStyles.dialogItem} style={{ color: 'hsl(var(--foreground))' }}>
+                  <span className={dialogStyles.dialogLabel} style={{ color: 'hsl(var(--muted-foreground))', fontWeight: 600 }}>Checked Posts:</span>
+                  <span className={dialogStyles.dialogValue} style={{ color: 'hsl(var(--foreground))', fontWeight: 700 }}>{checkStats.checkedPosts}</span>
                 </div>
                 
-                <div className={dialogStyles.dialogItem}>
-                  <span className={dialogStyles.dialogLabel}>Updated Posts:</span>
-                  <span className={dialogStyles.dialogValue}>{checkStats.updatedPosts}</span>
+                <div className={dialogStyles.dialogItem} style={{ color: 'hsl(var(--foreground))' }}>
+                  <span className={dialogStyles.dialogLabel} style={{ color: 'hsl(var(--muted-foreground))', fontWeight: 600 }}>Updated Posts:</span>
+                  <span className={dialogStyles.dialogValue} style={{ color: 'hsl(var(--foreground))', fontWeight: 700 }}>{checkStats.updatedPosts}</span>
                 </div>
               </div>
               
-              {/* Results - Show updated posts data, hide API URLs */}
+              {/* Results - Show only updated posts */}
               <div className={styles.resultsList}>
-                {detailedResults && detailedResults.length > 0 ? (
-                  detailedResults.map((res, index) => {
-                    const statusLabel = res.targetReached
-                      ? 'Target Reached'
-                      : res.stopLossTriggered
-                        ? 'Stop Loss Triggered'
-                        : res.message
-                          ? res.message
-                          : 'Checked';
-                    const tagClass = res.targetReached
-                      ? styles.priceUpTag
-                      : res.stopLossTriggered
-                        ? styles.priceDownTag
-                        : res.message && (res.noDataAvailable || res.postAfterMarketClose || res.postDateAfterPriceDate)
-                          ? styles.errorTag
-                          : styles.lastPriceTag;
-                    return (
-                      <div key={index} className={styles.simpleResultRow}>
-                        <div className={styles.symbolWithTag}>
-                          <span className={styles.symbolText}>{res.symbol || 'N/A'}</span>
-                          {res.companyName && (
-                            <span className={styles.exchangeTag}>{res.companyName}</span>
-                          )}
-                        </div>
+                {(() => {
+                  // Debug logging
+                  console.log('[DEBUG] All detailed results:', detailedResults);
+                  
+                  const updatedPosts = (detailedResults || []).filter(res => {
+                    const hasChanges = res.targetReached || 
+                                     res.stopLossTriggered || 
+                                     res.closed || 
+                                     res.priceChanged || 
+                                     res.updated ||
+                                     res.statusChanged ||
+                                     (res.currentPrice && res.initialPrice && res.currentPrice !== res.initialPrice) ||
+                                     (res.message && !res.message.toLowerCase().includes('no change') && 
+                                      !res.message.toLowerCase().includes('checked') && 
+                                      res.message !== 'Price updated');
+                    
+                    console.log(`[DEBUG] Post ${res.symbol}: targetReached=${res.targetReached}, stopLossTriggered=${res.stopLossTriggered}, closed=${res.closed}, currentPrice=${res.currentPrice}, initialPrice=${res.initialPrice}, message="${res.message}", hasChanges=${hasChanges}`);
+                    return hasChanges;
+                  });
+                  
+                  console.log('[DEBUG] Filtered updated posts:', updatedPosts);
+                  
+                  return updatedPosts.length > 0 ? (
+                    <>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: 600, color: 'var(--primary)' }}>
+                        📈 Updated Posts:
+                      </h4>
+                      {updatedPosts.map((res, index) => {
+                        const statusLabel = res.targetReached
+                          ? 'Target Reached'
+                          : res.stopLossTriggered
+                            ? 'Stop Loss Triggered'
+                            : res.closed
+                              ? 'Closed'
+                              : 'Updated';
+                        const tagClass = res.targetReached
+                          ? styles.priceUpTag
+                          : res.stopLossTriggered
+                            ? styles.priceDownTag
+                            : styles.lastPriceTag;
+                        return (
+                          <div 
+                            key={index} 
+                            className={styles.simpleResultRow}
+                            style={{ backgroundColor: 'hsl(var(--card))', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', marginBottom: 10 }}
+                          >
+                            <div className={styles.symbolWithTag}>
+                              <span className={styles.symbolText} style={{ color: 'hsl(var(--foreground))', fontWeight: 700, fontSize: '1rem' }}>{res.symbol || 'N/A'}</span>
+                              {res.companyName && (
+                                <span className={styles.exchangeTag} style={{ color: 'hsl(var(--muted-foreground))' }}>{res.companyName}</span>
+                              )}
+                            </div>
 
-                        <span className={`${styles.responseTypeTag} ${tagClass}`}>
-                          {statusLabel}
-                          {res.closed ? ' (Closed)' : ''}
-                        </span>
+                            <span className={`${styles.responseTypeTag} ${tagClass}`} style={{ color: '#ffffff', fontWeight: 700 }}>
+                              {statusLabel}
+                            </span>
 
-                        <div className={styles.apiUrlContainer}>
-                          <div className={styles.apiUrlInput} style={{ pointerEvents: 'none' }}>
-                            Price: {formatPrice(res.currentPrice)} | Target: {formatPrice(res.targetPrice)} | SL: {formatPrice(res.stopLossPrice)}
+                            <div className={styles.apiUrlContainer}>
+                              <div className={styles.apiUrlInput} style={{ pointerEvents: 'none', backgroundColor: 'hsl(var(--background))', border: '1px solid var(--border)', color: 'hsl(var(--foreground))', borderRadius: 6, padding: '8px 10px' }}>
+                                Price: {formatPrice(res.currentPrice)} | Target: {formatPrice(res.targetPrice)} | SL: {formatPrice(res.stopLossPrice)}
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        );
+                      })}
+                    </>
+                  ) : (
+                    <div className={styles.noDataMessage}>
+                      <div style={{ textAlign: 'center', padding: '20px', color: 'var(--muted-foreground)' }}>
+                        <span style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }}>✅</span>
+                        <strong>No posts were updated</strong>
+                        <p style={{ margin: '8px 0 0 0', fontSize: '0.9rem' }}>
+                          All your posts are still within their target ranges.
+                        </p>
                       </div>
-                    );
-                  })
-                ) : (
-                  <div className={styles.noDataMessage}>No results available</div>
-                )}
+                    </div>
+                  );
+                })()}
               </div>
 
+              {/* Actions */}
               <div className={styles.statsActions}>
                 <button 
                   className={styles.cancelCheckButton}
                   onClick={() => setShowStatsDialog(false)}
+                  style={{
+                    backgroundColor: '#6b7280',
+                    color: 'white',
+                    fontWeight: 600,
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
                 >
-                  Cancel
+                  Close
                 </button>
-                
+              </div>
+              </div>
+              
+              {/* Telegram Broadcast Section - with sticky bottom control bar */}
+              <div className={styles.telegramBroadcastSection} style={{
+                marginTop: '20px',
+                padding: '20px',
+                paddingBottom: '84px',
+                borderTop: '1px solid var(--border)',
+                position: 'relative',
+                background: 'hsl(var(--card))',
+                color: 'hsl(var(--foreground))',
+                borderRadius: '12px',
+                boxShadow: '0 -2px 10px rgba(0,0,0,0.08)',
+                border: '1px solid var(--border)'
+              }}>
+                {sendToTelegram && (
+                  <div style={{ display: 'grid', gap: 12, padding: '16px', backgroundColor: 'hsl(var(--card))', color: 'hsl(var(--foreground))', borderRadius: 8, border: '1px solid var(--border)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                    <div>
+                      <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: '0.9rem' }}>Title</label>
+                      <input
+                        type="text"
+                        value={tgTitle}
+                        onChange={(e) => setTgTitle(e.target.value)}
+                        placeholder="Price Check Report"
+                        style={{ width: '100%', padding: '10px', borderRadius: 6, border: '1px solid var(--border)', backgroundColor: 'hsl(var(--background))', color: 'hsl(var(--foreground))', fontSize: '0.9rem' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: '0.9rem' }}>Comment (optional)</label>
+                      <textarea
+                        value={tgComment}
+                        onChange={(e) => setTgComment(e.target.value)}
+                        rows={3}
+                        placeholder="Add a short comment to your followers..."
+                        style={{ width: '100%', padding: '10px', borderRadius: 6, border: '1px solid var(--border)', backgroundColor: 'hsl(var(--background))', color: 'hsl(var(--foreground))', fontSize: '0.9rem', resize: 'vertical' }}
+                      />
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <label style={{ fontWeight: 600, fontSize: '0.9rem' }}>Select posts to include</label>
+                        <div className={styles.postSelectionActions} style={{ display: 'flex', gap: '8px' }}>
+                          <button 
+                            className={styles.selectChangedButton} 
+                            onClick={selectAllChanged} 
+                            title="Select posts with changes"
+                            style={{
+                              padding: '8px 16px',
+                              backgroundColor: '#10b981',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontWeight: 600,
+                              fontSize: '0.9rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            📈 Select changed
+                          </button>
+                          <button 
+                            className={styles.clearSelectionButton} 
+                            onClick={clearAllSelected}
+                            style={{
+                              padding: '8px 16px',
+                              backgroundColor: '#ef4444',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontWeight: 600,
+                              fontSize: '0.9rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            🗑️ Clear
+                          </button>
+                        </div>
+                      </div>
+                      <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 6, padding: 8, backgroundColor: 'hsl(var(--background))', color: 'hsl(var(--foreground))' }}>
+                        {(detailedResults || []).map((res) => (
+                          <label key={res.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 6px', cursor: 'pointer', borderRadius: 4 }} className={styles.postSelectionItem}>
+                            <input
+                              type="checkbox"
+                              checked={selectedForBroadcast.includes(res.id)}
+                              onChange={() => toggleSelectPost(res.id)}
+                              style={{ cursor: 'pointer', accentColor: '#0066cc' }}
+                            />
+                            <span style={{ minWidth: 64, fontWeight: 600, fontSize: '0.9rem', color: 'hsl(var(--foreground))' }}>{res.symbol || 'N/A'}</span>
+                            <span style={{ color: 'hsl(var(--muted-foreground))', fontSize: '0.9rem', flex: 1 }}>{res.companyName || ''}</span>
+                            {(res.targetReached || res.stopLossTriggered || res.closed) && (
+                              <span className={styles.postStatusBadge}>
+                                {res.targetReached ? '🎯 Target' : res.stopLossTriggered ? '🛑 Stop Loss' : res.closed ? '🔒 Closed' : ''}
+                              </span>
+                            )}
+                          </label>
+                        ))}
+                      </div>
+                      <small style={{ display: 'block', marginTop: 8, color: 'var(--muted-foreground)', fontSize: '0.8rem', textAlign: 'center' }}>
+                        📊 Selected: {selectedForBroadcast.length} / {(detailedResults || []).length} posts
+                      </small>
+                    </div>
+                  </div>
+                )}
+
+                {/* end Telegram section content */}
+              </div>
+
+              {/* Global sticky footer inside dialog content */}
+              <div style={{
+                position: 'sticky',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                padding: '12px 16px',
+                background: 'hsl(var(--card))',
+                borderTop: '1px solid hsl(var(--border))',
+                zIndex: 50
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'hsl(var(--primary))' }}>
+                    📢 Telegram Broadcast
+                  </h4>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={sendToTelegram}
+                    onChange={(e) => setSendToTelegram(e.target.checked)}
+                    style={{ cursor: 'pointer', width: '18px', height: '18px', accentColor: 'hsl(var(--primary))' }}
+                  />
+                  <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>
+                    Send to Telegram followers
+                  </span>
+                </label>
+                </div>
+
+                <button 
+                  className={styles.closeStatsButton}
+                  onClick={handleSendTelegram}
+                  disabled={!sendToTelegram || sendingBroadcast || selectedForBroadcast.length === 0}
+                  style={{ 
+                    backgroundColor: 'hsl(var(--primary))',
+                    color: 'white',
+                    fontWeight: 700,
+                    padding: '10px 18px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    opacity: (!sendToTelegram || sendingBroadcast || selectedForBroadcast.length === 0) ? 0.6 : 1
+                  }}
+                >
+                  {sendingBroadcast ? '📤 Sending...' : '📢 Send to Telegram'}
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Show the error message as a dialog for better visibility */}
       {error && (
         <div className={dialogStyles.dialogOverlay} onClick={() => setError(null)} style={{ zIndex: 9999 }}>
           <div className={dialogStyles.statusDialog} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
