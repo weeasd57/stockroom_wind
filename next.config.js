@@ -15,9 +15,20 @@ const nextConfig = {
     serverActions: {
       allowedOrigins: ['localhost:3000', 'localhost:3001'],
     },
+    // Enable dynamic routing optimizations for Next.js 14
+    dynamicIO: true,
+    // Enable better error handling for dynamic routes
+    serverComponentsExternalPackages: ['@supabase/supabase-js'],
   },
   // Disable React StrictMode to prevent double-rendering which can worsen hydration issues
   reactStrictMode: false,
+  // Add timeout configuration for API routes
+  api: {
+    responseLimit: '8mb',
+    bodyParser: {
+      sizeLimit: '8mb',
+    },
+  },
   // Add custom headers to prevent translation extensions
   async headers() {
     return [

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
 import styles from '@/styles/view-profile.module.css';
@@ -29,8 +29,10 @@ export default function ViewProfile({ params }) {
     console.log('[VIEW-PROFILE] ProfileProvider not available');
   }
   
-  // Make sure to extract the ID correctly from params
-  const userId = params?.id;
+  // Make sure to extract the ID correctly from params with Next.js 14 compatibility
+  const paramsFromProps = params || {};
+  const paramsFromHook = useParams();
+  const userId = paramsFromProps.id || paramsFromHook?.id;
   console.log("[VIEW-PROFILE] Component loaded with params:", params);
   console.log("[VIEW-PROFILE] Extracted userId:", userId);
   
@@ -48,7 +50,8 @@ export default function ViewProfile({ params }) {
   // Fetch profile data with optimized parallel loading
   useEffect(() => {
     // Only redirect if there's definitely no user ID
-    if (userId === undefined || userId === null) {
+    if (!userId) {
+      console.warn('[VIEW-PROFILE] No user ID provided, redirecting to home');
       router.push('/home');
       return;
     }
@@ -105,7 +108,7 @@ export default function ViewProfile({ params }) {
             return await promise;
           } catch (e) {
             if (e?.name === 'AbortError' || e?.message?.includes('aborted')) {
-              throw new Error('Request timed out');
+              throw new Error('Request timed out. Please try again.');
             }
             throw e;
           } finally {
@@ -131,6 +134,10 @@ export default function ViewProfile({ params }) {
         console.log('[VIEW-PROFILE] Profile query result:', { profile: !!profile, error: profileError });
           
         if (profileError) {
+          // Handle timeout errors specifically
+          if (profileError.message && profileError.message.includes('timeout')) {
+            throw new Error('Request timed out while fetching profile. Please try again.');
+          }
           throw profileError;
         }
         
@@ -163,7 +170,11 @@ export default function ViewProfile({ params }) {
       } catch (error) {
         console.error('[VIEW-PROFILE] Error fetching profile:', error);
         safeSetState(() => {
-          setError(error.message);
+          if (error.message.includes('timed out')) {
+            setError('Request timed out. Please try again.');
+          } else {
+            setError(error.message);
+          }
           setBasicDataLoading(false);
           setShowSkeleton(false);
         });
@@ -320,6 +331,14 @@ export default function ViewProfile({ params }) {
       <div className={styles.errorContainer}>
         <h2>Error Loading Profile</h2>
         <p>{error}</p>
+        {error.includes('timed out') && (
+          <button 
+            onClick={() => window.location.reload()} 
+            className={styles.retryButton}
+          >
+            Try Again
+          </button>
+        )}
       </div>
     );
   }
@@ -481,6 +500,7 @@ export default function ViewProfile({ params }) {
             <div className={styles.loadingContainer}>
               <div className={styles.loadingSpinner}></div>
               <p>Loading posts...</p>
+              <p className={styles.loadingHint}>This may take a few moments...</p>
             </div>
           )}
         </div>

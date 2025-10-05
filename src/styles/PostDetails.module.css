@@ -788,3 +788,76 @@
 :global(.dark) .priceHistoryOHLC .priceHistoryValue:hover {
   background-color: rgba(255, 255, 255, 0.15);
 }
+
+/* Error container styles */
+.errorContainer {
+  text-align: center;
+  padding: 3rem 2rem;
+  background-color: hsl(var(--card));
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.errorContainer h2 {
+  color: hsl(var(--destructive));
+  margin-bottom: 1rem;
+}
+
+.errorContainer p {
+  color: hsl(var(--muted-foreground));
+  font-size: 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.retryButton {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.retryButton:hover {
+  background-color: hsl(var(--primary-foreground));
+  color: hsl(var(--primary));
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.retryButton:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode for error container */
+:global(.dark) .errorContainer {
+  background-color: #1a1a1a;
+  border-color: #333;
+}
+
+:global(.dark) .errorContainer h2 {
+  color: #ef4444;
+}
+
+:global(.dark) .errorContainer p {
+  color: #a3a3a3;
+}
+
+/* Loading hint styles */
+.loadingHint {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  opacity: 0.8;
+}
+
+:global(.dark) .loadingHint {
+  color: #a3a3a3;
+}
