@@ -38,6 +38,7 @@ async function sendTelegramMessage(botToken, chatId, text, options = {}) {
 
 export async function POST(request, { params }) {
   try {
+    // Handle Next.js 14 params structure
     const { botId } = params || {};
     if (!botId) {
       return NextResponse.json({ error: 'Missing botId' }, { status: 400 });

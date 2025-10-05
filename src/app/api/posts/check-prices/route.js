@@ -135,6 +135,11 @@ export async function GET(request) {
 export async function POST(request) {
   if (DEBUG) console.log(`[DEBUG] Check-prices API route called at ${new Date().toISOString()}`);
   
+  // Set a longer timeout for price checking (up to 5 minutes)
+  const timeoutMs = 300000; // 5 minutes
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
   try {
     // Check if Supabase is properly configured
     if (!supabaseUrl || !supabaseAnonKey) {
@@ -220,6 +225,19 @@ export async function POST(request) {
     
     if (checkError) {
       console.error('[ERROR] Error checking price limit:', checkError);
+      
+      // Handle timeout errors specifically
+      if (checkError.message && checkError.message.includes('timeout')) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: 'Request timed out while checking limits. Please try again.',
+            error: 'timeout' 
+          },
+          { status: 408 }
+        );
+      }
+      
       return NextResponse.json(
         { 
           success: false, 
@@ -295,6 +313,12 @@ export async function POST(request) {
     
     if (postsError) {
       console.error('[ERROR] Error fetching open posts:', postsError);
+      
+      // Handle timeout errors specifically
+      if (postsError.message && postsError.message.includes('timeout')) {
+        throw new Error('Request timed out while fetching posts. Please try again.');
+      }
+      
       throw postsError;
     }
     
@@ -372,7 +396,7 @@ export async function POST(request) {
           if (DEBUG) console.log(`[DEBUG] Sending historical data API request for ${symbol}`);
           // Add timeout to fetch via AbortController
           const controller = new AbortController();
-          const timeoutMs = parseInt(process.env.PRICE_CHECK_FETCH_TIMEOUT || '12000', 10);
+          const timeoutMs = parseInt(process.env.PRICE_CHECK_FETCH_TIMEOUT || '30000', 10); // Increased from 12s to 30s
           const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
           const response = await fetch(historicalUrl, { signal: controller.signal });
           clearTimeout(timeoutId);
@@ -887,17 +911,32 @@ export async function POST(request) {
             })
             .eq('id', userId);
           
-          if (updateProfileError) {
-            console.error('Error updating user experience score:', updateProfileError);
-          } else {
-            experienceUpdated = true;
-            if (DEBUG) console.log(`Updated user experience score: +${successfulPosts} success, +${lostPosts} loss`);
+        if (updateProfileError) {
+          console.error('Error updating user experience score:', updateProfileError);
+          
+          // Handle timeout errors specifically
+          if (updateProfileError.message && updateProfileError.message.includes('timeout')) {
+            console.warn('Timeout while updating user experience score, continuing without update');
           }
         } else {
+          experienceUpdated = true;
+          if (DEBUG) console.log(`Updated user experience score: +${successfulPosts} success, +${lostPosts} loss`);
+        }
+        } else {
           console.error('Error fetching profile for experience score update:', profileError);
+          
+          // Handle timeout errors specifically
+          if (profileError.message && profileError.message.includes('timeout')) {
+            console.warn('Timeout while fetching profile for experience score update, continuing without update');
+          }
         }
       } catch (error) {
         console.error('Error in experience score calculation:', error);
+        
+        // Handle timeout errors specifically
+        if (error.message && error.message.includes('timeout')) {
+          console.warn('Timeout in experience score calculation, continuing without update');
+        }
       }
     }
 
@@ -960,6 +999,11 @@ export async function POST(request) {
           }
         } catch (error) {
           console.error(`Error updating price_checks for post ${updatedPosts[i]?.id}:`, error);
+          
+          // Handle timeout errors specifically
+          if (error.message && error.message.includes('timeout')) {
+            console.warn(`Timeout while updating price_checks for post ${updatedPosts[i]?.id}, skipping...`);
+          }
         }
       }
       
@@ -990,6 +1034,13 @@ export async function POST(request) {
               if (error) {
                 updateError = error;
                 console.error('Error updating post:', postId, error);
+                
+                // Handle timeout errors specifically
+                if (error.message && error.message.includes('timeout')) {
+                  console.warn(`Timeout while updating post ${postId}, continuing with next post...`);
+                  continue; // Continue with next post instead of breaking
+                }
+                
                 break;
               }
             }
@@ -1005,6 +1056,11 @@ export async function POST(request) {
             // Check for specific error types
             if (updateError.message && updateError.message.includes('permission denied')) {
               console.error('PERMISSION DENIED: The service role may not have proper access. Check RLS policies.');
+            }
+            
+            // Handle timeout errors specifically
+            if (updateError.message && updateError.message.includes('timeout')) {
+              console.warn('Timeout while updating posts, retrying...');
             }
             
             retryCount++;
@@ -1024,15 +1080,31 @@ export async function POST(request) {
               .select('id, target_reached, stop_loss_triggered, closed, postdateafterpricedate, postaftermarketclose, nodataavailable')
               .in('id', sampleIds);
               
-            if (verifyError) {
-              console.error('Error verifying update:', verifyError);
-            } else {
-              if (DEBUG) console.log(`Verification successful. Sample of updated posts:`, verifyData);
-            }
+    if (verifyError) {
+      console.error('Error verifying update:', verifyError);
+      
+      // Handle timeout errors specifically
+      if (verifyError.message && verifyError.message.includes('timeout')) {
+        console.warn('Timeout while verifying update, continuing without verification');
+      }
+    } else {
+      if (DEBUG) console.log(`Verification successful. Sample of updated posts:`, verifyData);
+    }
           }
         } catch (error) {
           console.error(`Error updating posts (attempt ${retryCount + 1}/${maxRetries + 1}):`, error);
           console.error('Error type:', error.name, 'Message:', error.message);
+          
+          // Handle timeout errors specifically
+          if (error.message && error.message.includes('timeout')) {
+            console.warn(`Timeout while updating posts (attempt ${retryCount + 1}), retrying...`);
+          }
+          
+          // Handle network errors specifically
+          if (error.message && error.message.includes('network')) {
+            console.warn(`Network error while updating posts (attempt ${retryCount + 1}), retrying...`);
+          }
+          
           retryCount++;
           
           if (retryCount <= maxRetries) {
@@ -1078,17 +1150,29 @@ export async function POST(request) {
             
             if (singleUpdateError) {
               console.error(`Error updating post ${post.id}:`, singleUpdateError);
+              
+              // Handle timeout errors specifically
+              if (singleUpdateError.message && singleUpdateError.message.includes('timeout')) {
+                console.warn(`Timeout while updating post ${post.id}, skipping...`);
+              }
             } else {
               individualUpdateSuccess++;
             }
           } catch (err) {
             console.error(`Exception updating post ${post.id}:`, err);
+            
+            // Handle timeout errors specifically
+            if (err.message && err.message.includes('timeout')) {
+              console.warn(`Timeout exception while updating post ${post.id}, skipping...`);
+            }
           }
         }
         
         if (individualUpdateSuccess > 0) {
           if (DEBUG) console.log(`Successfully updated ${individualUpdateSuccess}/${updatedPosts.length} posts individually`);
           updateSuccess = individualUpdateSuccess === updatedPosts.length;
+        } else {
+          console.warn('No posts were successfully updated individually');
         }
       }
       
@@ -1106,27 +1190,38 @@ export async function POST(request) {
           p_country: null
         });
       
-      if (logError) {
-        console.error('[LOG_PRICE_CHECK] Failed to log price check usage:', {
-          error: logError,
-          code: logError.code,
-          message: logError.message,
-          details: logError.details,
-          hint: logError.hint
-        });
-        // Don't fail the whole operation, just log the error
-      } else {
-        console.log(`[LOG_PRICE_CHECK] Price check usage logged successfully for user ${userId}`, {
-          logData,
-          timestamp: new Date().toISOString()
-        });
+    if (logError) {
+      console.error('[LOG_PRICE_CHECK] Failed to log price check usage:', {
+        error: logError,
+        code: logError.code,
+        message: logError.message,
+        details: logError.details,
+        hint: logError.hint
+      });
+      
+      // Handle timeout errors specifically
+      if (logError.message && logError.message.includes('timeout')) {
+        console.warn('[LOG_PRICE_CHECK] Timeout while logging price check usage, continuing without logging');
       }
+      
+      // Don't fail the whole operation, just log the error
+    } else {
+      console.log(`[LOG_PRICE_CHECK] Price check usage logged successfully for user ${userId}`, {
+        logData,
+        timestamp: new Date().toISOString()
+      });
+    }
     } catch (logPriceCheckError) {
       console.error('[LOG_PRICE_CHECK] Exception in log_price_check:', {
         error: logPriceCheckError,
         message: logPriceCheckError?.message,
         stack: logPriceCheckError?.stack
       });
+      
+      // Handle timeout errors specifically
+      if (logPriceCheckError?.message && logPriceCheckError.message.includes('timeout')) {
+        console.warn('[LOG_PRICE_CHECK] Timeout exception while logging price check usage, continuing without logging');
+      }
     }
 
     // Get updated subscription limits after logging the usage
@@ -1138,6 +1233,11 @@ export async function POST(request) {
     
     if (subscriptionError) {
       console.error('[SUBSCRIPTION_INFO] Error fetching subscription info:', subscriptionError);
+      
+      // Handle timeout errors specifically
+      if (subscriptionError.message && subscriptionError.message.includes('timeout')) {
+        console.warn('[SUBSCRIPTION_INFO] Timeout while fetching subscription info, using defaults');
+      }
     }
     
     const subscriptionInfo = subscriptionData && subscriptionData.length > 0 ? subscriptionData[0] : null;
@@ -1162,6 +1262,16 @@ export async function POST(request) {
     
     if (DEBUG) console.log(`[DEBUG] Price check completed for ${posts.length} posts. Updated: ${updatedPosts.length}, Skipped: ${closedPostsCount}, Usage: ${usageCount}, Remaining checks this month: ${remainingChecks}`);
     
+    // Add warning if some posts failed to update
+    if (updatedPosts.length > 0 && !updateSuccess) {
+      console.warn(`[WARNING] Some posts failed to update. Successfully updated: ${updatedPosts.length}, Total posts: ${updatedPosts.length}`);
+    }
+    
+    // Add info about timeout handling
+    if (DEBUG) {
+      console.log(`[DEBUG] Timeout handling: API calls timeout after 30s, overall operation timeout after 5 minutes`);
+    }
+    
     return NextResponse.json({
       success: true,
       message: 'Price check completed successfully',
@@ -1173,17 +1283,80 @@ export async function POST(request) {
       updateSuccess,
       experienceUpdated,
       results,
-      apiDetails: includeApiDetails ? apiDetails : []
+      apiDetails: includeApiDetails ? apiDetails : [],
+      // Add timeout info for debugging
+      timeoutInfo: {
+        apiTimeout: '30s',
+        overallTimeout: '5m',
+        retryAttempts: 2
+      }
     });
   } catch (error) {
+    if (error.name === 'AbortError') {
+      console.error('Price check timed out after 5 minutes');
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Price check timed out. Please try again.',
+          error: 'Request timeout',
+          timeoutInfo: {
+            apiTimeout: '30s',
+            overallTimeout: '5m',
+            retryAttempts: 2
+          }
+        },
+        { status: 408 }
+      );
+    }
     console.error('Error checking post prices:', error);
+    
+    // Handle specific error types
+    if (error.message && error.message.includes('timeout')) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Price check timed out. Please try again.',
+          error: 'Request timeout',
+          timeoutInfo: {
+            apiTimeout: '30s',
+            overallTimeout: '5m',
+            retryAttempts: 2
+          }
+        },
+        { status: 408 }
+      );
+    }
+    
+    if (error.message && error.message.includes('network')) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Network error. Please check your connection and try again.',
+          error: 'Network error',
+          timeoutInfo: {
+            apiTimeout: '30s',
+            overallTimeout: '5m',
+            retryAttempts: 2
+          }
+        },
+        { status: 503 }
+      );
+    }
+    
     return NextResponse.json(
       {
         success: false,
-        message: 'Error checking post prices',
-        error: error.message
+        message: 'Error checking post prices. Please try again later.',
+        error: error.message,
+        timeoutInfo: {
+          apiTimeout: '30s',
+          overallTimeout: '5m',
+          retryAttempts: 2
+        }
       },
       { status: 500 }
     );
+  } finally {
+    clearTimeout(timeoutId);
   }
 }

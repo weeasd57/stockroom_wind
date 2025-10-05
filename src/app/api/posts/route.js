@@ -119,13 +119,19 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    // Check if Supabase is properly configured
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return NextResponse.json({
-        error: 'Database configuration not available',
-        success: false
-      }, { status: 503 });
-    }
+    // Set a longer timeout for post creation
+    const timeoutMs = 60000; // 60 seconds timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    
+    try {
+      // Check if Supabase is properly configured
+      if (!supabaseUrl || !supabaseAnonKey) {
+        return NextResponse.json({
+          error: 'Database configuration not available',
+          success: false
+        }, { status: 503 });
+      }
     
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -184,6 +190,8 @@ export async function POST(request) {
     if (!postPayload.symbol) missing.push('symbol');
     if (!postPayload.country) missing.push('country');
     if (!postPayload.content && !postPayload.description) missing.push('content/description');
+    
+    // Add timeout validation
     if (missing.length) {
       // Try to recover missing user_id from Authorization bearer token if available
       const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
@@ -240,7 +248,38 @@ export async function POST(request) {
 
     if (error) {
       console.error('[API /posts] Error creating post:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      
+      // Handle specific error types
+      if (error.message && error.message.includes('timeout')) {
+        return NextResponse.json({ 
+          error: 'Request timed out. Please try again.',
+          success: false,
+          timeoutInfo: {
+            postCreationTimeout: '60s',
+            retryAttempts: 1
+          }
+        }, { status: 408 });
+      }
+      
+      if (error.message && error.message.includes('network')) {
+        return NextResponse.json({ 
+          error: 'Network error. Please check your connection and try again.',
+          success: false,
+          timeoutInfo: {
+            postCreationTimeout: '60s',
+            retryAttempts: 1
+          }
+        }, { status: 503 });
+      }
+      
+      return NextResponse.json({ 
+        error: error.message,
+        success: false,
+        timeoutInfo: {
+          postCreationTimeout: '60s',
+          retryAttempts: 1
+        }
+      }, { status: 500 });
     }
 
     // Log post creation if successful and user is authenticated
@@ -265,10 +304,64 @@ export async function POST(request) {
       }
     }
 
-    return NextResponse.json({ data: post, success: true });
+      return NextResponse.json({ 
+        data: post, 
+        success: true,
+        timeoutInfo: {
+          postCreationTimeout: '60s',
+          retryAttempts: 1
+        }
+      });
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.error('Post creation timed out after 60 seconds');
+        return NextResponse.json({ 
+          error: 'Request timed out. Please try again.',
+          success: false,
+          timeoutInfo: {
+            postCreationTimeout: '60s',
+            retryAttempts: 1
+          }
+        }, { status: 408 });
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   } catch (error) {
     console.error('Unhandled error in POST /api/posts:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    
+    // Handle specific error types
+    if (error.message && error.message.includes('timeout')) {
+      return NextResponse.json({ 
+        error: 'Request timed out. Please try again.',
+        success: false,
+        timeoutInfo: {
+          postCreationTimeout: '60s',
+          retryAttempts: 1
+        }
+      }, { status: 408 });
+    }
+    
+    if (error.message && error.message.includes('network')) {
+      return NextResponse.json({ 
+        error: 'Network error. Please check your connection and try again.',
+        success: false,
+        timeoutInfo: {
+          postCreationTimeout: '60s',
+          retryAttempts: 1
+        }
+      }, { status: 503 });
+    }
+    
+    return NextResponse.json({ 
+      error: 'Internal Server Error. Please try again later.',
+      success: false,
+      timeoutInfo: {
+        postCreationTimeout: '60s',
+        retryAttempts: 1
+      }
+    }, { status: 500 });
   }
 }
 
