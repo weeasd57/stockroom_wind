@@ -11,11 +11,6 @@ const nextConfig = {
       'mfbgpnpgxmxgxpjnxzrb.supabase.co', // Additional Supabase storage
     ],
   },
-  experimental: {
-    serverActions: {
-      allowedOrigins: ['localhost:3000', 'localhost:3001'],
-    },
-  },
   // Disable React StrictMode to prevent double-rendering which can worsen hydration issues
   reactStrictMode: false,
   // Add custom headers to prevent translation extensions

@@ -18,7 +18,9 @@
     "jsx": "preserve",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": [
+        "src/*"
+      ]
     },
     "plugins": [
       {
@@ -26,9 +28,12 @@
       }
     ],
     "strictNullChecks": true,
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "forceConsistentCasingInFileNames": true,
-    "maxNodeModuleJsDepth": 0
+    "maxNodeModuleJsDepth": 0,
+    "target": "ES2017"
   },
   "include": [
     "next-env.d.ts",

@@ -5,11 +5,11 @@ scripts\update-telegram-webhook.js *** for telegram bot 🔥
 ** add custom telegram bot in pro palne
    for have the user create has bot and return set the bot token 
 
-
+** fix  edit profile
+** fix posts feed 
+** fix vote system
 
 ** add post count and telegram follower in view profile 
-** add im telegram tap in profile tap for my subscribtions
 ** add stratgyes tap in view profile page
-* fix vote system
 * add send the post state to my telegram followers in detal post page 
-* need add grid view for my posts 
+* add grid view for my posts 
