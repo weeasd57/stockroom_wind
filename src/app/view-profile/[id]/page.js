@@ -4,20 +4,24 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
-import styles from '@/styles/view-profile.module.css';
 import { useFollow } from '@/providers/FollowProvider';
+import styles from '@/styles/view-profile.module.css';
 import PostCard from '@/components/posts/PostCard';
 import PostsFeed from '@/components/home/PostsFeed';
 import TelegramSubscribeButton from '@/components/telegram/TelegramSubscribeButton';
 
 // Local cache for profile data
-const profileCache = new Map();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  const profileCache = new Map();
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-export default function ViewProfile({ params }) {
+export default function ViewProfile() {
   const { supabase, isAuthenticated, user } = useSupabase();
   const router = useRouter();
-  const { isFollowing, toggleFollow, checkIsFollowing, loading: followLoading, error: followError } = useFollow(); // Use useFollow hook
+  const paramsFromHook = useParams();
+  const rawId = paramsFromHook?.id;
+  const userId = Array.isArray(rawId) ? rawId[0] : rawId;
+  console.log("[VIEW-PROFILE] Extracted userId:", userId);
+  const { isFollowing, toggleFollow, checkIsFollowing, loading: followLoading, error: followError } = useFollow();
   const hasFetchedRef = useRef({});
   
   // Try to get ProfileProvider for updating follow counts
@@ -28,13 +32,6 @@ export default function ViewProfile({ params }) {
     // ProfileProvider not available in this context, that's okay
     console.log('[VIEW-PROFILE] ProfileProvider not available');
   }
-  
-  // Make sure to extract the ID correctly from params with Next.js 14 compatibility
-  const paramsFromProps = params || {};
-  const paramsFromHook = useParams();
-  const userId = paramsFromProps.id || paramsFromHook?.id;
-  console.log("[VIEW-PROFILE] Component loaded with params:", params);
-  console.log("[VIEW-PROFILE] Extracted userId:", userId);
   
   // Progressive loading states
   const [basicDataLoading, setBasicDataLoading] = useState(true);
@@ -68,12 +65,11 @@ export default function ViewProfile({ params }) {
     hasFetchedRef.current[userId] = true;
 
     let isCancelled = false;
-    // Use a single controller per mount
+    // Ensure no previous in-flight request keeps running
     if (controllerRef.current) {
       controllerRef.current.abort();
     }
-    controllerRef.current = new AbortController();
-    const controller = controllerRef.current;
+    controllerRef.current = null;
 
     const safeSetState = (setter) => {
       if (!isCancelled) setter();
@@ -99,18 +95,44 @@ export default function ViewProfile({ params }) {
         }
         
         setError(null);
-        const TIMEOUT_MS = 10000; // Reduced timeout for faster fail
         
-        // Simplified fetch without complex retry logic
-        const fetchWithTimeout = async (promise, ms = TIMEOUT_MS) => {
-          const timeoutId = setTimeout(() => controller.abort(), ms);
+        // Set immediate fallback data for instant UI
+        const immediateProfile = {
+          id: userId,
+          username: 'Loading...',
+          avatar_url: '/default-avatar.svg', 
+          background_url: 'https://images.unsplash.com/photo-1579546929662-711aa81148cf?q=80&w=1200&auto=format&fit=crop',
+          bio: 'Loading profile information...',
+          followers: 0,
+          following: 0,
+          experience_score: 0,
+          success_posts: 0,
+          loss_posts: 0,
+          created_at: new Date().toISOString()
+        };
+        
+        // Show immediate UI to prevent blank screen
+        setProfileData(immediateProfile);
+        setAvatarUrl('/default-avatar.svg');
+        setBackgroundUrl('https://images.unsplash.com/photo-1579546929662-711aa81148cf?q=80&w=1200&auto=format&fit=crop');
+        setBasicDataLoading(false);
+        setShowSkeleton(false);
+        setPostsReady(true);
+        
+        const TIMEOUT_MS = 8000; // reduced timeout (8s) for faster fail and retry
+        
+        // Robust timeout: race the request with a timeout and abort on timeout (per-attempt controller)
+        const fetchWithTimeout = async (promise, abortController, ms = TIMEOUT_MS) => {
+          let timeoutId;
+          const timeoutPromise = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => {
+              try { abortController?.abort(); } catch {}
+              reject(new Error('Request timed out. Please try again.'));
+            }, ms);
+          });
           try {
-            return await promise;
-          } catch (e) {
-            if (e?.name === 'AbortError' || e?.message?.includes('aborted')) {
-              throw new Error('Request timed out. Please try again.');
-            }
-            throw e;
+            const result = await Promise.race([promise, timeoutPromise]);
+            return result;
           } finally {
             clearTimeout(timeoutId);
           }
@@ -119,17 +141,55 @@ export default function ViewProfile({ params }) {
         // Fetch user profile with reduced fields for speed
         console.log('[VIEW-PROFILE] Fetching profile from database...');
         
-        const profilePromise = fetchWithTimeout(
-          supabase
-            .from('profiles')
-            .select('id, username, avatar_url, background_url, bio, facebook_url, telegram_url, youtube_url, followers, following, created_at, experience_score, success_posts, loss_posts')
-            .eq('id', userId)
-            .maybeSingle()
-            .abortSignal(controller.signal)
-        );
-        
-        // Start fetching profile
-        const { data: profile, error: profileError } = await profilePromise;
+        // Start fetching profile with more retries on timeout
+        const maxRetries = 2;
+        let attempt = 0;
+        let profile = null;
+        let profileError = null;
+        while (attempt <= maxRetries) {
+          console.log(`[VIEW-PROFILE] Fetch attempt ${attempt + 1}/${maxRetries + 1}`);
+          // Abort any previous attempt
+          if (controllerRef.current) {
+            try { controllerRef.current.abort(); } catch {}
+          }
+          const attemptController = new AbortController();
+          controllerRef.current = attemptController;
+          
+          // Use minimal fields on first attempt for speed, full fields on retries
+          const selectFields = attempt === 0 
+            ? 'id, username, avatar_url, followers, following' // minimal essential fields first
+            : 'id, username, avatar_url, background_url, bio, facebook_url, telegram_url, youtube_url, followers, following, created_at, experience_score, success_posts, loss_posts';
+          
+          const timeoutMs = TIMEOUT_MS + attempt * 3000; // 8s, 11s, 14s - faster retries
+          const profilePromise = fetchWithTimeout(
+            supabase
+              .from('profiles')
+              .select(selectFields)
+              .eq('id', userId)
+              .maybeSingle()
+              .abortSignal(attemptController.signal),
+            attemptController,
+            timeoutMs
+          );
+          const { data, error } = await profilePromise;
+          if (!error && data) {
+            profile = data;
+            profileError = null;
+            break;
+          }
+          profileError = error;
+          if (error?.message?.includes('timed out') && attempt < maxRetries) {
+            // backoff before retry with longer delays
+            const retryDelay = 1500 + attempt * 1500;
+            console.log(`[VIEW-PROFILE] Attempt ${attempt + 1} timed out. Retrying in ${retryDelay}ms...`);
+            await new Promise((r) => setTimeout(r, retryDelay));
+            attempt += 1;
+            continue;
+          }
+          // non-timeout errors or last attempt - log for debugging
+          console.error(`[VIEW-PROFILE] Attempt ${attempt + 1} failed:`, error?.message || 'Unknown error');
+          break;
+        }
           
         console.log('[VIEW-PROFILE] Profile query result:', { profile: !!profile, error: profileError });
           
@@ -170,13 +230,35 @@ export default function ViewProfile({ params }) {
       } catch (error) {
         console.error('[VIEW-PROFILE] Error fetching profile:', error);
         safeSetState(() => {
+          // Create fallback profile data for better UX
+          const fallbackProfile = {
+            id: userId,
+            username: 'User',
+            avatar_url: '/default-avatar.svg',
+            background_url: 'https://images.unsplash.com/photo-1579546929662-711aa81148cf?q=80&w=1200&auto=format&fit=crop',
+            bio: 'Profile information temporarily unavailable',
+            followers: 0,
+            following: 0,
+            experience_score: 0,
+            success_posts: 0,
+            loss_posts: 0,
+            created_at: new Date().toISOString()
+          };
+          
+          // Set fallback data for partial functionality
+          setProfileData(fallbackProfile);
+          setAvatarUrl('/default-avatar.svg');
+          setBackgroundUrl('https://images.unsplash.com/photo-1579546929662-711aa81148cf?q=80&w=1200&auto=format&fit=crop');
+          
           if (error.message.includes('timed out')) {
-            setError('Request timed out. Please try again.');
+            setError('Connection timeout. Showing limited profile information. Please refresh to try again.');
           } else {
-            setError(error.message);
+            setError('Unable to load complete profile. Showing basic information.');
           }
           setBasicDataLoading(false);
           setShowSkeleton(false);
+          // Enable posts even with fallback data
+          setPostsReady(true);
         });
       }
     };
@@ -185,7 +267,9 @@ export default function ViewProfile({ params }) {
 
     return () => {
       isCancelled = true;
-      controller.abort();
+      if (controllerRef.current) {
+        try { controllerRef.current.abort(); } catch {}
+      }
     };
   }, [userId, supabase]);
 
@@ -326,10 +410,11 @@ export default function ViewProfile({ params }) {
     return <ProfileSkeleton />;
   }
 
-  if (error) {
+  // Only show error page if we have no fallback data
+  if (error && !profileData) {
     return (
       <div className={styles.errorContainer}>
-        <h2>Error Loading Profile</h2>
+        <h2>Unable to Load Profile</h2>
         <p>{error}</p>
         {error.includes('timed out') && (
           <button 

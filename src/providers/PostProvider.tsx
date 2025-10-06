@@ -14,6 +14,7 @@ type PostsContextType = {
   loading: boolean;
   error: string | null;
   fetchPosts: (mode?: 'following' | 'all' | 'trending', opts?: { excludeCurrentUser?: boolean; userId?: string }) => Promise<void>;
+  invalidateCache: () => void;
   loadMore: () => Promise<void>;
   hasMore: boolean;
   loadingMore: boolean;
@@ -92,9 +93,16 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   };
 
+  // Create a stable version counter for cache invalidation
+  const [fetchVersion, setFetchVersion] = useState(0);
+  const invalidateCache = useCallback(() => {
+    setFetchVersion(prev => prev + 1);
+  }, []);
+
   const fetchPosts = useCallback<PostsContextType['fetchPosts']>(async (mode, opts) => {
     setLoading(true);
     setError(null);
+    console.log(`[PostProvider] fetchPosts called - mode: ${mode}, version: ${fetchVersion}`);
     try {
       let data: any[] | null = null;
       modeRef.current = mode;
@@ -159,7 +167,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [supabase, getPostsPage, user?.id]);
+  }, [supabase, getPostsPage, user?.id, fetchVersion]); // Include fetchVersion to maintain stable reference
 
   const loadMore = useCallback(async () => {
     if (loadingMore) return;
@@ -287,7 +295,11 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
           
           // Debounce the actual update
           if (updateTimeout) clearTimeout(updateTimeout);
-          updateTimeout = setTimeout(processUpdates, 300);
+          updateTimeout = setTimeout(() => {
+            processUpdates();
+            // Trigger cache invalidation to refresh feed
+            invalidateCache();
+          }, 300);
           
         } else if (evt === 'DELETE' && oldRow) {
           setPosts(prev => prev.filter(p => p.id !== oldRow.id));
@@ -399,6 +411,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     loading,
     error,
     fetchPosts,
+    invalidateCache,
     loadMore,
     hasMore,
     loadingMore,

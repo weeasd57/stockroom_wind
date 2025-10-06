@@ -8,8 +8,9 @@ const supabase = createClient(
 
 export async function GET(request, { params }) {
   try {
-    // Handle Next.js 14 params structure
-    const { userId } = params || {};
+    // Handle Next.js 15 params structure - await params
+    const resolvedParams = await params;
+    const { userId } = resolvedParams || {};
     const url = new URL(request.url);
     const currentUserId = url.searchParams.get('currentUserId');
 

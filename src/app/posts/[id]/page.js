@@ -37,11 +37,10 @@ function formatDate(dateString) {
 const postCache = new Map();
 const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
 
-export default function PostDetailsPage({ params }) {
-  // Use params from props for Next.js 14 compatibility, with fallback to useParams
-  const paramsFromProps = params || {};
+export default function PostDetailsPage() {
   const paramsFromHook = useParams();
-  const { id } = paramsFromProps.id ? paramsFromProps : paramsFromHook;
+  const rawId = paramsFromHook?.id;
+  const id = Array.isArray(rawId) ? rawId[0] : rawId;
   
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -243,19 +242,75 @@ export default function PostDetailsPage({ params }) {
 
         setLoading(true);
         
-        // Add timeout to the post fetch
-        const fetchController = new AbortController();
-        const fetchTimeout = setTimeout(() => fetchController.abort(), 30000); // 30 second timeout
+        // Enhanced retry mechanism with timeout
+        const TIMEOUT_MS = 20000; // 20s base timeout
+        const maxRetries = 2;
+        let attempt = 0;
+        let data = null;
+        let error = null;
         
-        const { data, error } = await getPostById(id, { signal: fetchController.signal });
-        clearTimeout(fetchTimeout);
+        while (attempt <= maxRetries) {
+          console.log(`[POST-DETAILS] Fetch attempt ${attempt + 1}/${maxRetries + 1}`);
+          const fetchController = new AbortController();
+          const timeoutMs = TIMEOUT_MS + attempt * 10000; // 20s, 30s, 40s
+          const fetchTimeout = setTimeout(() => {
+            fetchController.abort();
+          }, timeoutMs);
+          
+          try {
+            const result = await getPostById(id, { signal: fetchController.signal });
+            clearTimeout(fetchTimeout);
+            data = result.data;
+            error = result.error;
+            if (!error && data) {
+              break;
+            }
+            if (error?.message?.includes('timed out') && attempt < maxRetries) {
+              console.log(`[POST-DETAILS] Attempt ${attempt + 1} timed out, retrying...`);
+              await new Promise((r) => setTimeout(r, 1000 + attempt * 1000));
+              attempt += 1;
+              continue;
+            }
+            break;
+          } catch (fetchError) {
+            clearTimeout(fetchTimeout);
+            error = fetchError;
+            if (fetchError.name === 'AbortError' && attempt < maxRetries) {
+              console.log(`[POST-DETAILS] Attempt ${attempt + 1} aborted, retrying...`);
+              await new Promise((r) => setTimeout(r, 1000 + attempt * 1000));
+              attempt += 1;
+              continue;
+            }
+            break;
+          }
+        }
         
         if (error) {
-          // Handle timeout errors specifically
+          console.error('[POST-DETAILS] Failed to fetch post after retries:', error);
+          // Create fallback post data for better UX
+          const fallbackPost = {
+            id: id,
+            title: 'Post Loading...',
+            content: 'Post information temporarily unavailable. Please refresh to try again.',
+            symbol: 'N/A',
+            exchange: 'N/A',
+            prediction: 'neutral',
+            target_price: null,
+            current_price: null,
+            created_at: new Date().toISOString(),
+            author_name: 'User',
+            author_avatar: '/default-avatar.svg',
+            price_checks: null
+          };
+          
+          setPost(fallbackPost);
           if (error.message && error.message.includes('timeout')) {
-            throw new Error('Request timed out. Please try again.');
+            setError('Connection timeout. Showing limited post information. Please refresh to try again.');
+          } else {
+            setError('Unable to load complete post. Please refresh to try again.');
           }
-          throw error;
+          setLoading(false);
+          return;
         }
         
         if (data) {
@@ -331,20 +386,19 @@ export default function PostDetailsPage({ params }) {
     );
   }
   
-  if (error) {
+  // Only show error page if we have no fallback post data
+  if (error && !post) {
     return (
       <div className={styles.container}>
         <div className={styles.errorContainer}>
-          <h2>Error</h2>
+          <h2>Unable to Load Post</h2>
           <p>{error}</p>
-          {error.includes('timed out') && (
-            <button 
-              onClick={() => window.location.reload()} 
-              className={styles.retryButton}
-            >
-              Try Again
-            </button>
-          )}
+          <button 
+            onClick={() => window.location.reload()} 
+            className={styles.retryButton}
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -367,6 +421,11 @@ export default function PostDetailsPage({ params }) {
   
   return (
     <div className={styles.container}>
+      {error && post && (
+        <div className={styles.warningBanner}>
+          ⚠️ {error}
+        </div>
+      )}
       <div className={styles.header}>
         <h1 className={styles.title}>Stock Analysis</h1>
       </div>

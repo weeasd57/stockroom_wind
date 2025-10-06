@@ -13,12 +13,6 @@ const nextConfig = {
   },
   // experimental config removed for Next.js 15 compatibility
   reactStrictMode: false,
-  api: {
-    responseLimit: '8mb',
-    bodyParser: {
-      sizeLimit: '8mb',
-    },
-  },
   // Add custom headers to prevent translation extensions
   async headers() {
     return [

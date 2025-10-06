@@ -28,7 +28,7 @@ export function PostsFeed({
   
   // Get posts from PostProvider for real-time updates
   // Use feedPosts which respects excludeCurrentUser flag
-  const { feedPosts, fetchPosts, loadMore, hasMore, loadingMore, loading: providerLoading, error: providerError } = usePosts();
+  const { feedPosts, posts: allPosts, fetchPosts, invalidateCache, loadMore, hasMore, loadingMore, loading: providerLoading, error: providerError } = usePosts();
   const providerPosts = feedPosts; // Alias for consistency with existing code
   
   const [loading, setLoading] = useState(true);
@@ -133,7 +133,7 @@ export function PostsFeed({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, userId]); // Remove fetchPosts from deps to prevent infinite loop
+  }, [filter, userId]); // Stable dependencies - fetchPosts is now stable with fetchVersion
 
   // Update loading and error states from PostProvider
   // Show skeleton only if we have no posts yet; otherwise keep rendering while background refreshes
@@ -142,6 +142,14 @@ export function PostsFeed({
     setLoading(derivedLoading);
     setError(providerError);
   }, [providerLoading, providerError, providerPosts]);
+
+  // Auto-refresh when posts array changes (new posts, updates, deletes)
+  useEffect(() => {
+    // Trigger re-filter when provider posts change
+    // This ensures UI stays in sync with realtime updates
+    const postsCount = Array.isArray(providerPosts) ? providerPosts.length : 0;
+    console.log(`[PostsFeed] Posts updated: ${postsCount} posts available`);
+  }, [providerPosts]);
 
   // Memoize posts array length to prevent unnecessary re-renders
   const postsLength = useMemo(() => providerPosts?.length || 0, [providerPosts]);

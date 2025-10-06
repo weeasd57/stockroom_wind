@@ -42,8 +42,18 @@ export default function CheckoutPage() {
   // Obtain CSP nonce exposed by RootLayout to allow PayPal SDK to inject styles with the same nonce
   useEffect(() => {
     try {
-      // eslint-disable-next-line no-undef
-      const n = typeof window !== 'undefined' ? (window.__CSP_NONCE__ || '') : '';
+      let n = '';
+      if (typeof document !== 'undefined') {
+        n = document.body?.getAttribute('data-csp-nonce') || '';
+        if (!n) {
+          const el = document.querySelector('script[nonce]');
+          n = (el && (el).nonce) || '';
+        }
+      }
+      if (!n && typeof window !== 'undefined') {
+        // eslint-disable-next-line no-undef
+        n = window.__CSP_NONCE__ || '';
+      }
       setCspNonce(n);
     } catch (_) {}
   }, []);
