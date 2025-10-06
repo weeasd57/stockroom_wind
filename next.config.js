@@ -11,8 +11,14 @@ const nextConfig = {
       'mfbgpnpgxmxgxpjnxzrb.supabase.co', // Additional Supabase storage
     ],
   },
-  // Disable React StrictMode to prevent double-rendering which can worsen hydration issues
+  // experimental config removed for Next.js 15 compatibility
   reactStrictMode: false,
+  api: {
+    responseLimit: '8mb',
+    bodyParser: {
+      sizeLimit: '8mb',
+    },
+  },
   // Add custom headers to prevent translation extensions
   async headers() {
     return [

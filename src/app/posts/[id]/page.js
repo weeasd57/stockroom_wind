@@ -37,8 +37,12 @@ function formatDate(dateString) {
 const postCache = new Map();
 const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
 
-export default function PostDetailsPage() {
-  const { id } = useParams();
+export default function PostDetailsPage({ params }) {
+  // Use params from props for Next.js 14 compatibility, with fallback to useParams
+  const paramsFromProps = params || {};
+  const paramsFromHook = useParams();
+  const { id } = paramsFromProps.id ? paramsFromProps : paramsFromHook;
+  
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -209,7 +213,14 @@ export default function PostDetailsPage() {
   
   useEffect(() => {
     // Wait until we have a valid id, then guard against double-fetch
-    if (!id || hasFetchedRef.current) return;
+    if (!id) {
+      console.warn('[POST-DETAILS] No ID provided, cannot fetch post');
+      setError('Post ID is required');
+      setLoading(false);
+      return;
+    }
+    
+    if (hasFetchedRef.current) return;
     hasFetchedRef.current = true;
 
     // Cancel previous request if any
@@ -218,7 +229,7 @@ export default function PostDetailsPage() {
     }
     controllerRef.current = new AbortController();
 
-    async function fetchPost() {
+        async function fetchPost() {
       try {
         // Check cache first
         const cacheKey = `post_${id}`;
@@ -231,9 +242,19 @@ export default function PostDetailsPage() {
         }
 
         setLoading(true);
-        const { data, error } = await getPostById(id);
+        
+        // Add timeout to the post fetch
+        const fetchController = new AbortController();
+        const fetchTimeout = setTimeout(() => fetchController.abort(), 30000); // 30 second timeout
+        
+        const { data, error } = await getPostById(id, { signal: fetchController.signal });
+        clearTimeout(fetchTimeout);
         
         if (error) {
+          // Handle timeout errors specifically
+          if (error.message && error.message.includes('timeout')) {
+            throw new Error('Request timed out. Please try again.');
+          }
           throw error;
         }
         
@@ -264,7 +285,11 @@ export default function PostDetailsPage() {
           setError('Post not found');
         }
       } catch (err) {
-        if (err.name === 'AbortError') return; // Ignore aborted requests
+        if (err.name === 'AbortError') {
+          console.warn('[POST-DETAILS] Request was aborted or timed out');
+          setError('Request timed out. Please try again.');
+          return;
+        }
         console.error('Error fetching post:', err);
         setError(err.message || 'Failed to load post');
       } finally {
@@ -300,6 +325,7 @@ export default function PostDetailsPage() {
         <div className={styles.loadingContainer}>
           <div className={styles.loadingSpinner}></div>
           <p>Loading post details...</p>
+          <p className={styles.loadingHint}>This may take a few moments...</p>
         </div>
       </div>
     );
@@ -311,6 +337,14 @@ export default function PostDetailsPage() {
         <div className={styles.errorContainer}>
           <h2>Error</h2>
           <p>{error}</p>
+          {error.includes('timed out') && (
+            <button 
+              onClick={() => window.location.reload()} 
+              className={styles.retryButton}
+            >
+              Try Again
+            </button>
+          )}
         </div>
       </div>
     );
