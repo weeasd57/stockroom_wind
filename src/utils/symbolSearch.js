@@ -12,7 +12,10 @@ async function ensureCountrySummaryLoaded() {
   if (countrySummaryData) return countrySummaryData;
   if (!countrySummaryLoadedPromise) {
     countrySummaryLoadedPromise = (async () => {
+      const _dbgStart = Date.now();
+      console.warn('[symbolSearch] load country summary -> start');
       const response = await fetch('/symbols_data/country_summary_20250304_171206.json');
+      console.warn('[symbolSearch] load country summary <- end', { status: response.status, ms: Date.now() - _dbgStart });
       if (!response.ok) {
         throw new Error('Failed to load country summary');
       }
@@ -137,7 +140,10 @@ export async function searchStocks(query, country = null, limit = 50) {
         try {
           // Convert country name to format used in file names
           const fileCountryName = getCountryFilenameSafe(countrySummaryKey);
+          const _dbgStart2 = Date.now();
+          console.warn('[symbolSearch] load country symbols -> start', { file: fileCountryName });
           const response = await fetch(`/symbols_data/${encodeURIComponent(fileCountryName)}.json`);
+          console.warn('[symbolSearch] load country symbols <- end', { file: fileCountryName, status: response.status, ms: Date.now() - _dbgStart2 });
           
           if (!response.ok) {
             throw new Error(`Failed to load symbols for ${countrySummaryKey} (${response.status})`);
@@ -183,7 +189,10 @@ export async function searchStocks(query, country = null, limit = 50) {
           // Try to load from all_symbols_by_country file
           console.log(`Attempting to load ${countryName} symbols from all_symbols_by_country file`);
           try {
+            const _dbgStart3 = Date.now();
+            console.warn('[symbolSearch] load all_symbols_by_country -> start');
             const allSymbolsResponse = await fetch(`/symbols_data/all_symbols_by_country_20250304_171206.json`);
+            console.warn('[symbolSearch] load all_symbols_by_country <- end', { status: allSymbolsResponse.status, ms: Date.now() - _dbgStart3 });
             
             if (!allSymbolsResponse.ok) {
               throw new Error(`Failed to load all_symbols_by_country file (${allSymbolsResponse.status})`);
@@ -293,7 +302,10 @@ export async function searchStocks(query, country = null, limit = 50) {
               try {
                 // Convert country name to format used in file names
                 const fileCountryName = getCountryFilenameSafe(countryKey);
+                const _dbgStart4 = Date.now();
+                console.warn('[symbolSearch] bulk load country -> start', { file: fileCountryName });
                 const response = await fetch(`/symbols_data/${encodeURIComponent(fileCountryName)}.json`);
+                console.warn('[symbolSearch] bulk load country <- end', { file: fileCountryName, status: response.status, ms: Date.now() - _dbgStart4 });
                 
                 if (!response.ok) {
                   throw new Error(`Failed to load symbols for ${countryKey} (${response.status})`);
@@ -398,14 +410,20 @@ async function loadCountrySymbols(country) {
   try {
     // Use the safe filename helper to get the proper filename format
     const fileCountryName = getCountryFilenameSafe(country);
+    let _dbgStart5 = Date.now();
+    console.warn('[symbolSearch] load specific country -> start', { file: fileCountryName });
     let response = await fetch(`/symbols_data/${encodeURIComponent(fileCountryName)}.json`);
+    console.warn('[symbolSearch] load specific country <- end', { file: fileCountryName, status: response.status, ms: Date.now() - _dbgStart5 });
     
     // If country-specific file not found, try to extract from all_symbols_by_country file
     if (!response.ok) {
       console.log(`Country file not found for ${country}, trying to extract from all_symbols_by_country file`);
       
       // Get the all_symbols_by_country file
+      const _dbgStart6 = Date.now();
+      console.warn('[symbolSearch] fallback load all_symbols_by_country -> start');
       const allSymbolsResponse = await fetch(`/symbols_data/all_symbols_by_country_20250304_171206.json`);
+      console.warn('[symbolSearch] fallback load all_symbols_by_country <- end', { status: allSymbolsResponse.status, ms: Date.now() - _dbgStart6 });
       
       if (!allSymbolsResponse.ok) {
         throw new Error(`Failed to load all_symbols_by_country file (${allSymbolsResponse.status})`);
@@ -480,7 +498,10 @@ async function loadCountrySymbols(country) {
  */
 async function loadCountrySummary() {
   try {
+    const _dbgStart7 = Date.now();
+    console.warn('[symbolSearch] getCountrySymbolCounts -> load summary start');
     const response = await fetch('/symbols_data/country_summary_20250304_171206.json');
+    console.warn('[symbolSearch] getCountrySymbolCounts <- load summary end', { status: response.status, ms: Date.now() - _dbgStart7 });
     if (!response.ok) {
       throw new Error('Failed to load country summary');
     }
