@@ -10,6 +10,8 @@ const API_BASE = '/api/subscription/manage';
  */
 export async function cancelSubscription(options = {}) {
   try {
+    const _dbgStart = Date.now();
+    console.warn('[subscription-api] cancel -> start');
     const response = await fetch(API_BASE, {
       method: 'POST',
       headers: {
@@ -22,6 +24,7 @@ export async function cancelSubscription(options = {}) {
         metadata: options.metadata
       }),
     });
+    console.warn('[subscription-api] cancel <- end', { status: response.status, ms: Date.now() - _dbgStart });
 
     const result = await response.json();
     
@@ -45,6 +48,8 @@ export async function switchToFreePlan(options = {}) {
       throw new Error('Confirmation is required to switch to free plan');
     }
 
+    const _dbgStart = Date.now();
+    console.warn('[subscription-api] switch_to_free -> start');
     const response = await fetch(API_BASE, {
       method: 'POST',
       headers: {
@@ -58,6 +63,7 @@ export async function switchToFreePlan(options = {}) {
         metadata: options.metadata
       }),
     });
+    console.warn('[subscription-api] switch_to_free <- end', { status: response.status, ms: Date.now() - _dbgStart });
 
     const result = await response.json();
     
@@ -77,6 +83,8 @@ export async function switchToFreePlan(options = {}) {
  */
 export async function syncWithPayPal() {
   try {
+    const _dbgStart = Date.now();
+    console.warn('[subscription-api] sync_with_paypal -> start');
     const response = await fetch(API_BASE, {
       method: 'POST',
       headers: {
@@ -86,6 +94,7 @@ export async function syncWithPayPal() {
         action: 'sync_with_paypal'
       }),
     });
+    console.warn('[subscription-api] sync_with_paypal <- end', { status: response.status, ms: Date.now() - _dbgStart });
 
     const result = await response.json();
     
@@ -109,6 +118,8 @@ export async function validatePayPalSubscription(subscriptionId) {
       throw new Error('PayPal subscription ID is required');
     }
 
+    const _dbgStart = Date.now();
+    console.warn('[subscription-api] validate_paypal -> start');
     const response = await fetch(API_BASE, {
       method: 'POST',
       headers: {
@@ -119,6 +130,7 @@ export async function validatePayPalSubscription(subscriptionId) {
         subscriptionId
       }),
     });
+    console.warn('[subscription-api] validate_paypal <- end', { status: response.status, ms: Date.now() - _dbgStart });
 
     const result = await response.json();
     

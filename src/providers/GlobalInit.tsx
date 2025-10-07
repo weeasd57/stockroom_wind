@@ -90,6 +90,49 @@ export default function GlobalInit() {
       };
     }
 
+    // Install global client fetch logger (before/after/error)
+    try {
+      const g: any = window as any;
+      if (!g.__FETCH_LOGGER_INSTALLED__) {
+        const sanitizeUrlForLog = (raw: string): string => {
+          try {
+            const u = new URL(raw, window.location.origin);
+            const SENSITIVE = /token|api[_-]?key|key|secret|password|pass|authorization|auth|bearer/i;
+            u.searchParams.forEach((value, key) => {
+              if (SENSITIVE.test(key)) {
+                u.searchParams.set(key, '***');
+              }
+            });
+            return u.toString();
+          } catch {
+            const idx = raw.indexOf('?');
+            return idx >= 0 ? raw.slice(0, idx + 1) + '***' : raw;
+          }
+        };
+        const originalFetch = window.fetch.bind(window);
+        let requestCounter = 0;
+        window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+          const id = (++requestCounter).toString(36) + '-' + Date.now().toString(36);
+          const url = typeof input === 'string' || input instanceof URL ? String(input) : (input as Request).url;
+          const method = (init?.method) || ((typeof input === 'object' && (input as any)?.method) || 'GET');
+          const start = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+          const logPrefix = `[client-fetch][${id}]`;
+          try {
+            console.warn(`${logPrefix} -> start`, { url: sanitizeUrlForLog(url), method, hasSignal: Boolean(init?.signal) });
+            const res = await originalFetch(input as any, init as any);
+            const end = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+            console.warn(`${logPrefix} <- end`, { url: sanitizeUrlForLog(url), method, status: res.status, ok: res.ok, ms: Math.round(end - start) });
+            return res;
+          } catch (err: any) {
+            const end = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+            console.warn(`${logPrefix} xx error`, { url: sanitizeUrlForLog(url), method, name: err?.name, message: err?.message, ms: Math.round(end - start) });
+            throw err;
+          }
+        };
+        g.__FETCH_LOGGER_INSTALLED__ = true;
+      }
+    } catch {}
+
     // Image cache manager used across the app
     if (!(window as any).imageCacheManager) {
       (window as any).imageCacheManager = {
