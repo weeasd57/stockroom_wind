@@ -3,8 +3,9 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { SupabaseClient, User } from '@supabase/supabase-js';
-import { useRouter } from 'next/navigation';
 import { supabase as globalSupabase } from '@/utils/supabase'; // Import the shared instance
+import { getCookie, deleteCookie } from '@/utils/cookies';
+import performanceMonitor, { trackApiCall, trackSubscription, removeSubscription, isApiThrottled } from '@/utils/performanceMonitor';
 
 interface SupabaseContextType {
   supabase: SupabaseClient;
@@ -44,13 +45,17 @@ interface SupabaseProviderProps {
 }
 
 export function SupabaseProvider({ children }: SupabaseProviderProps) {
+  const providerStartTime = performance.now();
+  console.log(`[SUPABASE-PROVIDER] 🚀 Initialization START: ${new Date().toISOString()}`);
+  
   // Use the globally imported Supabase client instance
   const supabase = globalSupabase;
+  console.log('[SUPABASE-PROVIDER] 🔗 Client status:', !!supabase);
+  
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const refreshTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -58,8 +63,13 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
   useEffect(() => {
     // Check active session
     const initializeAuth = async () => {
+      const authStartTime = performance.now();
+      console.log('[SUPABASE-PROVIDER] 🔐 Auth Check START');
+      
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
+        const authEndTime = performance.now();
+        console.log(`[SUPABASE-PROVIDER] ⚙️ getSession completed in ${authEndTime - authStartTime}ms`);
         
         if (error) {
           // console.error('Error getting session:', error.message);
@@ -69,12 +79,13 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
         }
 
       const hasUser = !!session?.user;
+      console.log('[SUPABASE-PROVIDER] 👤 Auth State:', { hasUser, userId: session?.user?.id?.slice(0, 8) });
       setUser(session?.user ?? null);
       setIsAuthenticated(hasUser);
 
     // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-          // console.log(`[Auth] State change: ${event}`);
+          console.log(`[SUPABASE-PROVIDER] 🔄 Auth State Change: ${event}`);
           if (event === 'SIGNED_IN') {
             const currentUser = await supabase.auth.getUser();
             setUser(currentUser.data.user);
@@ -82,10 +93,11 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
 
             // If a post-auth redirect was requested (set before OAuth flow), follow it
             try {
-              const postAuth = typeof window !== 'undefined' ? localStorage.getItem('postAuthRedirect') : null;
+              const postAuth = typeof window !== 'undefined' ? getCookie('postAuthRedirect') : null;
               if (postAuth) {
-                try { localStorage.removeItem('postAuthRedirect'); } catch (e) { /* ignore */ }
-                router.push(postAuth);
+                try { deleteCookie('postAuthRedirect'); } catch (e) { /* ignore */ }
+                // Use native navigation to avoid Next.js RSC prefetching
+                window.location.href = postAuth;
                 return; // stop further processing
               }
             } catch (e) {
@@ -360,6 +372,12 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
 
   // Posts functions
   const getPosts = useCallback(async () => {
+    // Check if API calls are throttled
+    if (isApiThrottled()) {
+      throw new Error('API calls are temporarily throttled. Please wait a moment.');
+    }
+    
+    const callId = trackApiCall('posts', 'SELECT');
     try {
       const { data, error } = await supabase
         .from('posts')
@@ -374,7 +392,14 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
   }, [supabase]);
 
   const getPostsPage = useCallback(async (params: { limit?: number; before?: string | null; userIds?: string[] } = {}) => {
+    // Check if API calls are throttled
+    if (isApiThrottled()) {
+      throw new Error('API calls are temporarily throttled. Please wait a moment.');
+    }
+    
     const { limit = 20, before = null, userIds } = params;
+    const callId = trackApiCall('posts_with_stats', 'SELECT_PAGE');
+    
     try {
       let query = supabase
         .from('posts_with_stats')
@@ -422,6 +447,7 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
       // Batch fetch profiles and attach as `profile` to each post
       const uniqueUserIds = Array.from(new Set(rows.map((r: any) => r.user_id).filter(Boolean)));
       if (uniqueUserIds.length > 0) {
+        const profileCallId = trackApiCall('profiles', 'SELECT_BATCH');
         const { data: profiles, error: pError } = await supabase
           .from('profiles')
           .select('id, username, avatar_url')
@@ -705,7 +731,7 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
         // Clear state before redirect
         setIsAuthenticated(false);
         setUser(null);
-        // Force page reload to ensure clean state
+        // Use native navigation to avoid Next.js prefetching
         window.location.href = '/landing';
       }
     } catch (error) {

@@ -106,7 +106,7 @@ export function PostsFeed({
 
     function performFetch() {
       lastFetchRef.current = Date.now();
-      console.log(`[PostsFeed] Fetching posts. Filter: ${filter}, userId: ${userId || 'none'}`);
+      // Fetching posts silently
       
       if (userId) {
         // Profile/View-Profile: fetch only this user's posts
@@ -148,7 +148,7 @@ export function PostsFeed({
     // Trigger re-filter when provider posts change
     // This ensures UI stays in sync with realtime updates
     const postsCount = Array.isArray(providerPosts) ? providerPosts.length : 0;
-    console.log(`[PostsFeed] Posts updated: ${postsCount} posts available`);
+    // Posts updated silently
   }, [providerPosts]);
 
   // Memoize posts array length to prevent unnecessary re-renders
@@ -239,7 +239,9 @@ export function PostsFeed({
       loading !== logStateRef.current.lastLoading) {
     const now = Date.now();
     if (!lastLogRef.current || (now - lastLogRef.current) > 2000) {
-      console.log(`[PostsFeed] Rendering with ${posts.length} posts. Loading: ${loading}, Filter: ${filter}, Mode: ${mode || 'home'}, UserId: ${userId || 'none'}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[PostsFeed] Rendering: ${posts.length} posts, ${filter} filter`);
+      }
       lastLogRef.current = now;
     }
     logStateRef.current = { lastPostsLength: posts.length, lastFilter: filter, lastLoading: loading };

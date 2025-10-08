@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSupabase } from './SupabaseProvider';
 import '@/styles/auth.css';
+import { getCookie, deleteCookie, setCookie } from '@/utils/cookies';
 
 // Define paths that don't require authentication
 const PUBLIC_PATHS = ['/landing', '/login', '/register', '/auth/callback', '/traders', '/pricing', '/checkout'];
@@ -63,24 +64,21 @@ function ProtectedContent({ children, pathname }: { children: React.ReactNode, p
   const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
-    // Don't do anything while still loading
     if (loading) return;
     
     // Mark auth as checked after loading completes
     setAuthChecked(true);
     
-    console.log('AuthGuard processing path:', pathname, 'isAuthenticated:', isAuthenticated);
-    console.log('Is public path?', isPublicPath(pathname));
-    console.log('Should redirect to profile?', shouldRedirectToProfile(pathname));
+    // Auth processing silently
     
     // If we're on the root path, implement smart routing
     if (pathname === '/') {
       if (isAuthenticated) {
         console.log('Authenticated user on root, redirecting to profile');
-        router.push('/profile');
+        window.location.href = '/profile';
       } else {
         console.log('Non-authenticated user on root, redirecting to landing');
-        router.push('/landing');
+        window.location.href = '/landing';
       }
       return;
     }
@@ -88,7 +86,7 @@ function ProtectedContent({ children, pathname }: { children: React.ReactNode, p
     // Smart routing for auth pages
     if (shouldRedirectToProfile(pathname) && isAuthenticated) {
       console.log('Authenticated user on auth page, redirecting to profile');
-      router.push('/profile');
+      window.location.href = '/profile';
       return;
     }
     
@@ -101,7 +99,7 @@ function ProtectedContent({ children, pathname }: { children: React.ReactNode, p
 
     // Current path is a public path, allow access
     if (isPublicPath(pathname)) {
-      console.log('Public path detected, allowing access:', pathname);
+      // Public path access
       return;
     }
 
@@ -110,20 +108,20 @@ function ProtectedContent({ children, pathname }: { children: React.ReactNode, p
       console.log('User not authenticated, redirecting to landing page');
       // Allow pages to suppress auth redirect if they encounter an error (e.g., checkout failing)
       try {
-        const suppressed = (typeof window !== 'undefined') && localStorage.getItem('suppressAuthRedirect') === '1';
+        const suppressed = (typeof window !== 'undefined') && getCookie('suppressAuthRedirect') === '1';
         if (suppressed) {
           // Clear suppression after reading
-          localStorage.removeItem('suppressAuthRedirect');
+          deleteCookie('suppressAuthRedirect');
           console.log('Auth redirect suppressed for current navigation due to page-level error');
           return;
         }
       } catch (e) {
-        // ignore storage errors
+        // ignore cookie errors
       }
 
       // Store the intended destination for post-login redirect
       if (typeof window !== 'undefined') {
-        localStorage.setItem('postAuthRedirect', pathname);
+        setCookie('postAuthRedirect', pathname, { maxAgeSeconds: 600, sameSite: 'Lax' });
       }
 
       // Start the fade out animation

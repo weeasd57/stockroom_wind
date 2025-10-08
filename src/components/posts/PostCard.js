@@ -1,18 +1,21 @@
 'use client';
 
-import React from 'react';
+import React, { memo } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { CommentProvider } from '@/providers/CommentProvider';
 import PostActions from '@/components/posts/PostActions';
 import PostSentiment from '@/components/posts/PostSentiment';
 import Comments from '@/components/posts/Comments';
 import PriceUpdateIndicator from '@/components/PriceUpdateIndicator';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import styles from '@/styles/home/PostsFeed.module.css';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 
 // Reusable PostCard component used across Home feed and Traders page
-export default function PostCard({ post, showFlagBackground = false, hideUserInfo = false }) {
+function PostCard({ post, showFlagBackground = false, hideUserInfo = false }) {
+  const router = useRouter();
+  
   if (!post) return null;
 
   const formatPrice = (price) => {
@@ -92,7 +95,14 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
         <div className={styles.postHeader}>
           {!hideUserInfo && (
             profileId ? (
-              <Link href={`/view-profile/${profileId}`} className={styles.userInfo} prefetch>
+              <Link 
+                href={`/view-profile/${profileId}`}
+                prefetch={false}
+                className={styles.userInfo}
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+              >
                 <div className={styles.avatar}>
                   {avatarUrl ? (
                     <img src={avatarUrl} alt={username} className={styles.avatarImage} />
@@ -273,11 +283,33 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
 
         {/* Footer Actions */}
         <div className={styles.postFooter}>
-          <Link className={styles.actionButton} href={`/posts/${post.id}`}>
+          <button 
+            className={styles.actionButton}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              router.push(`/posts/${post.id}`);
+            }}
+          >
             View Details
-          </Link>
+          </button>
         </div>
       </div>
     </CommentProvider>
   );
 }
+
+// Memoize PostCard to prevent unnecessary re-renders when post data hasn't changed
+export default memo(PostCard, (prevProps, nextProps) => {
+  return (
+    prevProps.post?.id === nextProps.post?.id &&
+    prevProps.post?.updated_at === nextProps.post?.updated_at &&
+    prevProps.post?.comment_count === nextProps.post?.comment_count &&
+    prevProps.post?.buy_count === nextProps.post?.buy_count &&
+    prevProps.post?.sell_count === nextProps.post?.sell_count &&
+    prevProps.post?.current_price === nextProps.post?.current_price &&
+    prevProps.showFlagBackground === nextProps.showFlagBackground &&
+    prevProps.post?.target_reached === nextProps.post?.target_reached &&
+    prevProps.post?.target_reached_date === nextProps.post?.target_reached_date
+  );
+});

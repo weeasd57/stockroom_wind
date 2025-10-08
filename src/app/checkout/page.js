@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useSubscription } from '@/providers/SubscriptionProvider';
 import Script from 'next/script';
+import { setCookie, deleteCookie } from '@/utils/cookies';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -102,7 +103,8 @@ export default function CheckoutPage() {
   const setErrorAndSuppressRedirect = (msg) => {
     try {
       if (typeof window !== 'undefined') {
-        localStorage.setItem('suppressAuthRedirect', '1');
+        // Suppress for a short time to allow dialogs to show
+        setCookie('suppressAuthRedirect', '1', { maxAgeSeconds: 120, sameSite: 'Lax' });
       }
     } catch (e) {}
     setError(msg);
@@ -111,7 +113,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     // Clear any stale post-auth redirect so we don't get redirected away
     try {
-      if (typeof window !== 'undefined') localStorage.removeItem('postAuthRedirect');
+      if (typeof window !== 'undefined') deleteCookie('postAuthRedirect');
     } catch (e) {}
 
     // Don't redirect while auth is still loading
@@ -123,7 +125,7 @@ export default function CheckoutPage() {
     if (!isAuthenticated) {
       // If not authenticated, send user to login and request returning to checkout
       console.log('User not authenticated, redirecting to login');
-      try { if (typeof window !== 'undefined') localStorage.setItem('postAuthRedirect', '/checkout'); } catch (e) {}
+      try { if (typeof window !== 'undefined') setCookie('postAuthRedirect', '/checkout', { maxAgeSeconds: 600, sameSite: 'Lax' }); } catch (e) {}
       router.push('/login?redirect=/checkout');
       return;
     }
@@ -133,7 +135,7 @@ export default function CheckoutPage() {
     // Check if user is already Pro
     if (isPro) {
       console.log('User already has Pro subscription, redirecting to profile');
-      router.push('/profile');
+      window.location.href = '/profile';
       return;
     }
   }, [user, authLoading, router, isPro]);
@@ -366,7 +368,7 @@ export default function CheckoutPage() {
 
   const handleSuccessDialogClose = () => {
     setShowSuccessDialog(false);
-    router.push('/profile');
+    window.location.href = '/profile';
   };
 
   const handleErrorDialogClose = () => {

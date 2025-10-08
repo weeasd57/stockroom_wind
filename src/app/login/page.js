@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { supabase, signIn, signUp } from '@/utils/supabase';
 import styles from '@/styles/login.module.css';
+import { setCookie } from '@/utils/cookies';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -92,7 +93,7 @@ export default function Login() {
         console.log('Login page: Attempting to sign up with:', email, 'Username:', username);
         
         // Remember to redirect to profile after auth completes
-        try { localStorage.setItem('postAuthRedirect', '/profile'); } catch (e) { /* ignore */ }
+        try { setCookie('postAuthRedirect', '/profile', { maxAgeSeconds: 600, sameSite: 'Lax' }); } catch (e) { /* ignore */ }
 
         // Call our custom API route to create the user
         const response = await fetch('/api/signup', {
@@ -129,7 +130,7 @@ export default function Login() {
 
           // Fade out and redirect to profile
           setVisible(false);
-          router.push('/profile');
+          window.location.href = '/profile';
           return;
         } catch (e) {
           // If email confirmation is required, inform the user
@@ -148,7 +149,7 @@ export default function Login() {
         
         // Fade out before navigation
         setVisible(false);
-        setTimeout(() => router.push('/profile'), 300);
+        setTimeout(() => window.location.href = '/profile', 300);
       }
     } catch (err) {
       console.error('Login page: Authentication error:', err);
@@ -192,7 +193,7 @@ export default function Login() {
         ? 'http://localhost:3000/auth/callback' 
         : 'https://firestocks.vercel.app/auth/callback';
       
-      try { localStorage.setItem('postAuthRedirect', '/profile'); } catch (e) { /* ignore */ }
+      try { setCookie('postAuthRedirect', '/profile', { maxAgeSeconds: 600, sameSite: 'Lax' }); } catch (e) { /* ignore */ }
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',

@@ -1,9 +1,5 @@
 import React from 'react';
-import styles from '@/styles/ProfilePostCard.module.css';
-import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
-import { COUNTRY_ISO_CODES } from '@/models/CurrencyData';
-import { getCountryForExchange, EXCHANGE_COUNTRIES } from '@/models/ExchangeData';
-import 'flag-icons/css/flag-icons.min.css';
+import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
 
 /**
@@ -224,15 +220,7 @@ export const ProfilePostCard = ({ post = {} }) => {
             </div>
           );
         })()}
-      
-          <span className={styles.statusDate}>
-            {post.target_reached 
-              ? `on ${formatDate(post.target_reached_date)} (UTC)`
-              : `on ${formatDate(post.stop_loss_triggered_date)} (UTC)`
-            }
-          </span>
-        </div>
-      )}
+      </div>
       
       {/* Price check status for open posts */}
       {!post.closed && post.last_price_check && (
@@ -299,7 +287,9 @@ export const ProfilePostCard = ({ post = {} }) => {
         
         <button 
           className={styles.showDetailsButton}
-          onClick={() => router.push(`/posts/${post.id}`)}
+          onClick={() => {
+            router.push(`/posts/${post.id}`);
+          }}
         >
           Show Details
         </button>

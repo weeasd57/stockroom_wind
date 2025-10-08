@@ -6,7 +6,7 @@ import { useProfile } from '@/providers/ProfileProvider';
 import { useSubscription } from '@/providers/SubscriptionProvider';
 import { useBackgroundProfileUpdate } from '@/providers/BackgroundProfileUpdateProvider';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import styles from '@/styles/profile.module.css';
 import editStyles from '@/styles/editProfile.module.css';
 import { CreatePostButton } from '@/components/posts/CreatePostButton';
@@ -27,6 +27,7 @@ import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useSupabase();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { theme } = useTheme();
   const { 
     subscriptionInfo,
@@ -1752,7 +1753,14 @@ export default function Profile() {
             {followers.length > 0 ? (
               followers.map((follower) => (
                 <div key={follower.follower_id} className={styles.userCard}>
-                  <Link href={`/view-profile/${follower.profiles?.id || follower.follower_id}`} className={styles.userLink}>
+                  <div 
+                    className={styles.userLink}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.location.href = `/view-profile/${follower.profiles?.id || follower.follower_id}`;
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <div className={styles.userCardInner}>
                       <div className={styles.userAvatarContainer}>
                         <img 
@@ -1766,10 +1774,10 @@ export default function Profile() {
                         />
                       </div>
                       <div className={styles.userInfo}>
-                        <h3 className={styles.userName}>{follower.profiles?.username || 'User'}</h3>
+                        <h3 className={styles.userName}>{follower.profiles?.username || "User"}</h3>
                       </div>
                     </div>
-                  </Link>
+                  </div>
                 </div>
               ))
             ) : (
@@ -1788,7 +1796,14 @@ export default function Profile() {
             {following.length > 0 ? (
               following.map((follow) => (
                 <div key={follow.following_id} className={styles.userCard}>
-                  <Link href={`/view-profile/${follow.profiles?.id || follow.following_id}`} className={styles.userLink}>
+                  <div 
+                    className={styles.userLink}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.location.href = `/view-profile/${follow.profiles?.id || follow.following_id}`;
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <div className={styles.userCardInner}>
                       <div className={styles.userAvatarContainer}>
                         <img 
@@ -1802,10 +1817,10 @@ export default function Profile() {
                         />
                       </div>
                       <div className={styles.userInfo}>
-                        <h3 className={styles.userName}>{follow.profiles?.username || 'User'}</h3>
+                        <h3 className={styles.userName}>{follow.profiles?.username || "User"}</h3>
                       </div>
                     </div>
-                  </Link>
+                  </div>
                 </div>
               ))
             ) : (

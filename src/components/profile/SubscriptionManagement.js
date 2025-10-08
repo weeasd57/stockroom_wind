@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSubscription } from '@/providers/SubscriptionProvider';
 import styles from '@/styles/profile.module.css';
 import { toast } from 'sonner';
 
 export default function SubscriptionManagement() {
+  const router = useRouter();
   const { subscriptionInfo, refreshSubscription, isPro } = useSubscription();
   const [cancelling, setCancelling] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);

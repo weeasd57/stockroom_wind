@@ -36,6 +36,19 @@ alwaysApply: true
 - Detect and reduce memory leaks or bottlenecks.
 - Suggest performance-optimized state management strategies (e.g., selective re-rendering, atomic stores).
 
+🚨 RSC Prefetch & Memory Leak Prevention
+- NEVER use Link components for  navigation - causes RSC Prefetch Cascade Error
+- Always use programmatic navigation: `router.push()` instead of `<Link href="/view-profile/id">`
+- Add `e.preventDefault()` and `e.stopPropagation()` to button onClick handlers
+- Watch for Network Console showing `?_rsc=` requests - indicates aggressive prefetching bug
+- Replace ALL profile Links with buttons + useRouter for clean client-side navigation
+- Monitor for "Request timed out" errors - symptom of RSC cascade conflicts
+- Clean up subscriptions, intervals, and event listeners in useEffect cleanup functions
+- Use AbortController for fetch requests to prevent memory leaks on component unmount
+- Implement global cleanup for Supabase channels and background processes
+- Throttle and debounce expensive operations (API calls, re-renders, event handlers)
+- Cache frequently accessed data with proper TTL to reduce redundant network requests
+
 🔎 Testing & Edge Case Coverage
 - Identify edge cases and validate inputs properly.
 - Suggest appropriate unit, integration, and E2E testing strategies.
@@ -50,3 +63,12 @@ alwaysApply: true
 - Suggest better naming conventions and improve code readability.
 - Break large logic blocks into small, purposeful functions.
 - Ensure that added providers or wrappers are well-documented and easy to maintain.
+
+📊 Performance Monitoring & Debugging
+- Monitor Network Console for excessive RSC requests (`?_rsc=` parameters)
+- Check for memory growth in DevTools Performance tab during navigation
+- Log cleanup operations only in development mode to reduce console spam
+- Use performance.mark() and performance.measure() for critical code paths
+- Implement error boundaries for graceful degradation during navigation issues
+- Track component mount/unmount cycles to detect memory leak patterns
+- Monitor Supabase connection pools and active subscription counts

@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import Image from 'next/image';
 import { useEffect, useState, useRef } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
@@ -24,7 +24,6 @@ const navigationConfig = {
 };
 
 export default function Navbar() {
-  const router = useRouter();
   const pathname = usePathname();
   const { user, signOut, handleLogout, isAuthenticated } = useSupabase();
   const profileContext = useProfile();
@@ -133,17 +132,12 @@ export default function Navbar() {
     setIsMenuOpen(false);
   };
 
-  // Navigation handlers
-  const handleHomeNavigation = (e) => {
-    e.preventDefault();
-    closeMenu();
-    const targetPath = isAuthenticated ? '/home' : '/landing';
-    router.push(targetPath);
-  };
-
+  // Navigation handlers - native navigation to avoid RSC prefetching
   const handleNavigation = (href) => {
     closeMenu();
-    router.push(href);
+    if (href && typeof window !== 'undefined') {
+      window.location.href = href;
+    }
   };
 
   // Logout handler
@@ -174,39 +168,41 @@ export default function Navbar() {
     >
       <div className={styles.container}>
         {/* Logo */}
-        <Link 
-          href={isAuthenticated ? '/home' : '/landing'} 
+        <button 
+          type="button"
           className={styles.logo}
-          onClick={closeMenu}
+          onClick={() => handleNavigation(isAuthenticated ? '/home' : '/landing')}
+          aria-label="Go to home"
         >
           <div className={styles.logoWrapper}>
-            <img 
+            <Image 
               src="/favicon_io/android-chrome-192x192.png" 
               alt="SharksZone Logo" 
               width={40}
               height={40}
+              sizes="40px"
               className={styles.logoImage}
             />
             <span className={styles.logoText}>
               <span className="gradient-text" style={{ fontSize: '1.75rem' }}>Sharks</span>Zone
             </span>
           </div>
-        </Link>
+        </button>
 
         {/* Desktop Navigation */}
         <nav className={styles.desktopNav} aria-label="Main navigation">
           <ul className={styles.navList}>
             {navLinks.map((link, index) => (
               <li key={link.href} className={styles.navItem}>
-                <Link 
-                  href={link.href}
+                <button 
+                  onClick={() => handleNavigation(link.href)}
                   className={`${styles.navLink} ${pathname === link.href ? styles.active : ''}`}
                 >
                   <span className={styles.navIcon} aria-hidden="true">
                     {link.icon}
                   </span>
                   {link.label}
-                </Link>
+                </button>
               </li>
             ))}
           </ul>
@@ -218,7 +214,7 @@ export default function Navbar() {
           
           {isAuthenticated ? (
             <div className={styles.userSection}>
-              <Link href="/profile" className={styles.profileButton}>
+              <button onClick={() => handleNavigation('/profile')} className={styles.profileButton}>
                 <div className={styles.avatarWrapper}>
                   {avatarLoading ? (
                     <div className={styles.avatarSkeleton}>
@@ -243,7 +239,7 @@ export default function Navbar() {
                   )}
                 </div>
                 <span className={styles.profileText}>Profile</span>
-              </Link>
+              </button>
               
               <button 
                 className={styles.logoutButton} 
@@ -264,10 +260,10 @@ export default function Navbar() {
               </button>
             </div>
           ) : (
-            <Link href="/login" className={styles.signInButton}>
+            <button onClick={() => handleNavigation('/login')} className={styles.signInButton}>
               <span aria-hidden="true">🚀</span>
               Sign In
-            </Link>
+            </button>
           )}
         </div>
 

@@ -3060,6 +3060,16 @@
   color: inherit;
   display: block;
   height: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  width: 100%;
+}
+
+.userLink:hover {
+  opacity: 0.8;
 }
 
 .userCardInner {

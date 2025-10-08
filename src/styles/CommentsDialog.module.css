@@ -244,7 +244,6 @@
   margin-bottom: 4px;
   position: relative;
 }
-
 .commentHeader {
   margin-bottom: 4px;
 }
@@ -253,10 +252,17 @@
   font-weight: 600;
   color: var(--text-primary, #1f2937);
   font-size: 0.875rem;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: none;
+  font: inherit;
 }
 
-.commentText {
-  margin: 0;
+.username:hover {
+  color: var(--primary-color, #3b82f6);
+  text-decoration: underline;
 }
 
 .commentText p {

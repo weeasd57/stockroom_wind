@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { sendTelegramBroadcastForPost } from '@/services/telegram';
 import { useSupabase } from '@/providers/SupabaseProvider';
+import { trackSubscription, removeSubscription } from '@/utils/performanceMonitor';
 
 type Post = any;
 
@@ -96,13 +97,12 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
   // Create a stable version counter for cache invalidation
   const [fetchVersion, setFetchVersion] = useState(0);
   const invalidateCache = useCallback(() => {
-    setFetchVersion(prev => prev + 1);
   }, []);
 
   const fetchPosts = useCallback<PostsContextType['fetchPosts']>(async (mode, opts) => {
     setLoading(true);
     setError(null);
-    console.log(`[PostProvider] fetchPosts called - mode: ${mode}, version: ${fetchVersion}`);
+    // Fetch posts silently
     try {
       let data: any[] | null = null;
       modeRef.current = mode;
@@ -113,12 +113,13 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
 
       // If userId is provided (view-profile mode), fetch only that user's posts
       if (opts?.userId) {
-        console.log('[PostProvider] Fetching posts for userId:', opts.userId);
+        // Fetching user posts
         data = await getPostsPage({ limit: PAGE_SIZE, before: null, userIds: [opts.userId] });
       } else if (mode === 'following') {
         if (!user?.id) {
           setPosts([]);
           setLoading(false);
+          setError('Please log in to view following feed');
           setHasMore(false);
           nextCursorRef.current = null;
           return;
@@ -217,12 +218,14 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!supabase) return;
     
-    // Throttle real-time updates to prevent excessive re-renders
+    // Enhanced cleanup tracking
+    let isMounted = true;
     let updateTimeout: NodeJS.Timeout | null = null;
     const pendingUpdates = new Map<string, any>();
+    let channel: any = null;
 
     const processUpdates = () => {
-      if (pendingUpdates.size === 0) return;
+      if (pendingUpdates.size === 0 || !isMounted) return;
       
       setPosts(prev => {
         let next = [...prev];
@@ -242,9 +245,23 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       pendingUpdates.clear();
     };
 
-    const channel = supabase
-      .channel('posts-realtime')
+    // Create channel with unique name to prevent conflicts
+    const channelName = `posts-realtime-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const subscriptionId = trackSubscription(channelName, 'supabase-posts');
+    
+    channel = supabase
+      .channel(channelName);
+    
+    // Track channel for global cleanup
+    if (typeof window !== 'undefined' && (window as any).trackChannel) {
+      (window as any).trackChannel(channel);
+    }
+    
+    channel = channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload: any) => {
+        // Early exit if component unmounted
+        if (!isMounted) return;
+        
         const evt = payload.eventType;
         const newRow = payload.new;
         const oldRow = payload.old;
@@ -263,7 +280,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
 
           // Fetch enriched row from posts_with_stats + profile then prepend if not exists
           fetchPostWithStats(newRow.id).then((full) => {
-            if (!full) return;
+            if (!full || !isMounted) return;
             setPosts(prev => {
               if (prev.some(p => p.id === full.id)) return prev;
               const combined = [full, ...prev];
@@ -294,26 +311,62 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
           pendingUpdates.set(newRow.id, updateData);
           
           // Debounce the actual update
-          if (updateTimeout) clearTimeout(updateTimeout);
+          if (updateTimeout) {
+            clearTimeout(updateTimeout);
+            updateTimeout = null;
+          }
+          
           updateTimeout = setTimeout(() => {
-            processUpdates();
-            // Trigger cache invalidation to refresh feed
-            invalidateCache();
+            if (isMounted) {
+              processUpdates();
+              // Trigger cache invalidation to refresh feed
+              invalidateCache();
+            }
+            updateTimeout = null;
           }, 300);
           
         } else if (evt === 'DELETE' && oldRow) {
-          setPosts(prev => prev.filter(p => p.id !== oldRow.id));
+          if (isMounted) {
+            setPosts(prev => prev.filter(p => p.id !== oldRow.id));
+          }
         }
       })
       .subscribe();
 
+    // Enhanced cleanup function
     return () => {
-      try { 
-        channel.unsubscribe(); 
-        if (updateTimeout) clearTimeout(updateTimeout);
-      } catch {}
+      isMounted = false;
+      
+      // Clear any pending timeouts
+      if (updateTimeout) {
+        clearTimeout(updateTimeout);
+        updateTimeout = null;
+      }
+      
+      // Clear pending updates
+      pendingUpdates.clear();
+      
+      // Properly unsubscribe from channel
+      if (channel) {
+        try {
+          channel.unsubscribe();
+          // Remove from performance monitor
+          removeSubscription(subscriptionId);
+          
+          // Remove from global tracking
+          if (typeof window !== 'undefined' && (window as any).activeChannels) {
+            const channels = (window as any).activeChannels;
+            const index = channels.indexOf(channel);
+            if (index > -1) {
+              channels.splice(index, 1);
+            }
+          }
+        } catch (error) {
+          console.warn('[PostProvider] Error unsubscribing from channel:', error);
+        }
+      }
     };
-  }, [supabase, fetchPostWithStats]);
+  }, [supabase, fetchPostWithStats, invalidateCache]);
 
   const createPost: PostsContextType['createPost'] = async (postData: any) => {
     const tempId = `temp-${Date.now()}`;

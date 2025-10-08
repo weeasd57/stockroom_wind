@@ -42,6 +42,9 @@ export default function PostDetailsPage() {
   const rawId = paramsFromHook?.id;
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
   
+  // Validate ID format (UUID)
+  const isValidId = id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -211,24 +214,22 @@ export default function PostDetailsPage() {
   };
   
   useEffect(() => {
-    // Wait until we have a valid id, then guard against double-fetch
-    if (!id) {
-      console.warn('[POST-DETAILS] No ID provided, cannot fetch post');
-      setError('Post ID is required');
-      setLoading(false);
-      return;
-    }
+    const fetchPost = async () => {
+      if (!id || !isValidId) {
+        setError('Invalid post ID');
+        setLoading(false);
+        return;
+      }
     
-    if (hasFetchedRef.current) return;
-    hasFetchedRef.current = true;
+      if (hasFetchedRef.current) return;
+      hasFetchedRef.current = true;
 
-    // Cancel previous request if any
-    if (controllerRef.current) {
-      controllerRef.current.abort();
-    }
-    controllerRef.current = new AbortController();
+      // Cancel previous request if any
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+      }
+      controllerRef.current = new AbortController();
 
-        async function fetchPost() {
       try {
         // Check cache first
         const cacheKey = `post_${id}`;
@@ -360,7 +361,7 @@ export default function PostDetailsPage() {
         controllerRef.current.abort();
       }
     };
-  }, [id]);
+  }, [id, isValidId]);
   
   // Precompute derived values with safe fallbacks to keep hooks order consistent across renders
   const safePost = post || {};

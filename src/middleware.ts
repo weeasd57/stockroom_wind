@@ -19,6 +19,28 @@ function generateNonce(): string {
 }
 
 export async function middleware(req: NextRequest) {
+  // Smart RSC handling - allow navigation but block prefetching
+  const url = req.nextUrl.clone()
+  
+  if (url.searchParams.has('_rsc')) {
+    // Check if this is a prefetch request or actual navigation
+    const isPrefetch = req.headers.get('purpose') === 'prefetch' || 
+                      req.headers.get('x-middleware-prefetch') === '1'
+    
+    if (isPrefetch) {
+      console.log('🚫 Blocked RSC prefetch:', url.pathname)
+      // Return minimal RSC response for prefetch
+      return new NextResponse('0:["$L1"]', { 
+        status: 200,
+        headers: {
+          'Content-Type': 'text/x-component',
+          'Cache-Control': 'no-store',
+        }
+      })
+    }
+    // Allow actual navigation RSC requests to proceed
+  }
+
   const nonce = generateNonce()
   const isDev = process.env.NODE_ENV !== 'production'
 

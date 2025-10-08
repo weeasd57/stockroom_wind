@@ -125,7 +125,22 @@ export default function GlobalInit() {
             return res;
           } catch (err: any) {
             const end = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-            console.warn(`${logPrefix} xx error`, { url: sanitizeUrlForLog(url), method, name: err?.name, message: err?.message, ms: Math.round(end - start) });
+            
+            // Filter out expected AbortErrors for certain APIs to reduce console noise
+            const isExpectedAbort = err?.name === 'AbortError' && (
+              url.includes('/api/telegram/check-bot') ||
+              url.includes('/api/telegram/subscription-status')
+            );
+            
+            if (!isExpectedAbort) {
+              console.warn(`${logPrefix} xx error`, { url: sanitizeUrlForLog(url), method, name: err?.name, message: err?.message, ms: Math.round(end - start) });
+            } else {
+              // Log expected aborts at a lower level for debugging if needed
+              if (process.env.NODE_ENV === 'development') {
+                console.debug(`${logPrefix} timeout (expected)`, { url: sanitizeUrlForLog(url), ms: Math.round(end - start) });
+              }
+            }
+            
             throw err;
           }
         };

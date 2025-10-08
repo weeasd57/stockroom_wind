@@ -177,6 +177,17 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    border: none;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    font: inherit;
+  }
+  
+  .userInfo:hover {
+    opacity: 0.8;
   }
   
   .avatar {
@@ -440,8 +451,6 @@
   .postFooter {
     display: flex;
     gap: 12px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border-light, #f3f4f6);
   }
   
   .actionButton {
@@ -449,13 +458,16 @@
     align-items: center;
     gap: 4px;
     padding: 6px 12px;
-    background: transparent;
-    border: 1px solid var(--border-color, #e5e7eb);
-    border-radius: 6px;
     font-size: 0.875rem;
-    color: var(--text-secondary, #6b7280);
-    cursor: pointer;
+    font-weight: 500;
+    color: var(--text-muted, #6b7280);
+    background: transparent;
+    border-radius: 6px;
+    text-decoration: none;
     transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
   }
   
   .actionButton:hover {

@@ -2,6 +2,8 @@
 🔥 *** when change domain should run this 
 scripts\update-telegram-webhook.js *** for telegram bot 🔥
 
+** add payment gataway to pro users for pro posts 
+
 ** add custom telegram bot in pro palne
    for have the user create has bot and return set the bot token 
 

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSupabase } from './SupabaseProvider';
+import { trackSubscription, removeSubscription } from '@/utils/performanceMonitor';
 
 const SubscriptionContext = createContext({});
 
@@ -16,13 +17,10 @@ export const useSubscription = () => {
 export function SubscriptionProvider({ children }) {
   const { supabase, user, isAuthenticated } = useSupabase();
   
-  // Debug logging
-  console.log('[SUBSCRIPTION PROVIDER] Component initialized', { 
-    hasUser: !!user, 
-    userId: user?.id, 
-    hasSupabase: !!supabase,
-    isAuthenticated 
-  });
+  // Debug logging (reduced)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[SUBSCRIPTION PROVIDER] Initialized for user:', user?.id?.slice(0, 8));
+  }
   
   // Default free plan state for immediate UI response (memoized)
   const defaultFreePlan = useMemo(() => ({
@@ -61,15 +59,12 @@ export function SubscriptionProvider({ children }) {
 
   // Optimized fetch subscription info from API with caching
   const fetchSubscriptionInfo = useCallback(async (forceRefresh = false, options = { silent: false }) => {
-    console.log('[SUBSCRIPTION PROVIDER] fetchSubscriptionInfo called', { 
-      userId: user?.id, 
-      hasSupabase: !!supabase,
-      forceRefresh,
-      silent: options.silent
-    });
+    // Silent operation unless debug mode
+    if (process.env.NODE_ENV === 'development' && !options.silent) {
+      console.log('[SUBSCRIPTION PROVIDER] Fetching subscription for:', user?.id?.slice(0, 8));
+    }
 
     if (!user?.id || !supabase) {
-      console.log('[SUBSCRIPTION PROVIDER] No user or supabase, skipping fetch');
       setSubscriptionInfo(null);
       setLoading(false);
       return;
@@ -77,14 +72,14 @@ export function SubscriptionProvider({ children }) {
 
     // Prevent concurrent fetches
     if (fetchingRef.current && !forceRefresh) {
-      console.log('[SUBSCRIPTION PROVIDER] Fetch already in progress, skipping');
+      // Fetch in progress, skip
       return;
     }
 
     // Cache for 30 seconds to avoid excessive API calls
     const now = Date.now();
     if (!forceRefresh && (now - lastFetchTime.current) < 30000) {
-      console.log('[SUBSCRIPTION PROVIDER] Cache still valid, skipping fetch');
+      // Cache valid, skip
       return;
     }
 
@@ -100,39 +95,82 @@ export function SubscriptionProvider({ children }) {
       
       setError(null);
 
-      console.log('[SUBSCRIPTION PROVIDER] Starting API call to /api/subscription/info');
+      // Starting API call
 
-      // Use the existing API endpoint for subscription info
-      const response = await fetch('/api/subscription/info', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+      // Use the existing API endpoint for subscription info with resilient fallbacks
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+
+      // Build candidate API URLs
+      const buildCandidates = () => {
+        const rel = '/api/subscription/info';
+        const candidates = [rel];
+        if (typeof window !== 'undefined') {
+          const { protocol, hostname, port } = window.location;
+          // Prefer current origin first (relative), then explicit common dev ports
+          const url3000 = `${protocol}//${hostname}:3000${rel}`;
+          const url3001 = `${protocol}//${hostname}:3001${rel}`;
+          // Avoid duplicating current explicit port
+          const currentExplicit = port ? `${protocol}//${hostname}:${port}${rel}` : `${protocol}//${hostname}${rel}`;
+          [url3000, url3001].forEach(u => {
+            if (u !== currentExplicit) candidates.push(u);
+          });
         }
-      });
+        return candidates;
+      };
 
-      console.log('[SUBSCRIPTION PROVIDER] API response received', { status: response.status, ok: response.ok });
+      const tryFetch = async (url) => {
+        try {
+          const res = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            }
+          });
+          return res;
+        } catch (e) {
+          // Network error, treat as non-ok to trigger fallback
+          return { ok: false, status: 0 };
+        }
+      };
 
-      if (!response.ok) {
+      let response = null;
+      for (const url of buildCandidates()) {
+        const res = await tryFetch(url);
+        if (res && res.ok) {
+          response = res;
+          break;
+        }
+        // Continue on 404/0; break on 401 to bubble auth issues immediately
+        if (res && res.status === 401) {
+          response = res;
+          break;
+        }
+      }
+
+      // API response received
+
+      if (!response || !response.ok) {
         // Handle unauthorized error - redirect to login if session expired
-        if (response.status === 401) {
+        if (response && response.status === 401) {
           console.warn('[SUBSCRIPTION PROVIDER] Unauthorized - session may have expired');
           // Don't redirect here as this is a provider, let the UI components handle it
           throw new Error('Session expired. Please log in again.');
         }
-        throw new Error(`API Error: ${response.status}`);
+        const status = response?.status ?? 0;
+        throw new Error(`API Error: ${status}`);
       }
 
       const result = await response.json();
       
-      console.log('[SUBSCRIPTION PROVIDER] API response data:', result);
+      // Process API response
       
       if (result.success && result.data) {
-        console.log('[SUBSCRIPTION PROVIDER] Setting subscription info:', result.data);
+        // Set subscription info
         setSubscriptionInfo(result.data);
         lastFetchTime.current = now;
       } else {
-        console.log('[SUBSCRIPTION PROVIDER] API response invalid or no data, using fallback');
+        // Use fallback data
         // Fallback to default free plan
         const defaultInfo = {
           user_id: user.id,
@@ -509,14 +547,10 @@ export function SubscriptionProvider({ children }) {
 
   // Auto-fetch subscription info when user changes
   useEffect(() => {
-    console.log('[SUBSCRIPTION PROVIDER] useEffect triggered - user change detected', { 
-      userId: user?.id, 
-      hasUser: !!user,
-      isAuthenticated 
-    });
+    // User change detected
 
     if (user?.id) {
-      console.log('[SUBSCRIPTION PROVIDER] User found, updating default plan and fetching in background');
+      // User found, updating plan
       // Update default plan with actual user ID
       const userDefaultPlan = {
         ...defaultFreePlan,
@@ -541,8 +575,22 @@ export function SubscriptionProvider({ children }) {
       return;
     }
 
+    let isMounted = true;
+    let refreshTimeout = null;
+
+    // Create channel with unique name to prevent conflicts
+    const channelName = `subscription-changes-${user.id}-${Date.now()}`;
+    const subscriptionId = trackSubscription(channelName, 'supabase-subscription');
+    
     const channel = supabase
-      .channel('subscription-changes')
+      .channel(channelName);
+    
+    // Track channel for global cleanup
+    if (typeof window !== 'undefined' && window.trackChannel) {
+      window.trackChannel(channel);
+    }
+    
+    const finalChannel = channel
       .on(
         'postgres_changes',
         {
@@ -552,15 +600,54 @@ export function SubscriptionProvider({ children }) {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
+          if (!isMounted) return;
+          
           console.log('Real-time subscription change detected:', payload);
-          // Refresh subscription info when changes occur (silently)
-          fetchSubscriptionInfo(true, { silent: true });
+          
+          // Debounce refresh to prevent excessive calls
+          if (refreshTimeout) {
+            clearTimeout(refreshTimeout);
+          }
+          
+          refreshTimeout = setTimeout(() => {
+            if (isMounted) {
+              // Refresh subscription info when changes occur (silently)
+              fetchSubscriptionInfo(true, { silent: true });
+            }
+            refreshTimeout = null;
+          }, 500);
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      isMounted = false;
+      
+      // Clear any pending refresh timeout
+      if (refreshTimeout) {
+        clearTimeout(refreshTimeout);
+        refreshTimeout = null;
+      }
+      
+      // Properly unsubscribe from channel
+      if (finalChannel) {
+        try {
+          finalChannel.unsubscribe();
+          // Remove from performance monitor
+          removeSubscription(subscriptionId);
+          
+          // Remove from global tracking
+          if (typeof window !== 'undefined' && window.activeChannels) {
+            const channels = window.activeChannels;
+            const index = channels.indexOf(finalChannel);
+            if (index > -1) {
+              channels.splice(index, 1);
+            }
+          }
+        } catch (error) {
+          console.warn('[SubscriptionProvider] Error unsubscribing from channel:', error);
+        }
+      }
     };
   }, [user?.id, supabase, fetchSubscriptionInfo]);
 

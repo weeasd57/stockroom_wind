@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { setCookie } from '@/utils/cookies';
 import { User, AuthState, LoginFormData, SignUpFormData } from '@/types';
 import { supabase } from '@/utils/supabase';
 import { Session } from '@supabase/supabase-js';
@@ -63,7 +64,7 @@ export const useAuth = (): UseAuthReturn => {
       // Ask SupabaseProvider to redirect to /profile after auth completes
       try {
         if (typeof window !== 'undefined') {
-          localStorage.setItem('postAuthRedirect', '/profile');
+          setCookie('postAuthRedirect', '/profile', { maxAgeSeconds: 600, sameSite: 'Lax' });
         }
       } catch {}
 

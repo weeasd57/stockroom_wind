@@ -1,6 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { useSupabase } from './SupabaseProvider';
 
 interface Trader {
@@ -59,6 +60,8 @@ const MAX_RETRIES = 3;
 
 export const TradersProvider = ({ children }: { children: ReactNode }) => {
   const { supabase, isAuthenticated, user } = useSupabase();
+  const pathname = usePathname();
+  const enabled = Boolean(pathname && pathname.startsWith('/traders'));
   
   const [traders, setTraders] = useState<Trader[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,12 +72,13 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const inFlightRef = useRef(false);
 
-  console.log('[TRADERS PROVIDER] Component initialized');
+  // Component initialized
 
   // Function to clear cache
   const clearCache = useCallback(() => {
-    console.log('[TRADERS PROVIDER] Clearing cache');
+    // Clearing cache
     tradersCache.clear();
     failedProfiles.clear();
     setRetryCount(0);
@@ -84,7 +88,7 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
   const retryFailedProfiles = useCallback(async () => {
     if (failedProfiles.size === 0) return;
     
-    console.log('[TRADERS PROVIDER] Retrying failed profiles:', failedProfiles.size);
+    // Retrying failed profiles
     
     // Convert failed profiles to array and clear the set
     const failedIds = Array.from(failedProfiles);
@@ -117,126 +121,136 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [supabase]);
 
-  // Enhanced function to get post data with better error handling
-  const enhanceProfilesWithPostData = useCallback(async (profiles: any[]) => {
-    const enhancedProfiles = await Promise.allSettled(
-      profiles.map(async (profile) => {
-        try {
-          // Use Promise.allSettled for better error handling
-          const [postCountResult, latestPostResult, countriesResult] = await Promise.allSettled([
-            supabase
-              .from('posts')
-              .select('*', { count: 'exact', head: true })
-              .eq('user_id', profile.id),
-            supabase
-              .from('posts')
-              .select('id, symbol, country, image_url, created_at, description')
-              .eq('user_id', profile.id)
-              .order('created_at', { ascending: false })
-              .limit(1),
-            // Fetch countries for this user's posts (client-side aggregate to counts)
-            supabase
-              .from('posts')
-              .select('country')
-              .eq('user_id', profile.id)
-              .not('country', 'is', null)
-              .limit(500)
-          ]);
+  // Enhanced function to get post data with better error handling and limited concurrency
+  const enhanceProfilesWithPostData = useCallback(async (profiles: any[], concurrency = 3) => {
+    const processProfile = async (profile: any) => {
+      try {
+        // For each profile, run the 3 queries in parallel
+        const [postCountResult, latestPostResult, countriesResult] = await Promise.allSettled([
+          supabase
+            .from('posts')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', profile.id),
+          supabase
+            .from('posts')
+            .select('id, symbol, country, image_url, created_at, description')
+            .eq('user_id', profile.id)
+            .order('created_at', { ascending: false })
+            .limit(1),
+          // Fetch countries for this user's posts (client-side aggregate to counts)
+          supabase
+            .from('posts')
+            .select('country')
+            .eq('user_id', profile.id)
+            .not('country', 'is', null)
+            .limit(500)
+        ]);
 
-          const postCount = postCountResult.status === 'fulfilled' 
-            ? (postCountResult.value.count || 0) 
-            : 0;
+        const postCount = postCountResult.status === 'fulfilled'
+          ? (postCountResult.value.count || 0)
+          : 0;
 
-          const latestPost = latestPostResult.status === 'fulfilled' 
-            ? (latestPostResult.value.data?.[0] || null)
-            : null;
+        const latestPost = latestPostResult.status === 'fulfilled'
+          ? (latestPostResult.value.data?.[0] || null)
+          : null;
 
-          // Build country counts map
-          const countryCounts: Record<string, number> = countriesResult.status === 'fulfilled'
-            ? (countriesResult.value.data || []).reduce((acc: Record<string, number>, row: any) => {
-                const code = String(row?.country || '').toLowerCase().trim();
-                if (!code) return acc;
-                acc[code] = (acc[code] || 0) + 1;
-                return acc;
-              }, {})
-            : {};
+        // Build country counts map
+        const countryCounts: Record<string, number> = countriesResult.status === 'fulfilled'
+          ? (countriesResult.value.data || []).reduce((acc: Record<string, number>, row: any) => {
+              const code = String(row?.country || '').toLowerCase().trim();
+              if (!code) return acc;
+              acc[code] = (acc[code] || 0) + 1;
+              return acc;
+            }, {})
+          : {};
 
-          return {
-            ...profile,
-            avatar_url: profile.avatar_url || '/default-avatar.svg',
-            bio: profile.bio || '',
-            full_name: profile.full_name || profile.username || 'Unknown User',
-            post_count: postCount,
-            followers: profile.followers || 0,
-            following: profile.following || 0,
-            experience_score: profile.experience_score ?? 0,
-            success_posts: profile.success_posts ?? 0,
-            loss_posts: profile.loss_posts ?? 0,
-            latestPost: latestPost,
-            countryCounts,
-            isLoading: false,
-            hasError: false
-          };
-        } catch (error) {
-          console.warn(`[TRADERS PROVIDER] Failed to enhance profile ${profile.id}:`, error);
-          failedProfiles.add(profile.id);
-          
-          return {
-            ...profile,
-            avatar_url: profile.avatar_url || '/default-avatar.svg',
-            bio: profile.bio || '',
-            full_name: profile.full_name || profile.username || 'Unknown User',
-            post_count: 0,
-            followers: profile.followers || 0,
-            following: profile.following || 0,
-            experience_score: profile.experience_score ?? 0,
-            success_posts: profile.success_posts ?? 0,
-            loss_posts: profile.loss_posts ?? 0,
-            latestPost: null,
-            countryCounts: {},
-            isLoading: false,
-            hasError: true
-          };
-        }
-      })
-    );
+        return {
+          ...profile,
+          avatar_url: profile.avatar_url || '/default-avatar.svg',
+          bio: profile.bio || '',
+          full_name: profile.full_name || profile.username || 'Unknown User',
+          post_count: postCount,
+          followers: profile.followers || 0,
+          following: profile.following || 0,
+          experience_score: profile.experience_score ?? 0,
+          success_posts: profile.success_posts ?? 0,
+          loss_posts: profile.loss_posts ?? 0,
+          latestPost,
+          countryCounts,
+          isLoading: false,
+          hasError: false,
+        };
+      } catch (error) {
+        console.warn(`[TRADERS PROVIDER] Failed to enhance profile ${profile.id}:`, error);
+        failedProfiles.add(profile.id);
+        return {
+          ...profile,
+          avatar_url: profile.avatar_url || '/default-avatar.svg',
+          bio: profile.bio || '',
+          full_name: profile.full_name || profile.username || 'Unknown User',
+          post_count: 0,
+          followers: profile.followers || 0,
+          following: profile.following || 0,
+          experience_score: profile.experience_score ?? 0,
+          success_posts: profile.success_posts ?? 0,
+          loss_posts: profile.loss_posts ?? 0,
+          latestPost: null,
+          countryCounts: {},
+          isLoading: false,
+          hasError: true,
+        };
+      }
+    };
 
-    return enhancedProfiles
-      .filter(result => result.status === 'fulfilled')
-      .map(result => (result as PromiseFulfilledResult<any>).value);
+    const results: any[] = new Array(profiles.length);
+    let index = 0;
+
+    const worker = async () => {
+      while (true) {
+        const i = index++;
+        if (i >= profiles.length) break;
+        results[i] = await processProfile(profiles[i]);
+      }
+    };
+
+    const pool = Math.max(1, Math.min(concurrency, profiles.length));
+    await Promise.all(Array.from({ length: pool }, () => worker()));
+    return results;
   }, [supabase]);
 
   // Fetch traders function with improved error handling
   const fetchTraders = useCallback(async (pageNum = 1, isLoadMore = false) => {
     try {
-      console.log(`[TRADERS PROVIDER] Fetching traders page ${pageNum}, loadMore: ${isLoadMore}`);
-      
-      if (!isLoadMore) {
-        setLoading(true);
-      } else {
-        setLoadingMore(true);
-      }
-      
-      setError(null);
+      // Fetching traders
 
-      // Check cache first
+      // Check cache first (avoid spinner flicker on cache hits)
       const cacheKey = `traders_page_${pageNum}_${ITEMS_PER_PAGE}_${filter}_${searchQuery}`;
       const cachedData = tradersCache.get(cacheKey);
-      
+
       if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
-        console.log(`[TRADERS PROVIDER] Using cached data for page ${pageNum}`);
-        
         if (isLoadMore) {
           setTraders(prev => [...prev, ...cachedData.data]);
         } else {
           setTraders(cachedData.data);
         }
-        
         setHasMore(cachedData.data.length === ITEMS_PER_PAGE);
         return;
       }
 
-      console.log(`[TRADERS PROVIDER] Fetching from database for page ${pageNum}`);
+      // Prevent overlapping non-loadMore fetches
+      if (!isLoadMore && inFlightRef.current) {
+        return;
+      }
+      inFlightRef.current = true;
+
+      if (!isLoadMore) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+      setError(null);
+
+      // Fetching from database
 
       // Calculate offset for pagination
       const offset = (pageNum - 1) * ITEMS_PER_PAGE;
@@ -264,8 +278,7 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
 
       const { data: profilesData, error: profilesError } = await query;
 
-      console.log(`[TRADERS PROVIDER] Database query completed. Error:`, profilesError);
-      console.log(`[TRADERS PROVIDER] Found ${profilesData?.length || 0} profiles`);
+      // Database query completed
 
       if (profilesError) {
         throw profilesError;
@@ -280,25 +293,63 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      // Enhance profiles with post data
-      const processedTraders = await enhanceProfilesWithPostData(profilesData);
+      // Progressive: set minimal list immediately for faster first paint
+      if (!isLoadMore) {
+        setTraders(
+          profilesData.map((profile: any) => ({
+            id: profile.id,
+            username: profile.username,
+            full_name: profile.full_name || profile.username || 'Unknown User',
+            bio: profile.bio || '',
+            avatar_url: profile.avatar_url || '/default-avatar.svg',
+            created_at: profile.created_at,
+            post_count: 0,
+            followers: profile.followers || 0,
+            following: profile.following || 0,
+            experience_score: profile.experience_score ?? 0,
+            success_posts: profile.success_posts ?? 0,
+            loss_posts: profile.loss_posts ?? 0,
+            latestPost: null,
+            countryCounts: {},
+            isLoading: true,
+            hasError: false,
+          }))
+        );
+      }
 
-      console.log(`[TRADERS PROVIDER] Processed ${processedTraders.length} traders`);
+      // Enhance profiles with post data (limited concurrency)
+      const processedTraders = await enhanceProfilesWithPostData(profilesData, 3);
 
-      // Fetch telegram bot badges for these users (no tokens exposed)
-      let mergedTraders: Trader[] = processedTraders;
-      try {
-        const userIds = processedTraders.map((t: Trader) => t.id);
-        const { data: botsData, error: botsError } = await supabase
-          .rpc('public_get_users_with_active_bots', { p_user_ids: userIds });
+      // Immediately update UI with processed traders (without telegram badges yet)
+      if (isLoadMore) {
+        setTraders(prev => [...prev, ...processedTraders]);
+      } else {
+        const enhancedMap = new Map<string, any>(processedTraders.map((t: any) => [t.id, t]));
+        setTraders(prev => prev.map(p => enhancedMap.get(p.id) || p));
+      }
 
-        if (botsError) {
-          console.warn('[TRADERS PROVIDER] Failed to fetch telegram bots info:', botsError);
-        } else {
+      // Store interim result in cache
+      tradersCache.set(cacheKey, {
+        data: processedTraders,
+        timestamp: Date.now()
+      });
+
+      // Fetch telegram bot badges in background to avoid blocking UI
+      (async () => {
+        try {
+          const userIds = processedTraders.map((t: Trader) => t.id);
+          const { data: botsData, error: botsError } = await supabase
+            .rpc('public_get_users_with_active_bots', { p_user_ids: userIds });
+
+          if (botsError) {
+            console.warn('[TRADERS PROVIDER] Failed to fetch telegram bots info:', botsError);
+            return;
+          }
+
           const botMap = new Map<string, { user_id: string; bot_username: string; is_active: boolean }>(
             (botsData || []).map((b: any) => [b.user_id, b])
           );
-          mergedTraders = processedTraders.map((t: Trader) => {
+          const mergedTraders: Trader[] = processedTraders.map((t: Trader) => {
             const bot = botMap.get(t.id);
             return {
               ...t,
@@ -306,22 +357,28 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
               botUsername: bot?.bot_username || null,
             } as Trader;
           });
+
+          // Update cache with merged data
+          tradersCache.set(cacheKey, {
+            data: mergedTraders,
+            timestamp: Date.now()
+          });
+
+          // Apply bot flags to UI
+          if (isLoadMore) {
+            setTraders(prev => {
+              const existing = new Map(prev.map((t: any) => [t.id, t]));
+              mergedTraders.forEach(mt => existing.set(mt.id, mt));
+              return Array.from(existing.values());
+            });
+          } else {
+            const enhancedMapWithBots = new Map<string, any>(mergedTraders.map((t: any) => [t.id, t]));
+            setTraders(prev => prev.map(p => enhancedMapWithBots.get(p.id) || p));
+          }
+        } catch (e) {
+          console.warn('[TRADERS PROVIDER] Error merging telegram bot badges:', e);
         }
-      } catch (e) {
-        console.warn('[TRADERS PROVIDER] Error merging telegram bot badges:', e);
-      }
-
-      // Cache the results
-      tradersCache.set(cacheKey, {
-        data: mergedTraders,
-        timestamp: Date.now()
-      });
-
-      if (isLoadMore) {
-        setTraders(prev => [...prev, ...mergedTraders]);
-      } else {
-        setTraders(mergedTraders);
-      }
+      })();
       
       // Check if there are more items
       setHasMore(processedTraders.length === ITEMS_PER_PAGE);
@@ -338,7 +395,7 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
         errorMessage.includes('timeout') ||
         errorMessage.includes('connection')
       )) {
-        console.log(`[TRADERS PROVIDER] Retrying... attempt ${retryCount + 1}`);
+        // Retrying connection
         setRetryCount(prev => prev + 1);
         setTimeout(() => {
           fetchTraders(pageNum, isLoadMore);
@@ -351,9 +408,10 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
       }
       setRetryCount(0);
     } finally {
-      console.log(`[TRADERS PROVIDER] Setting loading states to false`);
+      // Setting loading states to false
       setLoading(false);
       setLoadingMore(false);
+      inFlightRef.current = false;
     }
   }, [searchQuery, filter, supabase, retryCount, enhanceProfilesWithPostData]);
 
@@ -386,6 +444,7 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
 
   // Effect to fetch traders when dependencies change
   useEffect(() => {
+    if (!enabled) return; // only fetch on traders page
     const timeoutId = setTimeout(() => {
       setPage(1);
       setRetryCount(0);
@@ -393,12 +452,14 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
     }, 300); // Debounce search
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, filter]);
+  }, [enabled, searchQuery, filter]);
 
-  // Initial fetch
+  // Keep provider idle when disabled (no initial fetch here to avoid double calls with the debounced effect)
   useEffect(() => {
-    fetchTraders(1, false);
-  }, []);
+    if (!enabled) {
+      setLoading(false);
+    }
+  }, [enabled]);
 
   const value = {
     traders: filteredTraders,

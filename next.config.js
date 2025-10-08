@@ -11,7 +11,13 @@ const nextConfig = {
       'mfbgpnpgxmxgxpjnxzrb.supabase.co', // Additional Supabase storage
     ],
   },
-  // experimental config removed for Next.js 15 compatibility
+  // Disable RSC prefetching to prevent ?_rsc= requests
+  experimental: {
+    serverComponentsExternalPackages: [],
+    optimizePackageImports: [],
+  },
+  // Disable prefetching globally
+  trailingSlash: false,
   reactStrictMode: false,
   // Add custom headers to prevent translation extensions
   async headers() {

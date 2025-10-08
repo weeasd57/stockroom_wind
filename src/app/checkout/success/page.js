@@ -10,7 +10,7 @@ export default function CheckoutSuccessPage() {
   useEffect(() => {
     // Redirect to profile after 3 seconds
     const timer = setTimeout(() => {
-      router.push('/profile');
+      window.location.href = '/profile';
     }, 3000);
 
     return () => clearTimeout(timer);

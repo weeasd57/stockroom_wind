@@ -7,8 +7,9 @@ import { getPostComments, createComment, getPostCommentCount, updateComment, del
 import { detectTextDirection, applyTextDirection } from '@/utils/textDirection';
 import styles from '@/styles/CommentsDialog.module.css';
 import { useComments } from '@/providers/CommentProvider';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import Link from 'next/link';
 
 // Child component for a single comment/reply to keep hooks at top level
 function CommentItem({
@@ -28,6 +29,7 @@ function CommentItem({
   setEditText,
   handleSubmitEdit,
   handleDeleteComment,
+  router,
 }) {
   const replyInputRef = useRef(null);
   const editInputRef = useRef(null);
@@ -52,7 +54,14 @@ function CommentItem({
             <div className={styles.commentHeader}>
               <span className={styles.username}>
                 {comment.user_id ? (
-                  <Link href={`/view-profile/${comment.user_id}`} className={styles.username} prefetch>
+                  <Link
+                    href={`/view-profile/${comment.user_id}`}
+                    prefetch={false}
+                    className={styles.username}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                  >
                     {comment.username || comment.full_name || 'Unknown User'}
                   </Link>
                 ) : (
@@ -218,6 +227,7 @@ function CommentItem({
               setEditText={setEditText}
               handleSubmitEdit={handleSubmitEdit}
               handleDeleteComment={handleDeleteComment}
+              router={router}
             />
           ))}
         </div>
@@ -228,6 +238,7 @@ function CommentItem({
 
 export default function CommentsDialog({ postId, isOpen, onClose, initialCommentCount = 0 }) {
   const { user, supabase } = useSupabase();
+  const router = useRouter();
   const { 
     fetchCommentsForPost, 
     startPolling, 
@@ -563,6 +574,7 @@ export default function CommentsDialog({ postId, isOpen, onClose, initialComment
                       setEditText={setEditText}
                       handleSubmitEdit={handleSubmitEdit}
                       handleDeleteComment={handleDeleteComment}
+                      router={router}
                     />
                     {/* Render nested replies */}
                     {comment.replies && comment.replies.length > 0 && (
@@ -586,6 +598,7 @@ export default function CommentsDialog({ postId, isOpen, onClose, initialComment
                             setEditText={setEditText}
                             handleSubmitEdit={handleSubmitEdit}
                             handleDeleteComment={handleDeleteComment}
+                            router={router}
                           />
                         ))}
                       </div>

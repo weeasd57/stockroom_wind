@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useTraders } from '@/providers/TradersProvider';
 import styles from '@/styles/traders.module.css';
@@ -31,7 +31,8 @@ export default function TradersPage() {
   const [country, setCountry] = useState('all');
   const [followings, setFollowings] = useState({});
   const [loadingMore, setLoadingMore] = useState(false);
-  const router = useRouter();
+  const [firstPaintLogged, setFirstPaintLogged] = useState(false);
+  const mountStartRef = useMemo(() => (typeof performance !== 'undefined' ? performance.now() : 0), []);
 
   // Animation effect
   useEffect(() => {
@@ -42,12 +43,23 @@ export default function TradersPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Log mount to first visible paint
+  useEffect(() => {
+    if (visible && !firstPaintLogged) {
+      const now = typeof performance !== 'undefined' ? performance.now() : 0;
+      const delta = Math.max(0, Math.round(now - mountStartRef));
+      console.log('[TRADERS] First visible paint after', `${delta}ms`);
+      setFirstPaintLogged(true);
+    }
+  }, [visible, firstPaintLogged, mountStartRef]);
+
   // Fetch user followings when authenticated
   useEffect(() => {
     const fetchFollowings = async () => {
       if (!isAuthenticated || !user) return;
       
       try {
+        const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
         const { data, error } = await supabase
           .from('user_followings')
           .select('following_id')
@@ -64,23 +76,27 @@ export default function TradersPage() {
         });
         
         setFollowings(followingsMap);
+        const t1 = typeof performance !== 'undefined' ? performance.now() : 0;
+        console.log('[TRADERS] Followings fetched in', `${Math.max(0, Math.round(t1 - t0))}ms`, 'items:', data?.length || 0);
       } catch (error) {
         console.error('Error in fetchFollowings:', error);
       }
     };
     
-    fetchFollowings();
+    // Defer followings fetch slightly to avoid competing with initial paint
+    const id = setTimeout(fetchFollowings, 200);
+    return () => clearTimeout(id);
   }, [supabase, isAuthenticated, user]);
 
-  // Navigation functions
+  // Navigation functions - Native navigation to avoid Next.js RSC prefetch
   const navigateToProfile = (userId) => {
     if (isAuthenticated && user && userId === user.id) {
-      router.push('/profile');
+      window.location.href = '/profile';
       return;
     }
-    
+
     if (userId) {
-      router.push(`/view-profile/${userId}`);
+      window.location.href = `/view-profile/${userId}`;
     }
   };
 
@@ -89,7 +105,7 @@ export default function TradersPage() {
     e.stopPropagation();
     
     if (!isAuthenticated) {
-      router.push('/login');
+      window.location.href = '/login';
       return;
     }
     
@@ -145,12 +161,16 @@ export default function TradersPage() {
     }
   };
 
-  // Lazy Image Component
-  const LazyImage = ({ src, alt, profileId, onError }) => {
+  // Avatar Image Component using next/image with fixed dimensions
+  const LazyImage = ({ src, alt, onError }) => {
+    const safeSrc = src || '/default-avatar.svg';
     return (
-      <img 
-        src={src || '/default-avatar.svg'}
+      <Image
+        src={safeSrc}
         alt={alt}
+        width={64}
+        height={64}
+        sizes="64px"
         onError={onError}
       />
     );

@@ -20,6 +20,8 @@ export default function TelegramSubscribeButton({ userId, username, language = '
   const [awaitingSubscription, setAwaitingSubscription] = useState(false);
   const pollRef = useRef(null);
   const botCheckRetried = useRef(false);
+  const requestedRef = useRef(false);
+  const botCacheRef = useRef(new Map()); // key: userId, value: { botInfo, timestamp }
   
   // Text based on language
   const texts = {
@@ -90,20 +92,77 @@ export default function TelegramSubscribeButton({ userId, username, language = '
     };
   }, []);
 
-  // تحميل البوت بشكل آمن مع fallback
+  // Safe bot check: wait for tab visibility and prefer requestIdleCallback when available
   useEffect(() => {
-    if (userId && !checked) {
-      // تأخير أطول لضمان تحميل الصفحة أولاً
-      const timer = setTimeout(() => {
-        checkTelegramBot();
-      }, 1000);
-      
-      return () => clearTimeout(timer);
+    if (!userId || checked) return;
+
+    let cancelled = false;
+    let visibilityHandler = null;
+
+    // Try cache first to avoid repeated requests
+    const TTL = 5 * 60 * 1000; // 5 minutes
+    const cache = botCacheRef.current.get(userId);
+    if (cache && Date.now() - cache.timestamp < TTL) {
+      setBotInfo(cache.botInfo || null);
+      setChecked(true);
+      return () => {};
     }
+
+    const runCheck = () => {
+      if (cancelled) return;
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        visibilityHandler = () => {
+          if (document.visibilityState === 'visible') {
+            document.removeEventListener('visibilitychange', visibilityHandler);
+            visibilityHandler = null;
+            if (!cancelled) checkTelegramBot();
+          }
+        };
+        document.addEventListener('visibilitychange', visibilityHandler);
+        return;
+      }
+      // Tab is visible now
+      checkTelegramBot();
+    };
+
+    // Schedule after idle when possible, otherwise fallback to small setTimeout
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      window.requestIdleCallback(runCheck, { timeout: 1500 });
+    } else {
+      const t = setTimeout(runCheck, 500);
+      // cleanup fallback timer
+      visibilityHandler = visibilityHandler; // no-op to retain reference
+      return () => {
+        clearTimeout(t);
+        cancelled = true;
+        if (visibilityHandler) {
+          document.removeEventListener('visibilitychange', visibilityHandler);
+        }
+      };
+    }
+
+    return () => {
+      cancelled = true;
+      if (visibilityHandler) {
+        document.removeEventListener('visibilitychange', visibilityHandler);
+      }
+    };
   }, [userId, checked]);
 
-  const checkTelegramBot = async (timeoutMs = 12000) => {
+  const checkTelegramBot = async (timeoutMs = 8000) => {
     try {
+      if (requestedRef.current) return;
+      requestedRef.current = true;
+
+      // Serve from cache if available and valid
+      const TTL = 5 * 60 * 1000;
+      const cache = botCacheRef.current.get(userId);
+      if (cache && Date.now() - cache.timestamp < TTL) {
+        setBotInfo(cache.botInfo || null);
+        setChecked(true);
+        return;
+      }
+
       setLoading(true);
       setChecked(true);
       
@@ -121,6 +180,7 @@ export default function TelegramSubscribeButton({ userId, username, language = '
       if (!response.ok) {
         console.warn(`Telegram API returned ${response.status}, treating as no bot`);
         setBotInfo(null);
+        botCacheRef.current.set(userId, { botInfo: null, timestamp: Date.now() });
         return;
       }
       
@@ -128,26 +188,28 @@ export default function TelegramSubscribeButton({ userId, username, language = '
 
       if (data.hasTelegramBot && data.botInfo) {
         setBotInfo(data.botInfo);
+        botCacheRef.current.set(userId, { botInfo: data.botInfo, timestamp: Date.now() });
         // Check subscription status if user is authenticated
         if (user?.id) {
           checkSubscriptionStatus();
         }
       } else {
         setBotInfo(null);
+        botCacheRef.current.set(userId, { botInfo: null, timestamp: Date.now() });
       }
     } catch (error) {
-      // Handle aborts silently and retry once with longer timeout
+      // Handle aborts gracefully - timeout is expected for slow connections
       if (error?.name === 'AbortError') {
-        if (!botCheckRetried.current) {
-          botCheckRetried.current = true;
-          setTimeout(() => checkTelegramBot(20000), 1000);
-        }
+        // Set as no bot for now - user can manually check later if needed
+        setBotInfo(null);
+        botCacheRef.current.set(userId, { botInfo: null, timestamp: Date.now() });
         return;
       }
       console.warn('[Telegram] check-bot failed:', error);
       setBotInfo(null);
     } finally {
       setLoading(false);
+      requestedRef.current = false;
     }
   };
 

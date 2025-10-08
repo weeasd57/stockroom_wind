@@ -22,6 +22,7 @@ import BackgroundProfileUpdateIndicator from '@/components/background/Background
 import { Toaster } from 'sonner';
 import FloatingClock from '@/components/ui/FloatingClock';
 import { setupGlobalErrorHandler } from '@/utils/errorHandler';
+import GlobalCleanup from '@/providers/GlobalCleanup';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -69,7 +70,7 @@ export default async function RootLayout({ children }) {
     cspNonce = 'dev-nonce';
   }
   return (
-    <html lang="en" className={`scroll-smooth ${inter.variable} ${robotoMono.variable}`} suppressHydrationWarning translate="no">
+    <html lang="en" className={`scroll-smooth ${inter.variable} ${robotoMono.variable}`} data-scroll-behavior="smooth" suppressHydrationWarning translate="no">
       <head>
         <meta name="google" content="notranslate" />
         <meta name="translate" content="no" />
@@ -88,39 +89,46 @@ export default async function RootLayout({ children }) {
       >
         {/* Client-side init to avoid inline script hydration differences */}
         { /* eslint-disable-next-line @next/next/no-head-element */ }
-        <GlobalInit />
-        <SupabaseProvider>
-          <UserProvider>
-            <ProfileProvider>
-              <SubscriptionProvider>
-                <TradersProvider>
-                  <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={true}>
-                    <CreatePostFormProvider>
-                      <ClientSideLayout>
-                        <AuthGuard>
-                          <ClientImagePreloader />
-                          <PostProvider>
-                            <BackgroundPostCreationProvider>
-                              <BackgroundProfileUpdateProvider>
-                                <FollowProvider> {/* Wrap children with FollowProvider */}
-                                  {children}
-                                  <BackgroundPostCreationFloatingIndicator />
-                                  <BackgroundProfileUpdateIndicator />
-                                  <FloatingClock />
-                                  <Toaster richColors position="top-right" />
-                                </FollowProvider>
-                              </BackgroundProfileUpdateProvider>
-                            </BackgroundPostCreationProvider>
-                          </PostProvider>
-                        </AuthGuard>
-                      </ClientSideLayout>
-                    </CreatePostFormProvider>
-                  </ThemeProvider>
-                </TradersProvider>
-              </SubscriptionProvider>
-            </ProfileProvider>
-          </UserProvider>
-        </SupabaseProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <GlobalCleanup>
+            <SupabaseProvider>
+              <AuthGuard>
+                <PostProvider>
+                  <UserProvider>
+                    <ProfileProvider>
+                      <TradersProvider>
+                        <FollowProvider>
+                          <SubscriptionProvider>
+                            <CreatePostFormProvider>
+                              <BackgroundPostCreationProvider>
+                                <BackgroundProfileUpdateProvider>
+                                  <ClientSideLayout>
+                                    <GlobalInit />
+                                    {children}
+                                    <ClientImagePreloader />
+                                    <BackgroundPostCreationFloatingIndicator />
+                                    <BackgroundProfileUpdateIndicator />
+                                    <Toaster richColors position="top-right" />
+                                    <FloatingClock />
+                                  </ClientSideLayout>
+                                </BackgroundProfileUpdateProvider>
+                              </BackgroundPostCreationProvider>
+                            </CreatePostFormProvider>
+                          </SubscriptionProvider>
+                        </FollowProvider>
+                      </TradersProvider>
+                    </ProfileProvider>
+                  </UserProvider>
+                </PostProvider>
+              </AuthGuard>
+            </SupabaseProvider>
+          </GlobalCleanup>
+        </ThemeProvider>
       </body>
     </html>
   );
