@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import performanceMonitor from '@/utils/performanceMonitor';
+import { supabase as supabaseClient } from '@/utils/supabase';
 
 /**
  * Global Cleanup Provider - ينظف الذاكرة والاشتراكات عند تغيير الصفحات
@@ -13,6 +14,7 @@ export function GlobalCleanup({ children }) {
 
   useEffect(() => {
     let isInitialized = false;
+    let reconnectTimer = null;
     
     // تهيئة مراقب الأداء
     const initializeMonitoring = () => {
@@ -156,6 +158,43 @@ export function GlobalCleanup({ children }) {
       }
     };
 
+    // Reconnect helpers when returning to the tab or network comes back
+    const scheduleReconnect = (reason) => {
+      try {
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(() => {
+          attemptReconnect(reason);
+        }, 250);
+      } catch {}
+    };
+
+    const attemptReconnect = async (reason) => {
+      try {
+        if (typeof document !== 'undefined') {
+          if (document.visibilityState !== 'visible') return;
+        }
+        if (typeof navigator !== 'undefined' && 'onLine' in navigator) {
+          if (!navigator.onLine) return;
+        }
+
+        const supabase = supabaseClient;
+        if (!supabase) return;
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[GlobalCleanup] Reconnect check (${reason})`);
+        }
+
+        // Ask Realtime client to (re)connect; it will rejoin channels automatically
+        try {
+          if (supabase.realtime && typeof supabase.realtime.connect === 'function') {
+            supabase.realtime.connect();
+          }
+        } catch (e) {
+          // Best-effort only
+        }
+      } catch {}
+    };
+
     // تهيئة النظام
     initializeMonitoring();
 
@@ -171,6 +210,16 @@ export function GlobalCleanup({ children }) {
       if (!window.activeChannels) window.activeChannels = [];
       
       window.addEventListener('beforeunload', handleBeforeUnload);
+
+      // Reconnect when user returns to tab or network restores
+      const onVisibilityChange = () => {
+        if (document.visibilityState === 'visible') scheduleReconnect('visibility');
+      };
+      const onFocus = () => scheduleReconnect('focus');
+      const onOnline = () => scheduleReconnect('online');
+      document.addEventListener('visibilitychange', onVisibilityChange);
+      window.addEventListener('focus', onFocus);
+      window.addEventListener('online', onOnline);
       
       // مراقبة تغييرات الـ router - حفظ المراجع الأصلية
       originalPush = router.push.bind(router);
@@ -191,6 +240,15 @@ export function GlobalCleanup({ children }) {
     return () => {
       if (typeof window !== 'undefined') {
         window.removeEventListener('beforeunload', handleBeforeUnload);
+        try {
+          document.removeEventListener('visibilitychange', onVisibilityChange);
+          window.removeEventListener('focus', onFocus);
+          window.removeEventListener('online', onOnline);
+        } catch {}
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
         
         // استعادة الدوال الأصلية
         if (originalPush) {
