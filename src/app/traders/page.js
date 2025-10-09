@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useTraders } from '@/providers/TradersProvider';
@@ -10,6 +11,7 @@ import { calculateSuccessRate } from '@/lib/utils';
 // Removed unused imports for cleaner code
 
 export default function TradersPage() {
+  const router = useRouter();
   const { supabase, isAuthenticated, user } = useSupabase();
   const {
     traders,
@@ -88,15 +90,15 @@ export default function TradersPage() {
     return () => clearTimeout(id);
   }, [supabase, isAuthenticated, user]);
 
-  // Navigation functions - Native navigation to avoid Next.js RSC prefetch
+  // Navigation functions - use Next.js router
   const navigateToProfile = (userId) => {
     if (isAuthenticated && user && userId === user.id) {
-      window.location.href = '/profile';
+      try { router.push('/profile'); } catch { window.location.assign('/profile'); }
       return;
     }
 
     if (userId) {
-      window.location.href = `/view-profile/${userId}`;
+      try { router.push(`/view-profile/${userId}`); } catch { window.location.assign(`/view-profile/${userId}`); }
     }
   };
 
@@ -105,7 +107,7 @@ export default function TradersPage() {
     e.stopPropagation();
     
     if (!isAuthenticated) {
-      window.location.href = '/login';
+      try { router.push('/login'); } catch { window.location.assign('/login'); }
       return;
     }
     

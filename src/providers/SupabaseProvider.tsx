@@ -150,6 +150,61 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
     initializeAuth();
   }, []);  // Remove supabase.auth from dependencies as it's stable
 
+  // Reconnect Supabase Realtime channels when tab regains focus/visibility
+  useEffect(() => {
+    if (!supabase) return;
+
+    let lastRun = 0;
+    const MIN_GAP = 1500; // ms between reconnection attempts
+
+    const safeReconnect = () => {
+      const now = Date.now();
+      if (now - lastRun < MIN_GAP) return;
+      lastRun = now;
+
+      // Attempt to reconnect the realtime socket (no-op if already connected)
+      try {
+        (supabase as any).realtime?.connect?.();
+      } catch {}
+
+      // Re-subscribe any channels that are not joined
+      try {
+        const channels: any[] = (supabase as any).getChannels
+          ? (supabase as any).getChannels()
+          : (typeof window !== 'undefined' && (window as any).activeChannels) || [];
+
+        for (const ch of channels) {
+          try {
+            // Some clients expose `state`, others may not. Best-effort check.
+            const state = (ch as any)?.state;
+            if (ch && typeof ch.subscribe === 'function' && state !== 'joined') {
+              ch.subscribe();
+            }
+          } catch {}
+        }
+      } catch {}
+    };
+
+    const onFocus = () => safeReconnect();
+    const onVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        safeReconnect();
+      }
+    };
+
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      window.addEventListener('focus', onFocus);
+      document.addEventListener('visibilitychange', onVisibility);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+        window.removeEventListener('focus', onFocus);
+        document.removeEventListener('visibilitychange', onVisibility);
+      }
+    };
+  }, [supabase]);
+
   // Auth functions
   const signIn = async (email: string, password: string) => {
     try {

@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useEffect, useState, useRef } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
@@ -25,6 +25,7 @@ const navigationConfig = {
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, signOut, handleLogout, isAuthenticated } = useSupabase();
   const profileContext = useProfile();
   const profile = profileContext?.profile;
@@ -132,11 +133,16 @@ export default function Navbar() {
     setIsMenuOpen(false);
   };
 
-  // Navigation handlers - native navigation to avoid RSC prefetching
+  // Navigation handlers - use Next.js router
   const handleNavigation = (href) => {
     closeMenu();
-    if (href && typeof window !== 'undefined') {
-      window.location.href = href;
+    if (!href) return;
+    try {
+      router.push(href);
+    } catch (_) {
+      if (typeof window !== 'undefined') {
+        window.location.assign(href);
+      }
     }
   };
 

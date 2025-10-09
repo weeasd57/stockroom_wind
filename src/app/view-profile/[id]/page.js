@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
 import { useFollow } from '@/providers/FollowProvider';
@@ -28,6 +28,7 @@ export default function ViewProfile() {
   });
   
   const paramsFromHook = useParams();
+  const router = useRouter();
   const rawId = paramsFromHook?.id;
   const userId = Array.isArray(rawId) ? rawId[0] : rawId;
   console.log("[VIEW-PROFILE] 🎯 Extracted userId:", userId);
@@ -61,7 +62,7 @@ export default function ViewProfile() {
     // Only redirect if there's definitely no user ID
     if (!userId) {
       console.warn('[VIEW-PROFILE] No user ID provided, redirecting to home');
-      if (typeof window !== 'undefined') window.location.href = '/home';
+      try { router.push('/home'); } catch { if (typeof window !== 'undefined') window.location.assign('/home'); }
       return;
     }
 
@@ -396,7 +397,7 @@ export default function ViewProfile() {
   const handleFollowClick = async () => {
     // Check if user is authenticated before following
     if (!isAuthenticated) {
-      if (typeof window !== 'undefined') window.location.href = '/login';
+      try { router.push('/login'); } catch { if (typeof window !== 'undefined') window.location.assign('/login'); }
       return;
     }
     
@@ -638,7 +639,7 @@ export default function ViewProfile() {
             ) : (
               <>
                 <button 
-                  onClick={() => { if (typeof window !== 'undefined') window.location.href = '/login'; }} 
+                  onClick={() => { try { router.push('/login'); } catch { if (typeof window !== 'undefined') window.location.assign('/login'); } }} 
                   className={styles.loginToFollowButton}
                 >
                   Login to follow
