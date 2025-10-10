@@ -1,13 +1,24 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
 // import logger from '@/utils/logger';
 import imageCompression from 'browser-image-compression';
 
 // Lazy initialize Supabase client to avoid build-time env access
 let _supabaseClient = null;
 
+// Read env at build-time; Next.js inlines NEXT_PUBLIC_* values on client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
 function initSupabaseClient() {
-  // Use auth-helpers browser client so auth persists in cookies (required for API routes)
-  return createClientComponentClient();
+  // Optional: tune realtime stability via client options if needed
+  // e.g. realtime: { params: { heartbeatIntervalMs: 15000 } }
+  return createClient(supabaseUrl || '', supabaseAnonKey || '', {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  });
 }
 
 export function getSupabaseClient() {

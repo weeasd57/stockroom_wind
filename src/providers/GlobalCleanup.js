@@ -15,6 +15,8 @@ export function GlobalCleanup({ children }) {
   useEffect(() => {
     let isInitialized = false;
     let reconnectTimer = null;
+    let lastReconnectAt = 0;
+    const RECONNECT_MIN_GAP_MS = 1500;
     
     // تهيئة مراقب الأداء
     const initializeMonitoring = () => {
@@ -170,29 +172,93 @@ export function GlobalCleanup({ children }) {
 
     const attemptReconnect = async (reason) => {
       try {
-        if (typeof document !== 'undefined') {
-          if (document.visibilityState !== 'visible') return;
-        }
-        if (typeof navigator !== 'undefined' && 'onLine' in navigator) {
-          if (!navigator.onLine) return;
-        }
+        const now = Date.now();
+        if (now - lastReconnectAt < RECONNECT_MIN_GAP_MS) return;
+        lastReconnectAt = now;
+
+        if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+        if (typeof navigator !== 'undefined' && 'onLine' in navigator && !navigator.onLine) return;
 
         const supabase = supabaseClient;
         if (!supabase) return;
 
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[GlobalCleanup] Reconnect check (${reason})`);
+        console.log(`[Reconnect] ▶️ Start (${reason}) at ${new Date().toISOString()}`);
+
+        // 1) Hard reset Realtime socket to avoid stale connections
+        try {
+          if (supabase.realtime?.disconnect) {
+            console.log('[Reconnect] 🔌 realtime.disconnect()');
+            supabase.realtime.disconnect();
+          }
+        } catch (e) {
+          console.warn('[Reconnect] realtime.disconnect() failed:', e);
         }
 
-        // Ask Realtime client to (re)connect; it will rejoin channels automatically
+        // 2) Connect Realtime again
         try {
-          if (supabase.realtime && typeof supabase.realtime.connect === 'function') {
+          if (supabase.realtime?.connect) {
+            console.log('[Reconnect] ⚡ realtime.connect()');
             supabase.realtime.connect();
           }
         } catch (e) {
-          // Best-effort only
+          console.warn('[Reconnect] realtime.connect() failed:', e);
         }
-      } catch {}
+
+        // 3) Refresh auth session to rotate tokens if needed
+        try {
+          console.log('[Reconnect] 🔐 auth.refreshSession()');
+          const { data, error } = await supabase.auth.refreshSession();
+          if (error) {
+            console.warn('[Reconnect] refreshSession error:', error?.message || error);
+          } else {
+            console.log('[Reconnect] ✅ refreshSession ok:', Boolean(data?.session));
+          }
+        } catch (e) {
+          console.warn('[Reconnect] refreshSession threw:', e);
+        }
+
+        // 4) Best-effort probe to confirm network path to Supabase REST
+        try {
+          console.log('[Reconnect] 🔎 probe: select 1 from profiles (limit 1)');
+          const controller = new AbortController();
+          const probeTimeout = setTimeout(() => controller.abort(), 4000);
+          const { error: probeError } = await supabase
+            .from('profiles')
+            .select('id')
+            .limit(1)
+            .abortSignal(controller.signal);
+          clearTimeout(probeTimeout);
+          if (probeError) {
+            console.warn('[Reconnect] probe error (expected under RLS too):', probeError.message || probeError);
+          } else {
+            console.log('[Reconnect] 🌐 probe ok');
+          }
+        } catch (e) {
+          console.warn('[Reconnect] probe threw:', e?.name || e);
+        }
+
+        // 5) Re-subscribe any channels that are not joined
+        try {
+          const channels = typeof supabase.getChannels === 'function' ? supabase.getChannels() : [];
+          for (const ch of channels) {
+            try {
+              const state = ch?.state;
+              if (typeof ch.subscribe === 'function' && state !== 'joined') {
+                console.log('[Reconnect] 📡 rejoin channel');
+                ch.subscribe();
+              }
+            } catch (e) {
+              console.warn('[Reconnect] channel subscribe failed:', e);
+            }
+          }
+        } catch (e) {
+          console.warn('[Reconnect] channels iteration failed:', e);
+        }
+
+        console.log('[Reconnect] 🟢 Done');
+      } catch (e) {
+        console.warn('[Reconnect] Unexpected failure:', e);
+      }
     };
 
     // تهيئة النظام

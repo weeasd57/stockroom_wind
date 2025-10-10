@@ -90,6 +90,24 @@ export default function GlobalInit() {
       };
     }
 
+    // Register service worker for PWA
+    try {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker
+          .register('/service-worker.js')
+          .then((reg) => {
+            console.log('[PWA] Service worker registered', { scope: reg.scope });
+          })
+          .catch((err) => {
+            console.warn('[PWA] Service worker registration failed', err);
+          });
+      } else {
+        console.log('[PWA] Service worker not supported in this browser');
+      }
+    } catch (e) {
+      console.warn('[PWA] Service worker registration error', e);
+    }
+
     // Install global client fetch logger (before/after/error)
     try {
       const g: any = window as any;
