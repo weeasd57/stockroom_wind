@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { uploadPostImageEnhanced } from "@/utils/imageUpload";
 import { useSupabase } from "@/providers/SupabaseProvider";
@@ -52,6 +52,57 @@ export function BackgroundPostCreationProvider({ children }: { children: React.R
   const [tasks, setTasks] = useState<BackgroundTask[]>([]);
   const controllersRef = useRef<Map<string, AbortController>>(new Map());
   const canceledRef = useRef<Set<string>>(new Set());
+  const wakeLockRef = useRef<any>(null);
+
+  const tryAcquireWakeLock = useCallback(async () => {
+    try {
+      // Screen Wake Lock keeps device awake during long tasks (Chrome/Android)
+      if (typeof navigator !== 'undefined' && 'wakeLock' in navigator && !wakeLockRef.current) {
+        // @ts-ignore - experimental API
+        const lock = await (navigator as any).wakeLock.request('screen');
+        wakeLockRef.current = lock;
+        try { lock.addEventListener?.('release', () => console.log('[Background] WakeLock released')); } catch {}
+        console.log('[Background] WakeLock acquired');
+      }
+    } catch (e) {
+      console.warn('[Background] WakeLock request failed', e);
+    }
+  }, []);
+
+  const releaseWakeLock = useCallback(async () => {
+    try {
+      const lock = wakeLockRef.current;
+      if (lock) {
+        await lock.release?.();
+        wakeLockRef.current = null;
+        console.log('[Background] WakeLock manually released');
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
+  // Manage Wake Lock based on active background tasks
+  useEffect(() => {
+    const hasActive = tasks.some(t => t.status === 'pending' || t.status === 'compressing' || t.status === 'uploading' || t.status === 'creating');
+    if (hasActive) {
+      void tryAcquireWakeLock();
+    } else {
+      void releaseWakeLock();
+    }
+  }, [tasks, tryAcquireWakeLock, releaseWakeLock]);
+
+  // Re-acquire Wake Lock when tab becomes visible again (some platforms release it on blur)
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        const hasActive = tasks.some(t => t.status === 'pending' || t.status === 'compressing' || t.status === 'uploading' || t.status === 'creating');
+        if (hasActive) void tryAcquireWakeLock();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [tasks, tryAcquireWakeLock]);
 
   const updateTask = useCallback((taskId: string, patch: Partial<BackgroundTask>) => {
     setTasks(prev => prev.map(t => (t.id === taskId ? { ...t, ...patch } : t)));
