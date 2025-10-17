@@ -31,14 +31,7 @@ export default function TelegramBotManagement() {
 
   const fetchBotInfo = async () => {
     try {
-      const token = localStorage.getItem('sb-jyoeecprvhpqfirxmpkx-auth-token');
-      const parsed = JSON.parse(token);
-      
-      const response = await fetch('/api/telegram/bot-setup', {
-        headers: {
-          'Authorization': `Bearer ${parsed.access_token}`
-        }
-      });
+      const response = await fetch('/api/telegram/bot-setup');
       const data = await response.json();
       setBotInfo(data.bot);
     } catch (error) {
@@ -50,14 +43,7 @@ export default function TelegramBotManagement() {
 
   const fetchSubscribers = async () => {
     try {
-      const token = localStorage.getItem('sb-jyoeecprvhpqfirxmpkx-auth-token');
-      const parsed = JSON.parse(token);
-      
-      const response = await fetch('/api/telegram/subscribers', {
-        headers: {
-          'Authorization': `Bearer ${parsed.access_token}`
-        }
-      });
+      const response = await fetch('/api/telegram/subscribers');
       const data = await response.json();
       setSubscribers(data.subscribers || []);
     } catch (error) {
@@ -67,16 +53,9 @@ export default function TelegramBotManagement() {
 
   const fetchUserPosts = async () => {
     try {
-      const token = localStorage.getItem('sb-jyoeecprvhpqfirxmpkx-auth-token');
-      const parsed = JSON.parse(token);
-      
-      const response = await fetch(`/api/posts?userId=${user.id}&limit=100`, {
-        headers: {
-          'Authorization': `Bearer ${parsed.access_token}`
-        }
-      });
+      const response = await fetch(`/api/posts?userId=${user.id}&limit=100`);
       const data = await response.json();
-      setPosts(data.posts || []);
+      setPosts(data.data || data.posts || []);
     } catch (error) {
       console.error('Error fetching posts:', error);
     }
@@ -84,15 +63,9 @@ export default function TelegramBotManagement() {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem('sb-jyoeecprvhpqfirxmpkx-auth-token');
-      const parsed = JSON.parse(token);
-      
       const response = await fetch('/api/telegram/subscribers', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${parsed.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'get_stats' })
       });
       const data = await response.json();
@@ -106,15 +79,7 @@ export default function TelegramBotManagement() {
     e?.preventDefault?.();
     setSaving(true);
     try {
-      const token = localStorage.getItem('sb-jyoeecprvhpqfirxmpkx-auth-token');
-      const parsed = JSON.parse(token);
-      
-      const response = await fetch('/api/telegram/bot-setup', {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${parsed.access_token}`
-        }
-      });
+      const response = await fetch('/api/telegram/bot-setup', { method: 'POST' });
 
       const data = await response.json();
       
@@ -149,15 +114,9 @@ export default function TelegramBotManagement() {
 
     setSendingBroadcast(true);
     try {
-      const token = localStorage.getItem('sb-jyoeecprvhpqfirxmpkx-auth-token');
-      const parsed = JSON.parse(token);
-      
       const response = await fetch('/api/telegram/send-broadcast', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${parsed.access_token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: broadcastTitle,
           message: broadcastMessage,

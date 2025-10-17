@@ -21,6 +21,7 @@ function generateNonce(): string {
 export async function middleware(req: NextRequest) {
   const nonce = generateNonce()
   const isDev = process.env.NODE_ENV !== 'production'
+  const isApiRoute = req.nextUrl.pathname.startsWith('/api/')
 
   // Pass nonce to the rest of the app via request headers
   const requestHeaders = new Headers(req.headers)
@@ -57,13 +58,19 @@ export async function middleware(req: NextRequest) {
 
   const res = NextResponse.next({ request: { headers: requestHeaders } })
 
-  // Ensure Supabase auth session cookies are kept in sync for server routes
-  try {
-    const supabase = createMiddlewareClient({ req, res })
-    // This call refreshes session cookies when needed so API routes can read them
-    await supabase.auth.getSession()
-  } catch (e) {
-    // Silent fail: do not block request if auth helper is unavailable
+  // Ensure Supabase auth session cookies are kept in sync for server API routes only
+  // and do not block the request longer than a short timeout window.
+  if (isApiRoute) {
+    try {
+      const supabase = createMiddlewareClient({ req, res })
+      const timeoutMs = 200
+      await Promise.race([
+        supabase.auth.getSession(),
+        new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+      ])
+    } catch (_) {
+      // best-effort only
+    }
   }
   res.headers.set('Content-Security-Policy', csp)
 
