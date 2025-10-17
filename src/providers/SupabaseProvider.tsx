@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { SupabaseClient, User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { supabase as globalSupabase } from '@/utils/supabase'; // Import the shared instance
@@ -52,7 +52,6 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const refreshTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
 
   useEffect(() => {
     // Check active session
@@ -96,36 +95,12 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
             setIsAuthenticated(false);
           }
           
-          // Clear any pending refresh
-          if (refreshTimeout.current) {
-            clearTimeout(refreshTimeout.current);
-            refreshTimeout.current = undefined;
-          }
-          
-          // Only attempt refresh if we have a session and it's not a SIGNED_OUT event
-          if (session && event !== 'SIGNED_OUT') {
-            // If session exists but is expired or will expire soon
-            const expiresAt = new Date(session.expires_at! * 1000);
-            const timeUntilExpiry = expiresAt.getTime() - Date.now();
-            
-            if (timeUntilExpiry < 600000) { // Less than 10 minutes until expiry
-              refreshTimeout.current = setTimeout(() => {
-                refreshTimeout.current = undefined;
-                if (!isRefreshing) {
-                  refreshSession();
-                }
-              }, 1000); // Small delay to prevent immediate refresh
-            }
-          }
+          // Disable manual auto-refresh scheduling; rely on Supabase autoRefresh
         });
 
         setLoading(false);
         return () => {
           subscription.unsubscribe();
-          if (refreshTimeout.current) {
-            clearTimeout(refreshTimeout.current);
-            refreshTimeout.current = undefined;
-          }
         };
       } catch (err) {
         // console.error('Error initializing auth:', err);
