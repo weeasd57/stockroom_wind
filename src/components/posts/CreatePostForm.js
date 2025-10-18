@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useSupabase } from '@/providers/SupabaseProvider'; // Updated from useAuth
+import { useSupabase } from '@/providers/SimpleSupabaseProvider'; // Updated from useAuth
 import { useProfile } from '@/providers/ProfileProvider'; // Updated from contexts/ProfileContext
 import { useSubscription } from '@/providers/SubscriptionProvider';
 import { getCountrySymbolCounts, searchStocks } from '@/utils/symbolSearch';

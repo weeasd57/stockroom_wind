@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSupabase } from '@/providers/SupabaseProvider';
+import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { supabase, followUser, unfollowUser } from '@/utils/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import styles from '@/styles/home/TopPerformers.module.css';

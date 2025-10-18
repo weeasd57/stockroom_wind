@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { useSupabase } from './SupabaseProvider';
+import { useSupabase } from './SimpleSupabaseProvider';
 import '@/styles/auth.css';
 
 // Define paths that don't require authentication

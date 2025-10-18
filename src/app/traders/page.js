@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSupabase } from '@/providers/SupabaseProvider';
+import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useTraders } from '@/providers/TradersProvider';
 import styles from '@/styles/traders.module.css';
 import { calculateSuccessRate } from '@/lib/utils';

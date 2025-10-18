@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { useSupabase } from '@/providers/SupabaseProvider';
+import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 
 type Post = any;
 

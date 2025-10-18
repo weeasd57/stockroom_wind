@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { useSupabase } from './SupabaseProvider';
+import { useSupabase } from './SimpleSupabaseProvider';
 
 interface Trader {
   id: string;

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import styles from '@/styles/profile.module.css';
 import { useProfile } from '@/providers/ProfileProvider';
-import { useSupabase } from '@/providers/SupabaseProvider';
+import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useSubscription } from '@/providers/SubscriptionProvider';
 import dialogStyles from '@/styles/ProfilePostCard.module.css';
 import ConfirmActionDialog from '@/components/common/ConfirmActionDialog'; // Import the new dialog

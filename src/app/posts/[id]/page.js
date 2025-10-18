@@ -8,7 +8,7 @@ import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 import { COUNTRY_ISO_CODES } from '@/models/CurrencyData';
 import { getCountryForExchange } from '@/models/ExchangeData';
 import 'flag-icons/css/flag-icons.min.css';
-import { useSupabase } from '@/providers/SupabaseProvider';
+import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
 import PriceHistoryChart from '@/components/PriceHistoryChart';
 import { CommentProvider } from '@/providers/CommentProvider';

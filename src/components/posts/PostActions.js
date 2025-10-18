@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSupabase } from '@/providers/SupabaseProvider';
+import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useComments } from '@/providers/CommentProvider';
 import { isValidUUID, isTempId } from '@/lib/utils';
 import styles from '../../styles/PostActions.module.css';

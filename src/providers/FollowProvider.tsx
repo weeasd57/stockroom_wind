@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { useSupabase } from './SupabaseProvider';
+import { useSupabase } from './SimpleSupabaseProvider';
 import { User } from '@/models/User';
 
 interface FollowContextType {

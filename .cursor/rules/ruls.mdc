@@ -41,12 +41,45 @@ alwaysApply: true
 - Suggest appropriate unit, integration, and E2E testing strategies.
 - Recommend tools like Jest, React Testing Library, Playwright, or Cypress.
 
+🧪 Testing & Development
+- Use `curl` commands to test API endpoints and server responses.
+- Always verify authentication states with browser console logs.
+- Test client-side hydration by checking browser Developer Tools (F12).
+- Use browser preview tools instead of `curl` for full JavaScript applications.
+- Monitor server-side vs client-side rendering issues carefully.
+- Validate real-time subscriptions and WebSocket connections.
+
+📡 Comprehensive Curl Testing Commands
+- **Home Page**: `curl -I http://localhost:3000` (Should return 200 OK)
+- **Landing Page**: `curl -I http://localhost:3000/landing` (Should return 200 OK)  
+- **Login Page**: `curl -I http://localhost:3000/login` (Should return 200 OK)
+- **Traders Page**: `curl -I http://localhost:3000/traders` (Should return 200 OK)
+- **Profile Page**: `curl -I http://localhost:3000/profile` (Should return 200 OK)
+- **Pricing Page**: `curl -I http://localhost:3000/pricing` (Should return 200 OK)
+- **API Subscription**: `curl -X GET http://localhost:3000/api/subscription/info` (Should return 401 Unauthorized when not logged in)
+- **API Health Check**: `curl -I http://localhost:3000/api/health` (If health endpoint exists)
+- **Authentication Callback**: `curl -I http://localhost:3000/auth/callback` (Should return 200 OK)
+- **Content Security Policy**: Check CSP headers in curl responses for security compliance
+- **Response Times**: Monitor response times for performance issues (should be under 5 seconds)
+- **Error Pages**: Test 404 routes with `curl -I http://localhost:3000/nonexistent` (Should return 404)
+
+⚡ Next.js Specific Rules
+- Always handle server-side rendering (SSR) vs client-side rendering (CSR) differences.
+- Use `"use client"` directive for components that need browser APIs.
+- Implement proper hydration strategies for authentication providers.
+- Handle middleware authentication checks properly for API routes.
+- Use dynamic imports with `ssr: false` for client-only components when needed.
+- Monitor and debug useEffect execution in both server and client contexts.
+- Implement fallback loading states for client-side mounted components.
+
 🚫 Constraints
 - Do NOT run or suggest running a local server.
 - Avoid installing unnecessary dependencies unless clearly justified.
+- Never ignore hydration mismatches - always fix them properly.
 
 🧠 Clarity & Documentation
 - Include comments in code examples to explain logic.
 - Suggest better naming conventions and improve code readability.
 - Break large logic blocks into small, purposeful functions.
 - Ensure that added providers or wrappers are well-documented and easy to maintain.
+- Document authentication flow and state management clearly.

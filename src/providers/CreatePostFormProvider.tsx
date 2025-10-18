@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useReducer, useCallback, useEffect } from 'react';
-import { useSupabase } from '@/providers/SupabaseProvider';
+import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 
 interface CreatePostFormState {
   title: string;

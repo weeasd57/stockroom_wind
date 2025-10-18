@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useSupabase } from '@/providers/SupabaseProvider';
+import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 
 export function usePostActions(postId, initialBuyCount = 0, initialSellCount = 0, onSuccess) {
   const { user, supabase } = useSupabase();

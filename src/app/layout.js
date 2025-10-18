@@ -2,7 +2,7 @@ import { Inter, Roboto_Mono } from 'next/font/google';
 import '@/styles/globals.css';
 import 'flag-icons/css/flag-icons.min.css';
 import { ThemeProvider } from "@/providers/theme-provider";
-import { SupabaseProvider } from '@/providers/SupabaseProvider';
+import { SimpleSupabaseProvider } from '@/providers/SimpleSupabaseProvider';
 import { UserProvider } from '@/providers/UserProvider';
 import { CreatePostFormProvider } from '@/providers/CreatePostFormProvider';
 import { ProfileProvider } from '@/providers/ProfileProvider';
@@ -282,7 +282,7 @@ export default function RootLayout({ children }) {
             };
           `}
         </Script>
-        <SupabaseProvider>
+        <SimpleSupabaseProvider>
           <UserProvider>
             <ProfileProvider>
               <SubscriptionProvider>
@@ -310,7 +310,7 @@ export default function RootLayout({ children }) {
               </SubscriptionProvider>
             </ProfileProvider>
           </UserProvider>
-        </SupabaseProvider>
+        </SimpleSupabaseProvider>
       </body>
     </html>
   );

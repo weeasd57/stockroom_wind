@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSupabase } from '@/providers/SupabaseProvider';
+import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
 import { usePosts } from '@/providers/PostProvider'; // Add PostProvider for real-time updates
 import { getUserPosts } from '@/utils/supabase';

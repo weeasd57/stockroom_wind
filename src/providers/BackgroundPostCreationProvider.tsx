@@ -3,7 +3,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { uploadPostImageEnhanced } from "@/utils/imageUpload";
-import { useSupabase } from "@/providers/SupabaseProvider";
+import { useSupabase } from "@/providers/SimpleSupabaseProvider";
 import { usePosts } from "@/providers/PostProvider";
 
 export type BackgroundTaskStatus =

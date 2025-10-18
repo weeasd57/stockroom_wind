@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Comment } from '../models/Comment';
-import { useSupabase } from './SupabaseProvider';
+import { useSupabase } from './SimpleSupabaseProvider';
 import { isValidUUID, isTempId } from '@/lib/utils';
 
 interface PostStats {

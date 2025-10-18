@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import styles from '@/styles/StrategyDetailsModal.module.css';
-import { useSupabase } from '@/providers/SupabaseProvider';
+import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 
 export default function StrategyDetailsModal({ strategy, isOpen, onClose, onSave }) {
   const { supabase, user } = useSupabase();

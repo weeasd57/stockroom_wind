@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useSupabase } from '@/providers/SupabaseProvider';
+import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { formatDistanceToNow } from 'date-fns';
 import { getPostComments, createComment, getPostCommentCount, updateComment, deleteComment } from '@/utils/comments';
 import { detectTextDirection, applyTextDirection } from '@/utils/textDirection';

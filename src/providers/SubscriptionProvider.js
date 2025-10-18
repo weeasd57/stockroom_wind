@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useSupabase } from './SupabaseProvider';
+import { useSupabase } from './SimpleSupabaseProvider';
 
 const SubscriptionContext = createContext({});
 

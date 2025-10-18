@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSupabase } from '@/providers/SupabaseProvider';
+import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useTheme } from '@/providers/theme-provider';
 import { toast } from 'sonner';
 import { createPortal } from 'react-dom';
