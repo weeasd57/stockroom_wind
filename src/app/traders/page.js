@@ -6,8 +6,7 @@ import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useTraders } from '@/providers/TradersProvider';
 import styles from '@/styles/traders.module.css';
 import { calculateSuccessRate } from '@/lib/utils';
-
-// Removed unused imports for cleaner code
+import TelegramSubscribeButton from '@/components/telegram/TelegramSubscribeButton';
 
 export default function TradersPage() {
   const { supabase, isAuthenticated, user } = useSupabase();
@@ -371,15 +370,24 @@ export default function TradersPage() {
                         </div>
                       </div>
                       
-                      {/* Follow button */}
+                      {/* Follow button and Telegram Subscribe */}
                       <div className={styles.cardActions}>
                         {isAuthenticated && user?.id !== trader.id && (
-                          <button
-                            className={followings[trader.id] ? styles.unfollowButton : styles.followButton}
-                            onClick={(e) => handleFollowClick(e, trader.id)}
-                          >
-                            {followings[trader.id] ? 'Unfollow' : 'Follow'}
-                          </button>
+                          <>
+                            <button
+                              className={followings[trader.id] ? styles.unfollowButton : styles.followButton}
+                              onClick={(e) => handleFollowClick(e, trader.id)}
+                            >
+                              {followings[trader.id] ? 'Unfollow' : 'Follow'}
+                            </button>
+                            <div style={{ marginTop: '8px' }}>
+                              <TelegramSubscribeButton 
+                                brokerUserId={trader.id} 
+                                brokerName={trader.full_name || trader.username}
+                                compact={true}
+                              />
+                            </div>
+                          </>
                         )}
                       </div>
                     </div>
@@ -447,12 +455,21 @@ export default function TradersPage() {
                     {/* Actions at bottom of the card */}
                     <div className={styles.cardActions}>
                       {isAuthenticated && user?.id !== trader.id && (
-                        <button
-                          className={followings[trader.id] ? styles.unfollowButton : styles.followButton}
-                          onClick={(e) => handleFollowClick(e, trader.id)}
-                        >
-                          {followings[trader.id] ? 'Unfollow' : 'Follow'}
-                        </button>
+                        <>
+                          <button
+                            className={followings[trader.id] ? styles.unfollowButton : styles.followButton}
+                            onClick={(e) => handleFollowClick(e, trader.id)}
+                          >
+                            {followings[trader.id] ? 'Unfollow' : 'Follow'}
+                          </button>
+                          <div style={{ marginTop: '8px', width: '100%' }}>
+                            <TelegramSubscribeButton 
+                              brokerUserId={trader.id} 
+                              brokerName={trader.full_name || trader.username}
+                              compact={true}
+                            />
+                          </div>
+                        </>
                       )}
                     </div>
                   </>

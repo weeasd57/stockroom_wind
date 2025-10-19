@@ -741,18 +741,11 @@ export default function Profile() {
     
     // Close modal immediately and show optimistic UI
     setShowEditModal(false);
-    
     // Show background saving indicator
     setIsSaving(true);
     setIsUploading(true);
     
-    // Optimistically update profile data in UI
-    if (profile) {
-      setProfile(prev => ({
-        ...prev,
-        ...formData
-      }));
-    }
+    // Note: Profile will be updated after successful save via updateProfile function
     
     try {
       // Upload avatar and background images if selected
