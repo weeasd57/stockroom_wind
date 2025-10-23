@@ -15,8 +15,12 @@ import { headers } from 'next/headers';
 import { FollowProvider } from '@/providers/FollowProvider'; // Import FollowProvider
 import { PostProvider } from '@/providers/PostProvider';
 import { BackgroundPostCreationProvider } from '@/providers/BackgroundPostCreationProvider';
+import { BackgroundProfileEditProvider } from '@/providers/BackgroundProfileEditProvider';
+import { BackgroundPriceCheckProvider } from '@/providers/BackgroundPriceCheckProvider';
 import { SubscriptionProvider } from '@/providers/SubscriptionProvider';
-import BackgroundPostCreationFloatingIndicator from '@/components/background/BackgroundPostCreationFloatingIndicator';
+import { PriceCheckResultsProvider } from '@/providers/PriceCheckResultsProvider';
+import GlobalPriceCheckHandler from '@/components/internal/GlobalPriceCheckHandler';
+import UnifiedBackgroundProcessDrawer from '@/components/background/UnifiedBackgroundProcessDrawer';
 import { Toaster } from 'sonner';
 import FloatingClock from '@/components/ui/FloatingClock';
 
@@ -31,7 +35,7 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata = {
-  title: 'SharksZone — Social Trading Platform',
+  title: 'SharkZone — Social Trading Platform',
   description: 'Share stock ideas, connect with traders, and build a community around trading insights. Discuss market opportunities and follow successful traders.',
 };
 
@@ -287,19 +291,26 @@ export default function RootLayout({ children }) {
             <ProfileProvider>
               <SubscriptionProvider>
                 <TradersProvider>
-                  <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={true}>
+                  <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={false}>
                     <CreatePostFormProvider>
                       <ClientSideLayout>
                         <AuthGuard>
                           <ClientImagePreloader />
                           <PostProvider>
                             <BackgroundPostCreationProvider>
-                              <FollowProvider> {/* Wrap children with FollowProvider */}
-                                {children}
-                                <BackgroundPostCreationFloatingIndicator />
-                                <FloatingClock />
-                                <Toaster richColors position="top-right" />
-                              </FollowProvider>
+                              <BackgroundProfileEditProvider>
+                                <BackgroundPriceCheckProvider>
+                                  <PriceCheckResultsProvider>
+                                    <GlobalPriceCheckHandler />
+                                    <FollowProvider> {/* Wrap children with FollowProvider */}
+                                      {children}
+                                      <UnifiedBackgroundProcessDrawer />
+                                      <FloatingClock />
+                                      <Toaster richColors position="top-right" />
+                                    </FollowProvider>
+                                  </PriceCheckResultsProvider>
+                                </BackgroundPriceCheckProvider>
+                              </BackgroundProfileEditProvider>
                             </BackgroundPostCreationProvider>
                           </PostProvider>
                         </AuthGuard>

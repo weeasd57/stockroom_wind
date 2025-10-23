@@ -1,0 +1,318 @@
+/* Background Price Check Indicator Styles */
+
+.priceCheckTasks {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 1000;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 320px;
+  max-width: 420px;
+  max-height: 320px;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+.tasksHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid hsl(var(--border));
+  background: linear-gradient(135deg, 
+    hsl(var(--primary) / 0.1) 0%, 
+    hsl(var(--secondary) / 0.1) 100%);
+}
+
+.tasksHeader h4 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.clearButton {
+  background: none;
+  border: none;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.clearButton:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.tasksList {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.taskItem {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid hsl(var(--border));
+  transition: background-color 0.2s ease;
+  position: relative;
+}
+
+.taskItem:last-child {
+  border-bottom: none;
+}
+
+.taskItem.pending,
+.taskItem.fetching_posts,
+.taskItem.checking_prices,
+.taskItem.updating_database {
+  background: linear-gradient(90deg, 
+    hsl(var(--primary) / 0.05) 0%, 
+    transparent 100%);
+  border-left: 3px solid hsl(var(--primary));
+}
+
+.taskItem.completed {
+  background: linear-gradient(90deg, 
+    hsl(var(--success) / 0.05) 0%, 
+    transparent 100%);
+  border-left: 3px solid #22c55e;
+}
+
+.taskItem.failed {
+  background: linear-gradient(90deg, 
+    hsl(var(--destructive) / 0.05) 0%, 
+    transparent 100%);
+  border-left: 3px solid hsl(var(--destructive));
+}
+
+.taskHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.taskIcon {
+  font-size: 1rem;
+  width: 20px;
+  text-align: center;
+}
+
+.taskStatus {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+}
+
+.taskActions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.retryButton,
+.removeButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.retryButton {
+  color: hsl(var(--primary));
+}
+
+.retryButton:hover {
+  background: hsl(var(--primary) / 0.1);
+  transform: rotate(180deg);
+}
+
+.removeButton {
+  color: hsl(var(--muted-foreground));
+}
+
+.removeButton:hover {
+  background: hsl(var(--destructive) / 0.1);
+  color: hsl(var(--destructive));
+}
+
+.taskDetails {
+  margin: 0.5rem 0;
+}
+
+.taskStats {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.taskStats span {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted) / 0.5);
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.taskError {
+  font-size: 0.75rem;
+  color: hsl(var(--destructive));
+  margin-top: 0.25rem;
+  padding: 0.375rem 0.5rem;
+  background: hsl(var(--destructive) / 0.1);
+  border-radius: 4px;
+  border-left: 3px solid hsl(var(--destructive));
+  line-height: 1.4;
+}
+
+.progressContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.progressBar {
+  flex: 1;
+  height: 6px;
+  background: hsl(var(--muted));
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.progressFill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+.progressText {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+  min-width: 35px;
+  text-align: right;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Pulse animation for active tasks */
+.taskItem.pending .taskIcon,
+.taskItem.fetching_posts .taskIcon,
+.taskItem.checking_prices .taskIcon,
+.taskItem.updating_database .taskIcon {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 640px) {
+  .priceCheckTasks {
+    bottom: 0.5rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    min-width: unset;
+  }
+  
+  .tasksHeader h4 {
+    font-size: 0.85rem;
+  }
+  
+  .taskStatus {
+    font-size: 0.8rem;
+  }
+  
+  .taskStats {
+    gap: 0.5rem;
+  }
+  
+  .taskStats span {
+    font-size: 0.7rem;
+  }
+}
+
+/* Status-specific colors */
+.taskItem.fetching_posts .progressFill {
+  background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
+}
+
+.taskItem.checking_prices .progressFill {
+  background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+}
+
+.taskItem.updating_database .progressFill {
+  background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+}
+
+/* Scrollbar styling */
+.tasksList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tasksList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tasksList::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+
+.tasksList::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.5);
+}

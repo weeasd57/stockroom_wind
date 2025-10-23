@@ -5,8 +5,10 @@ import styles from '@/styles/profile.module.css';
 import { useProfile } from '@/providers/ProfileProvider';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useSubscription } from '@/providers/SubscriptionProvider';
+import { useBackgroundPriceCheck } from '@/providers/BackgroundPriceCheckProvider';
 import dialogStyles from '@/styles/ProfilePostCard.module.css';
 import ConfirmActionDialog from '@/components/common/ConfirmActionDialog'; // Import the new dialog
+import { savePriceCheckResult } from '@/utils/priceCheckHistory';
 
 export default function CheckPostPricesButton({ userId }) {
   const [isChecking, setIsChecking] = useState(false);
@@ -15,6 +17,7 @@ export default function CheckPostPricesButton({ userId }) {
   const { refreshData } = useProfile();
   const { supabase } = useSupabase();
   const { canPerformPriceCheck, refreshSubscription, usageInfo } = useSubscription();
+  const { submitPriceCheck, isProcessing } = useBackgroundPriceCheck();
   const [abortController, setAbortController] = useState(null);
   const [isCancelled, setIsCancelled] = useState(false);
   const [showStatsDialog, setShowStatsDialog] = useState(false);
@@ -24,6 +27,13 @@ export default function CheckPostPricesButton({ userId }) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false); // New state for confirm dialog
   const [confirmDialogContent, setConfirmDialogContent] = useState({ title: '', message: '', confirmAction: () => {}, confirmText: 'Confirm', cancelText: 'Cancel', showCancelButton: true });
   const [isPreflight, setIsPreflight] = useState(false);
+  
+  // Telegram broadcast states
+  const [sendToTelegram, setSendToTelegram] = useState(false);
+  const [selectedForBroadcast, setSelectedForBroadcast] = useState([]);
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [tgTitle, setTgTitle] = useState('');
+  const [tgComment, setTgComment] = useState('');
   
   // Real-time subscription for price updates
   useEffect(() => {
@@ -131,6 +141,16 @@ export default function CheckPostPricesButton({ userId }) {
     setAbortController(controller);
 
     try {
+      // Set a 3-minute timeout for the API request
+      const timeoutId = setTimeout(() => {
+        if (!isCancelled) {
+          console.log('[CHECK POST PRICES] Request timed out after 3 minutes');
+          controller.abort();
+          setError('Request timed out after 3 minutes. Please try again.');
+          setIsChecking(false);
+        }
+      }, 3 * 60 * 1000); // 3 minutes in milliseconds
+
       // Request the price check API
       const response = await fetch('/api/posts/check-prices', {
         method: 'POST',
@@ -141,6 +161,9 @@ export default function CheckPostPricesButton({ userId }) {
         credentials: 'include',
         signal: controller.signal // Add the abort signal to the fetch request
       });
+
+      // Clear the timeout if request completes successfully
+      clearTimeout(timeoutId);
       
       // Check if cancelled before processing response
       if (isCancelled) {
@@ -191,6 +214,19 @@ export default function CheckPostPricesButton({ userId }) {
         setDetailedResults(data.results);
       }
       
+      // Save results to localStorage for history
+      const historyEntryId = savePriceCheckResult({
+        checkedPosts: data.checkedPosts,
+        updatedPosts: data.updatedPosts,
+        closedPostsSkipped: data.closedPostsSkipped,
+        usageCount: data.usageCount,
+        remainingChecks: data.remainingChecks,
+        results: data.results,
+        userId: userId
+      });
+      
+      console.log(`[CHECK POST PRICES] Saved to history with ID: ${historyEntryId}`);
+      
       // Refresh subscription info after successful check
       refreshSubscription();
       
@@ -206,21 +242,32 @@ export default function CheckPostPricesButton({ userId }) {
     } catch (err) {
       if (err.name === 'AbortError') {
         // This is expected when the request is aborted
-        console.log('Request aborted');
-        // Error is already set in cancelCheck
+        console.log('[CHECK POST PRICES] Request aborted');
+        // Don't set error if already handled by timeout or cancel
+        if (!isCancelled) {
+          setError('Request was cancelled');
+        }
       } else if (!isCancelled) {
         // Only set error if not cancelled
+        console.error('[CHECK POST PRICES] Error occurred:', err);
         setError(err.message || 'An error occurred while checking prices');
       }
     } finally {
+      // Always ensure loading state is stopped
       setIsChecking(false);
       setAbortController(null);
       // Reset cancelled state
       setIsCancelled(false);
+      console.log('[CHECK POST PRICES] Request completed, loading state cleared');
     }
   }, [userId, refreshData, canPerformPriceCheck, usageInfo, refreshSubscription]);
   
   const checkPostPrices = async () => {
+    // Prevent duplicate submissions while background task is running
+    if (isProcessing) {
+      console.log('[CHECK POST PRICES] Skipping: background processing already running');
+      return;
+    }
     setCheckStats(null);
     setError(null);
     setIsCancelled(false);
@@ -231,6 +278,7 @@ export default function CheckPostPricesButton({ userId }) {
 
     // If limit reached, show info-only dialog
     if (remaining <= 0) {
+      console.error('[CHECK POST PRICES] Limit reached. Remaining checks is 0');
       setConfirmDialogContent({
         title: 'Daily Check Limit Reached',
         message: 'You have reached the maximum price checks for today. Please upgrade your plan or try again tomorrow.',
@@ -246,12 +294,33 @@ export default function CheckPostPricesButton({ userId }) {
     setConfirmDialogContent({
       title: 'Confirm Price Check',
       message: `This will check the latest prices for your posts and update their statuses accordingly.${remainingText}`,
-      confirmAction: handleProceedCheck,
+      confirmAction: handleProceedCheckBackground,
       confirmText: 'Proceed',
       cancelText: 'Cancel',
       showCancelButton: true
     });
     setShowConfirmDialog(true);
+  };
+
+  // New background price check handler
+  const handleProceedCheckBackground = async () => {
+    setShowConfirmDialog(false);
+    
+    try {
+      // Submit to background processing
+      const taskId = await submitPriceCheck(userId);
+      
+      console.log(`[PRICE CHECK] Price check submitted to background processing: ${taskId}`);
+      
+      // Show success message
+      if (typeof window !== 'undefined') {
+        console.log('✅ Price check submitted to background processing');
+      }
+      
+    } catch (error) {
+      console.error('[CHECK POST PRICES] Error submitting price check:', error);
+      setError(error.message || 'Failed to submit price check. Please try again.');
+    }
   };
   
   // Calculate price change percentage and direction between initial and last price
@@ -268,6 +337,67 @@ export default function CheckPostPricesButton({ userId }) {
     }
     return { change: 'none', percent: 0 };
   };
+
+  // Telegram broadcast functions
+  const toggleSelectPost = (postId) => {
+    setSelectedForBroadcast(prev => 
+      prev.includes(postId) 
+        ? prev.filter(id => id !== postId)
+        : [...prev, postId]
+    );
+  };
+
+  const selectAllChanged = () => {
+    const changedPosts = (detailedResults || []).filter(res => 
+      res.targetReached || res.stopLossTriggered || res.closed
+    );
+    setSelectedForBroadcast(changedPosts.map(post => post.id));
+  };
+
+  const clearAllSelected = () => {
+    setSelectedForBroadcast([]);
+  };
+
+  const handleSendTelegram = async () => {
+    if (!sendToTelegram || selectedForBroadcast.length === 0) return;
+    
+    setSendingBroadcast(true);
+    try {
+      const response = await fetch('/api/telegram/send-broadcast', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          postIds: selectedForBroadcast,
+          title: tgTitle || 'Price Check Update',
+          comment: tgComment
+        }),
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to send Telegram broadcast');
+      }
+
+      // Show success message
+      console.log('✅ Telegram broadcast sent successfully');
+      
+      // Reset form
+      setSendToTelegram(false);
+      setSelectedForBroadcast([]);
+      setTgTitle('');
+      setTgComment('');
+      
+    } catch (error) {
+      console.error('❌ Failed to send Telegram broadcast:', error);
+      setError(error.message || 'Failed to send Telegram broadcast');
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
   
   return (
     <div className={styles.priceCheckContainer}>
@@ -276,18 +406,21 @@ export default function CheckPostPricesButton({ userId }) {
         
         <button 
           onClick={checkPostPrices}
-          disabled={isChecking || isPreflight}
-          className={styles.checkPricesButton}
+          disabled={isChecking || isPreflight || isProcessing}
+          className={`${styles.checkPricesButton} ${isProcessing ? styles.processing : ''}`}
           aria-label="Check post prices"
         >
-          {(isChecking || isPreflight) ? (
+          {(isChecking || isPreflight || isProcessing) ? (
             <>
-              <span className={styles.spinner}>⟳</span>
-              {isChecking ? 'Checking...' : 'Preparing...'}
+              <div className={styles.modernSpinner}>
+                <div className={styles.spinnerRing}></div>
+              </div>
+              {isProcessing ? 'Processing in background...' : isChecking ? 'Checking...' : 'Preparing...'}
             </>
           ) : (
             <>
-              📈 Check Post Prices
+              <span className={styles.buttonIcon}>📈</span>
+              Check Post Prices
               {realTimeUpdates.size > 0 && (
                 <span className={styles.updateBadge}>
                   {realTimeUpdates.size}
@@ -297,7 +430,8 @@ export default function CheckPostPricesButton({ userId }) {
           )}
         </button>
         
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          
           <button 
             onClick={() => setShowInfoDialog(true)}
             className={styles.infoButton}
@@ -311,7 +445,6 @@ export default function CheckPostPricesButton({ userId }) {
               onClick={cancelCheck}
               className={styles.cancelCheckButton}
               aria-label="Cancel price check"
-              style={{ marginLeft: '10px' }}
             >
               Cancel
             </button>
@@ -446,14 +579,157 @@ export default function CheckPostPricesButton({ userId }) {
                 )}
               </div>
 
-              <div className={styles.statsActions}>
+              {/* Telegram Broadcast Section */}
+              {detailedResults && detailedResults.length > 0 && (
+                <div className={styles.telegramBroadcastSection}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'hsl(var(--primary))' }}>
+                      📢 Telegram Broadcast
+                    </h4>
+                  </div>
+                  <div>
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: '0.9rem' }}>Title</label>
+                      <input
+                        type="text"
+                        value={tgTitle}
+                        onChange={(e) => setTgTitle(e.target.value)}
+                        placeholder="Price Check Update - [Date]"
+                        style={{ width: '100%', padding: '10px', borderRadius: 6, border: '1px solid var(--border)', backgroundColor: 'hsl(var(--background))', color: 'hsl(var(--foreground))', fontSize: '0.9rem' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: '0.9rem' }}>Comment (optional)</label>
+                      <textarea
+                        value={tgComment}
+                        onChange={(e) => setTgComment(e.target.value)}
+                        rows={3}
+                        placeholder="Add a short comment to your followers..."
+                        style={{ width: '100%', padding: '10px', borderRadius: 6, border: '1px solid var(--border)', backgroundColor: 'hsl(var(--background))', color: 'hsl(var(--foreground))', fontSize: '0.9rem', resize: 'vertical' }}
+                      />
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <label style={{ fontWeight: 600, fontSize: '0.9rem' }}>Select posts to include</label>
+                        <div className={styles.postSelectionActions} style={{ display: 'flex', gap: '8px' }}>
+                          <button 
+                            className={styles.selectChangedButton} 
+                            onClick={selectAllChanged} 
+                            title="Select posts with changes"
+                            style={{
+                              padding: '8px 16px',
+                              backgroundColor: '#10b981',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontWeight: 600,
+                              fontSize: '0.9rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            📈 Select changed
+                          </button>
+                          <button 
+                            className={styles.clearSelectionButton} 
+                            onClick={clearAllSelected}
+                            style={{
+                              padding: '8px 16px',
+                              backgroundColor: '#ef4444',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontWeight: 600,
+                              fontSize: '0.9rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            🗑️ Clear
+                          </button>
+                        </div>
+                      </div>
+                      <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 6, padding: 8, backgroundColor: 'hsl(var(--background))', color: 'hsl(var(--foreground))' }}>
+                        {(detailedResults || []).map((res) => (
+                          <label key={res.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 6px', cursor: 'pointer', borderRadius: 4 }} className={styles.postSelectionItem}>
+                            <input
+                              type="checkbox"
+                              checked={selectedForBroadcast.includes(res.id)}
+                              onChange={() => toggleSelectPost(res.id)}
+                              style={{ cursor: 'pointer', accentColor: '#0066cc' }}
+                            />
+                            <span style={{ minWidth: 64, fontWeight: 600, fontSize: '0.9rem', color: 'hsl(var(--foreground))' }}>{res.symbol || 'N/A'}</span>
+                            <span style={{ color: 'hsl(var(--muted-foreground))', fontSize: '0.9rem', flex: 1 }}>{res.companyName || ''}</span>
+                            {(res.targetReached || res.stopLossTriggered || res.closed) && (
+                              <span className={styles.postStatusBadge}>
+                                {res.targetReached ? '🎯 Target' : res.stopLossTriggered ? '🛑 Stop Loss' : res.closed ? '🔒 Closed' : ''}
+                              </span>
+                            )}
+                          </label>
+                        ))}
+                      </div>
+                      <small style={{ display: 'block', marginTop: 8, color: 'var(--muted-foreground)', fontSize: '0.8rem', textAlign: 'center' }}>
+                        📊 Selected: {selectedForBroadcast.length} / {(detailedResults || []).length} posts
+                      </small>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Global sticky footer inside dialog content */}
+              <div style={{
+                position: 'sticky',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                padding: '12px 16px',
+                background: 'hsl(var(--card))',
+                borderTop: '1px solid hsl(var(--border))',
+                zIndex: 50
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'hsl(var(--primary))' }}>
+                    📢 Telegram Broadcast
+                  </h4>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={sendToTelegram}
+                    onChange={(e) => setSendToTelegram(e.target.checked)}
+                    style={{ cursor: 'pointer', width: '18px', height: '18px', accentColor: 'hsl(var(--primary))' }}
+                  />
+                  <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>
+                    Send to Telegram followers
+                  </span>
+                </label>
+                </div>
+
                 <button 
-                  className={styles.cancelCheckButton}
-                  onClick={() => setShowStatsDialog(false)}
+                  className={styles.closeStatsButton}
+                  onClick={handleSendTelegram}
+                  disabled={!sendToTelegram || sendingBroadcast || selectedForBroadcast.length === 0}
+                  style={{ 
+                    backgroundColor: 'hsl(var(--primary))',
+                    color: 'white',
+                    fontWeight: 700,
+                    padding: '10px 18px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    opacity: (!sendToTelegram || sendingBroadcast || selectedForBroadcast.length === 0) ? 0.6 : 1
+                  }}
                 >
-                  Cancel
+                  {sendingBroadcast ? '📤 Sending...' : '📢 Send to Telegram'}
                 </button>
-                
               </div>
             </div>
           </div>
@@ -497,6 +773,7 @@ export default function CheckPostPricesButton({ userId }) {
         cancelText={confirmDialogContent.cancelText}
         showCancelButton={confirmDialogContent.showCancelButton}
       />
+
     </div>
   );
 }

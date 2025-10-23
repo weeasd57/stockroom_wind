@@ -12,7 +12,7 @@ import styles from '@/styles/home/PostsFeed.module.css';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 
 // Reusable PostCard component used across Home feed and Traders page
-export default function PostCard({ post, showFlagBackground = false, hideUserInfo = false }) {
+export default function PostCard({ post, showFlagBackground = false, hideUserInfo = false, viewMode = 'list' }) {
   if (!post) return null;
 
   const formatPrice = (price) => {
@@ -82,7 +82,9 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
 
   return (
     <CommentProvider>
-      <div className={styles.postCard}>
+      <div className={`${styles.postCard} ${viewMode === 'grid' ? styles.gridCard : styles.listCard}`}>
+        {/* Debug: Log viewMode in PostCard */}
+        {process.env.NODE_ENV === 'development' && console.log('PostCard viewMode:', viewMode, 'for post:', post.id)}
         {showFlagBackground && countryCode && (
           <div className={styles.flagBackground} aria-hidden="true">
             <span className={`fi fi-${countryCode}`}></span>

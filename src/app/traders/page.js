@@ -30,6 +30,7 @@ export default function TradersPage() {
   const [country, setCountry] = useState('all');
   const [followings, setFollowings] = useState({});
   const [loadingMore, setLoadingMore] = useState(false);
+  const [telegramBots, setTelegramBots] = useState({}); // Track telegram bot status
   const router = useRouter();
 
   // Animation effect
@@ -70,6 +71,43 @@ export default function TradersPage() {
     
     fetchFollowings();
   }, [supabase, isAuthenticated, user]);
+
+  // Fetch telegram bot status for all traders
+  useEffect(() => {
+    const fetchTelegramBots = async () => {
+      if (!traders || traders.length === 0) return;
+      
+      try {
+        const traderIds = traders.map(t => t.id);
+        
+        const { data, error } = await supabase
+          .from('telegram_bots')
+          .select('user_id, bot_token, is_active')
+          .in('user_id', traderIds)
+          .eq('is_active', true);
+          
+        if (error) {
+          console.error('Error fetching telegram bots:', error);
+          return;
+        }
+        
+        const botsMap = {};
+        data.forEach(bot => {
+          botsMap[bot.user_id] = {
+            hasBot: true,
+            isActive: bot.is_active,
+            hasToken: !!bot.bot_token
+          };
+        });
+        
+        setTelegramBots(botsMap);
+      } catch (error) {
+        console.error('Error in fetchTelegramBots:', error);
+      }
+    };
+    
+    fetchTelegramBots();
+  }, [supabase, traders]);
 
   // Navigation functions
   const navigateToProfile = (userId) => {
@@ -167,13 +205,19 @@ export default function TradersPage() {
     return Array.from(set).sort();
   }, [traders]);
 
-  // Derived list: filter by country and sort by selected key/order
+  // Derived list: filter by country, telegram bot, and sort by selected key/order
   const displayedTraders = useMemo(() => {
     let list = Array.isArray(traders) ? [...traders] : [];
 
+    // Filter by country
     if (country !== 'all') {
       const target = (country || '').toLowerCase();
       list = list.filter(t => (t?.countryCounts?.[target] || 0) > 0);
+    }
+
+    // Filter by telegram bot status
+    if (filter === 'telegram') {
+      list = list.filter(t => telegramBots[t.id]?.hasBot);
     }
 
     const key = sortKey;
@@ -185,7 +229,7 @@ export default function TradersPage() {
       return av > bv ? dir : -dir;
     });
     return list;
-  }, [traders, country, sortKey, sortOrder]);
+  }, [traders, country, sortKey, sortOrder, filter, telegramBots]);
 
   // Show error state
   if (error) {
@@ -244,6 +288,12 @@ export default function TradersPage() {
             onClick={() => setFilter('trending')}
           >
             Trending
+          </button>
+          <button 
+            className={`${styles.filterButton} ${filter === 'telegram' ? styles.active : ''}`}
+            onClick={() => setFilter('telegram')}
+          >
+            📱 With Telegram Bot
           </button>
         </div>
 
@@ -325,7 +375,16 @@ export default function TradersPage() {
                           />
                         </div>
                         <div className={styles.traderInfo}>
-                          <h3>{trader.full_name || trader.username || 'Trader'}</h3>
+                          <div className={styles.traderNameRow}>
+                            <h3>{trader.full_name || trader.username || 'Trader'}</h3>
+                            {telegramBots[trader.id]?.hasBot && (
+                              <div className={styles.telegramBadge} title="Has active Telegram bot">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                                </svg>
+                              </div>
+                            )}
+                          </div>
                           <p className={styles.username}>@{trader.username || 'username'}</p>
                         </div>
                       </div>
@@ -411,7 +470,16 @@ export default function TradersPage() {
                         />
                       </div>
                       <div className={styles.traderInfo}>
-                        <h3>{trader.full_name || trader.username || 'Trader'}</h3>
+                        <div className={styles.traderNameRow}>
+                          <h3>{trader.full_name || trader.username || 'Trader'}</h3>
+                          {telegramBots[trader.id]?.hasBot && (
+                            <div className={styles.telegramBadge} title="Has active Telegram bot">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                              </svg>
+                            </div>
+                          )}
+                        </div>
                         <p className={styles.username}>@{trader.username || 'username'}</p>
                       </div>
                     </div>

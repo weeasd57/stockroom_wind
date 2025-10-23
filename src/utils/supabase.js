@@ -218,10 +218,10 @@ export const getUserProfile = async (userId) => {
   }
 
   try {
-    // First, get the user profile data
+    // First, get the user profile data including social media URLs
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, username, full_name, email, avatar_url, background_url, bio, success_posts, loss_posts, experience_score, followers, following, created_at')
+      .select('id, username, full_name, email, avatar_url, background_url, bio, facebook_url, telegram_url, youtube_url, success_posts, loss_posts, experience_score, followers, following, created_at')
       .eq('id', userId);
 
     if (error) throw error;
@@ -381,6 +381,54 @@ export const updateUserProfile = async (userId, updates) => {
     if (updates.username) dbUpdates.username = updates.username;
     if (updates.full_name) dbUpdates.full_name = updates.full_name;
     if (updates.bio) dbUpdates.bio = updates.bio;
+    
+    // Handle social media URLs
+    // All social media URLs need proper format validation or null
+    if (updates.hasOwnProperty('facebook_url')) {
+      const facebookUrl = updates.facebook_url || '';
+      if (facebookUrl === '' || !facebookUrl.trim()) {
+        dbUpdates.facebook_url = null;
+      } else if (facebookUrl.includes('facebook.com') || facebookUrl.includes('fb.com')) {
+        dbUpdates.facebook_url = facebookUrl;
+      } else if (!facebookUrl.includes('://')) {
+        // If it's just a username, construct proper Facebook URL
+        dbUpdates.facebook_url = 'https://facebook.com/' + facebookUrl;
+      } else {
+        dbUpdates.facebook_url = facebookUrl;
+      }
+    }
+    if (updates.hasOwnProperty('telegram_url')) {
+      // For telegram, send null if empty or invalid format
+      const telegramUrl = updates.telegram_url || '';
+      // Only allow valid telegram URLs or null (convert empty string to null)
+      if (telegramUrl === '' || !telegramUrl.trim()) {
+        dbUpdates.telegram_url = null;
+      } else if (telegramUrl.startsWith('https://t.me/') || telegramUrl.startsWith('http://t.me/')) {
+        dbUpdates.telegram_url = telegramUrl;
+      } else if (telegramUrl.startsWith('t.me/')) {
+        // Add https:// prefix if missing
+        dbUpdates.telegram_url = 'https://' + telegramUrl;
+      } else if (!telegramUrl.includes('://') && !telegramUrl.startsWith('t.me/')) {
+        // If it's just a username without proper format, construct a proper URL
+        dbUpdates.telegram_url = 'https://t.me/' + telegramUrl.replace('@', '');
+      } else {
+        // Use as is (might fail constraint but that's user input)
+        dbUpdates.telegram_url = telegramUrl;
+      }
+    }
+    if (updates.hasOwnProperty('youtube_url')) {
+      const youtubeUrl = updates.youtube_url || '';
+      if (youtubeUrl === '' || !youtubeUrl.trim()) {
+        dbUpdates.youtube_url = null;
+      } else if (youtubeUrl.includes('youtube.com') || youtubeUrl.includes('youtu.be')) {
+        dbUpdates.youtube_url = youtubeUrl;
+      } else if (!youtubeUrl.includes('://')) {
+        // If it's just a channel name, construct proper YouTube URL
+        dbUpdates.youtube_url = 'https://youtube.com/@' + youtubeUrl;
+      } else {
+        dbUpdates.youtube_url = youtubeUrl;
+      }
+    }
     
     // Handle avatarUrl (from form) or avatar_url (directly provided)
     if (updates.avatarUrl) {

@@ -3,8 +3,10 @@
 console.log('🚀 [SimpleSupabase] Module loaded');
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { SupabaseClient, User } from '@supabase/supabase-js';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { User, Session, SupabaseClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
+import AuthLoadingScreen from '@/components/loading/AuthLoadingScreen';
 import { supabase as globalSupabase } from '@/utils/supabase';
 
 interface SupabaseContextType {
@@ -280,7 +282,7 @@ export function SimpleSupabaseProvider({ children }: SupabaseProviderProps) {
   
   // Don't render until client-side
   if (!isClient) {
-    return <div>Loading authentication...</div>;
+    return <AuthLoadingScreen />;
   }
   
   const value: SupabaseContextType = {

@@ -40,8 +40,6 @@
   .header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 24px;
     flex-wrap: wrap;
     gap: 16px;
   }
@@ -51,6 +49,41 @@
     flex-direction: column;
     gap: 12px;
     align-items: flex-end;
+  }
+  
+  .viewToggle {
+    display: flex;
+    gap: 4px;
+    background: var(--card-secondary, #f9fafb);
+    border-radius: 8px;
+    padding: 4px;
+    border: 1px solid var(--border-color, #e5e7eb);
+  }
+  
+  .viewButton {
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    color: var(--text-secondary, #6b7280);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+  }
+  
+  .viewButton:hover {
+    background: var(--card-background, #ffffff);
+    color: var(--text-primary, #1f2937);
+  }
+  
+  .viewButton.active {
+    background: var(--primary-color, #3b82f6);
+    color: white;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
   }
   
   .title {
@@ -150,6 +183,21 @@
     gap: 20px;
   }
   
+  /* List View (default) */
+  .listView {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  /* Grid View */
+  .gridView {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+    align-items: start;
+  }
+  
   .postCard {
     background: var(--card-secondary, #f9fafb);
     border-radius: 12px;
@@ -163,6 +211,61 @@
   .postCard:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* List Card (default) */
+  .listCard {
+    width: 100%;
+  }
+  
+  /* Grid Card */
+  .gridCard {
+    display: flex;
+    flex-direction: column;
+    height: fit-content;
+    min-height: 300px;
+  }
+  
+  .gridCard .postHeader {
+    margin-bottom: 12px;
+  }
+  
+  .gridCard .stockInfo {
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+  }
+  
+  .gridCard .priceAnalysis {
+    margin-bottom: 12px;
+  }
+  
+  .gridCard .priceGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  
+  .gridCard .postContent {
+    margin-bottom: 12px;
+    flex: 1;
+  }
+  
+  .gridCard .postContent p {
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .gridCard .strategy {
+    margin-bottom: 12px;
+  }
+  
+  .gridCard .postFooter {
+    margin-top: auto;
+    padding-top: 12px;
   }
   
   /* Post Header */
@@ -395,6 +498,12 @@
     border: 1px solid var(--border-light, #f3f4f6);
   }
   
+  .gridSkeleton {
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+  }
+  
   .skeletonHeader,
   .skeletonContent,
   .skeletonFooter {
@@ -585,6 +694,8 @@
     .controls {
       width: 100%;
       align-items: stretch;
+      flex-direction: row;
+      justify-content: space-between;
     }
     
     .sortControls {
@@ -631,6 +742,57 @@
       padding: 4px 8px;
       font-size: 0.8125rem;
     }
+    
+    .avatar {
+      width: 32px;
+      height: 32px;
+    }
+    
+    .userDetails h4 {
+      font-size: 0.875rem;
+    }
+    
+    .timestamp {
+      font-size: 0.8125rem;
+    }
+    
+    .stockSymbol {
+      font-size: 1.125rem;
+    }
+    
+    .priceGrid {
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    
+    .title {
+      font-size: 1.25rem;
+    }
+    
+    /* Grid view adjustments for mobile */
+    .gridView {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    
+    .gridCard {
+      min-height: 250px;
+    }
+    
+    .gridCard .priceGrid {
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    
+    .viewToggle {
+      padding: 2px;
+    }
+    
+    .viewButton {
+      padding: 6px 10px;
+      font-size: 0.875rem;
+      min-width: 36px;
+    }
   }
   
   @media (max-width: 480px) {
@@ -663,4 +825,31 @@
     .title {
       font-size: 1.25rem;
     }
+    
+    /* Ensure single column grid on very small screens */
+    .gridView {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+  }
+  
+  /* Dark mode support for new view toggle buttons */
+  :global(.dark) .viewToggle {
+    background: #000000;
+    border-color: #1f2937;
+  }
+  
+  :global(.dark) .viewButton {
+    color: #9ca3af;
+  }
+  
+  :global(.dark) .viewButton:hover {
+    background: #111827;
+    color: #ffffff;
+  }
+  
+  :global(.dark) .viewButton.active {
+    background: #3b82f6;
+    color: #ffffff;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.5);
   }

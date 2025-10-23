@@ -1,20 +1,27 @@
 
-
+*** add pro planes for brokers
+* upgrade to next 15
 
 working {
-     * cancel subscraption 
-     * add telegram features 
+    drawer for background prosses
 }
 
-** should when user select free plane can
-     cancle thee pro plane subscraption
-     and add this feature in plane section in profile page 
 
-* add backround for profile edit page 
-* fix dashboard in homepage
-* and fix more renders home 
+* get from commit
+2b0a7dcc7d5a5ccd9ef865d3f4d3e8b7d7efa279
+    * get landing page 
+    * posts card style 
+    * telegram button in view profile
 
-*get telegram from view profile from github
-*get edit profile from view profile from github
+* add grid view in profile , home 
+* fix posts puplish info
+* fix vot 
+* fix width Symbol: filter in profile 
+* remove "📊 Price Check History"from profile
 
+** add post count and telegram follower in view profile 
+** add in telegram tap in profile tap for my subscribtions
 
+** add stratgyes tap in view profile page
+** add analysis page for every trader howmatch earn prsentage 
+    for sussces post and lose post and more statics

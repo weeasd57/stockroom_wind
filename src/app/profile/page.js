@@ -7,6 +7,7 @@ import { useSubscription } from '@/providers/SubscriptionProvider';
 // No longer needed since we're using the ProfileProvider
 // import useProfileStore from '@/store/profileStore';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import styles from '@/styles/profile.module.css';
 import editStyles from '@/styles/editProfile.module.css';
 import { CreatePostButton } from '@/components/posts/CreatePostButton';
@@ -14,7 +15,6 @@ import CreatePostForm from '@/components/posts/CreatePostForm';
 import { uploadImage } from '@/utils/supabase';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
 import { createPortal } from 'react-dom';
-import '@/styles/create-post-page.css';
 import { PostsFeed } from '@/components/home/PostsFeed';
 import CheckPostPricesButton from '@/components/profile/CheckPostPricesButton';
 import StrategyDetailsModal from '@/components/profile/StrategyDetailsModal';
@@ -22,9 +22,14 @@ import TelegramBotManagement from '@/components/telegram/TelegramBotManagement';
 import { DashboardSection } from '@/components/home/DashboardSection';
 import { useTheme } from '@/providers/theme-provider';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
+import { useBackgroundProfileEdit } from '@/providers/BackgroundProfileEditProvider';
+// Background indicators removed - now handled by UnifiedBackgroundProcessDrawer
+import SocialLinks from '@/components/profile/SocialLinks';
+import logger from '@/utils/logger';
 
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading } = useSupabase();
+  const searchParams = useSearchParams();
   const { theme } = useTheme();
   const { 
     subscriptionInfo,
@@ -64,49 +69,63 @@ export default function Profile() {
   
   // Get dialog state at the component level - MUST be before any conditions
   const { isOpen, closeDialog } = useCreatePostForm();
+  const { submitProfileEdit, isProcessing } = useBackgroundProfileEdit();
 
   // Debug authentication on mount
   useEffect(() => {
-    console.log("[PROFILE] Authentication Status:", { 
+    logger.debug("Authentication Status:", { 
       isAuthenticated, 
       user: !!user, 
       userId: user?.id,
       authLoading,
       profileLoading
-    });
+    }, 'AUTH');
     
     // Debug subscription data
-    console.log("[PROFILE] Subscription Info:", subscriptionInfo);
-    console.log("[PROFILE] Subscription Info Details:", {
+    logger.debug("Subscription Info:", subscriptionInfo, 'AUTH');
+    logger.debug("Subscription Info Details:", {
       remaining_checks: subscriptionInfo?.remaining_checks,
       price_checks_used: subscriptionInfo?.price_checks_used,
       price_check_limit: subscriptionInfo?.price_check_limit,
       subscriptionLoading
-    });
+    }, 'AUTH');
     
     // Debug the profile data
-    console.log("[PROFILE] Profile data:", profile);
+    logger.debug("Profile data:", profile, 'AUTH');
     if (profile) {
-      console.log("[PROFILE] Username from profile:", profile.username);
-      console.log("[PROFILE] Profile data type:", typeof profile);
-      console.log("[PROFILE] Profile keys:", Object.keys(profile));
-      console.log("[PROFILE] Experience score from database:", {
+      logger.debug("Username from profile:", profile.username, 'AUTH');
+      logger.debug("Profile data type:", typeof profile, 'AUTH');
+      logger.debug("Profile keys:", Object.keys(profile), 'AUTH');
+      logger.debug("Experience score from database:", {
         experience_score: profile.experience_score,
         success_posts: profile.success_posts,
         loss_posts: profile.loss_posts
-      });
+      }, 'AUTH');
     } else {
-      console.log("[PROFILE] No profile data available");
+      logger.debug("No profile data available", null, 'AUTH');
     }
   }, [isAuthenticated, user, authLoading, profileLoading, profile, subscriptionInfo, subscriptionLoading]);
 
-  
+  // Initialize active tab from query param (e.g., /profile?tab=telegram)
+  useEffect(() => {
+    try {
+      const tab = searchParams?.get('tab');
+      const allowed = ['posts', 'followers', 'following', 'strategies', 'telegram'];
+      if (tab && allowed.includes(tab) && tab !== activeTab) {
+        setActiveTab(tab);
+      }
+    } catch {}
+    // We intentionally depend on searchParams so this reacts to URL changes
+  }, [searchParams, activeTab, setActiveTab]);
+
   const [showEditModal, setShowEditModal] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     full_name: '',
     bio: '',
     facebook_url: '',
+    telegram_url: '',
+    youtube_url: '',
     show_facebook: false,
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -118,22 +137,39 @@ export default function Profile() {
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [backgroundUrl, setBackgroundUrl] = useState(null);
   const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
-  const [backgroundUploadProgress, setBackgroundUploadProgress] = useState(0);
   const [avatarUploadError, setAvatarUploadError] = useState(null);
   const [backgroundUploadError, setBackgroundUploadError] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
   const backgroundInputRef = useRef(null);
   const refreshInterval = useRef(null);
-  const [localSelectedStrategy, setLocalSelectedStrategy] = useState(null);
+  const [localSelectedStrategy, setLocalSelectedStrategy] = useState('');
+  const [selectedSymbol, setSelectedSymbol] = useState('');
+  const [discoveredCountries, setDiscoveredCountries] = useState([]);
+  const [discoveredSymbols, setDiscoveredSymbols] = useState([]);
   const [selectedStrategyForDetails, setSelectedStrategyForDetails] = useState(null);
   const [isStrategyModalOpen, setIsStrategyModalOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedCountry, setSelectedCountry] = useState('');
   const [filterLoading, setFilterLoading] = useState(false);
-  const [selectedSymbol, setSelectedSymbol] = useState('');
-  const [discoveredCountries, setDiscoveredCountries] = useState([]);
-  const [discoveredSymbols, setDiscoveredSymbols] = useState([]);
+  const [backgroundUploadProgress, setBackgroundUploadProgress] = useState(0);
+  const [viewMode, setViewMode] = useState('list'); // 'grid' or 'list'
+  
+  // Debug: Log viewMode changes
+  useEffect(() => {
+    console.log('viewMode changed to:', viewMode);
+  }, [viewMode]);
+
+  // Helper function to ensure all values are strings for controlled inputs
+  const sanitizeFormData = useCallback((profile) => ({
+    username: profile?.username || '',
+    full_name: profile?.full_name || '',
+    bio: profile?.bio || '',
+    facebook_url: profile?.facebook_url || '',
+    telegram_url: profile?.telegram_url || '',
+    youtube_url: profile?.youtube_url || '',
+    show_facebook: Boolean(profile?.show_facebook),
+  }), []);
 
   // Initialize data once when authenticated
   useEffect(() => {
@@ -167,13 +203,7 @@ export default function Profile() {
     
     // Update form data with profile details when they become available
     if (profile && !profileLoading) {
-      setFormData({
-        username: profile.username || '',
-        full_name: profile.full_name || '',
-        bio: profile.bio || '',
-        facebook_url: profile.facebook_url || '',
-        show_facebook: profile.show_facebook || false,
-      });
+      setFormData(sanitizeFormData(profile));
       setAvatarUrl(contextAvatarUrl || '/default-avatar.svg');
       setBackgroundUrl(contextBackgroundUrl || '/profile-bg.jpg');
       
@@ -278,15 +308,9 @@ export default function Profile() {
   // Update form data when profile changes
   useEffect(() => {
     if (profile) {
-      setFormData({
-        username: profile.username || '',
-        full_name: profile.full_name || '',
-        bio: profile.bio || '',
-        facebook_url: profile.facebook_url || '',
-        show_facebook: profile.show_facebook || false,
-      });
+      setFormData(sanitizeFormData(profile));
     }
-  }, [profile]);
+  }, [profile, sanitizeFormData]);
 
   // Memoized handlers
   const handleTabChange = useCallback((tab) => {
@@ -311,26 +335,20 @@ export default function Profile() {
     // as they'll only apply when we come back to the posts tab
   }, [activeTab, selectedStrategyForDetails]);
 
-  const handleEditProfile = useCallback(() => {
-    setShowEditModal(true);
-  }, []);
-
   const handleCloseModal = useCallback(() => {
     setShowEditModal(false);
+    setSaveError(null);
     setAvatarFile(null);
     setBackgroundFile(null);
     setAvatarPreview(null);
     setBackgroundPreview(null);
-    setFormData({
-      username: profile?.username || '',
-      full_name: profile?.full_name || '',
-      bio: profile?.bio || '',
-      facebook_url: profile?.facebook_url || '',
-      show_facebook: profile?.show_facebook || false,
-    });
-  }, [profile]);
+    setFormData(sanitizeFormData(profile));
+  }, [profile, sanitizeFormData]);
 
-  // Add this function at the top level of the component
+  const handleEditProfile = useCallback(() => {
+    setShowEditModal(true);
+  }, []);
+
   const addCacheBuster = useCallback((url) => {
     if (!url || url.startsWith('/')) return url;
     const cacheBuster = `?t=${Date.now()}`;
@@ -414,7 +432,7 @@ export default function Profile() {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({ 
       ...prev, 
-      [name]: type === 'checkbox' ? checked : value 
+      [name]: type === 'checkbox' ? checked : (value === '' ? null : value) // Allow null for empty social media URLs
     }));
   };
 
@@ -433,14 +451,14 @@ export default function Profile() {
     // Validate file is an image
     if (!file.type.startsWith('image/')) {
       setAvatarUploadError('File must be an image');
-      console.error('File must be an image');
+      console.error('[PROFILE UPLOAD] ❌ File must be an image');
       return;
     }
     
     // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       setAvatarUploadError('File must be less than 2MB');
-      console.error('File must be less than 2MB');
+      console.error('[PROFILE UPLOAD] ❌ File must be less than 2MB');
       return;
     }
     
@@ -451,7 +469,8 @@ export default function Profile() {
     setAvatarPreview(previewUrl);
     
     // Log file details for debugging
-    console.log(`Selected avatar: ${file.name}, ${file.type}, ${Math.round(file.size / 1024)}KB`);
+    console.log(`[PROFILE UPLOAD] 📁 Selected avatar: ${file.name}, ${file.type}, ${Math.round(file.size / 1024)}KB`);
+    console.log(`[PROFILE UPLOAD] 🖼️ Avatar preview URL created: ${previewUrl.substring(0, 50)}...`);
   };
 
   const handleBackgroundChange = (e) => {
@@ -464,14 +483,14 @@ export default function Profile() {
     // Validate file is an image
     if (!file.type.startsWith('image/')) {
       setBackgroundUploadError('File must be an image');
-      console.error('File must be an image');
+      console.error('[PROFILE UPLOAD] ❌ Background file must be an image');
       return;
     }
     
     // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       setBackgroundUploadError('File must be less than 2MB');
-      console.error('File must be less than 2MB');
+      console.error('[PROFILE UPLOAD] ❌ Background file must be less than 2MB');
       return;
     }
     
@@ -482,7 +501,8 @@ export default function Profile() {
     setBackgroundPreview(previewUrl);
     
     // Log file details for debugging
-    console.log(`Selected background: ${file.name}, ${file.type}, ${Math.round(file.size / 1024)}KB`);
+    console.log(`[PROFILE UPLOAD] 📁 Selected background: ${file.name}, ${file.type}, ${Math.round(file.size / 1024)}KB`);
+    console.log(`[PROFILE UPLOAD] 🎨 Background preview URL created: ${previewUrl.substring(0, 50)}...`);
   };
 
   // Upload avatar with better error handling
@@ -732,174 +752,45 @@ export default function Profile() {
     }
   };
 
-  // Update handleSaveProfile to handle image changes directly and display errors clearly
+  // Updated handleSaveProfile to use background processing like create post
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setSaveError(null);
     setAvatarUploadError(null);
     setBackgroundUploadError(null);
     
-    // Close modal immediately and show optimistic UI
-    setShowEditModal(false);
-    // Show background saving indicator
-    setIsSaving(true);
-    setIsUploading(true);
-    
-    // Note: Profile will be updated after successful save via updateProfile function
-    
     try {
-      // Upload avatar and background images if selected
-      let newAvatarUrl = null;
-      let newBackgroundUrl = null;
+      // Submit to background processing
+      const taskId = await submitProfileEdit(formData, avatarFile, backgroundFile);
       
-      // Process uploads concurrently if both files are present
-      if (avatarFile && backgroundFile) {
-        try {
-          console.log('Uploading both avatar and background files...');
-          
-          // Use Promise.allSettled to handle partial failures
-          const results = await Promise.allSettled([
-            uploadAvatar(),
-            uploadBackground()
-          ]);
-          
-          // Handle results
-          if (results[0].status === 'fulfilled') {
-            newAvatarUrl = results[0].value;
-            console.log('Avatar upload succeeded:', newAvatarUrl);
-          } else {
-            console.error('Avatar upload failed:', results[0].reason);
-            // Error is already set by uploadAvatar
-          }
-          
-          if (results[1].status === 'fulfilled') {
-            newBackgroundUrl = results[1].value;
-            console.log('Background upload succeeded:', newBackgroundUrl);
-          } else {
-            console.error('Background upload failed:', results[1].reason);
-            // Error is already set by uploadBackground
-          }
-          
-          // If both failed, stop the save process
-          if (results[0].status === 'rejected' && results[1].status === 'rejected') {
-            setSaveError('Failed to upload images. Please try again.');
-            setIsSaving(false);
-            setIsUploading(false);
-            return;
-          }
-          
-        } catch (uploadError) {
-          console.error('Error during file uploads:', uploadError);
-          setSaveError('Error uploading images. Please try again.');
-          setIsSaving(false);
-          setIsUploading(false);
-          return;
-        }
-      } else {
-        // Process individual uploads if needed
-        if (avatarFile) {
-          try {
-            console.log('Uploading only avatar file...');
-            const url = await uploadAvatar();
-            newAvatarUrl = url;
-            console.log('Avatar URL after upload (for database):', newAvatarUrl);
-            // URL is already set in uploadAvatar function
-          } catch (avatarError) {
-            console.error('Error uploading avatar:', avatarError);
-            // Error is already set by uploadAvatar
-            if (!backgroundFile) {
-              setIsSaving(false);
-              setIsUploading(false);
-              return;
-            }
-          }
-        }
-        
-        if (backgroundFile) {
-          try {
-            console.log('Uploading only background file...');
-            const url = await uploadBackground();
-            newBackgroundUrl = url;
-            console.log('Background URL after upload (for database):', newBackgroundUrl);
-            // URL is already set in uploadBackground function
-          } catch (backgroundError) {
-            console.error('Error uploading background:', backgroundError);
-            // Error is already set by uploadBackground
-            if (!avatarFile || avatarUploadError) {
-              setIsSaving(false);
-              setIsUploading(false);
-              return;
-            }
-          }
-        }
+      console.log(`[PROFILE EDIT] 🚀 Profile edit submitted to background processing: ${taskId}`);
+      console.log(`[PROFILE EDIT] 📋 Form data:`, formData);
+      
+      if (avatarFile) {
+        console.log(`[PROFILE EDIT] 📁 Avatar file: ${avatarFile.name} (${Math.round(avatarFile.size / 1024)}KB)`);
       }
       
-      // Check if there are any successful uploads to continue with
-      if (avatarFile && !newAvatarUrl && backgroundFile && !newBackgroundUrl) {
-        console.log('No successful uploads to save');
-        setIsSaving(false);
-        setIsUploading(false);
-        return;
+      if (backgroundFile) {
+        console.log(`[PROFILE EDIT] 🎨 Background file: ${backgroundFile.name} (${Math.round(backgroundFile.size / 1024)}KB)`);
       }
       
-      // Prepare the profile update data
-      const updateData = {
-        ...formData
-      };
+      // Close modal immediately - user can continue using the app
+      setShowEditModal(false);
       
-      // Add any new image URLs to the update data
-      if (newAvatarUrl) {
-        updateData.avatar_url = newAvatarUrl.split('?')[0]; // Remove cache busting
-        console.log('Adding avatar_url to update data:', updateData.avatar_url);
-      }
+      // Reset form state
+      setAvatarFile(null);
+      setBackgroundFile(null);
+      setAvatarPreview(null);
+      setBackgroundPreview(null);
       
-      if (newBackgroundUrl) {
-        updateData.background_url = newBackgroundUrl.split('?')[0]; // Remove cache busting
-        console.log('Adding background_url to update data:', updateData.background_url);
-      }
-      
-      console.log('Updating profile with data:', updateData);
-      
-      // Save the profile updates to Supabase
-      const { success, error } = await updateProfile(updateData);
-      
-      if (error) {
-        console.error('Error updating profile in Supabase:', error);
-        setSaveError(error.message || 'Failed to update profile. Please try again.');
-        setIsUploading(false);
-        return;
-      }
-      
-      console.log('Profile updated successfully in Supabase');
-      
-      // Just update the context data without refreshing images
-      await refreshData(user.id);
-      
-      console.log('Profile updated successfully in background');
-      
-      // Show success notification
+      // Show success message
       if (typeof window !== 'undefined') {
-        // You can implement a toast notification here
-        console.log('✅ Profile updated successfully!');
+        console.log('✅ Profile edit submitted to background processing - check floating indicator for progress');
       }
       
     } catch (error) {
-      console.error('Error in handleSaveProfile:', error);
-      
-      // Revert optimistic update if failed
-      if (profile) {
-        await refreshData(user.id);
-      }
-      
-      setSaveError(error.message || 'An unexpected error occurred. Please try again.');
-      
-      // Show error notification
-      if (typeof window !== 'undefined') {
-        console.error('❌ Failed to update profile:', error.message);
-      }
-    } finally {
-      setIsSaving(false);
-      setIsUploading(false);
+      console.error('Error submitting profile edit:', error);
+      setSaveError(error.message || 'Failed to submit profile update. Please try again.');
     }
   };
 
@@ -1089,171 +980,13 @@ export default function Profile() {
             </div>
           </div>
           
-          {/* Social Icons */}
-          {profile?.show_facebook && profile?.facebook_url && (
-            <div className={styles.socialIcons}>
-              <a 
-                href={profile.facebook_url} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className={styles.socialIcon}
-                aria-label="Facebook Profile"
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                </svg>
-              </a>
-            </div>
-          )}
-        </div>
-      </div>
-      {/* Subscription Info Section */}
-      <div className={styles.subscriptionInfo}>
-        <div className={styles.subscriptionCard}>
-          <div className={styles.planHeader}>
-            <span className={styles.planBadge} data-plan={subscriptionInfo?.plan_name || 'free'}>
-              {isPro ? '⭐ Pro' : '🆓 Free'} Plan
-            </span>
-            {subscriptionInfo?.subscription_status === 'active' && (
-              <span className={styles.statusBadge}>Active</span>
-            )}
+          {/* Social Links */}
+          <div className={styles.socialLinksContainer}>
+            <SocialLinks profile={profile} size="normal" />
           </div>
-          
-          {subscriptionLoading ? (
-            <div className={styles.loadingContainer}>
-              <div className={styles.loadingSpinner} />
-              <p>Loading subscription info...</p>
-            </div>
-          ) : null}
-          
-          {!isPro && (
-            <div className={styles.upgradePrompt}>
-              <p>Upgrade to Pro for more features!</p>
-              <Link href="/pricing" className={styles.upgradeButton}>
-                Upgrade to Pro 🚀
-              </Link>
-            </div>
-          )}
-          
-          {isPro && subscriptionInfo?.end_date && (
-            <div className={styles.billingInfo}>
-              <span>Next billing: {new Date(subscriptionInfo.end_date).toLocaleDateString()}</span>
-            </div>
-          )}
-          
-          {/* Modern Subscription Details */}
-          {subscriptionInfo && !subscriptionLoading && (
-            <div className={styles.modernCard} style={{ position: 'relative' }}>
-              {subscriptionSyncing && (
-                <div className={styles.syncingBadge}>
-                  <div style={{ 
-                    width: '8px', 
-                    height: '8px', 
-                    borderRadius: '50%', 
-                    backgroundColor: 'currentColor',
-                    animation: 'pulse 1.5s ease-in-out infinite' 
-                  }} />
-                  Syncing...
-                </div>
-              )}
-              <h4 className={styles.detailsTitle}>
-                Subscription Details
-              </h4>
-              <div className={styles.detailsGrid}>
-                {subscriptionInfo.plan_id && (
-                  <div className={styles.detailsRow}>
-                    <span className={styles.detailsLabel}>Plan ID</span>
-                    <span className={`${styles.detailsValue} ${styles.mono}`}>
-                      {subscriptionInfo.plan_id}
-                    </span>
-                  </div>
-                )}
-                
-                {subscriptionInfo.user_id && (
-                  <div className={styles.detailsRow}>
-                    <span className={styles.detailsLabel}>User ID</span>
-                    <span className={`${styles.detailsValue} ${styles.mono}`}>
-                      {subscriptionInfo.user_id}
-                    </span>
-                  </div>
-                )}
-                
-                <div className={styles.detailsRow}>
-                  <span className={styles.detailsLabel}>Plan Name</span>
-                  <span className={styles.detailsValue} style={{ color: isPro ? '#0f9d58' : undefined, textTransform: 'capitalize' }}>
-                    {subscriptionInfo.plan_display_name || subscriptionInfo.plan_name || 'Free'}
-                  </span>
-                </div>
-                
-                <div className={styles.detailsRow}>
-                  <span className={styles.detailsLabel}>Status</span>
-                  <span className={`${styles.detailsValue} ${subscriptionInfo.subscription_status === 'active' ? styles.statusActive : styles.statusInactive}`} style={{ textTransform: 'capitalize' }}>
-                    {subscriptionInfo.subscription_status || 'Active'}
-                  </span>
-                </div>
-                
-                {subscriptionInfo.start_date && (
-                  <div className={styles.detailsRow}>
-                    <span className={styles.detailsLabel}>Start Date</span>
-                    <span className={styles.detailsValue}>
-                      {new Date(subscriptionInfo.start_date).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short', 
-                        day: 'numeric'
-                      })}
-                    </span>
-                  </div>
-                )}
-                
-                {subscriptionInfo.end_date && (
-                  <div className={styles.detailsRow}>
-                    <span className={styles.detailsLabel}>End Date</span>
-                    <span className={styles.detailsValue}>
-                      {new Date(subscriptionInfo.end_date).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short', 
-                        day: 'numeric'
-                      })}
-                    </span>
-                  </div>
-                )}
-
-                {/* Price Checks Progress Bar */}
-                <div className={styles.progressBlock}>
-                  <div className={styles.progressHeader}>
-                    <span className={styles.progressLabel}>📊 Price Checks</span>
-                    <span className={styles.progressCount} style={{ color: (subscriptionInfo.price_checks_used || 0) >= (subscriptionInfo.price_check_limit || 50) ? '#dc2626' : undefined }}>
-                      {subscriptionInfo.price_checks_used || 0} / {subscriptionInfo.price_check_limit || 50}
-                    </span>
-                  </div>
-                  <div className={styles.progressTrack}>
-                    <div
-                      className={`${styles.progressFill} ${ (subscriptionInfo.price_checks_used || 0) >= (subscriptionInfo.price_check_limit || 50) ? styles.fillRed : (isPro ? styles.fillGreen : styles.fillBlue) }`}
-                      style={{ width: `${((subscriptionInfo.price_checks_used || 0) / (subscriptionInfo.price_check_limit || 50)) * 100}%` }}
-                    />
-                  </div>
-                </div>
-                
-                {/* Posts Progress Bar */}
-                <div className={styles.progressBlock}>
-                  <div className={styles.progressHeader}>
-                    <span className={styles.progressLabel}>📝 Posts Created</span>
-                    <span className={styles.progressCount}>
-                      {subscriptionInfo.posts_created || 0} / {subscriptionInfo.post_creation_limit || 100}
-                    </span>
-                  </div>
-                  <div className={styles.progressTrack}>
-                    <div
-                      className={`${styles.progressFill} ${ isPro ? styles.fillGreen : styles.fillBlue }`}
-                      style={{ width: `${((subscriptionInfo.posts_created || 0) / (subscriptionInfo.post_creation_limit || 100)) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
+      {/* Subscription Details moved to Background Process Drawer - access via floating button */}
 
       {/* Unified Dashboard Section */}
       <DashboardSection />
@@ -1309,6 +1042,46 @@ export default function Profile() {
             {/* زر التحقق من أسعار المنشورات */}
             <CheckPostPricesButton userId={user?.id} />
             
+            {/* View Mode Toggle */}
+            <div className={styles.viewControls}>
+              <div className={styles.viewToggle}>
+                <button
+                  className={`${styles.viewButton} ${viewMode === 'list' ? styles.activeView : ''}`}
+                  onClick={() => {
+                    console.log('Setting viewMode to list');
+                    setViewMode('list');
+                  }}
+                  aria-label="List view"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                  </svg>
+                  List
+                </button>
+                <button
+                  className={`${styles.viewButton} ${viewMode === 'grid' ? styles.activeView : ''}`}
+                  onClick={() => {
+                    console.log('Setting viewMode to grid');
+                    setViewMode('grid');
+                  }}
+                  aria-label="Grid view"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                  </svg>
+                  Grid
+                </button>
+              </div>
+            </div>
+
             <div className={styles.filterControls}>
               <div className={styles.filterItem}>
                 <label htmlFor="strategyFilter" className={styles.filterLabel}>Strategy:</label>
@@ -1440,11 +1213,37 @@ export default function Profile() {
                     <option value="">All Symbols</option>
                     {discoveredSymbols
                       .filter((s) => !selectedCountry || String(s.Country || '').toLowerCase() === String(selectedCountry).toLowerCase())
-                      .map((s) => (
-                        <option key={s.uniqueId || s.Symbol} value={s.Symbol}>
-                          {`${s.Symbol} ${s.Name ? `— ${s.Name}` : ''}`}
-                        </option>
-                      ))}
+                      .map((s) => {
+                        const countryCode = s.Country ? s.Country.toLowerCase() : null;
+                        // Simple flag emoji mapping for common countries
+                        const flagEmoji = countryCode === 'us' ? '🇺🇸' :
+                                        countryCode === 'gb' ? '🇬🇧' :
+                                        countryCode === 'de' ? '🇩🇪' :
+                                        countryCode === 'fr' ? '🇫🇷' :
+                                        countryCode === 'jp' ? '🇯🇵' :
+                                        countryCode === 'cn' ? '🇨🇳' :
+                                        countryCode === 'ca' ? '🇨🇦' :
+                                        countryCode === 'au' ? '🇦🇺' :
+                                        countryCode === 'in' ? '🇮🇳' :
+                                        countryCode === 'br' ? '🇧🇷' :
+                                        countryCode === 'mx' ? '🇲🇽' :
+                                        countryCode === 'kr' ? '🇰🇷' :
+                                        countryCode === 'it' ? '🇮🇹' :
+                                        countryCode === 'es' ? '🇪🇸' :
+                                        countryCode === 'nl' ? '🇳🇱' :
+                                        countryCode === 'ch' ? '🇨🇭' :
+                                        countryCode === 'se' ? '🇸🇪' :
+                                        countryCode === 'no' ? '🇳🇴' :
+                                        countryCode === 'dk' ? '🇩🇰' :
+                                        countryCode === 'fi' ? '🇫🇮' :
+                                        '🌍'; // Default globe emoji
+                        
+                        return (
+                          <option key={s.uniqueId || s.Symbol} value={s.Symbol}>
+                            {`${s.Symbol} ${flagEmoji}`}
+                          </option>
+                        );
+                      })}
                   </select>
 
                   {selectedSymbol && !filterLoading && (
@@ -1495,19 +1294,20 @@ export default function Profile() {
               )}
             </div>
 
-            <div className={styles.postsGrid}>
-              <PostsFeed
-                mode="profile"
-                userId={profile?.id || user?.id}
-                hideControls={true}
-                showFlagBackground={true}
-                hideUserInfo={true}
-                selectedStrategy={localSelectedStrategy || ''}
-                selectedStatus={selectedStatus}
-                selectedCountry={selectedCountry}
-                selectedSymbol={selectedSymbol}
-              />
-            </div>
+            {/* Debug: Log current viewMode */}
+            {console.log('Profile page viewMode before passing to PostsFeed:', viewMode)}
+            <PostsFeed
+              mode="profile"
+              userId={profile?.id || user?.id}
+              hideControls={true}
+              showFlagBackground={true}
+              hideUserInfo={true}
+              selectedStrategy={localSelectedStrategy || ''}
+              selectedStatus={selectedStatus}
+              selectedCountry={selectedCountry}
+              selectedSymbol={selectedSymbol}
+              viewMode={viewMode}
+            />
           </>
         )}
         
@@ -1686,8 +1486,8 @@ export default function Profile() {
       
       {/* Edit Profile Modal */}
       {showEditModal && (
-        <div className={editStyles.modalOverlay}>
-          <div className={editStyles.modalContent}>
+        <div className={editStyles.modalOverlay} onClick={handleCloseModal}>
+          <div className={editStyles.modalContent} onClick={(e) => e.stopPropagation()}>
             <div className={editStyles.modalHeader}>
               <h2 className={editStyles.modalTitle}>Edit Profile</h2>
               <button className={editStyles.closeButton} onClick={handleCloseModal} disabled={isSaving}>×</button>
@@ -1747,19 +1547,9 @@ export default function Profile() {
               </div>
               
               <div className={editStyles.formGroup}>
-                <div className={editStyles.facebookSection}>
-                  <div className={editStyles.checkboxGroup}>
-                    <input
-                      type="checkbox"
-                      id="show_facebook"
-                      name="show_facebook"
-                      checked={formData.show_facebook}
-                      onChange={handleInputChange}
-                      disabled={isSaving}
-                    />
-                    <label htmlFor="show_facebook">Show Facebook icon on profile</label>
-                  </div>
-                  <div className={editStyles.facebookInput}>
+                <label>Social Links</label>
+                <div className={editStyles.socialLinksSection}>
+                  <div className={editStyles.socialInput}>
                     <label htmlFor="facebook_url">Facebook URL</label>
                     <input
                       type="url"
@@ -1769,6 +1559,30 @@ export default function Profile() {
                       onChange={handleInputChange}
                       disabled={isSaving}
                       placeholder="https://facebook.com/your-profile"
+                    />
+                  </div>
+                  <div className={editStyles.socialInput}>
+                    <label htmlFor="telegram_url">Telegram URL</label>
+                    <input
+                      type="url"
+                      id="telegram_url"
+                      name="telegram_url"
+                      value={formData.telegram_url}
+                      onChange={handleInputChange}
+                      disabled={isSaving}
+                      placeholder="https://t.me/your-channel"
+                    />
+                  </div>
+                  <div className={editStyles.socialInput}>
+                    <label htmlFor="youtube_url">YouTube URL</label>
+                    <input
+                      type="url"
+                      id="youtube_url"
+                      name="youtube_url"
+                      value={formData.youtube_url}
+                      onChange={handleInputChange}
+                      disabled={isSaving}
+                      placeholder="https://youtube.com/@your-channel"
                     />
                   </div>
                 </div>
@@ -1924,6 +1738,8 @@ export default function Profile() {
           </div>
         </div>
       )}
+      
+      {/* Background indicators removed - now handled by UnifiedBackgroundProcessDrawer */}
     </div>
   );
 }

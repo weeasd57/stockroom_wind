@@ -13,6 +13,28 @@ alwaysApply: true
 - Suggest better system designs and algorithms, not just code fixes.
 - Respect the existing codebase structure and coding style.
 
+
+⚡ Next.js Specific Rules
+- Always handle server-side rendering (SSR) vs client-side rendering (CSR) differences.
+- Use `"use client"` directive for components that need browser APIs.
+- Implement proper hydration strategies for authentication providers.
+- Handle middleware authentication checks properly for API routes.
+- Use dynamic imports with `ssr: false` for client-only components when needed.
+- Monitor and debug useEffect execution in both server and client contexts.
+- Implement fallback loading states for client-side mounted components.
+
+🚫 Constraints
+- Do NOT run or suggest running a local server.
+- Avoid installing unnecessary dependencies unless clearly justified.
+- Never ignore hydration mismatches - always fix them properly.
+
+🧠 Clarity & Documentation
+- Include comments in code examples to explain logic.
+- Suggest better naming conventions and improve code readability.
+- Break large logic blocks into small, purposeful functions.
+- Ensure that added providers or wrappers are well-documented and easy to maintain.
+- Document authentication flow and state management clearly.
+
 💡 Code Quality & Design
 - Follow React and Next.js best practices.
 - Use modern, responsive, clean architecture for frontend and backend.
@@ -63,23 +85,34 @@ alwaysApply: true
 - **Response Times**: Monitor response times for performance issues (should be under 5 seconds)
 - **Error Pages**: Test 404 routes with `curl -I http://localhost:3000/nonexistent` (Should return 404)
 
-⚡ Next.js Specific Rules
-- Always handle server-side rendering (SSR) vs client-side rendering (CSR) differences.
-- Use `"use client"` directive for components that need browser APIs.
-- Implement proper hydration strategies for authentication providers.
-- Handle middleware authentication checks properly for API routes.
-- Use dynamic imports with `ssr: false` for client-only components when needed.
-- Monitor and debug useEffect execution in both server and client contexts.
-- Implement fallback loading states for client-side mounted components.
+🤖 Automated Testing Protocol
+- **ALWAYS implement automated self-testing** for any new feature or background function
+- **DO NOT ask user to run console commands** - create automated test functions instead
+- **Auto-validate** all background processes (profile edit, price checks, post creation, etc.)
+- **Implement error recovery** with automatic retry mechanisms
+- **Monitor console outputs** and handle errors programmatically
+- **Create test scenarios** that simulate real user interactions
+- **Add debug modes** with comprehensive logging for troubleshooting
+- **Use synthetic test data** when real data is not available
+- **Implement health checks** for all critical background functions
+- **Auto-report test results** with clear pass/fail status and error details
 
-🚫 Constraints
-- Do NOT run or suggest running a local server.
-- Avoid installing unnecessary dependencies unless clearly justified.
-- Never ignore hydration mismatches - always fix them properly.
+🔄 Background Function Testing Requirements
+- **Profile Edit Testing**: Auto-test avatar upload, background upload, profile data saving
+- **Price Check Testing**: Auto-test API calls, data parsing, database updates
+- **Post Creation Testing**: Auto-test image compression, content validation, database insertion
+- **Subscription Testing**: Auto-test plan limits, usage tracking, billing status
+- **Authentication Testing**: Auto-test login flows, session management, token refresh
+- **API Integration Testing**: Auto-test all external API endpoints with mock data
+- **Database Testing**: Auto-test CRUD operations with transaction rollback
+- **Error Handling Testing**: Auto-test failure scenarios and recovery mechanisms
 
-🧠 Clarity & Documentation
-- Include comments in code examples to explain logic.
-- Suggest better naming conventions and improve code readability.
-- Break large logic blocks into small, purposeful functions.
-- Ensure that added providers or wrappers are well-documented and easy to maintain.
-- Document authentication flow and state management clearly.
+🎯 Testing Automation Strategy
+- **Self-contained tests** that run without user intervention
+- **Mock external dependencies** to ensure reliable testing
+- **Automatic test execution** on feature implementation
+- **Comprehensive error reporting** with actionable insights
+- **Performance benchmarking** with automatic alerts for degradation
+- **Cross-browser compatibility** testing for frontend features
+- **Load testing** for backend functions under stress
+- **Security testing** for authentication and authorization flows

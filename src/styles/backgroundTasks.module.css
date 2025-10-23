@@ -1,0 +1,206 @@
+/* Background Tasks Indicator Styles */
+
+.backgroundTasks {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 1000;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 300px;
+  max-width: 400px;
+  max-height: 300px;
+  overflow: hidden;
+}
+
+.tasksHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / 0.5);
+}
+
+.tasksHeader h4 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.clearButton {
+  background: none;
+  border: none;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.clearButton:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.tasksList {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.taskItem {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid hsl(var(--border));
+  transition: background-color 0.2s ease;
+}
+
+.taskItem:last-child {
+  border-bottom: none;
+}
+
+.taskItem.pending,
+.taskItem.uploading_avatar,
+.taskItem.uploading_background,
+.taskItem.saving_profile {
+  background: linear-gradient(90deg, hsl(var(--primary) / 0.1) 0%, transparent 100%);
+}
+
+.taskItem.completed {
+  background: linear-gradient(90deg, hsl(var(--success) / 0.1) 0%, transparent 100%);
+}
+
+.taskItem.failed {
+  background: linear-gradient(90deg, hsl(var(--destructive) / 0.1) 0%, transparent 100%);
+}
+
+.taskHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.taskIcon {
+  font-size: 1rem;
+  width: 20px;
+  text-align: center;
+}
+
+.taskStatus {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+}
+
+.taskActions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.retryButton,
+.removeButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.retryButton {
+  color: hsl(var(--primary));
+}
+
+.retryButton:hover {
+  background: hsl(var(--primary) / 0.1);
+}
+
+.removeButton {
+  color: hsl(var(--muted-foreground));
+}
+
+.removeButton:hover {
+  background: hsl(var(--destructive) / 0.1);
+  color: hsl(var(--destructive));
+}
+
+.taskError {
+  font-size: 0.75rem;
+  color: hsl(var(--destructive));
+  margin-top: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: hsl(var(--destructive) / 0.1);
+  border-radius: 4px;
+  border-left: 3px solid hsl(var(--destructive));
+}
+
+.progressBar {
+  width: 100%;
+  height: 4px;
+  background: hsl(var(--muted));
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.7) 100%);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  position: relative;
+}
+
+.progressFill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 640px) {
+  .backgroundTasks {
+    bottom: 0.5rem;
+    right: 0.5rem;
+    left: 0.5rem;
+    min-width: unset;
+  }
+  
+  .tasksHeader h4 {
+    font-size: 0.85rem;
+  }
+  
+  .taskStatus {
+    font-size: 0.8rem;
+  }
+}

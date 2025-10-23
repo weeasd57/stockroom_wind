@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useRef, useState, useEffect } from 'react';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
 import styles from '@/styles/view-profile.module.css';
@@ -9,11 +9,11 @@ import { useFollow } from '@/providers/FollowProvider';
 import PostCard from '@/components/posts/PostCard';
 import PostsFeed from '@/components/home/PostsFeed';
 import TelegramSubscribeButton from '@/components/telegram/TelegramSubscribeButton';
+import SocialLinks from '@/components/profile/SocialLinks';
 
 // Local cache for profile data
 const profileCache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
 export default function ViewProfile({ params }) {
   const { supabase, isAuthenticated, user } = useSupabase();
   const router = useRouter();
@@ -43,6 +43,8 @@ export default function ViewProfile({ params }) {
   const [error, setError] = useState(null);
   const [avatarError, setAvatarError] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(true);
+  const [hasTelegramBot, setHasTelegramBot] = useState(false);
+  const [telegramBotLoading, setTelegramBotLoading] = useState(true);
 
   // Fetch profile data
   useEffect(() => {
@@ -115,7 +117,7 @@ export default function ViewProfile({ params }) {
             () =>
               supabase
                 .from('profiles')
-                .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts')
+                .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts, facebook_url, telegram_url, youtube_url')
                 .eq('id', userId)
                 .maybeSingle()
                 .abortSignal(controller.signal)
@@ -129,7 +131,7 @@ export default function ViewProfile({ params }) {
               () =>
                 supabase
                   .from('profiles')
-                  .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts')
+                  .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts, facebook_url, telegram_url, youtube_url')
                   .eq('id', userId)
                   .maybeSingle()
                   .abortSignal(controller.signal),
@@ -237,6 +239,37 @@ export default function ViewProfile({ params }) {
       isCancelled = true;
       controller.abort();
     };
+  }, [userId, supabase]);
+
+  // Check if user has active Telegram bot
+  useEffect(() => {
+    if (!userId || !supabase) return;
+
+    const checkTelegramBot = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('telegram_bots')
+          .select('id, is_active, bot_token')
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error checking telegram bot:', error);
+          setHasTelegramBot(false);
+        } else {
+          // User has telegram bot if data exists and has bot_token
+          setHasTelegramBot(data && data.bot_token ? true : false);
+        }
+      } catch (error) {
+        console.error('Error in checkTelegramBot:', error);
+        setHasTelegramBot(false);
+      } finally {
+        setTelegramBotLoading(false);
+      }
+    };
+
+    checkTelegramBot();
   }, [userId, supabase]);
 
   // Use effect to check follow status using the FollowProvider
@@ -420,24 +453,40 @@ export default function ViewProfile({ params }) {
                   >
                     {followLoading ? (isFollowing ? 'Unfollowing...' : 'Following...') : (isFollowing ? 'Unfollow' : 'Follow')}
                   </button>
-                  <TelegramSubscribeButton 
-                    userId={userId} 
-                    username={profileData?.username || 'User'} 
-                  />
+                  {/* Show Telegram button only if user has active bot */}
+                  {telegramBotLoading ? (
+                    <div className={styles.telegramButtonSkeleton}></div>
+                  ) : hasTelegramBot ? (
+                    <TelegramSubscribeButton 
+                      userId={userId} 
+                      username={profileData?.username || 'User'} 
+                    />
+                  ) : null}
+                  <div style={{ marginTop: '1rem' }}>
+                    <SocialLinks profile={profileData} size="small" />
+                  </div>
                 </>
               )
             ) : (
               <>
                 <button 
-                  onClick={() => router.push('/login')} 
+                  onClick={() => router.push('/login')}
                   className={styles.loginToFollowButton}
                 >
                   Login to follow
                 </button>
-                <TelegramSubscribeButton 
-                  userId={userId} 
-                  username={profileData?.username || 'User'} 
-                />
+                {/* Show Telegram button only if user has active bot */}
+                {telegramBotLoading ? (
+                  <div className={styles.telegramButtonSkeleton}></div>
+                ) : hasTelegramBot ? (
+                  <TelegramSubscribeButton 
+                    userId={userId} 
+                    username={profileData?.username || 'User'} 
+                  />
+                ) : null}
+                <div style={{ marginTop: '1rem' }}>
+                  <SocialLinks profile={profileData} size="small" />
+                </div>
               </>
             )}
           </div>

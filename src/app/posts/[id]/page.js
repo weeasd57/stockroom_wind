@@ -197,11 +197,14 @@ export default function PostDetailsPage() {
     
     // Sort by date descending (newest first)
     return [...parsedChecks].sort((a, b) => {
-      return new Date(b.date) - new Date(a.date);
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
   };
   
   useEffect(() => {
+    // Wait until we have a valid id, then guard against double-fetch
+    if (!id) return;
+
     async function fetchPost() {
       try {
         setLoading(true);
@@ -239,9 +242,8 @@ export default function PostDetailsPage() {
       }
     }
     
-    if (id) {
-      fetchPost();
-    }
+    // id is guaranteed truthy here
+    fetchPost();
   }, [id]);
   
   if (loading) {

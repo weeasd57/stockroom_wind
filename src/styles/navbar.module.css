@@ -27,6 +27,8 @@
   align-items: center;
   justify-content: space-between;
   position: relative;
+  min-height: var(--navbar-height, 70px);
+  width: 100%;
 }
 
 /* ==========================================================================
@@ -73,6 +75,7 @@
   display: inline-block;
   letter-spacing: -0.025em;
 }
+
 
 /* ==========================================================================
    Desktop Navigation
@@ -156,6 +159,7 @@
 }
 
 .userSection {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -257,8 +261,6 @@
   background: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
   border: none;
-  cursor: pointer;
-  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 8px hsl(var(--primary) / 0.2);
 }
 
@@ -266,6 +268,110 @@
   background: hsl(var(--primary) / 0.9);
   box-shadow: 0 4px 16px hsl(var(--primary) / 0.3);
   transform: translateY(-2px);
+}
+
+/* ==========================================================================
+   Profile Dropdown Menu
+   ========================================================================== */
+
+.profileDropdownTrigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.75rem;
+  background: hsl(var(--muted) / 0.5);
+  border: 1px solid hsl(var(--border));
+  cursor: pointer;
+  transition: all var(--animation-normal) var(--animation-ease);
+  color: hsl(var(--foreground));
+}
+
+.profileDropdownTrigger:hover {
+  background: hsl(var(--muted));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dropdownArrow {
+  font-size: 0.625rem;
+  color: hsl(var(--muted-foreground));
+  transition: transform var(--animation-normal) var(--animation-ease);
+  margin-left: 0.25rem;
+}
+
+.profileDropdownTrigger:hover .dropdownArrow {
+  transform: translateY(-1px);
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  min-width: 200px;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1), 0 4px 10px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px) scale(0.95);
+  transition: all var(--animation-normal) var(--animation-ease);
+  margin-top: 0.5rem;
+}
+
+.dropdownMenu.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  text-decoration: none;
+  color: hsl(var(--foreground));
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all var(--animation-fast) var(--animation-ease);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.dropdownItem:first-child {
+  border-radius: 0.75rem 0.75rem 0 0;
+}
+
+.dropdownItem:last-child {
+  border-radius: 0 0 0.75rem 0.75rem;
+}
+
+.dropdownItem:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--primary));
+}
+
+.dropdownIcon {
+  font-size: 1rem;
+  opacity: 0.8;
+  transition: all var(--animation-fast) var(--animation-ease);
+}
+
+.dropdownItem:hover .dropdownIcon {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.dropdownDivider {
+  height: 1px;
+  background: hsl(var(--border));
+  margin: 0.25rem 0;
 }
 
 /* ==========================================================================
@@ -552,7 +658,20 @@
   }
 
   .container {
-    padding: 0 1.5rem;
+    padding: 0 1.25rem;
+  }
+
+  .logoText {
+    font-size: 1.4rem;
+  }
+
+  .navList {
+    gap: 1.75rem;
+  }
+
+  .navLink {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.9rem;
   }
 }
 
@@ -562,7 +681,16 @@
   }
 
   .navList {
-    gap: 2.5rem;
+    gap: 2.25rem;
+  }
+
+  .navLink {
+    padding: 0.5rem 1rem;
+    font-size: 0.95rem;
+  }
+
+  .logoText {
+    font-size: 1.5rem;
   }
 
   .profileText {
@@ -570,7 +698,8 @@
   }
 }
 
-@media (max-width: 767px) {
+/* Small tablets and large mobile devices */
+@media (min-width: 480px) and (max-width: 767px) {
   .container {
     padding: 0 1rem;
   }
@@ -583,11 +712,29 @@
     gap: 0.5rem;
   }
 
-  .logoWrapper::before {
-    left: -4px;
-    top: -4px;
+  .logoImage {
     width: 36px;
     height: 36px;
+  }
+}
+
+
+@media (max-width: 479px) {
+  .container {
+    padding: 0 0.75rem;
+  }
+
+  .logoText {
+    font-size: 1.1rem;
+  }
+
+  .logoWrapper {
+    gap: 0.375rem;
+  }
+
+  .logoImage {
+    width: 32px;
+    height: 32px;
   }
 
   .profileText {
@@ -602,6 +749,21 @@
 
   .mobileMenuToggle {
     display: flex;
+  }
+
+  /* Better mobile menu spacing */
+  .mobileMenuContent {
+    padding: 1.25rem 0.75rem;
+  }
+
+  .mobileNavList {
+    gap: 0.375rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .mobileNavLink {
+    padding: 0.75rem;
+    font-size: 0.95rem;
   }
 }
 

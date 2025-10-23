@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { usePosts } from '@/providers/PostProvider'; // Add PostProvider for real-time updates
 import PostCard from '@/components/posts/PostCard';
 import styles from '@/styles/home/PostsFeed.module.css';
@@ -24,6 +24,8 @@ export function PostsFeed({
   selectedStatus = '',
   selectedCountry = '',
   selectedSymbol = '',
+  // Optional external viewMode (used by profile/view-profile)
+  viewMode: externalViewMode = null,
 } = {}) {
   
   // Get posts from PostProvider for real-time updates
@@ -34,6 +36,9 @@ export function PostsFeed({
   const [filter, setFilter] = useState('following'); // following, all, trending
   const [sortBy, setSortBy] = useState('date_desc'); // date_desc, date_asc, engagement, price_change
   const [categoryFilter, setCategoryFilter] = useState('all'); // all, buy, sell, analysis
+  const [internalViewMode, setInternalViewMode] = useState('list'); // list, grid
+  // Use external viewMode if provided, otherwise use internal state
+  const viewMode = externalViewMode || internalViewMode;
   // Removed local following cache; PostProvider handles 'following' filtering
 
   // Helpers for external filters
@@ -173,7 +178,22 @@ export function PostsFeed({
   // Use filtered posts instead of local posts state
   const posts = filteredAndSortedPosts;
 
-  console.log(`[PostsFeed] Rendering with ${posts.length} posts. Loading: ${loading}, Filter: ${filter}`);
+  // Throttle console logging to reduce spam (only log every 2 seconds)
+  const logRenderRef = useRef(null);
+  const lastLogTime = useRef(0);
+  
+  const throttledLog = () => {
+    const now = Date.now();
+    if (now - lastLogTime.current >= 2000) { // Only log every 2 seconds
+      console.log(`[PostsFeed] Rendering with ${posts.length} posts. Loading: ${loading}, Filter: ${filter}`);
+      lastLogTime.current = now;
+    }
+  };
+  
+  // Only log in development mode and throttled
+  if (process.env.NODE_ENV === 'development') {
+    throttledLog();
+  }
 
   // (refactor) helpers moved into PostCard
 
@@ -188,9 +208,9 @@ export function PostsFeed({
                 : (filter === 'following' ? 'Following Posts' : 'Recent Posts'))}
           </h2>
         </div>
-        <div className={styles.loadingContainer}>
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className={styles.postSkeleton}>
+        <div className={`${styles.loadingContainer} ${viewMode === 'grid' ? styles.gridView : styles.listView}`}>
+          {[...Array(viewMode === 'grid' ? 6 : 3)].map((_, i) => (
+            <div key={i} className={`${styles.postSkeleton} ${viewMode === 'grid' ? styles.gridSkeleton : ''}`}>
               <div className={styles.skeletonHeader}></div>
               <div className={styles.skeletonContent}></div>
               <div className={styles.skeletonFooter}></div>
@@ -289,26 +309,54 @@ export function PostsFeed({
               >
                 Following
               </button>
-              <button
+              <button 
                 className={`${styles.filterButton} ${filter === 'all' ? styles.active : ''}`}
                 onClick={() => setFilter('all')}
               >
                 All
               </button>
-              <button
+              <button 
                 className={`${styles.filterButton} ${filter === 'trending' ? styles.active : ''}`}
                 onClick={() => setFilter('trending')}
               >
                 Trending
               </button>
             </div>
+            {!externalViewMode && (
+              <div className={styles.viewToggle}>
+                <button 
+                  className={`${styles.viewButton} ${internalViewMode === 'list' ? styles.active : ''}`}
+                  onClick={() => setInternalViewMode('list')}
+                  title="List View"
+                >
+                  ☰
+                </button>
+                <button 
+                  className={`${styles.viewButton} ${internalViewMode === 'grid' ? styles.active : ''}`}
+                  onClick={() => setInternalViewMode('grid')}
+                  title="Grid View"
+                >
+                  ⋮⋮⋮
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      <div className={styles.postsContainer}>
+      <div 
+        className={`${styles.postsContainer} ${viewMode === 'grid' ? styles.gridView : styles.listView}`}
+        style={viewMode === 'grid' ? {
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+          gap: '20px',
+          alignItems: 'start'
+        } : {}}
+      >
+        {/* Debug: Log viewMode */}
+        {process.env.NODE_ENV === 'development' && console.log('PostsFeed viewMode:', viewMode)}
         {posts.map((post) => (
-          <PostCard key={post.id} post={post} showFlagBackground={showFlagBackground} hideUserInfo={hideUserInfo} />
+          <PostCard key={post.id} post={post} showFlagBackground={showFlagBackground} hideUserInfo={hideUserInfo} viewMode={viewMode} />
         ))}
       </div>
 

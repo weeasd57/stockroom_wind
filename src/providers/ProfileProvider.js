@@ -447,6 +447,29 @@ export function ProfileProvider({ children }) {
         setBackgroundUrl(updates.backgroundUrl);
       }
       
+      // Always trigger UI update for social media URLs to handle empty strings consistently
+      console.log('[ProfileProvider] 🔗 Social media URLs updated, triggering UI refresh');
+      if (typeof window !== 'undefined') {
+        // Ensure we use empty strings instead of null or undefined
+        const socialUpdateEvent = new CustomEvent('profileSocialLinksUpdated', {
+          detail: {
+            userId: user.id,
+            // Handle cases where updates might contain empty strings
+            // Use explicit empty string rather than relying on OR logic
+            facebook_url: updates.hasOwnProperty('facebook_url') ? (updates.facebook_url || '') : (data.facebook_url || ''),
+            telegram_url: updates.hasOwnProperty('telegram_url') ? (updates.telegram_url || '') : (data.telegram_url || ''),
+            youtube_url: updates.hasOwnProperty('youtube_url') ? (updates.youtube_url || '') : (data.youtube_url || ''),
+            timestamp: Date.now()
+          }
+        });
+        window.dispatchEvent(socialUpdateEvent);
+        console.log('[ProfileProvider] Social links updated:', {
+          facebook: updates.hasOwnProperty('facebook_url') ? (updates.facebook_url || '') : (data.facebook_url || ''),
+          telegram: updates.hasOwnProperty('telegram_url') ? (updates.telegram_url || '') : (data.telegram_url || ''),
+          youtube: updates.hasOwnProperty('youtube_url') ? (updates.youtube_url || '') : (data.youtube_url || '')
+        });
+      }
+      
       return { success: true, data };
     } catch (error) {
       console.error('Exception in updateProfile:', error);

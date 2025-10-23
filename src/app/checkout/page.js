@@ -455,12 +455,15 @@ export default function CheckoutPage() {
                 <span className="text-green-500">✓</span>
                 500 posts per month
               </li>
-             
+              <li className="flex items-center gap-2">
+                <span className="text-green-500">✓</span>
+                Telegram notifications: subscribe to traders you follow
+              </li>
+              
               <li className="flex items-center gap-2">
                 <span className="text-green-500">✓</span>
                 Priority support
               </li>
-              
             </ul>
           </div>
         </div>

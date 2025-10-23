@@ -37,11 +37,13 @@ export default function Navbar() {
   const [avatarUrl, setAvatarUrl] = useState('/default-avatar.svg');
   const [avatarLoading, setAvatarLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
   // Refs
   const lastAvatarRefresh = useRef(Date.now());
   const unsubscribeRef = useRef(null);
   const navRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   // Get navigation links based on authentication status
   const navLinks = navigationConfig[isAuthenticated ? 'authenticated' : 'unauthenticated'];
@@ -54,6 +56,9 @@ export default function Navbar() {
     const handleClickOutside = (event) => {
       if (navRef.current && !navRef.current.contains(event.target)) {
         setIsMenuOpen(false);
+      }
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
       }
     };
 
@@ -217,8 +222,13 @@ export default function Navbar() {
           <ModeToggle />
           
           {isAuthenticated ? (
-            <div className={styles.userSection}>
-              <Link href="/profile" className={styles.profileButton}>
+            <div className={styles.userSection} ref={dropdownRef}>
+              <button 
+                className={styles.profileDropdownTrigger}
+                onMouseEnter={() => setIsDropdownOpen(true)}
+                onMouseLeave={() => setIsDropdownOpen(false)}
+                aria-label="User menu"
+              >
                 <div className={styles.avatarWrapper}>
                   {avatarLoading ? (
                     <div className={styles.avatarSkeleton}>
@@ -242,26 +252,41 @@ export default function Navbar() {
                     </Avatar>
                   )}
                 </div>
-                <span className={styles.profileText}>Profile</span>
-              </Link>
-              
-              <button 
-                className={styles.logoutButton} 
-                onClick={handleLogoutClick}
-                disabled={isLoggingOut}
-              >
-                {isLoggingOut ? (
-                  <>
-                    <span className={styles.spinner} aria-hidden="true"></span>
-                    Logging out...
-                  </>
-                ) : (
-                  <>
-                    <span aria-hidden="true">👋</span>
-                    Logout
-                  </>
-                )}
+                <span className={styles.profileText}>
+                  {profile?.username || user?.email?.split('@')[0] || 'User'}
+                </span>
+                <span className={styles.dropdownArrow}>▼</span>
               </button>
+
+              {/* Dropdown Menu */}
+              <div 
+                className={`${styles.dropdownMenu} ${isDropdownOpen ? styles.open : ''}`}
+                onMouseEnter={() => setIsDropdownOpen(true)}
+                onMouseLeave={() => setIsDropdownOpen(false)}
+              >
+                <Link href="/profile" className={styles.dropdownItem}>
+                  <span className={styles.dropdownIcon}>👤</span>
+                  <span>View Profile</span>
+                </Link>
+                <div className={styles.dropdownDivider}></div>
+                <button 
+                  className={styles.dropdownItem}
+                  onClick={handleLogoutClick}
+                  disabled={isLoggingOut}
+                >
+                  {isLoggingOut ? (
+                    <>
+                      <span className={styles.spinner} aria-hidden="true"></span>
+                      <span>Logging out...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className={styles.dropdownIcon}>👋</span>
+                      <span>Logout</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           ) : (
             <Link href="/login" className={styles.signInButton}>

@@ -23,7 +23,19 @@ CREATE TABLE profiles (
     background_url TEXT NOT NULL,
     experience_score INTEGER NOT NULL,
     followers INTEGER NOT NULL,
-    following INTEGER NOT NULL
+    following INTEGER NOT NULL,
+    facebook_url TEXT,
+    telegram_url TEXT,
+    youtube_url TEXT,
+    CONSTRAINT check_facebook_url_format CHECK (
+        (facebook_url IS NULL) OR (facebook_url ~ '^https?://')
+    ),
+    CONSTRAINT check_telegram_url_format CHECK (
+        (telegram_url IS NULL) OR (telegram_url ~ '^https?://')
+    ),
+    CONSTRAINT check_youtube_url_format CHECK (
+        (youtube_url IS NULL) OR (youtube_url ~ '^https?://')
+    )
 );
 
 CREATE INDEX idx_profiles_created_at ON profiles(created_at DESC);
