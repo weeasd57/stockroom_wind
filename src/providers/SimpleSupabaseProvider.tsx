@@ -224,13 +224,27 @@ export function SimpleSupabaseProvider({ children }: SupabaseProviderProps) {
   
   // Posts functions
   const getPosts = useCallback(async (): Promise<any[]> => {
-    const { data, error } = await supabase.from('posts').select('*').order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('posts').select(`
+      *,
+      profile:profiles!posts_user_id_fkey (
+        id,
+        username,
+        avatar_url
+      )
+    `).order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];
   }, [supabase]);
   
   const getPostsPage = useCallback(async (params: { limit?: number; before?: string | null; userIds?: string[] }): Promise<any[]> => {
-    let query = supabase.from('posts').select('*');
+    let query = supabase.from('posts').select(`
+      *,
+      profile:profiles!posts_user_id_fkey (
+        id,
+        username,
+        avatar_url
+      )
+    `);
     
     if (params.limit) query = query.limit(params.limit);
     if (params.before) query = query.lt('created_at', params.before);

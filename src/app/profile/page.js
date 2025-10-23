@@ -154,11 +154,6 @@ export default function Profile() {
   const [filterLoading, setFilterLoading] = useState(false);
   const [backgroundUploadProgress, setBackgroundUploadProgress] = useState(0);
   const [viewMode, setViewMode] = useState('list'); // 'grid' or 'list'
-  
-  // Debug: Log viewMode changes
-  useEffect(() => {
-    console.log('viewMode changed to:', viewMode);
-  }, [viewMode]);
 
   // Helper function to ensure all values are strings for controlled inputs
   const sanitizeFormData = useCallback((profile) => ({
@@ -1047,10 +1042,7 @@ export default function Profile() {
               <div className={styles.viewToggle}>
                 <button
                   className={`${styles.viewButton} ${viewMode === 'list' ? styles.activeView : ''}`}
-                  onClick={() => {
-                    console.log('Setting viewMode to list');
-                    setViewMode('list');
-                  }}
+                  onClick={() => setViewMode('list')}
                   aria-label="List view"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1065,10 +1057,7 @@ export default function Profile() {
                 </button>
                 <button
                   className={`${styles.viewButton} ${viewMode === 'grid' ? styles.activeView : ''}`}
-                  onClick={() => {
-                    console.log('Setting viewMode to grid');
-                    setViewMode('grid');
-                  }}
+                  onClick={() => setViewMode('grid')}
                   aria-label="Grid view"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1294,8 +1283,6 @@ export default function Profile() {
               )}
             </div>
 
-            {/* Debug: Log current viewMode */}
-            {console.log('Profile page viewMode before passing to PostsFeed:', viewMode)}
             <PostsFeed
               mode="profile"
               userId={profile?.id || user?.id}

@@ -302,44 +302,58 @@ export function PostsFeed({
         </h2>
         {!(hideControls || userId) && (
           <div className={styles.controls}>
-            <div className={styles.filters}>
-              <button 
-                className={`${styles.filterButton} ${filter === 'following' ? styles.active : ''}`}
-                onClick={() => setFilter('following')}
-              >
-                Following
-              </button>
-              <button 
-                className={`${styles.filterButton} ${filter === 'all' ? styles.active : ''}`}
-                onClick={() => setFilter('all')}
-              >
-                All
-              </button>
-              <button 
-                className={`${styles.filterButton} ${filter === 'trending' ? styles.active : ''}`}
-                onClick={() => setFilter('trending')}
-              >
-                Trending
-              </button>
-            </div>
-            {!externalViewMode && (
-              <div className={styles.viewToggle}>
+            <div className={styles.filtersAndView}>
+              <div className={styles.filters}>
                 <button 
-                  className={`${styles.viewButton} ${internalViewMode === 'list' ? styles.active : ''}`}
-                  onClick={() => setInternalViewMode('list')}
-                  title="List View"
+                  className={`${styles.filterButton} ${filter === 'following' ? styles.active : ''}`}
+                  onClick={() => setFilter('following')}
                 >
-                  ☰
+                  Following
                 </button>
                 <button 
-                  className={`${styles.viewButton} ${internalViewMode === 'grid' ? styles.active : ''}`}
-                  onClick={() => setInternalViewMode('grid')}
-                  title="Grid View"
+                  className={`${styles.filterButton} ${filter === 'all' ? styles.active : ''}`}
+                  onClick={() => setFilter('all')}
                 >
-                  ⋮⋮⋮
+                  All
+                </button>
+                <button 
+                  className={`${styles.filterButton} ${filter === 'trending' ? styles.active : ''}`}
+                  onClick={() => setFilter('trending')}
+                >
+                  Trending
                 </button>
               </div>
-            )}
+              {!externalViewMode && (
+                <div className={styles.viewToggle}>
+                  <button 
+                    className={`${styles.viewButton} ${internalViewMode === 'list' ? styles.active : ''}`}
+                    onClick={() => setInternalViewMode('list')}
+                    title="List View"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="8" y1="6" x2="21" y2="6"></line>
+                      <line x1="8" y1="12" x2="21" y2="12"></line>
+                      <line x1="8" y1="18" x2="21" y2="18"></line>
+                      <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                      <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                      <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                    </svg>
+                  </button>
+                  <button 
+                    className={`${styles.viewButton} ${internalViewMode === 'grid' ? styles.active : ''}`}
+                    onClick={() => setInternalViewMode('grid')}
+                    title="Grid View"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="14" width="7" height="7"></rect>
+                      <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -353,8 +367,6 @@ export function PostsFeed({
           alignItems: 'start'
         } : {}}
       >
-        {/* Debug: Log viewMode */}
-        {process.env.NODE_ENV === 'development' && console.log('PostsFeed viewMode:', viewMode)}
         {posts.map((post) => (
           <PostCard key={post.id} post={post} showFlagBackground={showFlagBackground} hideUserInfo={hideUserInfo} viewMode={viewMode} />
         ))}

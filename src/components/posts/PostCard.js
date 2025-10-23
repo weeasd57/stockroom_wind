@@ -83,8 +83,6 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
   return (
     <CommentProvider>
       <div className={`${styles.postCard} ${viewMode === 'grid' ? styles.gridCard : styles.listCard}`}>
-        {/* Debug: Log viewMode in PostCard */}
-        {process.env.NODE_ENV === 'development' && console.log('PostCard viewMode:', viewMode, 'for post:', post.id)}
         {showFlagBackground && countryCode && (
           <div className={styles.flagBackground} aria-hidden="true">
             <span className={`fi fi-${countryCode}`}></span>

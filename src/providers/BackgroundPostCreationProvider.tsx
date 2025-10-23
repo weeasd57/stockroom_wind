@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+// @ts-ignore - uuid module types not available
 import { v4 as uuidv4 } from "uuid";
 import { uploadPostImageEnhanced } from "@/utils/imageUpload";
 import { useSupabase } from "@/providers/SimpleSupabaseProvider";
@@ -154,11 +155,11 @@ export function BackgroundPostCreationProvider({ children }: { children: React.R
 
           if (canceledRef.current.has(id)) return; // stop silently
 
-          if (uploadResult.error) {
-            throw new Error(typeof uploadResult.error === "string" ? uploadResult.error : "Upload failed");
+          if ((uploadResult as any).error) {
+            throw new Error(typeof (uploadResult as any).error === "string" ? (uploadResult as any).error : "Upload failed");
           }
 
-          imageUrl = uploadResult.publicUrl || null;
+          imageUrl = (uploadResult as any).publicUrl || null;
           updateTask(id, { imageUrl });
           setProgress(85);
         }

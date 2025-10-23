@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+// @ts-ignore - uuid module types not available
 import { v4 as uuidv4 } from 'uuid';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
@@ -175,9 +176,10 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
           updateTaskStatus('uploading_avatar', 40, { avatarUrl: newAvatarUrl });
           
           console.log('Avatar uploaded successfully:', newAvatarUrl);
-        } catch (error) {
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
           console.error('Avatar upload failed:', error);
-          updateTaskStatus('failed', 0, { error: `Avatar upload failed: ${error.message}` });
+          updateTaskStatus('failed', 0, { error: `Avatar upload failed: ${errorMessage}` });
           return;
         }
       }
@@ -206,9 +208,10 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
           updateTaskStatus('uploading_background', 70, { backgroundUrl: newBackgroundUrl });
           
           console.log('Background uploaded successfully:', newBackgroundUrl);
-        } catch (error) {
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
           console.error('Background upload failed:', error);
-          updateTaskStatus('failed', 0, { error: `Background upload failed: ${error.message}` });
+          updateTaskStatus('failed', 0, { error: `Background upload failed: ${errorMessage}` });
           return;
         }
       }
@@ -258,7 +261,7 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
         
         const { success, error } = await updateProfile(updateData);
         
-        if (error) throw new Error(error.message || 'Failed to update profile');
+        if (error) throw new Error((error as any).message || 'Failed to update profile');
 
         // Clear any profile cache to ensure immediate updates
         if (typeof window !== 'undefined') {
@@ -273,24 +276,26 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
           // Force refresh all images with the user's avatar URL to bust browser cache
           const timestamp = Date.now();
           const avatarImages = document.querySelectorAll(`img[src*="${user.id}/avatar"]`);
-          avatarImages.forEach((img: HTMLImageElement) => {
-            const currentSrc = img.src;
+          avatarImages.forEach((img) => {
+            const htmlImg = img as HTMLImageElement;
+            const currentSrc = htmlImg.src;
             const baseSrc = currentSrc.split('?')[0]; // Remove existing query params
-            img.src = `${baseSrc}?t=${timestamp}`;
-            console.log('🔄 Force refreshed avatar image:', img.src);
+            htmlImg.src = `${baseSrc}?t=${timestamp}`;
+            console.log('🔄 Force refreshed avatar image:', htmlImg.src);
           });
           
           // Also force refresh background images
           const backgroundElements = document.querySelectorAll(`[style*="${user.id}/background"]`);
-          backgroundElements.forEach((el: HTMLElement) => {
-            const style = el.style.backgroundImage;
+          backgroundElements.forEach((el) => {
+            const htmlEl = el as HTMLElement;
+            const style = htmlEl.style.backgroundImage;
             if (style.includes(user.id)) {
               const urlMatch = style.match(/url\(['"]?(.*?)['"]?\)/);
               if (urlMatch) {
                 const currentUrl = urlMatch[1];
                 const baseUrl = currentUrl.split('?')[0];
-                el.style.backgroundImage = `url("${baseUrl}?t=${timestamp}")`;
-                console.log('🔄 Force refreshed background image:', el.style.backgroundImage);
+                htmlEl.style.backgroundImage = `url("${baseUrl}?t=${timestamp}")`;
+                console.log('🔄 Force refreshed background image:', htmlEl.style.backgroundImage);
               }
             }
           });
@@ -345,9 +350,10 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
           window.showNotification('Profile updated successfully! ✅', 'success');
         }
 
-      } catch (error) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         console.error('Profile save failed:', error);
-        updateTaskStatus('failed', 0, { error: `Failed to save profile: ${error.message}` });
+        updateTaskStatus('failed', 0, { error: `Failed to save profile: ${errorMessage}` });
         
         // Show error notification  
         if (typeof window !== 'undefined' && window.showNotification) {
@@ -355,11 +361,12 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
         }
       }
 
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error('Task processing failed:', error);
       setTasks(prev => prev.map(t => 
         t.id === taskId 
-          ? { ...t, status: 'failed', error: error.message, updatedAt: new Date() }
+          ? { ...t, status: 'failed', error: errorMessage, updatedAt: new Date() }
           : t
       ));
     } finally {
