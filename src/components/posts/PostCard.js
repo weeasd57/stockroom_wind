@@ -42,8 +42,9 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
   };
 
   const username = post?.profile?.username || 'Unknown';
-  const avatarUrl = post?.profile?.avatar_url;
+  const avatarUrl = post?.profile?.avatar_url?.startsWith('http') ? post.profile.avatar_url : null;
   const profileId = post?.profile?.id;
+  const userInitial = username ? username.charAt(0).toUpperCase() : 'U';
 
   // Debug: log post data to check last_price_check field
   if (post?.id && post.id === 'f2e20d85-c0b6-4e54-b723-4407bea26163') {

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'; // Ensure this route is server-rendered on each request
+
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';

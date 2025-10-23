@@ -190,7 +190,6 @@
   }
 }
 
-/* Animation keyframes */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -200,6 +199,39 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.visible {
+  opacity: 1;
+}
+
+/* Loading Skeleton Styles للـ Performance */
+.skeletonDashboard,
+.skeletonFeed,
+.skeletonForm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  background: var(--card-secondary, #f9fafb);
+  border: 1px solid var(--border-light, #e5e7eb);
+  border-radius: 12px;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.875rem;
+  animation: skeleton-pulse 2s infinite ease-in-out;
+}
+
+.skeletonFeed {
+  min-height: 200px;
+}
+
+.skeletonForm {
+  min-height: 400px;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
 }
 
 /* Dark theme specific styles - use class selector instead of media query */

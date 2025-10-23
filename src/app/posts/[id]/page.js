@@ -10,11 +10,41 @@ import { getCountryForExchange } from '@/models/ExchangeData';
 import 'flag-icons/css/flag-icons.min.css';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
-import PriceHistoryChart from '@/components/PriceHistoryChart';
 import { CommentProvider } from '@/providers/CommentProvider';
-import PostActions from '@/components/posts/PostActions';
-import PostSentiment from '@/components/posts/PostSentiment';
-import Comments from '@/components/posts/Comments';
+import dynamic from 'next/dynamic';
+
+// Dynamic Imports للمكونات الثقيلة في صفحة المنشور
+const PriceHistoryChart = dynamic(
+  () => import('@/components/PriceHistoryChart'),
+  {
+    loading: () => <div className={styles.skeletonChart}>Loading chart...</div>,
+    ssr: false // Charts don't need SSR
+  }
+);
+
+const PostActions = dynamic(
+  () => import('@/components/posts/PostActions'),
+  {
+    loading: () => <div className={styles.skeletonActions}>Loading actions...</div>,
+    ssr: false
+  }
+);
+
+const PostSentiment = dynamic(
+  () => import('@/components/posts/PostSentiment'),
+  {
+    loading: () => <div className={styles.skeletonSentiment}>Loading sentiment...</div>,
+    ssr: false
+  }
+);
+
+const Comments = dynamic(
+  () => import('@/components/posts/Comments'),
+  {
+    loading: () => <div className={styles.skeletonComments}>Loading comments...</div>,
+    ssr: true // Comments need SEO
+  }
+);
 
 // Function to format date
 function formatDate(dateString) {

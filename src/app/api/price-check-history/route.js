@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'; // Ensure this route is server-rendered on each request
+
 import { createClient } from '@supabase/supabase-js';
 
 // Use anon key for API routes (safer and more compatible)

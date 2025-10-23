@@ -1,3 +1,41 @@
+/* Performance Skeleton Styles */
+.skeletonChart,
+.skeletonActions,
+.skeletonSentiment,
+.skeletonComments {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card-secondary, #f9fafb);
+  border: 1px solid var(--border-light, #e5e7eb);
+  border-radius: 12px;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.875rem;
+  animation: skeleton-pulse 2s infinite ease-in-out;
+  margin: 1rem 0;
+}
+
+.skeletonChart {
+  min-height: 400px;
+}
+
+.skeletonActions {
+  min-height: 60px;
+}
+
+.skeletonSentiment {
+  min-height: 80px;
+}
+
+.skeletonComments {
+  min-height: 200px;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
 .container {
   max-width: 1200px;
   margin: 0 auto;

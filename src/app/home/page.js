@@ -5,12 +5,35 @@ import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
 import { CreatePostButton } from '@/components/posts/CreatePostButton';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
-import { DashboardSection } from '@/components/home/DashboardSection';
-import PostsFeed from '@/components/home/PostsFeed';
 import { createPortal } from 'react-dom';
 import styles from '@/styles/home.module.css';
-import '@/styles/create-post-page.css'; 
-import CreatePostForm from '@/components/posts/CreatePostForm';
+import '@/styles/create-post-page.css';
+import dynamic from 'next/dynamic';
+
+// Dynamic Imports للمكونات الثقيلة - تحسين الأداء
+const DashboardSection = dynamic(
+  () => import('@/components/home/DashboardSection').then((mod) => ({ default: mod.DashboardSection })),
+  {
+    loading: () => <div className={styles.skeletonDashboard}>Loading dashboard...</div>,
+    ssr: false
+  }
+);
+
+const PostsFeed = dynamic(
+  () => import('@/components/home/PostsFeed'),
+  {
+    loading: () => <div className={styles.skeletonFeed}>Loading posts...</div>,
+    ssr: true // Keep SSR for SEO
+  }
+);
+
+const CreatePostForm = dynamic(
+  () => import('@/components/posts/CreatePostForm'),
+  {
+    loading: () => <div className={styles.skeletonForm}>Loading form...</div>,
+    ssr: false // Only needed after interaction
+  }
+);
 
 export default function HomePage() {
   const { user } = useSupabase();
@@ -23,7 +46,6 @@ export default function HomePage() {
 
   // Reference to track if component is mounted
   const isMounted = useRef(false);
-
 
   // Animation effect
   useEffect(() => {
