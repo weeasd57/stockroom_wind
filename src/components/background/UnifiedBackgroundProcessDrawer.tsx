@@ -133,8 +133,7 @@ export default function UnifiedBackgroundProcessDrawer() {
     priceCheckTasks = priceContext?.tasks || [];
     removePriceTask = priceContext?.removeTask;
     retryPriceTask = priceContext?.retryTask;
-    // Note: cancelPriceTask not implemented in provider yet
-    cancelPriceTask = undefined;
+    cancelPriceTask = priceContext?.cancelTask;
   } catch (e) {
     // Provider not available
   }
@@ -685,14 +684,20 @@ export default function UnifiedBackgroundProcessDrawer() {
     }
   }, [user, historyLoading, isDataFresh, getFromLocalStorage, saveToLocalStorage, logDebugError]);
   
+  // Determine if an activity.type represents a price check, supporting multiple naming styles
+  const isPriceCheckType = useCallback((t: any) => {
+    const type = String(t || '').toLowerCase();
+    return type === 'price-check' || type === 'price_check' || type === 'price_check_group' || type === 'price_check_result' || type === 'pricecheck';
+  }, []);
+  
   // Handle clicking on historical price check task
   const handlePriceCheckTaskClick = useCallback((activity: any) => {
-    if (!activity || activity.type !== 'price-check') return;
+    if (!activity || !isPriceCheckType(activity.type)) return;
     
     console.log('[Drawer] 🔍 Opening price check dialog for activity:', activity);
     
-    // Transform activity data to match PriceCheckResultsDialog format
-    const results = activity.posts ? activity.posts.map((post: any) => ({
+    // Results may come as `posts` (snake_case) from Supabase or `results` (camelCase) from local history
+    const resultsFromPosts = Array.isArray(activity.posts) ? activity.posts.map((post: any) => ({
       id: post.id,
       symbol: post.symbol,
       companyName: post.company_name,
@@ -708,19 +713,45 @@ export default function UnifiedBackgroundProcessDrawer() {
       exchange: post.exchange,
       country: post.country
     })) : [];
+
+    const resultsFromResults = Array.isArray(activity.results) ? activity.results.map((r: any) => ({
+      id: r.id,
+      symbol: r.symbol,
+      companyName: r.companyName,
+      currentPrice: r.currentPrice,
+      targetPrice: r.targetPrice,
+      stopLossPrice: r.stopLossPrice,
+      targetReached: r.targetReached,
+      stopLossTriggered: r.stopLossTriggered,
+      closed: r.closed,
+      message: r.message,
+      noDataAvailable: r.noDataAvailable,
+      postAfterMarketClose: r.postAfterMarketClose,
+      exchange: r.exchange,
+      country: r.country
+    })) : [];
+
+    const results = resultsFromResults.length > 0 ? resultsFromResults : resultsFromPosts;
     
+    // Build stats with robust fallbacks (prefer summary if present)
+    const summary = activity.summary || {};
+    const checksCount = summary.checkedPosts ?? activity.checkedPosts ?? results.length;
+    const updatedCount = summary.updatedPosts ?? activity.updatedPosts ?? results.filter((r: any) => r.targetReached || r.stopLossTriggered).length;
+    const usageCount = summary.usageCount ?? activity.usageCount ?? (subscription?.getUsageInfo?.()?.priceChecksToday || 0);
+    const remainingChecks = summary.remainingChecks ?? activity.remainingChecks ?? subscription?.getUsageInfo?.()?.remainingPriceChecks;
+
     const stats = {
-      checkedPosts: activity.checkedPosts || results.length,
-      updatedPosts: activity.updatedPosts || results.filter((r: any) => r.targetReached || r.stopLossTriggered).length,
-      targetReached: activity.targetReached || results.filter((r: any) => r.targetReached).length,
-      stopLossTriggered: activity.stopLossTriggered || results.filter((r: any) => r.stopLossTriggered).length,
-      usageCount: subscription?.getUsageInfo?.()?.priceChecksToday || 0,
-      remainingChecks: subscription?.getUsageInfo?.()?.remainingPriceChecks
+      checkedPosts: checksCount,
+      updatedPosts: updatedCount,
+      targetReached: results.filter((r: any) => r.targetReached).length,
+      stopLossTriggered: results.filter((r: any) => r.stopLossTriggered).length,
+      usageCount,
+      remainingChecks
     };
     
     setSelectedPriceCheckData({ results, stats });
     setShowPriceCheckDialog(true);
-  }, [subscription]);
+  }, [subscription, isPriceCheckType]);
   
   // Enhanced Send historical Telegram notifications for all activity types
   const handleSendHistoricalTelegram = useCallback(async (activity: any, existingTaskId?: string) => {
@@ -1075,7 +1106,9 @@ export default function UnifiedBackgroundProcessDrawer() {
 
   // Define remove process handler with useCallback to prevent unnecessary re-renders
   const handleRemoveProcess = useCallback((processId: string, type: string) => {
-    const taskId = processId.split('-')[1];
+    // Extract original task id after the first hyphen to preserve full UUIDs with hyphens
+    const hyphenIndex = processId.indexOf('-');
+    const taskId = hyphenIndex >= 0 ? processId.substring(hyphenIndex + 1) : processId;
     
     switch (type) {
       case 'post':
@@ -1112,7 +1145,8 @@ export default function UnifiedBackgroundProcessDrawer() {
   }, [processes, handleRemoveProcess]);
 
   const handleRetryProcess = useCallback(async (processId: string, type: string) => {
-    const taskId = processId.split('-')[1];
+    const hyphenIndex = processId.indexOf('-');
+    const taskId = hyphenIndex >= 0 ? processId.substring(hyphenIndex + 1) : processId;
     
     switch (type) {
       case 'post':
@@ -1137,28 +1171,80 @@ export default function UnifiedBackgroundProcessDrawer() {
   }, [retryPostTask, retryProfileTask, retryPriceTask, telegramTasks, handleSendHistoricalTelegram]);
 
   const handleCancelProcess = useCallback((processId: string, type: string) => {
-    const taskId = processId.split('-')[1];
-    
-    switch (type) {
-      case 'post':
-        cancelPostTask?.(taskId);
-        break;
-      case 'profile':
-        cancelProfileTask?.(taskId);
-        break;
-      case 'price-check':
-        cancelPriceTask?.(taskId);
-        break;
-      case 'telegram':
-        setTelegramTasks(prev => prev.map(p => p.id === processId ? { ...p, status: 'canceled', error: 'User canceled', progress: p.progress ?? 0 } : p));
-        break;
-      default:
-        console.log(`Force cancelling process: ${processId} (${type})`);
-        // Force remove stuck processes
-        setProcesses(prev => prev.filter(p => p.id !== processId));
-        break;
+    // Check if process is already canceled or completed
+    const currentProcess = processes.find(p => p.id === processId);
+    if (!currentProcess || ['canceled', 'completed', 'failed', 'success', 'error'].includes(currentProcess.status)) {
+      console.log(`[Drawer] ⚠️ Process ${processId} is already ${currentProcess?.status || 'not found'}, skipping cancel`);
+      return;
     }
-  }, [cancelPostTask, cancelProfileTask, cancelPriceTask, setTelegramTasks]);
+    
+    const taskId = processId.split('-')[1];
+    console.log(`[Drawer] 🚫 Canceling process: ${processId} (type: ${type}, taskId: ${taskId})`);
+    
+    try {
+      switch (type) {
+        case 'post':
+          if (cancelPostTask) {
+            console.log(`[Drawer] 📝 Canceling post task: ${taskId}`);
+            cancelPostTask(taskId);
+          } else {
+            console.warn(`[Drawer] ⚠️ cancelPostTask function not available`);
+            // Force cancel by updating process status
+            setProcesses(prev => prev.map(p => p.id === processId ? { ...p, status: 'canceled', error: 'User canceled', progress: p.progress ?? 0 } : p));
+          }
+          break;
+        case 'profile':
+          if (cancelProfileTask) {
+            console.log(`[Drawer] 👤 Canceling profile task: ${taskId}`);
+            cancelProfileTask(taskId);
+          } else {
+            console.warn(`[Drawer] ⚠️ cancelProfileTask function not available`);
+            setProcesses(prev => prev.map(p => p.id === processId ? { ...p, status: 'canceled', error: 'User canceled', progress: p.progress ?? 0 } : p));
+          }
+          break;
+        case 'price-check':
+          if (cancelPriceTask) {
+            console.log(`[Drawer] 💹 Canceling price check task: ${taskId}`);
+            cancelPriceTask(taskId);
+          } else {
+            console.warn(`[Drawer] ⚠️ cancelPriceTask function not available, using fallback`);
+            setProcesses(prev => prev.map(p => p.id === processId ? { ...p, status: 'canceled', error: 'User canceled', progress: p.progress ?? 0 } : p));
+          }
+          break;
+        case 'telegram':
+          console.log(`[Drawer] 📱 Canceling telegram task: ${processId}`);
+          setTelegramTasks(prev => prev.map(p => p.id === processId ? { ...p, status: 'canceled', error: 'User canceled', progress: p.progress ?? 0 } : p));
+          break;
+        case 'check-posts':
+          console.log(`[Drawer] 🔍 Canceling check-posts task: ${processId}`);
+          setProcesses(prev => prev.map(p => p.id === processId ? { ...p, status: 'canceled', error: 'User canceled', progress: p.progress ?? 0 } : p));
+          break;
+        default:
+          console.log(`[Drawer] ⚠️ Unknown process type: ${type}, force canceling: ${processId}`);
+          // Force cancel by removing from active processes
+          setProcesses(prev => prev.map(p => p.id === processId ? { ...p, status: 'canceled', error: 'Unknown process type - User canceled', progress: p.progress ?? 0 } : p));
+          break;
+      }
+      
+      // Show success notification
+      if (typeof window !== 'undefined' && window.showNotification) {
+        window.showNotification(`🚫 Process canceled successfully`, 'info');
+      }
+      
+      console.log(`[Drawer] ✅ Successfully canceled process: ${processId}`);
+      
+    } catch (error) {
+      console.error(`[Drawer] ❌ Failed to cancel process ${processId}:`, error);
+      logDebugError('handleCancelProcess', error, { processId, type, taskId });
+      
+      // Fallback: Force update status
+      setProcesses(prev => prev.map(p => p.id === processId ? { ...p, status: 'canceled', error: 'Cancel failed, but marked as canceled', progress: p.progress ?? 0 } : p));
+      
+      if (typeof window !== 'undefined' && window.showNotification) {
+        window.showNotification(`⚠️ Process canceled with fallback method`, 'warning');
+      }
+    }
+  }, [processes, cancelPostTask, cancelProfileTask, cancelPriceTask, setTelegramTasks, logDebugError]);
 
   const getStatusText = (status: string, type: string) => {
     // Type-specific status messages
@@ -1436,8 +1522,8 @@ export default function UnifiedBackgroundProcessDrawer() {
   const handleActivityClick = useCallback((activity: any) => {
     console.log('[Drawer] 🔍 Activity clicked:', activity.type, activity);
     
-    // Handle price-check activities with specialized dialog
-    if (activity.type === 'price-check') {
+    // Handle price-check activities with specialized dialog (supports multiple type variants)
+    if (isPriceCheckType(activity.type)) {
       handlePriceCheckTaskClick(activity);
       return;
     }
@@ -1445,7 +1531,7 @@ export default function UnifiedBackgroundProcessDrawer() {
     // Handle other activity types with general dialog
     setSelectedActivity(activity);
     setShowActivityDialog(true);
-  }, [handlePriceCheckTaskClick]);
+  }, [handlePriceCheckTaskClick, isPriceCheckType]);
   
   // Handle closing activity dialog
   const handleCloseActivityDialog = useCallback(() => {
@@ -1660,10 +1746,10 @@ export default function UnifiedBackgroundProcessDrawer() {
                         <button 
                           className={styles.cancelButton}
                           onClick={() => handleCancelProcess(process.id, process.type)}
-                          title="Cancel process"
-                          aria-label="Cancel"
+                          title="Cancel this process"
+                          aria-label="Cancel process"
                         >
-                          ⏹️
+                          ❌
                         </button>
                       )}
                       {['failed', 'error'].includes(process.status) && (
@@ -1990,6 +2076,70 @@ export default function UnifiedBackgroundProcessDrawer() {
                       </div>
                     </div>
 
+                    {/* Pro Benefits Section for Free Users */}
+                    {!subscription.isPro && (
+                      <div className={styles.modernProBenefitsSection}>
+                        <div className={styles.proBenefitsHeader}>
+                          <h4 className={styles.sectionTitle}>⭐ Unlock Pro Benefits</h4>
+                          <p className={styles.sectionSubtitle}>Get 6x more price checks and enhanced features</p>
+                        </div>
+                        
+                        <div className={styles.benefitsGrid}>
+                          <div className={styles.benefitCard}>
+                            <div className={styles.benefitIcon}>💹</div>
+                            <div className={styles.benefitContent}>
+                              <h5>300 Price Checks</h5>
+                              <p>vs 50 on Free plan</p>
+                            </div>
+                          </div>
+                          
+                          <div className={styles.benefitCard}>
+                            <div className={styles.benefitIcon}>📝</div>
+                            <div className={styles.benefitContent}>
+                              <h5>500 Posts/Month</h5>
+                              <p>vs 100 on Free plan</p>
+                            </div>
+                          </div>
+                          
+                          <div className={styles.benefitCard}>
+                            <div className={styles.benefitIcon}>⚡</div>
+                            <div className={styles.benefitContent}>
+                              <h5>Priority Support</h5>
+                              <p>Faster response times</p>
+                            </div>
+                          </div>
+                          
+                          <div className={styles.benefitCard}>
+                            <div className={styles.benefitIcon}>🎯</div>
+                            <div className={styles.benefitContent}>
+                              <h5>Advanced Analytics</h5>
+                              <p>Coming soon</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className={styles.upgradeCallToAction}>
+                          <button 
+                            className={styles.ctaUpgradeButton}
+                            onClick={() => {
+                              if (typeof window !== 'undefined' && window.showNotification) {
+                                window.showNotification('🚀 Redirecting to upgrade page...', 'info');
+                              }
+                              setTimeout(() => {
+                                if (typeof window !== 'undefined') {
+                                  window.location.href = '/pricing';
+                                }
+                              }, 500);
+                            }}
+                          >
+                            <span className={styles.ctaIcon}>⭐</span>
+                            <span>Upgrade to Pro for $7/month</span>
+                            <span className={styles.ctaArrow}>→</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Modern Info Timeline */}
                     <div className={styles.modernInfoSection}>
                       <h4 className={styles.sectionTitle}>📋 Subscription Details</h4>
@@ -2043,7 +2193,22 @@ export default function UnifiedBackgroundProcessDrawer() {
                       </button>
                       
                       {!subscription.isPro && (
-                        <button className={styles.modernUpgradeButton}>
+                        <button 
+                          className={styles.modernUpgradeButton}
+                          onClick={() => {
+                            // Show notification about redirect
+                            if (typeof window !== 'undefined' && window.showNotification) {
+                              window.showNotification('🚀 Redirecting to upgrade page...', 'info');
+                            }
+                            
+                            // Navigate to pricing page
+                            setTimeout(() => {
+                              if (typeof window !== 'undefined') {
+                                window.location.href = '/pricing';
+                              }
+                            }, 500);
+                          }}
+                        >
                           <span className={styles.buttonIcon}>⭐</span>
                           <span>Upgrade to Pro</span>
                           <span className={styles.upgradeArrow}>→</span>

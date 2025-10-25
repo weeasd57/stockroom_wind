@@ -7,9 +7,17 @@ import styles from '@/styles/Comments.module.css';
 import { createPortal } from 'react-dom';
 
 export default function Comments({ postId, initialCommentCount = 0, autoFetchOnMount = false }) {
-  const { getPostStats, fetchCommentsForPost } = useComments();
+  // Add error handling for useComments hook
+  let commentHookResult;
+  try {
+    commentHookResult = useComments();
+  } catch (error) {
+    console.error('Comments: useComments hook failed:', error);
+    return <div style={{color: 'red', padding: '10px'}}>Comments unavailable: {error.message}</div>;
+  }
+  
+  const { getPostStats, fetchCommentsForPost, stopPolling } = commentHookResult;
   const [showDialog, setShowDialog] = useState(false);
-  const [portalContainer, setPortalContainer] = useState(null);
 
   const postStats = getPostStats(postId);
   const commentCount = postStats.commentCount || initialCommentCount;
@@ -22,51 +30,23 @@ export default function Comments({ postId, initialCommentCount = 0, autoFetchOnM
     }
   }, [postId, fetchCommentsForPost, autoFetchOnMount]);
 
-  // Setup a shared fixed portal container on the document body
+  // Toggle body scroll lock when dialog is open
   useEffect(() => {
-    if (typeof document === 'undefined') return;
-    let container = document.getElementById('dialog-portal-container');
-    if (!container) {
-      container = document.createElement('div');
-      container.id = 'dialog-portal-container';
-      container.style.position = 'fixed';
-      container.style.top = '0';
-      container.style.left = '0';
-      container.style.width = '100%';
-      container.style.height = '100%';
-      container.style.zIndex = '10000';
-      container.style.pointerEvents = 'none';
-      document.body.appendChild(container);
-    }
-    setPortalContainer(container);
-
-    return () => {
-      const existing = document.getElementById('dialog-portal-container');
-      // Remove the container only if it's empty (no other dialogs using it)
-      if (existing && existing.childNodes.length === 0) {
-        document.body.removeChild(existing);
-      }
-    };
-  }, []);
-
-  // Toggle background interaction and body scroll when dialog is open
-  useEffect(() => {
-    if (!portalContainer) return;
     if (showDialog) {
-      portalContainer.style.pointerEvents = 'auto';
-      document.body.classList.add('dialog-open');
+      typeof document !== 'undefined' && document.body.classList.add('dialog-open');
     } else {
-      portalContainer.style.pointerEvents = 'none';
-      document.body.classList.remove('dialog-open');
+      typeof document !== 'undefined' && document.body.classList.remove('dialog-open');
     }
-
     return () => {
-      portalContainer.style.pointerEvents = 'none';
-      document.body.classList.remove('dialog-open');
+      typeof document !== 'undefined' && document.body.classList.remove('dialog-open');
     };
-  }, [showDialog, portalContainer]);
+  }, [showDialog]);
 
   const handleOpenDialog = () => {
+    console.log('[DEBUG] Comments button clicked for post:', postId);
+    console.log('[DEBUG] Using document.body as portal root:', typeof document !== 'undefined');
+    console.log('[DEBUG] Current showDialog:', showDialog);
+
     setShowDialog(true);
     // Fetch latest comments when opening dialog
     if (postId) {
@@ -76,8 +56,9 @@ export default function Comments({ postId, initialCommentCount = 0, autoFetchOnM
 
   const handleCloseDialog = () => {
     setShowDialog(false);
+    // Stop polling when dialog closes
+    stopPolling();
   };
-
   return (
     <>
       {/* Comments Button */}
@@ -93,18 +74,21 @@ export default function Comments({ postId, initialCommentCount = 0, autoFetchOnM
         </button>
       </div>
 
-      {/* Comments Dialog via portal to fixed container */}
-      {portalContainer && showDialog && createPortal(
-        (
+      {/* Render Comments Dialog via Portal */}
+      {showDialog && typeof document !== 'undefined' && (() => {
+        console.log('[DEBUG] Rendering CommentsDialog via portal');
+        console.log('[DEBUG] showDialog:', showDialog);
+        console.log('[DEBUG] portalRoot is document.body');
+        return createPortal(
           <CommentsDialog
             postId={postId}
             isOpen={showDialog}
             onClose={handleCloseDialog}
-            commentCount={commentCount}
-          />
-        ),
-        portalContainer
-      )}
+          />,
+          document.body
+        );
+      })()}
+      
     </>
   );
 }

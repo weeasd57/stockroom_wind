@@ -471,10 +471,48 @@
   color: hsl(var(--foreground));
 }
 
-.postsGrid {
+/* Posts header row with view toggle */
+.postsHeaderRow {
   display: flex;
-  flex-direction: column;
-  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 0.75rem;
+}
+
+.viewToggle {
+  display: flex;
+  gap: 6px;
+  background: hsl(var(--card));
+  border-radius: 8px;
+  padding: 4px;
+  border: 1px solid hsl(var(--border));
+}
+
+.viewButton {
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+}
+
+.viewButton:hover {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+.viewButtonActive {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  box-shadow: 0 2px 4px hsla(var(--primary) / 0.3);
 }
 
 .postCard {

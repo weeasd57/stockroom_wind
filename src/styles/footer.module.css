@@ -59,12 +59,22 @@
   background: linear-gradient(90deg, #4f46e5, #9333ea);
 }
 
+:global(.dark) .title:after {
+  background: linear-gradient(90deg, hsl(45, 100%, 70%), hsl(45, 100%, 60%)); /* Golden gradient */
+}
+
+.darkFooter .title:after {
+  background: linear-gradient(90deg, hsl(45, 100%, 70%), hsl(45, 100%, 60%)); /* Golden gradient */
+}
+
 :global(.dark) .title {
-  color: hsl(0, 0%, 100%);
+  color: hsl(45, 100%, 70%); /* Golden color */
+  text-shadow: 0 2px 8px rgba(253, 224, 71, 0.3);
 }
 
 .darkFooter .title {
-  color: hsl(0, 0%, 100%);
+  color: hsl(45, 100%, 70%); /* Golden color */
+  text-shadow: 0 2px 8px rgba(253, 224, 71, 0.3);
 }
 
 .description {
@@ -157,12 +167,35 @@
   z-index: 0; /* behind content */
 }
 
+:global(.dark) .appname {
+  color: hsl(45, 100%, 70%, 0.08); /* Golden color with low opacity */
+}
+
+.darkFooter .appname {
+  color: hsl(45, 100%, 70%, 0.08); /* Golden color with low opacity */
+}
+
 :global(.dark) .copyright {
   color: hsl(0, 0%, 70%);
 }
 
 .darkFooter .copyright {
   color: hsl(0, 0%, 70%);
+}
+
+/* Make SharksZone golden in copyright text for dark mode */
+.appNameInCopyright {
+  color: inherit; /* Default: inherit from parent */
+}
+
+:global(.dark) .appNameInCopyright {
+  color: hsl(45, 100%, 70%); /* Golden color in dark mode */
+  font-weight: 600;
+}
+
+.darkFooter .appNameInCopyright {
+  color: hsl(45, 100%, 70%); /* Golden color in dark mode */
+  font-weight: 600;
 }
 
 @media (max-width: 768px) {

@@ -14,6 +14,7 @@ import Script from 'next/script';
 import { headers } from 'next/headers';
 import { FollowProvider } from '@/providers/FollowProvider'; // Import FollowProvider
 import { PostProvider } from '@/providers/PostProvider';
+import { CommentProvider } from '@/providers/CommentProvider';
 import { BackgroundPostCreationProvider } from '@/providers/BackgroundPostCreationProvider';
 import { BackgroundProfileEditProvider } from '@/providers/BackgroundProfileEditProvider';
 import { BackgroundPriceCheckProvider } from '@/providers/BackgroundPriceCheckProvider';
@@ -297,21 +298,23 @@ export default function RootLayout({ children }) {
                         <AuthGuard>
                           <ClientImagePreloader />
                           <PostProvider>
-                            <BackgroundPostCreationProvider>
-                              <BackgroundProfileEditProvider>
-                                <BackgroundPriceCheckProvider>
-                                  <PriceCheckResultsProvider>
-                                    <GlobalPriceCheckHandler />
-                                    <FollowProvider> {/* Wrap children with FollowProvider */}
-                                      {children}
-                                      <UnifiedBackgroundProcessDrawer />
-                                      <FloatingClock />
-                                      <Toaster richColors position="top-right" />
-                                    </FollowProvider>
-                                  </PriceCheckResultsProvider>
-                                </BackgroundPriceCheckProvider>
-                              </BackgroundProfileEditProvider>
-                            </BackgroundPostCreationProvider>
+                            <CommentProvider>
+                              <BackgroundPostCreationProvider>
+                                <BackgroundProfileEditProvider>
+                                  <BackgroundPriceCheckProvider>
+                                    <PriceCheckResultsProvider>
+                                      <GlobalPriceCheckHandler />
+                                      <FollowProvider> {/* Wrap children with FollowProvider */}
+                                        {children}
+                                        <UnifiedBackgroundProcessDrawer />
+                                        <FloatingClock />
+                                        <Toaster richColors position="top-right" />
+                                      </FollowProvider>
+                                    </PriceCheckResultsProvider>
+                                  </BackgroundPriceCheckProvider>
+                                </BackgroundProfileEditProvider>
+                              </BackgroundPostCreationProvider>
+                            </CommentProvider>
                           </PostProvider>
                         </AuthGuard>
                       </ClientSideLayout>

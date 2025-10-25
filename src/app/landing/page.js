@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@/providers/theme-provider';
 import dynamic from 'next/dynamic';
 import styles from '@/styles/landing.module.css';
+import { getCountrySymbolCounts } from '@/utils/symbolSearch';
+import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 
 // Lazy load the Footer component
 const Footer = dynamic(() => import('@/components/Footer'), {
@@ -17,6 +19,9 @@ export default function LandingPage() {
   const [hoverButton, setHoverButton] = useState(null);
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const [countsLoading, setCountsLoading] = useState(true);
+  const [counts, setCounts] = useState(null);
+  const [displayedCount, setDisplayedCount] = useState(12); // Show 12 countries initially
 
   // Optimize scroll listener with useCallback and requestAnimationFrame
   const [scrollPosition, setScrollPosition] = useState(0);
@@ -27,6 +32,42 @@ export default function LandingPage() {
       setScrollPosition(window.scrollY);
     });
   }, []);
+
+  // Load symbol counts by country for the showcase section
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const data = await getCountrySymbolCounts();
+        if (!alive) return;
+        setCounts(data || {});
+      } catch (e) {
+        // no-op; keep section hidden if fails
+        setCounts(null);
+      } finally {
+        if (alive) setCountsLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const allCountryItems = useMemo(() => {
+    if (!counts) return [];
+    return Object.entries(counts)
+      .filter(([code]) => code !== 'all' && code !== 'total')
+      .map(([code, cnt]) => ({
+        code: String(code).toLowerCase(),
+        name: COUNTRY_CODE_TO_NAME[String(code).toLowerCase()] || code.toUpperCase(),
+        count: Number(cnt) || 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [counts]);
+
+  const countryItems = useMemo(() => {
+    return allCountryItems.slice(0, displayedCount);
+  }, [allCountryItems, displayedCount]);
+
+  const totalSymbols = counts?.total || counts?.all || 0;
   
   useEffect(() => {
     // Add passive flag to improve scroll performance
@@ -61,32 +102,33 @@ export default function LandingPage() {
     },
     {
       id: 3,
+      title: 'Telegram Bot Integration',
+      description:
+        'Receive instant notifications for new posts, target achievements, and price updates directly in Telegram. Stay connected to the market wherever you are.',
+      icon: '✈️',
+    },
+    {
+      id: 4,
       title: 'Signal Trust Score',
       description:
         'Weights author track record and post performance to prioritize higher-confidence ideas for the bot.',
       icon: '⭐',
     },
     {
-      id: 4,
+      id: 5,
       title: 'Risk Controls & Limits',
       description:
         'Configurable max allocation, cool-downs, and stop-loss/take-profit presets to protect capital.',
       icon: '🛡️',
     },
     {
-      id: 5,
+      id: 6,
       title: 'Multi‑Broker Fallback',
       description:
         'Supports multiple brokers with health checks and automatic failover when a provider is degraded.',
       icon: '🔗',
     },
-    {
-      id: 6,
-      title: 'Transparent Logs & Alerts',
-      description:
-        'Full audit trail with notifications for executed actions, rejects, and risk breaches.',
-      icon: '📜',
-    },
+   
   ];
 
   const login = () => {
@@ -106,6 +148,10 @@ export default function LandingPage() {
   
   const toggleTheme = () => {
     setTheme(theme === 'light' ? 'dark' : 'light');
+  };
+
+  const handleLoadMore = () => {
+    setDisplayedCount(prev => prev + 12); // Load 12 more countries
   };
   
   return (
@@ -171,8 +217,63 @@ export default function LandingPage() {
               ))}
             </section>
           </div>
-          
+
           {/* Footer */}
+          {/* Symbols by Country Section */}
+          <section className={styles.countrySection} aria-label="Symbols per country">
+            <h2 className={styles.featuresTitle}>Symbols by Country</h2>
+            {countsLoading ? (
+              <div className={styles.countryLoading}>Loading coverage...</div>
+            ) : countryItems.length === 0 ? (
+              <div className={styles.countryEmpty}>No country coverage available.</div>
+            ) : (
+              <>
+                {totalSymbols > 0 && (
+                  <div className={styles.countryTotal} title="Total symbols across all countries">
+                    <span className={styles.totalLabel}>Total Symbols</span>
+                    <span className={styles.totalCount}>{totalSymbols.toLocaleString()}</span>
+                  </div>
+                )}
+                <div className={styles.countryGrid}>
+                  {countryItems.map((c, index) => (
+                    <div 
+                      className={styles.countryCard} 
+                      key={c.code}
+                      style={{
+                        '--flag-bg': `url('https://flagcdn.com/w320/${c.code}.png')`,
+                        animationDelay: `${(index % 12) * 0.05}s`
+                      }}
+                    >
+                      <div className={styles.countryHeader}>
+                        <span className={`fi fi-${c.code} ${styles.flag}`} aria-hidden="true"></span>
+                        <span className={styles.countryName}>{c.name}</span>
+                      </div>
+                      <div className={styles.countryCount} aria-label={`Symbols: ${c.count}`}>
+                        {c.count.toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Load More Button */}
+                {displayedCount < allCountryItems.length && (
+                  <div className={styles.loadMoreContainer}>
+                    <button 
+                      className={styles.loadMoreButton}
+                      onClick={handleLoadMore}
+                      aria-label={`Load ${Math.min(12, allCountryItems.length - displayedCount)} more countries`}
+                    >
+                      Load More Countries
+                      <span className={styles.loadMoreCount}>
+                        ({allCountryItems.length - displayedCount} remaining)
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+
           <div className={styles.footer}>
             <Footer />
           </div>

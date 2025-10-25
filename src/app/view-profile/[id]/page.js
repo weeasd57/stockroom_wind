@@ -45,6 +45,7 @@ export default function ViewProfile({ params }) {
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [hasTelegramBot, setHasTelegramBot] = useState(false);
   const [telegramBotLoading, setTelegramBotLoading] = useState(true);
+  const [postsViewMode, setPostsViewMode] = useState('list');
 
   // Fetch profile data
   useEffect(() => {
@@ -525,9 +526,43 @@ export default function ViewProfile({ params }) {
       </div>
       
       <div className={styles.postsSection}>
-        <h2>Recent Posts</h2>
+        <div className={styles.postsHeaderRow}>
+          <h2>Recent Posts</h2>
+          <div className={styles.viewToggle}>
+            <button
+              className={`${styles.viewButton} ${postsViewMode === 'list' ? styles.viewButtonActive : ''}`}
+              onClick={() => setPostsViewMode('list')}
+              title="List View"
+              aria-label="List view"
+              type="button"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="8" y1="6" x2="21" y2="6"></line>
+                <line x1="8" y1="12" x2="21" y2="12"></line>
+                <line x1="8" y1="18" x2="21" y2="18"></line>
+                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+              </svg>
+            </button>
+            <button
+              className={`${styles.viewButton} ${postsViewMode === 'grid' ? styles.viewButtonActive : ''}`}
+              onClick={() => setPostsViewMode('grid')}
+              title="Grid View"
+              aria-label="Grid view"
+              type="button"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+            </button>
+          </div>
+        </div>
         <div className={styles.postsGrid}>
-          <PostsFeed mode="view-profile" userId={userId} hideControls showFlagBackground />
+          <PostsFeed mode="view-profile" userId={userId} hideControls showFlagBackground viewMode={postsViewMode} />
         </div>
       </div>
     </div>

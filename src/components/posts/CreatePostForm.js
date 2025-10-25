@@ -216,7 +216,13 @@ export default function CreatePostForm() {
     // Update form state; price fetch will be triggered by useEffect on selectedStock
     updateField('selectedStock', normalized);
     updateField('stockSearch', normalized.symbol);
-  }, [updateField]);
+    // If user did not pick a country (or picked "all"), auto-assign the symbol's country
+    try {
+      if ((!selectedCountry || selectedCountry === 'all') && normalized.country) {
+        updateField('selectedCountry', String(normalized.country).toLowerCase());
+      }
+    } catch (_) {}
+  }, [updateField, selectedCountry]);
 
   // الاستراتيجيات الافتراضية
   const DEFAULT_STRATEGIES = [

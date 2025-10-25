@@ -262,6 +262,23 @@
   padding: 1rem;
 }
 
+/* Posts feed section wrapper for extra spacing */
+.postsFeedSection {
+  padding: 1rem 0;
+}
+
+@media (min-width: 768px) {
+  .postsFeedSection {
+    padding: 1.5rem 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .postsFeedSection {
+    padding: 2rem 0;
+  }
+}
+
 /* Create Post Section */
 .createPostSection {
   margin-bottom: 2rem;

@@ -3,10 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
-import { usePosts } from '@/providers/PostProvider'; // Add PostProvider for real-time updates
-import { getUserPosts } from '@/utils/supabase';
+import { usePosts } from '@/providers/PostProvider'; // Provider is the single source of truth
 import styles from '@/styles/home/DashboardSection.module.css';
-import { calculatePostStats } from '@/lib/utils';
 import CalculationInfoDialog from '@/components/common/CalculationInfoDialog'; // Import the new dialog component
 
 export function DashboardSection() {
@@ -18,8 +16,8 @@ export function DashboardSection() {
     following: followingList,
   } = useProfile();
   
-  // Get posts from PostProvider for real-time updates
-  const { posts: allPosts, onPostCreated } = usePosts();
+  // Get posts and computed stats from PostProvider
+  const { myPosts, postStats, myLoading, onPostCreated } = usePosts();
   
   const [stats, setStats] = useState({
     totalPosts: 0,
@@ -44,15 +42,12 @@ export function DashboardSection() {
     setDialogContent({ title: '', content: '' });
   };
 
-  // Update stats whenever posts change
+  // Update stats whenever provider myPosts/postStats change
   useEffect(() => {
     if (!user?.id || !profileData?.id) return;
 
-    // Filter posts for current user
-    const userPosts = allPosts.filter(post => post.user_id === user.id);
-    
-    // Calculate post statistics
-    const postStats = calculatePostStats(userPosts);
+    const userPosts = Array.isArray(myPosts) ? myPosts : [];
+    const computed = postStats;
     
     // Calculate follower/following counts
     const followersCount = Array.isArray(followersList)
@@ -63,14 +58,21 @@ export function DashboardSection() {
       : (profileData?.following || 0);
 
     setStats({
-      ...postStats,
+      ...computed,
       followers: followersCount,
       following: followingCount,
       experienceScore: profileData?.experience_score || 0
     });
 
-    setLoading(false);
-  }, [user?.id, profileData, allPosts, followersList, followingList]);
+    setLoading(Boolean(myLoading));
+    
+    // Debug log for tracking
+    console.log('[DASHBOARD] Stats updated:', {
+      userPostsCount: userPosts.length,
+      totalPosts: computed.totalPosts,
+      fromMyPosts: true
+    });
+  }, [user?.id, profileData, myPosts, postStats, myLoading, followersList, followingList]);
 
   // Listen for new posts to update stats immediately
   useEffect(() => {
@@ -79,64 +81,19 @@ export function DashboardSection() {
     const unsubscribe = onPostCreated((newPost) => {
       // Only update if it's the current user's post
       if (newPost.user_id === user.id) {
-        console.log('[DASHBOARD] New post created, updating stats');
+        console.log('[DASHBOARD] New post created, updating stats from myPosts');
+        // Provider will update postStats via context; reflect immediately
+        setStats(prev => ({ ...prev, ...postStats }));
         
-        // Get updated user posts including the new one
-        const userPosts = allPosts.filter(post => post.user_id === user.id);
-        const postStats = calculatePostStats(userPosts);
-        
-        setStats(prev => ({
-          ...prev,
-          ...postStats
-        }));
+        console.log('[DASHBOARD] Stats after new post:', {
+          totalPosts: postStats.totalPosts,
+          newPostId: newPost.id
+        });
       }
     });
 
     return unsubscribe;
-  }, [onPostCreated, user?.id, allPosts]);
-
-  // Fallback to fetch user posts if PostProvider doesn't have them
-  useEffect(() => {
-    async function fetchUserStats() {
-      // Wait until we have a user and profile id
-      if (!user?.id || !profileData?.id) return;
-
-      // If we already have posts from PostProvider, don't fetch again
-      const userPostsFromProvider = allPosts.filter(post => post.user_id === user.id);
-      if (userPostsFromProvider.length > 0) return;
-
-      try {
-        setLoading(true);
-
-        // Get user posts as fallback
-        const { posts } = await getUserPosts(user.id, 1, 100);
-        
-        // Calculate statistics
-        const postStats = calculatePostStats(posts);
-
-        const followersCount = Array.isArray(followersList)
-          ? followersList.length
-          : (profileData?.followers || 0);
-        const followingCount = Array.isArray(followingList)
-          ? followingList.length
-          : (profileData?.following || 0);
-
-        setStats({
-          ...postStats,
-          followers: followersCount,
-          following: followingCount,
-          experienceScore: profileData?.experience_score || 0
-        });
-
-      } catch (error) {
-        console.error('Error fetching user stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchUserStats();
-  }, [user?.id, profileData?.id, profileData?.experience_score, followersList?.length, followingList?.length, allPosts]);
+  }, [onPostCreated, user?.id, myPosts, postStats]);
 
   if (loading) {
     return (
@@ -209,21 +166,6 @@ export function DashboardSection() {
           </div>
         </div>
 
-        <div className={styles.statCard}>
-          <div className={styles.statIcon}>👥</div>
-          <div className={styles.statContent}>
-            <h3 className={styles.statNumber}>{stats.followers}</h3>
-            <p className={styles.statLabel}>Followers</p>
-          </div>
-        </div>
-
-        <div className={styles.statCard}>
-          <div className={styles.statIcon}>➡️</div>
-          <div className={styles.statContent}>
-            <h3 className={styles.statNumber}>{stats.following}</h3>
-            <p className={styles.statLabel}>Following</p>
-          </div>
-        </div>
 
         <div className={styles.statCard} onClick={() => handleOpenDialog('Experience Score Calculation', `
           <h4>What is Experience Score?</h4>
@@ -264,3 +206,5 @@ export function DashboardSection() {
     </div>
   );
 }
+
+export default DashboardSection;

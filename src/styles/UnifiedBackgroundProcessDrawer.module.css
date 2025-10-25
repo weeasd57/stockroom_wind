@@ -643,23 +643,178 @@
 }
 
 /* Progress Bar */
+.progressContainer {
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .progressBar {
-  height: 3px;
-  background: var(--border);
-  border-radius: 1.5px;
+  flex: 1;
+  height: 4px;
+  background: hsl(var(--muted));
+  border-radius: 2px;
   overflow: hidden;
 }
 
 .progressFill {
   height: 100%;
-  background: var(--foreground);
+  background: hsl(var(--primary));
   transition: width 0.3s ease;
+  border-radius: 2px;
+}
+
+.progressText {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  min-width: 3rem;
+  text-align: right;
+}
+
+/* Expand Button */
+.expandButton {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.25rem;
+  background: hsl(var(--background));
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.expandButton:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--primary) / 0.5);
+}
+
+.expandButton.expanded {
+  background: hsl(var(--primary) / 0.1);
+  border-color: hsl(var(--primary) / 0.3);
+  color: hsl(var(--primary));
+}
+
+/* Process Details Content */
+.processDetailsContent {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid hsl(var(--border) / 0.5);
+}
+
+.detailsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.5rem;
+}
+
+.detailItem {
+  padding: 0.5rem 0.75rem;
+  background: hsl(var(--muted) / 0.3);
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border) / 0.3);
+}
+
+/* Error Container */
+.errorContainer {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: hsl(0 84% 60% / 0.1);
+  border: 1px solid hsl(0 84% 60% / 0.3);
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.errorIcon {
+  font-size: 1rem;
+  color: hsl(0 84% 60%);
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.errorText {
+  font-size: 0.75rem;
+  color: hsl(0 84% 60%);
+  line-height: 1.4;
+}
+
+/* Debug View */
+.debugView {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: hsl(var(--muted) / 0.1);
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.375rem;
+}
+
+.debugHeader {
+  margin-bottom: 0.75rem;
+}
+
+.debugHeader h5 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.debugSection {
+  margin-bottom: 0.75rem;
+}
+
+.debugSection:last-child {
+  margin-bottom: 0;
+}
+
+.debugSection h6 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+
+.logsContainer {
+  background: hsl(var(--muted) / 0.5);
+  border-radius: 0.375rem;
+  padding: 0.5rem;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.logEntry {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.logEntry:last-child {
+  margin-bottom: 0;
+}
+
+.logIndex {
+  font-size: 0.625rem;
+  color: hsl(var(--muted-foreground));
+  flex-shrink: 0;
+  min-width: 2rem;
+}
+
+.logText {
+  font-size: 0.625rem;
+  color: hsl(var(--foreground));
+  line-height: 1.4;
+  word-break: break-word;
 }
 
 /* Buttons */
 .retryButton,
 .removeButton,
-.cancelButton,
 .refreshButton {
   padding: 0.375rem 0.75rem;
   border: 1px solid var(--border);
@@ -668,14 +823,55 @@
   color: var(--muted-foreground);
   font-size: 0.75rem;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .retryButton:hover,
 .removeButton:hover,
-.cancelButton:hover,
 .refreshButton:hover {
   background: var(--muted);
   color: var(--foreground);
+}
+
+/* Enhanced Cancel Button */
+.cancelButton {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid hsl(0 84% 60% / 0.3);
+  border-radius: 0.375rem;
+  background: hsl(0 84% 60% / 0.1);
+  color: hsl(0 84% 60%);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.cancelButton:hover {
+  background: hsl(0 84% 60% / 0.2);
+  border-color: hsl(0 84% 60% / 0.5);
+  color: hsl(0 84% 50%);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px hsl(0 84% 60% / 0.25);
+}
+
+.cancelButton:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px hsl(0 84% 60% / 0.2);
+}
+
+/* Dark mode cancel button */
+[data-theme="dark"] .cancelButton {
+  background: hsl(0 84% 60% / 0.15);
+  border-color: hsl(0 84% 60% / 0.4);
+  color: hsl(0 84% 65%);
+}
+
+[data-theme="dark"] .cancelButton:hover {
+  background: hsl(0 84% 60% / 0.25);
+  border-color: hsl(0 84% 60% / 0.6);
+  color: hsl(0 84% 70%);
 }
 
 .refreshButton:disabled {
@@ -1453,6 +1649,69 @@
   margin-top: 0.25rem;
 }
 
+/* Header Actions */
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.clearAllButton {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid hsl(38 92% 50% / 0.3);
+  border-radius: 0.375rem;
+  background: hsl(38 92% 50% / 0.1);
+  color: hsl(38 92% 50%);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.clearAllButton:hover {
+  background: hsl(38 92% 50% / 0.2);
+  border-color: hsl(38 92% 50% / 0.5);
+  color: hsl(38 92% 45%);
+  transform: translateY(-1px);
+}
+
+/* Dark mode clear all button */
+[data-theme="dark"] .clearAllButton {
+  background: hsl(38 92% 50% / 0.15);
+  border-color: hsl(38 92% 50% / 0.4);
+  color: hsl(38 92% 55%);
+}
+
+[data-theme="dark"] .clearAllButton:hover {
+  background: hsl(38 92% 50% / 0.25);
+  border-color: hsl(38 92% 50% / 0.6);
+  color: hsl(38 92% 65%);
+}
+
+/* View History Button */
+.viewHistoryButton {
+  padding: 0.625rem 1.25rem;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.viewHistoryButton:hover {
+  background: hsl(var(--primary) / 0.9);
+  transform: translateY(-1px);
+}
+
 /* Loading */
 .loadingState {
   display: flex;
@@ -1998,4 +2257,200 @@
   border-radius: 0.25rem;
   font-size: 0.75rem;
   font-weight: 500;
+}
+
+/* Pro Benefits Section Styles */
+.modernProBenefitsSection {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, hsl(var(--muted) / 0.3) 0%, hsl(var(--accent) / 0.2) 100%);
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.modernProBenefitsSection::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #f59e0b, #eab308, #22c55e);
+  border-radius: 0.75rem 0.75rem 0 0;
+}
+
+.proBenefitsHeader {
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.sectionSubtitle {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  line-height: 1.4;
+}
+
+.benefitsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.benefitCard {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  padding: 1rem;
+  text-align: center;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.benefitCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+}
+
+.benefitCard:hover {
+  transform: translateY(-2px);
+  border-color: hsl(var(--primary));
+  box-shadow: 0 4px 12px hsl(var(--primary) / 0.2);
+}
+
+.benefitCard:hover::before {
+  transform: translateX(0);
+}
+
+.benefitIcon {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.benefitContent h5 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  margin: 0 0 0.25rem 0;
+}
+
+.benefitContent p {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  margin: 0;
+}
+
+.upgradeCallToAction {
+  text-align: center;
+}
+
+.ctaUpgradeButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  background: linear-gradient(135deg, #f59e0b 0%, #eab308 50%, #22c55e 100%);
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.ctaUpgradeButton::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.6s ease;
+}
+
+.ctaUpgradeButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.4);
+  background: linear-gradient(135deg, #d97706 0%, #ca8a04 50%, #16a34a 100%);
+}
+
+.ctaUpgradeButton:hover::before {
+  left: 100%;
+}
+
+.ctaUpgradeButton:active {
+  transform: translateY(-1px);
+}
+
+.ctaIcon {
+  font-size: 1rem;
+  animation: sparkle 2s infinite;
+}
+
+.ctaArrow {
+  font-size: 1rem;
+  transition: transform 0.3s ease;
+}
+
+.ctaUpgradeButton:hover .ctaArrow {
+  transform: translateX(4px);
+}
+
+@keyframes sparkle {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2) rotate(180deg);
+    opacity: 0.8;
+  }
+}
+
+/* Responsive Design for Pro Benefits */
+@media (max-width: 768px) {
+  .benefitsGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+  
+  .benefitCard {
+    padding: 0.75rem;
+  }
+  
+  .benefitIcon {
+    font-size: 1.25rem;
+  }
+  
+  .ctaUpgradeButton {
+    padding: 0.75rem 1.25rem;
+    font-size: 0.8125rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .benefitsGrid {
+    grid-template-columns: 1fr;
+  }
+  
+  .modernProBenefitsSection {
+    padding: 1rem;
+  }
 }

@@ -9,15 +9,9 @@ import { createPortal } from 'react-dom';
 import styles from '@/styles/home.module.css';
 import '@/styles/create-post-page.css';
 import dynamic from 'next/dynamic';
+import DashboardSection from '@/components/home/DashboardSection';
 
-// Dynamic Imports للمكونات الثقيلة - تحسين الأداء
-const DashboardSection = dynamic(
-  () => import('@/components/home/DashboardSection').then((mod) => ({ default: mod.DashboardSection })),
-  {
-    loading: () => <div className={styles.skeletonDashboard}>Loading dashboard...</div>,
-    ssr: false
-  }
-);
+// DashboardSection imported statically to avoid dev-time chunk load issues
 
 const PostsFeed = dynamic(
   () => import('@/components/home/PostsFeed'),
@@ -176,7 +170,9 @@ export default function HomePage() {
         </div>
 
         {/* Posts Feed Section */}
-        <PostsFeed showFlagBackground />
+        <div className={styles.postsFeedSection}>
+          <PostsFeed showFlagBackground />
+        </div>
       </div>
 
       {/* Create Post Dialog - rendered directly in the component */}

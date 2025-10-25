@@ -31,25 +31,33 @@ const CountrySelectDialog: React.FC<CountrySelectDialogProps> = ({
 
   // Memoize filtered countries for performance
   const filteredCountries = useMemo(() => {
+    // Build the base list of countries from constants
     let allCountries = COUNTRY_CODES.map(code => ({
       code,
       name: COUNTRY_CODE_TO_NAME[code] || code,
     }));
 
+    // Optionally limit to discovered countries only (keep 'all' available regardless)
     if (Array.isArray(discoveredCountries) && discoveredCountries.length > 0) {
       const set = new Set(discoveredCountries.map(c => String(c).toLowerCase()));
       allCountries = allCountries.filter(c => set.has(String(c.code).toLowerCase()));
     }
 
+    // Always prepend a virtual 'all' option at the top
+    const withAll = [{ code: 'all', name: 'All Countries' }, ...allCountries];
+
+    // If no search term, return the list with 'all' on top
     if (!searchTerm) {
-      return allCountries;
+      return withAll;
     }
 
+    // Apply search filter only to actual countries; keep 'all' visible at the top
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
-    return allCountries.filter(country =>
+    const filtered = allCountries.filter(country =>
       (country.name as string).toLowerCase().includes(lowerCaseSearchTerm) ||
       (country.code as string).toLowerCase().includes(lowerCaseSearchTerm)
     );
+    return [{ code: 'all', name: 'All Countries' }, ...filtered];
   }, [searchTerm, discoveredCountries]);
 
   const handleSelect = useCallback((countryCode: string) => {

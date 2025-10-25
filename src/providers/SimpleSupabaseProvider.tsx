@@ -224,7 +224,7 @@ export function SimpleSupabaseProvider({ children }: SupabaseProviderProps) {
   
   // Posts functions
   const getPosts = useCallback(async (): Promise<any[]> => {
-    const { data, error } = await supabase.from('posts').select(`
+    const { data, error } = await supabase.from('posts_with_stats').select(`
       *,
       profile:profiles!posts_user_id_fkey (
         id,
@@ -237,7 +237,7 @@ export function SimpleSupabaseProvider({ children }: SupabaseProviderProps) {
   }, [supabase]);
   
   const getPostsPage = useCallback(async (params: { limit?: number; before?: string | null; userIds?: string[] }): Promise<any[]> => {
-    let query = supabase.from('posts').select(`
+    let query = supabase.from('posts_with_stats').select(`
       *,
       profile:profiles!posts_user_id_fkey (
         id,

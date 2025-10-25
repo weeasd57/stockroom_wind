@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { CommentProvider } from '@/providers/CommentProvider';
+// CommentProvider is provided at app level, no need to import
 import PostActions from '@/components/posts/PostActions';
 import PostSentiment from '@/components/posts/PostSentiment';
 import Comments from '@/components/posts/Comments';
@@ -82,8 +82,7 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
   const countryCode = getCountryCode(post);
 
   return (
-    <CommentProvider>
-      <div className={`${styles.postCard} ${viewMode === 'grid' ? styles.gridCard : styles.listCard}`}>
+    <div className={`${styles.postCard} ${viewMode === 'grid' ? styles.gridCard : styles.listCard}`}>
         {showFlagBackground && countryCode && (
           <div className={styles.flagBackground} aria-hidden="true">
             <span className={`fi fi-${countryCode}`}></span>
@@ -93,7 +92,7 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
         <div className={styles.postHeader}>
           {!hideUserInfo && (
             profileId ? (
-              <Link href={`/view-profile/${profileId}`} className={styles.userInfo} prefetch>
+              <Link href={`/view-profile/${profileId}`} className={styles.userInfo} prefetch={false}>
                 <div className={styles.avatar}>
                   {avatarUrl ? (
                     <img src={avatarUrl} alt={username} className={styles.avatarImage} />
@@ -221,6 +220,7 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
           postId={post.id}
           initialBuyCount={post.buy_count || 0}
           initialSellCount={post.sell_count || 0}
+          autoSubscribe={true}
         />
 
         {/* Market Sentiment */}
@@ -243,6 +243,5 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
           </Link>
         </div>
       </div>
-    </CommentProvider>
   );
 }

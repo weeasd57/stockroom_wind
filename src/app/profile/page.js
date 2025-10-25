@@ -25,6 +25,7 @@ import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 import { useBackgroundProfileEdit } from '@/providers/BackgroundProfileEditProvider';
 // Background indicators removed - now handled by UnifiedBackgroundProcessDrawer
 import SocialLinks from '@/components/profile/SocialLinks';
+import FollowersDialog from '@/components/profile/FollowersDialog';
 import logger from '@/utils/logger';
 
 export default function Profile() {
@@ -154,6 +155,12 @@ export default function Profile() {
   const [filterLoading, setFilterLoading] = useState(false);
   const [backgroundUploadProgress, setBackgroundUploadProgress] = useState(0);
   const [viewMode, setViewMode] = useState('list'); // 'grid' or 'list'
+  const [mounted, setMounted] = useState(false);
+  const [followersDialogOpen, setFollowersDialogOpen] = useState(false);
+  const [followingDialogOpen, setFollowingDialogOpen] = useState(false);
+
+  // View mode storage key
+  const VIEW_MODE_STORAGE_KEY = "sharkszone-viewmode";
 
   // Helper function to ensure all values are strings for controlled inputs
   const sanitizeFormData = useCallback((profile) => ({
@@ -165,6 +172,30 @@ export default function Profile() {
     youtube_url: profile?.youtube_url || '',
     show_facebook: Boolean(profile?.show_facebook),
   }), []);
+
+  // Initialize view mode from localStorage only after component is mounted
+  useEffect(() => {
+    setMounted(true);
+    try {
+      const storedViewMode = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+      if (storedViewMode && (storedViewMode === 'list' || storedViewMode === 'grid')) {
+        setViewMode(storedViewMode);
+      }
+    } catch (error) {
+      console.error("Error accessing localStorage for view mode:", error);
+    }
+  }, [VIEW_MODE_STORAGE_KEY]);
+
+  // Save view mode to localStorage whenever it changes, but only after mounted
+  useEffect(() => {
+    if (!mounted) return;
+    
+    try {
+      localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+    } catch (error) {
+      console.error("Error saving view mode to localStorage:", error);
+    }
+  }, [viewMode, mounted, VIEW_MODE_STORAGE_KEY]);
 
   // Initialize data once when authenticated
   useEffect(() => {
@@ -962,6 +993,7 @@ export default function Profile() {
               </h1>
               <p className={styles.profileBio}>{profile?.bio || 'No bio yet'}</p>
               
+              
               {!showEditModal && (
                 <div className={styles.profileButtons}>
                   <button 
@@ -975,9 +1007,27 @@ export default function Profile() {
             </div>
           </div>
           
-          {/* Social Links */}
+          {/* Social Links with Follow Stats */}
           <div className={styles.socialLinksContainer}>
-            <SocialLinks profile={profile} size="normal" />
+            <div className={styles.followStatsContainer}>
+              <button 
+                className={styles.followStat}
+                onClick={() => setFollowersDialogOpen(true)}
+              >
+                <span className={styles.followNumber}>{followers?.length || 0}</span>
+                <span className={styles.followLabel}>Followers</span>
+              </button>
+              <button 
+                className={styles.followStat}
+                onClick={() => setFollowingDialogOpen(true)}
+              >
+                <span className={styles.followNumber}>{following?.length || 0}</span>
+                <span className={styles.followLabel}>Following</span>
+              </button>
+            </div>
+            <div className={styles.socialLinksWrapper}>
+              <SocialLinks profile={profile} size="normal" />
+            </div>
           </div>
         </div>
       </div>
@@ -1469,6 +1519,25 @@ export default function Profile() {
           // Refresh data to get updated strategy information
           refreshData(user?.id);
         }}
+      />
+      
+      {/* Followers/Following Dialogs */}
+      <FollowersDialog
+        isOpen={followersDialogOpen}
+        onClose={() => setFollowersDialogOpen(false)}
+        followers={followers}
+        following={following}
+        type="followers"
+        loading={profileLoading}
+      />
+      
+      <FollowersDialog
+        isOpen={followingDialogOpen}
+        onClose={() => setFollowingDialogOpen(false)}
+        followers={followers}
+        following={following}
+        type="following"
+        loading={profileLoading}
       />
       
       {/* Edit Profile Modal */}

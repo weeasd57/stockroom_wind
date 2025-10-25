@@ -52,7 +52,7 @@ function CommentItem({
             <div className={styles.commentHeader}>
               <span className={styles.username}>
                 {comment.user_id ? (
-                  <Link href={`/view-profile/${comment.user_id}`} className={styles.username} prefetch>
+                  <Link href={`/view-profile/${comment.user_id}`} className={styles.username} prefetch={false}>
                     {comment.username || comment.full_name || 'Unknown User'}
                   </Link>
                 ) : (
@@ -224,14 +224,23 @@ function CommentItem({
       )}
     </div>
   );
+
 }
 
-export default function CommentsDialog({ postId, isOpen, onClose, initialCommentCount = 0 }) {
+// Main CommentsDialog component
+export default function CommentsDialog({ postId, isOpen, onClose, commentCount: initialCommentCount = 0 }) {
+  console.log('[DEBUG] CommentsDialog rendered with:', { postId, isOpen, commentCount: initialCommentCount });
+  
+  // Add simple alert for debugging
+  if (isOpen) {
+    console.log('[DEBUG] Dialog should be visible now!');
+  }
+  
   const { user } = useSupabase();
   const { 
-    fetchCommentsForPost, 
-    startPolling, 
-    stopPolling, 
+    fetchCommentsForPost,
+    startPolling,
+    stopPolling,
     deleteComment, 
     editComment,
     getPostComments,
@@ -242,7 +251,7 @@ export default function CommentsDialog({ postId, isOpen, onClose, initialComment
   // Use provider's real-time data instead of local state
   const comments = getPostComments(postId);
   const postStats = getPostStats(postId);
-  const commentCount = postStats.commentCount;
+  const commentCount = postStats.commentCount || initialCommentCount;
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -427,21 +436,20 @@ export default function CommentsDialog({ postId, isOpen, onClose, initialComment
   if (!isOpen) return null;
 
   const commentInputDirection = detectTextDirection(newComment);
-
   return (
     <div className={styles.overlay}>
       <div className={styles.dialog} ref={dialogRef}>
-        {/* Dialog Header */}
-        <div className={styles.header}>
-          <h3 className={styles.title}>
-            {commentCount > 0 ? `${commentCount} Comments` : 'Comments'}
-          </h3>
-          <button className={styles.closeButton} onClick={onClose}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </button>
-        </div>
+      {/* Dialog Header */}
+      <div className={styles.header}>
+        <h3 className={styles.title}>
+          {commentCount > 0 ? `${commentCount} Comments` : 'Comments'}
+        </h3>
+        <button className={styles.closeButton} onClick={onClose}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+        </button>
+      </div>
 
         {/* Comments Content */}
         <div className={styles.content}>
@@ -515,52 +523,25 @@ export default function CommentsDialog({ postId, isOpen, onClose, initialComment
             ) : comments.length > 0 ? (
               <div className={styles.commentsList}>
                 {comments.map((comment) => (
-                  <div key={comment.id}>
-                    <CommentItem
-                      comment={comment}
-                      isReply={false}
-                      user={user}
-                      replyingTo={replyingTo}
-                      setReplyingTo={setReplyingTo}
-                      replyText={replyText}
-                      setReplyText={setReplyText}
-                      handleSubmitReply={handleSubmitReply}
-                      handleReplyTextChange={handleReplyTextChange}
-                      submitting={submitting}
-                      editingComment={editingComment}
-                      setEditingComment={setEditingComment}
-                      editText={editText}
-                      setEditText={setEditText}
-                      handleSubmitEdit={handleSubmitEdit}
-                      handleDeleteComment={handleDeleteComment}
-                    />
-                    {/* Render nested replies */}
-                    {comment.replies && comment.replies.length > 0 && (
-                      <div className={styles.repliesContainer}>
-                        {comment.replies.map((reply) => (
-                          <CommentItem
-                            key={reply.id}
-                            comment={reply}
-                            isReply={true}
-                            user={user}
-                            replyingTo={replyingTo}
-                            setReplyingTo={setReplyingTo}
-                            replyText={replyText}
-                            setReplyText={setReplyText}
-                            handleSubmitReply={handleSubmitReply}
-                            handleReplyTextChange={handleReplyTextChange}
-                            submitting={submitting}
-                            editingComment={editingComment}
-                            setEditingComment={setEditingComment}
-                            editText={editText}
-                            setEditText={setEditText}
-                            handleSubmitEdit={handleSubmitEdit}
-                            handleDeleteComment={handleDeleteComment}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <CommentItem
+                    key={comment.id}
+                    comment={comment}
+                    isReply={false}
+                    user={user}
+                    replyingTo={replyingTo}
+                    setReplyingTo={setReplyingTo}
+                    replyText={replyText}
+                    setReplyText={setReplyText}
+                    handleSubmitReply={handleSubmitReply}
+                    handleReplyTextChange={handleReplyTextChange}
+                    submitting={submitting}
+                    editingComment={editingComment}
+                    setEditingComment={setEditingComment}
+                    editText={editText}
+                    setEditText={setEditText}
+                    handleSubmitEdit={handleSubmitEdit}
+                    handleDeleteComment={handleDeleteComment}
+                  />
                 ))}
               </div>
             ) : (

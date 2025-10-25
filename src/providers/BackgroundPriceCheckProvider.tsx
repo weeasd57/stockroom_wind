@@ -20,7 +20,8 @@ export type PriceCheckTaskStatus =
   | 'checking_prices'
   | 'updating_database'
   | 'completed'
-  | 'failed';
+  | 'failed'
+  | 'canceled';
 
 export interface PriceCheckTask {
   id: string;
@@ -47,6 +48,7 @@ interface BackgroundPriceCheckContextType {
   removeTask: (taskId: string) => void;
   retryTask: (taskId: string) => Promise<void>;
   clearCompletedTasks: () => void;
+  cancelTask: (taskId: string) => void;
 }
 
 const BackgroundPriceCheckContext = createContext<BackgroundPriceCheckContextType | undefined>(undefined);
@@ -60,6 +62,16 @@ export function BackgroundPriceCheckProvider({ children }: BackgroundPriceCheckP
   
   const [tasks, setTasks] = useState<PriceCheckTask[]>([]);
   const processingRef = useRef(false);
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+
+  // Keep a live reference to tasks to avoid stale closures in async handlers
+  const tasksRef = useRef<PriceCheckTask[]>([]);
+  React.useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
+
+  // Track user-canceled tasks to suppress post-response UI (notifications/results)
+  const canceledTaskIdsRef = useRef<Set<string>>(new Set());
 
   // Check if we're currently processing any tasks
   const isProcessing = tasks.some(task => 
@@ -119,6 +131,16 @@ export function BackgroundPriceCheckProvider({ children }: BackgroundPriceCheckP
       }
 
       console.log(`[BackgroundPriceCheck] Processing task ${taskId}`);
+      // If user canceled before processing begins, exit early
+      if (canceledTaskIdsRef.current.has(taskId)) {
+        setTasks(prev => prev.map(t => 
+          t.id === taskId 
+            ? { ...t, status: 'canceled', error: 'User canceled', updatedAt: new Date() }
+            : t
+        ));
+        processingRef.current = false;
+        return;
+      }
 
       // Update task status
       const updateTaskStatus = (status: PriceCheckTaskStatus, progress: number, updates?: Partial<PriceCheckTask>) => {
@@ -137,14 +159,22 @@ export function BackgroundPriceCheckProvider({ children }: BackgroundPriceCheckP
         
         // Create AbortController for timeout and cancellation
         const controller = new AbortController();
+        abortControllersRef.current.set(taskId, controller);
         
         // Set 3-minute timeout for background price check
         const timeoutId = setTimeout(() => {
-          console.log('[BackgroundPriceCheck] Request timed out after 3 minutes');
+          console.log(`[BackgroundPriceCheck] Request timed out after 3 minutes for task ${taskId}`);
           controller.abort();
+          abortControllersRef.current.delete(taskId);
         }, 3 * 60 * 1000); // 3 minutes
         
         try {
+          // Guard again right before network call in case user canceled during preparation
+          if (canceledTaskIdsRef.current.has(taskId)) {
+            updateTaskStatus('canceled', 0, { error: 'User canceled' });
+            return;
+          }
+
           // Call the price check API route
           const response = await fetch('/api/posts/check-prices', {
             method: 'POST',
@@ -160,6 +190,7 @@ export function BackgroundPriceCheckProvider({ children }: BackgroundPriceCheckP
           
           // Clear timeout on successful response
           clearTimeout(timeoutId);
+          abortControllersRef.current.delete(taskId);
 
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
@@ -215,38 +246,64 @@ export function BackgroundPriceCheckProvider({ children }: BackgroundPriceCheckP
           
           console.log(`[BackgroundPriceCheck] Price check completed successfully. Checked: ${checkedCount}, Updated: ${updatedCount}`);
           
-          // Show success notification
+          // Show success notification only if task is not canceled
           if (typeof window !== 'undefined' && window.showNotification) {
-            const message = checkedCount === 0 
-              ? 'No posts found to check prices 📊'
-              : `✅ Price check completed! Checked ${checkedCount} posts, updated ${updatedCount} prices. ${remainingChecks} checks remaining.`;
-            
-            window.showNotification(message, checkedCount === 0 ? 'info' : 'success');
+            if (!canceledTaskIdsRef.current.has(taskId)) {
+              const currentTask = tasksRef.current.find(t => t.id === taskId);
+              if (currentTask && currentTask.status !== 'canceled') {
+                const message = checkedCount === 0 
+                  ? 'No posts found to check prices 📊'
+                  : `✅ Price check completed! Checked ${checkedCount} posts, updated ${updatedCount} prices. ${remainingChecks} checks remaining.`;
+                window.showNotification(message, checkedCount === 0 ? 'info' : 'success');
+              } else {
+                console.log(`[BackgroundPriceCheck] Task ${taskId} marked canceled, skipping success notification`);
+              }
+            } else {
+              console.log(`[BackgroundPriceCheck] Task ${taskId} canceled by user, skipping success notification`);
+            }
           }
 
-          // Show detailed results dialog if there are results to show
+          // Show detailed results dialog if there are results to show AND task is not canceled
           if (result.results && result.results.length > 0 && typeof window !== 'undefined' && window.showPriceCheckResults) {
-            console.log(`[BackgroundPriceCheck] Showing results dialog with ${result.results.length} results`);
-            
-            // Prepare stats for dialog
-            const statsForDialog = {
-              usageCount: result.usageCount || 0,
-              remainingChecks: remainingChecks,
-              checkedPosts: checkedCount,
-              updatedPosts: updatedCount
-            };
-            
-            // Show the results dialog
-            window.showPriceCheckResults(result.results, statsForDialog);
+            if (!canceledTaskIdsRef.current.has(taskId)) {
+              const currentTask = tasksRef.current.find(t => t.id === taskId);
+              if (currentTask && currentTask.status !== 'canceled') {
+                console.log(`[BackgroundPriceCheck] Showing results dialog with ${result.results.length} results`);
+                // Prepare stats for dialog
+                const statsForDialog = {
+                  usageCount: result.usageCount || 0,
+                  remainingChecks: remainingChecks,
+                  checkedPosts: checkedCount,
+                  updatedPosts: updatedCount
+                };
+                // Show the results dialog
+                window.showPriceCheckResults(result.results, statsForDialog);
+              } else {
+                console.log(`[BackgroundPriceCheck] Task ${taskId} status is canceled, skipping results dialog`);
+              }
+            } else {
+              console.log(`[BackgroundPriceCheck] Task ${taskId} canceled by user, skipping results dialog`);
+            }
           }
 
         } catch (fetchError: unknown) {
           // Clear timeout on error
           clearTimeout(timeoutId);
+          abortControllersRef.current.delete(taskId);
           
-          // Handle specific timeout error
+          // Handle specific timeout/cancellation error
           if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-            throw new Error('Request timed out after 3 minutes. Please try again.');
+            // Check if this was a user cancellation vs timeout
+            const controller = abortControllersRef.current.get(taskId);
+            if (!controller) {
+              // Controller was removed = user cancellation
+              updateTaskStatus('canceled', 0, { error: 'User canceled' });
+              console.log(`[BackgroundPriceCheck] Task ${taskId} was canceled by user`);
+              return; // Exit early, don't throw error
+            } else {
+              // Controller still exists = timeout
+              throw new Error('Request timed out after 3 minutes. Please try again.');
+            }
           }
           
           // Re-throw the error with proper handling
@@ -281,10 +338,46 @@ export function BackgroundPriceCheckProvider({ children }: BackgroundPriceCheckP
     }
   }, [tasks, user, supabase]);
 
+  // Cancel a running task
+  const cancelTask = useCallback((taskId: string) => {
+    console.log(`[BackgroundPriceCheck] 🚫 Canceling task: ${taskId}`);
+    // Mark task as user-canceled (used to suppress any late success handlers)
+    canceledTaskIdsRef.current.add(taskId);
+    
+    // Abort the ongoing request if it exists
+    const controller = abortControllersRef.current.get(taskId);
+    if (controller) {
+      controller.abort();
+      abortControllersRef.current.delete(taskId);
+      console.log(`[BackgroundPriceCheck] ✅ Aborted API request for task: ${taskId}`);
+    }
+    
+    // Update task status to canceled
+    setTasks(prev => prev.map(t => 
+      t.id === taskId 
+        ? { ...t, status: 'canceled', error: 'User canceled', progress: t.progress, updatedAt: new Date() }
+        : t
+    ));
+    
+    // Reset processing ref if this was the current task
+    processingRef.current = false;
+    
+    // Show cancellation notification
+    if (typeof window !== 'undefined' && window.showNotification) {
+      window.showNotification('🚫 Price check cancelled', 'info');
+    }
+  }, []);
+
   // Remove a task
   const removeTask = useCallback((taskId: string) => {
+    // Cancel first if task is still running
+    const task = tasks.find(t => t.id === taskId);
+    if (task && ['pending', 'fetching_posts', 'checking_prices', 'updating_database'].includes(task.status)) {
+      cancelTask(taskId);
+    }
+    
     setTasks(prev => prev.filter(t => t.id !== taskId));
-  }, []);
+  }, [tasks, cancelTask]);
 
   // Retry a failed task
   const retryTask = useCallback(async (taskId: string) => {
@@ -322,6 +415,7 @@ export function BackgroundPriceCheckProvider({ children }: BackgroundPriceCheckP
     removeTask,
     retryTask,
     clearCompletedTasks,
+    cancelTask,
   };
 
   return (

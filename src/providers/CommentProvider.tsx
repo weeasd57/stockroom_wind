@@ -21,6 +21,7 @@ interface CommentContextType {
   editComment: (id: string, newContent: string) => Promise<void>;
   getPostComments: (postId: string) => Comment[];
   getPostStats: (postId: string) => PostStats;
+  updatePostStats: (postId: string) => Promise<void>;
   fetchCommentsForPost: (postId: string) => Promise<void>;
   toggleBuyVote: (postId: string, currentAction?: 'buy' | 'sell' | null) => Promise<void>;
   toggleSellVote: (postId: string, currentAction?: 'buy' | 'sell' | null) => Promise<void>;
@@ -58,12 +59,16 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
           filter: `post_id=eq.${postId}`
         },
         async (payload) => {
-          console.log('Comments change:', payload);
-          // Always refresh counts; refresh comment list only if already loaded to avoid heavy fetches in feeds
+          // Always refresh counts; refresh comment list only if dialog is open
           await updatePostStats(postId);
-          if (loadedCommentsPosts.has(postId)) {
-            await fetchCommentsForPost(postId);
-          }
+          // Use current state instead of stale closure to prevent infinite loops
+          setLoadedCommentsPosts(current => {
+            if (current.has(postId)) {
+              // Only refetch if comments are actually loaded (dialog open)
+              fetchCommentsForPost(postId);
+            }
+            return current;
+          });
         }
       )
       .on(
@@ -75,7 +80,6 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
           filter: `post_id=eq.${postId}`
         },
         async (payload) => {
-          console.log('Post actions change:', payload);
           await updatePostStats(postId);
         }
       )
@@ -85,7 +89,7 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
       ...prev,
       [postId]: { channel }
     }));
-  }, [supabase, subscriptions, loadedCommentsPosts]);
+  }, [supabase, subscriptions]);
 
   // Update post statistics
   const updatePostStats = useCallback(async (postId: string) => {
@@ -137,7 +141,7 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
         .eq('post_id', postId)
         .order('created_at', { ascending: true });
 
-      console.debug("Comments fetched for post:", postId, data);
+      // Comments fetched silently in production
 
       if (error) throw error;
 
@@ -177,7 +181,7 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
       console.error('Error fetching comments:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch comments');
     }
-  }, [supabase, updatePostStats, subscribeToPost]);
+  }, [supabase, updatePostStats]);
 
   const addComment = async (postId: string, content: string): Promise<Comment> => {
     if (!supabase || !user) throw new Error('Not authenticated');
@@ -356,7 +360,6 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
         return current;
       }
       
-      console.log(`🚀 Starting polling for post: ${postId}`);
       return postId;
     });
     
@@ -367,13 +370,10 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
       }
       
       // Set up new polling every 10 seconds
-      console.log(`⏰ Setting up interval for post: ${postId} (10s)`);
       const newInterval = setInterval(async () => {
-        console.log(`🔄 Polling cycle for post: ${postId}`);
         try {
           await fetchCommentsForPost(postId);
           await updatePostStats(postId);
-          console.log(`✅ Polling cycle completed for post: ${postId}`);
         } catch (error) {
           console.error(`❌ Polling error for post ${postId}:`, error);
         }
@@ -385,13 +385,10 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
 
   const stopPolling = useCallback(() => {
     if (pollingInterval) {
-      console.log(`🛑 Stopping polling for post: ${currentPollingPostId}`);
       clearInterval(pollingInterval);
       setPollingInterval(null);
       setCurrentPollingPostId(null);
-      console.log(`✅ Polling stopped successfully`);
     } else {
-      console.log(`ℹ️ No active polling to stop`);
       setCurrentPollingPostId(null);
     }
   }, [pollingInterval, currentPollingPostId]);
@@ -515,6 +512,7 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
       editComment,
       getPostComments,
       getPostStats,
+      updatePostStats,
       fetchCommentsForPost,
       toggleBuyVote,
       toggleSellVote,

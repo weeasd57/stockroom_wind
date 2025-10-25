@@ -1,7 +1,7 @@
 'use client';
-
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
+import { calculatePostStats } from '@/lib/utils';
 
 type Post = any;
 
@@ -10,14 +10,21 @@ type PostsContextType = {
   // feedPosts respects provider-level flags like excludeCurrentUser
   feedPosts: Post[];
   myPosts: Post[];
+  myLoading: boolean;
+  myHasMore: boolean;
   loading: boolean;
   error: string | null;
   fetchPosts: (mode?: 'following' | 'all' | 'trending', opts?: { excludeCurrentUser?: boolean }) => Promise<void>;
   loadMore: () => Promise<void>;
   hasMore: boolean;
   loadingMore: boolean;
+  // Current user's posts controls
+  fetchMyPosts: () => Promise<void>;
+  loadMoreMyPosts: () => Promise<void>;
+  postStats: { totalPosts: number; successfulPosts: number; lossPosts: number; successRate: number };
   createPost: (postData: any) => Promise<Post>;
   onPostCreated: (cb: (post: Post) => void) => () => void;
+  updateUserPosts: (userPosts: Post[]) => void;
 };
 
 const PostsContext = createContext<PostsContextType | undefined>(undefined);
@@ -25,6 +32,11 @@ const PostsContext = createContext<PostsContextType | undefined>(undefined);
 export function PostProvider({ children }: { children: React.ReactNode }) {
   const { supabase, getPostsPage, createPost: supaCreatePost, user } = useSupabase();
   const [posts, setPosts] = useState<Post[]>([]);
+  // Dedicated state for current user's posts (profile/dashboard)
+  const [myPostsState, setMyPostsState] = useState<Post[]>([]);
+  const [myLoading, setMyLoading] = useState<boolean>(false);
+  const [myHasMore, setMyHasMore] = useState<boolean>(false);
+  const myBeforeCursorRef = useRef<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const subscribersRef = useRef<Array<(post: Post) => void>>([]);
@@ -33,7 +45,8 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
   const nextCursorRef = useRef<string | null>(null); // created_at cursor for keyset pagination
   const modeRef = useRef<'following' | 'all' | 'trending' | undefined>(undefined);
   const followingIdsRef = useRef<string[] | null>(null);
-  const PAGE_SIZE = 20;
+  const PAGE_SIZE = 20; // feed page size
+  const MY_PAGE_SIZE = 25; // initial page size for current user's posts (dashboard/profile)
   // Whether to exclude current user's posts for the consumer feed (Home)
   const [excludeSelf, setExcludeSelf] = useState<boolean>(false);
 
@@ -194,6 +207,50 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     }
   }, [getPostsPage, loadingMore]);
 
+  // Fetch current user's posts (profile/dashboard owner)
+  const fetchMyPosts = useCallback(async () => {
+    if (!user?.id) {
+      setMyPostsState([]);
+      setMyHasMore(false);
+      myBeforeCursorRef.current = null;
+      return;
+    }
+    setMyLoading(true);
+    try {
+      const page = await getPostsPage({ limit: MY_PAGE_SIZE, before: null, userIds: [user.id] });
+      const list = Array.isArray(page) ? page : [];
+      setMyPostsState(list);
+      myBeforeCursorRef.current = list.length > 0 ? String(list[list.length - 1].created_at) : null;
+      setMyHasMore(list.length === MY_PAGE_SIZE);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to fetch my posts');
+      setMyPostsState([]);
+      setMyHasMore(false);
+    } finally {
+      setMyLoading(false);
+    }
+  }, [getPostsPage, user?.id]);
+
+  // Load more for current user's posts
+  const loadMoreMyPosts = useCallback(async () => {
+    if (!user?.id) return;
+    if (myLoading) return;
+    const before = myBeforeCursorRef.current;
+    if (!before) { setMyHasMore(false); return; }
+    setMyLoading(true);
+    try {
+      const page = await getPostsPage({ limit: PAGE_SIZE, before, userIds: [user.id] });
+      const list = Array.isArray(page) ? page : [];
+      setMyPostsState(prev => [...prev, ...list]);
+      myBeforeCursorRef.current = list.length > 0 ? String(list[list.length - 1].created_at) : null;
+      setMyHasMore(list.length === PAGE_SIZE);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load more my posts');
+    } finally {
+      setMyLoading(false);
+    }
+  }, [getPostsPage, myLoading, user?.id]);
+
   // Subscribe to realtime updates for posts (price checks, status changes)
   useEffect(() => {
     if (!supabase) return;
@@ -228,6 +285,13 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
               }
               return combined;
             });
+            // If it's my post, prepend to myPostsState as well
+            if (full.user_id && user?.id && full.user_id === user.id) {
+              setMyPostsState(prev => {
+                if (prev.some(p => p.id === full.id)) return prev;
+                return [full, ...prev];
+              });
+            }
           }).catch(() => {});
         } else if (evt === 'UPDATE' && newRow) {
           console.log('[PostProvider] Real-time UPDATE received:', newRow.id, {
@@ -260,8 +324,22 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
             }
             return next;
           });
+          // Update myPostsState if applicable
+          if (newRow.user_id && user?.id && newRow.user_id === user.id) {
+            setMyPostsState(prev => {
+              const next = [...prev];
+              const idx = next.findIndex(p => p.id === newRow.id);
+              if (idx !== -1) {
+                next[idx] = { ...next[idx], ...newRow } as any;
+              }
+              return next;
+            });
+          }
         } else if (evt === 'DELETE' && oldRow) {
           setPosts(prev => prev.filter(p => p.id !== oldRow.id));
+          if (user?.id) {
+            setMyPostsState(prev => prev.filter(p => p.id !== oldRow.id));
+          }
         }
       })
       .subscribe();
@@ -308,8 +386,19 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       
       setPosts(prev => {
         const withoutTemp = prev.filter(p => p.id !== tempId);
-        return [saved, ...withoutTemp];
+        const newList = [saved, ...withoutTemp];
+        console.log('[PostProvider] Post added to posts list:', {
+          tempId,
+          savedId: saved?.id,
+          newListLength: newList.length,
+          savedUserId: saved?.user_id
+        });
+        return newList;
       });
+      // Also update myPostsState if it's my own post
+      if (saved?.user_id && user?.id && saved.user_id === user.id) {
+        setMyPostsState(prev => [saved, ...prev]);
+      }
       notifyCreated(saved);
       return saved;
     } catch (e: any) {
@@ -326,11 +415,35 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  // Initial fetch only on mount
+  // Function to update user posts from PostsFeed
+  const updateUserPosts = useCallback((newUserPosts: Post[]) => {
+    // Temporary compatibility: allow external components to push myPosts
+    setMyPostsState(newUserPosts);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[PostProvider] User posts updated externally:', {
+        userId: user?.id,
+        newUserPostsCount: newUserPosts.length,
+        postIds: newUserPosts.map(p => p.id).slice(0, 3)
+      });
+    }
+  }, [user?.id]);
+
+  // Initial fetch for feed posts only on mount
   useEffect(() => {
     fetchPosts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
+
+  // Fetch myPosts whenever user changes
+  useEffect(() => {
+    if (!user?.id) {
+      setMyPostsState([]);
+      setMyHasMore(false);
+      myBeforeCursorRef.current = null;
+      return;
+    }
+    fetchMyPosts();
+  }, [user?.id, fetchMyPosts]);
 
   const value: PostsContextType = {
     posts,
@@ -341,18 +454,33 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       return posts;
     }, [posts, excludeSelf, user?.id]),
     myPosts: useMemo(() => {
-      const uid = user?.id;
-      if (!uid) return [] as Post[];
-      return posts.filter((p: any) => p?.user_id === uid);
-    }, [posts, user?.id]),
+      const list = Array.isArray(myPostsState) ? myPostsState : [];
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[PostProvider] myPosts updated:', {
+          userId: user?.id,
+          myPostsCount: list.length,
+          myPostsIds: list.map(p => p.id).slice(0, 3)
+        });
+      }
+      return list;
+    }, [myPostsState, user?.id]),
+    myLoading,
+    myHasMore,
     loading,
     error,
     fetchPosts,
     loadMore,
     hasMore,
     loadingMore,
+    fetchMyPosts,
+    loadMoreMyPosts,
+    postStats: useMemo(() => {
+      const list = Array.isArray(myPostsState) ? myPostsState : [];
+      return calculatePostStats(list as any);
+    }, [myPostsState]),
     createPost,
     onPostCreated,
+    updateUserPosts,
   };
 
   return <PostsContext.Provider value={value}>{children}</PostsContext.Provider>;

@@ -20,7 +20,7 @@ export default function Footer() {
         
         <div className={styles.bottom}>
           <p className={styles.copyright}>
-            &copy; {new Date().getFullYear()} SharksZone. All rights reserved.
+            &copy; {new Date().getFullYear()} <span className={styles.appNameInCopyright}>SharksZone</span>. All rights reserved.
           </p>
         </div>
         <div className={styles.appname}>SharksZone</div>

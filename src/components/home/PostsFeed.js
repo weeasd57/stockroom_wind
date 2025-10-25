@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { usePosts } from '@/providers/PostProvider'; // Add PostProvider for real-time updates
+import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import PostCard from '@/components/posts/PostCard';
 import styles from '@/styles/home/PostsFeed.module.css';
 
@@ -29,7 +30,22 @@ export function PostsFeed({
 } = {}) {
   
   // Get posts from PostProvider for real-time updates
-  const { feedPosts: providerPosts, fetchPosts, loadMore, hasMore, loadingMore, loading: providerLoading, error: providerError } = usePosts();
+  const { 
+    fetchPosts, 
+    loading: providerLoading, 
+    posts: providerPosts, 
+    error: providerError,
+    onPostCreated,
+    myPosts,
+    myLoading,
+    myHasMore,
+    loadMoreMyPosts,
+    updateUserPosts,
+    hasMore,
+    loadMore,
+    loadingMore 
+  } = usePosts();
+  const { getPostsPage, user } = useSupabase();
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -37,11 +53,22 @@ export function PostsFeed({
   const [sortBy, setSortBy] = useState('date_desc'); // date_desc, date_asc, engagement, price_change
   const [categoryFilter, setCategoryFilter] = useState('all'); // all, buy, sell, analysis
   const [internalViewMode, setInternalViewMode] = useState('list'); // list, grid
+  const [mounted, setMounted] = useState(false);
   // Use external viewMode if provided, otherwise use internal state
   const viewMode = externalViewMode || internalViewMode;
+  // In profile page, we always render the current user's posts
+  const isSelfProfile = mode === 'profile';
+
+  // User-specific feed (for profile/view-profile). We fetch directly by userId to avoid pagination mismatch.
+  const [userPosts, setUserPosts] = useState([]);
+  const [userLoading, setUserLoading] = useState(false);
+  const [userHasMore, setUserHasMore] = useState(false);
+  const userBeforeCursorRef = useRef(null);
+  
+  // View mode storage key
+  const VIEW_MODE_STORAGE_KEY = "sharkszone-viewmode";
   // Removed local following cache; PostProvider handles 'following' filtering
 
-  // Helpers for external filters
   const matchesStatus = (post, statusFilter) => {
     if (!statusFilter) return true;
     if (statusFilter === 'success') return post.status === 'success' || post.target_reached === true;
@@ -52,9 +79,10 @@ export function PostsFeed({
     return true;
   };
 
+  // Extract country code from post (either explicit country or from symbol suffix like AAPL.US)
   const getPostCountry = (post) => {
-    if (post.country) return String(post.country);
-    if (post.symbol) {
+    if (post?.country) return String(post.country);
+    if (post?.symbol) {
       const parts = String(post.symbol).split('.');
       if (parts.length > 1) return parts[1];
     }
@@ -82,12 +110,38 @@ export function PostsFeed({
 
   // Local following list removed to prevent double-filtering and races
 
+  // Initialize view mode from localStorage only after component is mounted
+  useEffect(() => {
+    setMounted(true);
+    try {
+      const storedViewMode = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+      if (storedViewMode && (storedViewMode === 'list' || storedViewMode === 'grid')) {
+        setInternalViewMode(storedViewMode);
+      }
+    } catch (error) {
+      console.error("Error accessing localStorage for view mode:", error);
+    }
+  }, [VIEW_MODE_STORAGE_KEY]);
+
+  // Save view mode to localStorage whenever it changes, but only after mounted
+  useEffect(() => {
+    if (!mounted) return;
+    
+    try {
+      localStorage.setItem(VIEW_MODE_STORAGE_KEY, internalViewMode);
+    } catch (error) {
+      console.error("Error saving view mode to localStorage:", error);
+    }
+  }, [internalViewMode, mounted, VIEW_MODE_STORAGE_KEY]);
+
   // Fetch posts with the appropriate filter when filter changes
   useEffect(() => {
-    console.log(`[PostsFeed] useEffect for fetching posts fired. Filter: ${filter}, FetchPosts changed: ${typeof fetchPosts === 'function'}`);
-    if (userId) {
-      // Profile/View-Profile: do not exclude current user's posts
-      fetchPosts();
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[PostsFeed] useEffect for fetching posts fired. Filter: ${filter}, FetchPosts changed: ${typeof fetchPosts === 'function'}`);
+    }
+    if (isSelfProfile || userId) {
+      // For profile/view-profile, we fetch directly via getPostsPage in a separate effect.
+      return;
     } else if (filter === 'following') {
       // Following feed: normally won't include self; keep explicit mode
       fetchPosts('following', { excludeCurrentUser: false });
@@ -100,13 +154,74 @@ export function PostsFeed({
     }
   }, [filter, fetchPosts, userId]);
 
+  // Fetch user posts directly when userId is provided (profile/view-profile)
+  useEffect(() => {
+    if (!userId || isSelfProfile) return;
+    let canceled = false;
+    const PAGE_SIZE = 20;
+
+    const run = async () => {
+      setUserLoading(true);
+      try {
+        const page = await getPostsPage({ limit: PAGE_SIZE, before: null, userIds: [userId] });
+        if (canceled) return;
+        const list = Array.isArray(page) ? page : [];
+        setUserPosts(list);
+        userBeforeCursorRef.current = list.length > 0 ? String(list[list.length - 1].created_at) : null;
+        setUserHasMore(list.length === PAGE_SIZE);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[PostsFeed] User posts fetched:', {
+            userId,
+            fetchedCount: list.length,
+            mode,
+            updatedProvider: false
+          });
+        }
+      } catch (e) {
+        console.error('[PostsFeed] Failed to fetch user posts:', e);
+        setUserPosts([]);
+        setUserHasMore(false);
+      } finally {
+        if (!canceled) setUserLoading(false);
+      }
+    };
+
+    run();
+    return () => { canceled = true; };
+  }, [userId, isSelfProfile, getPostsPage]);
+
   // Update loading and error states from PostProvider
   // Show skeleton only if we have no posts yet; otherwise keep rendering while background refreshes
   useEffect(() => {
-    const derivedLoading = providerLoading && (Array.isArray(providerPosts) ? providerPosts.length === 0 : true);
+    let derivedLoading;
+    if (isSelfProfile) {
+      derivedLoading = myLoading && (Array.isArray(myPosts) ? myPosts.length === 0 : true);
+    } else if (userId) {
+      derivedLoading = userLoading && (Array.isArray(userPosts) ? userPosts.length === 0 : true);
+    } else {
+      derivedLoading = providerLoading && (Array.isArray(providerPosts) ? providerPosts.length === 0 : true);
+    }
     setLoading(derivedLoading);
     setError(providerError);
-  }, [providerLoading, providerError, providerPosts]);
+  }, [providerLoading, providerError, providerPosts, isSelfProfile, userId, myLoading, myPosts, userLoading, userPosts]);
+
+  // Listen for new posts to update userPosts when in profile/view-profile mode
+  useEffect(() => {
+    if (!onPostCreated || !userId) return;
+
+    const unsubscribe = onPostCreated((newPost) => {
+      // Only update if it's a post from the user we're viewing
+      if (newPost.user_id === userId) {
+        console.log('[PostsFeed] New post created for viewed user, updating userPosts');
+        setUserPosts(prev => [newPost, ...prev]);
+      }
+    });
+
+    return unsubscribe;
+  }, [onPostCreated, userId]);
+
+  // Provider owns myPosts now; no external sync from PostsFeed
 
   // Filter and sort posts based on current settings
   const filteredAndSortedPosts = useMemo(() => {
@@ -175,8 +290,96 @@ export function PostsFeed({
     return filtered; // No client-side limit; pagination handled via PostProvider + Load More
   }, [providerPosts, filter, sortBy, categoryFilter, userId, selectedStrategy, selectedStatus, selectedCountry, selectedSymbol]);
 
-  // Use filtered posts instead of local posts state
-  const posts = filteredAndSortedPosts;
+  // Source posts for profile mode (provider-owned for self, local for others)
+  const profileSourcePosts = isSelfProfile ? myPosts : userPosts;
+
+  // Filtered user posts for profile mode with external filters
+  const filteredUserPosts = useMemo(() => {
+    if (!userId || profileSourcePosts.length === 0) return profileSourcePosts;
+    
+    let filtered = [...profileSourcePosts];
+
+    // Apply category filter
+    if (categoryFilter === 'buy') {
+      filtered = filtered.filter(post => post.sentiment === 'bullish');
+    } else if (categoryFilter === 'sell') {
+      filtered = filtered.filter(post => post.sentiment === 'bearish');
+    }
+
+    // Apply external filters when provided (profile/view-profile)
+    if (selectedStrategy) {
+      filtered = filtered.filter(post => String(post.strategy || '') === String(selectedStrategy));
+    }
+    if (selectedStatus) {
+      filtered = filtered.filter(post => matchesStatus(post, selectedStatus));
+    }
+    if (selectedCountry) {
+      filtered = filtered.filter(post => matchesCountry(post, selectedCountry));
+    }
+    if (selectedSymbol) {
+      filtered = filtered.filter(post => matchesSymbol(post, selectedSymbol));
+    }
+
+    // Apply sorting
+    switch (sortBy) {
+      case 'date_asc':
+        filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        break;
+      case 'engagement':
+        filtered.sort((a, b) => {
+          const aEngagement = (a.comment_count || 0) + (a.buy_count || 0) + (a.sell_count || 0);
+          const bEngagement = (b.comment_count || 0) + (b.buy_count || 0) + (b.sell_count || 0);
+          return bEngagement - aEngagement;
+        });
+        break;
+      case 'price_change':
+        filtered.sort((a, b) => (b.current_price || 0) - (a.current_price || 0));
+        break;
+      default: // date_desc
+        filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[PostsFeed] Profile filters applied:', {
+        originalCount: profileSourcePosts.length,
+        filteredCount: filtered.length,
+        filters: {
+          selectedStrategy,
+          selectedStatus,
+          selectedCountry,
+          selectedSymbol,
+          categoryFilter,
+          sortBy
+        }
+      });
+    }
+
+    return filtered;
+  }, [profileSourcePosts, myPosts, userPosts, sortBy, categoryFilter, selectedStrategy, selectedStatus, selectedCountry, selectedSymbol]);
+
+  // Use filtered posts - either filteredUserPosts for profile mode or filteredAndSortedPosts for home mode
+  const posts = (isSelfProfile || userId) ? filteredUserPosts : filteredAndSortedPosts;
+  
+  // Debug post count differences (throttled)
+  const lastPostCountLogTime = useRef(0);
+  const logPostCountComparison = () => {
+    const now = Date.now();
+    if (now - lastPostCountLogTime.current >= 3000) { // Only log every 3 seconds
+      console.log('[PostsFeed] Post count comparison:', {
+        userId,
+        mode,
+        userPostsCount: (isSelfProfile ? (myPosts?.length || 0) : (userPosts?.length || 0)),
+        providerPostsCount: providerPosts.length,
+        selectedUserId: userId,
+        usingSelfProvider: isSelfProfile
+      });
+      lastPostCountLogTime.current = now;
+    }
+  };
+  
+  if (userId && process.env.NODE_ENV === 'development') {
+    logPostCountComparison();
+  }
 
   // Throttle console logging to reduce spam (only log every 2 seconds)
   const logRenderRef = useRef(null);
@@ -184,7 +387,7 @@ export function PostsFeed({
   
   const throttledLog = () => {
     const now = Date.now();
-    if (now - lastLogTime.current >= 2000) { // Only log every 2 seconds
+    if (now - lastLogTime.current >= 5000) { // Only log every 5 seconds (less frequent)
       console.log(`[PostsFeed] Rendering with ${posts.length} posts. Loading: ${loading}, Filter: ${filter}`);
       lastLogTime.current = now;
     }
@@ -372,16 +575,62 @@ export function PostsFeed({
         ))}
       </div>
 
-      {!userId && hasMore && (
-        <div className={styles.loadMore}>
-          <button
-            onClick={loadMore}
-            disabled={loadingMore}
-            className={styles.loadMoreButton}
-          >
-            {loadingMore ? 'Loading…' : 'Load More Posts'}
-          </button>
-        </div>
+      {(isSelfProfile || userId) ? (
+        isSelfProfile
+          ? (
+            myHasMore && (
+              <div className={styles.loadMore}>
+                <button
+                  onClick={loadMoreMyPosts}
+                  disabled={myLoading}
+                  className={styles.loadMoreButton}
+                >
+                  {myLoading ? 'Loading…' : 'Load More Posts'}
+                </button>
+              </div>
+            )
+          ) : (
+            userHasMore && (
+              <div className={styles.loadMore}>
+                <button
+                  onClick={async () => {
+                    if (userLoading) return;
+                    const before = userBeforeCursorRef.current;
+                    if (!before) { setUserHasMore(false); return; }
+                    setUserLoading(true);
+                    try {
+                      const PAGE_SIZE = 20;
+                      const page = await getPostsPage({ limit: PAGE_SIZE, before, userIds: [userId] });
+                      const list = Array.isArray(page) ? page : [];
+                      setUserPosts(prev => [...prev, ...list]);
+                      userBeforeCursorRef.current = list.length > 0 ? String(list[list.length - 1].created_at) : null;
+                      setUserHasMore(list.length === PAGE_SIZE);
+                    } catch (e) {
+                      console.error('[PostsFeed] Failed to load more user posts:', e);
+                    } finally {
+                      setUserLoading(false);
+                    }
+                  }}
+                  disabled={userLoading}
+                  className={styles.loadMoreButton}
+                >
+                  {userLoading ? 'Loading…' : 'Load More Posts'}
+                </button>
+              </div>
+            )
+          )
+      ) : (
+        hasMore && (
+          <div className={styles.loadMore}>
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className={styles.loadMoreButton}
+            >
+              {loadingMore ? 'Loading…' : 'Load More Posts'}
+            </button>
+          </div>
+        )
       )}
     </div>
   );

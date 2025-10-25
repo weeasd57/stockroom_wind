@@ -8,7 +8,7 @@ import styles from '../../styles/PostActions.module.css';
 
 export default function PostActions({ postId, initialBuyCount = 0, initialSellCount = 0, onVoteChange, autoSubscribe = false }) {
   const { user, supabase } = useSupabase();
-  const { getPostStats, fetchCommentsForPost, toggleBuyVote, toggleSellVote } = useComments();
+  const { getPostStats, fetchCommentsForPost, toggleBuyVote, toggleSellVote, updatePostStats } = useComments();
   const [userAction, setUserAction] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
@@ -26,6 +26,13 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
       fetchCommentsForPost(postId);
     }
   }, [postId, fetchCommentsForPost, isRealId, autoSubscribe]);
+
+  // Load current vote counts for the post
+  useEffect(() => {
+    if (postId && isRealId) {
+      updatePostStats(postId);
+    }
+  }, [postId, updatePostStats, isRealId]);
 
   // Check user's current vote status
   useEffect(() => {
