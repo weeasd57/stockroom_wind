@@ -100,7 +100,7 @@
 .filtersContainer {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.5rem;
   margin-bottom: 2rem;
 }
 
@@ -143,6 +143,91 @@
   justify-content: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+/* Main Filters Row - Centered */
+.mainFiltersRow {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0;
+}
+
+/* View Controls Row - Right Aligned */
+.viewControlsRow {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+.viewToggle {
+  display: flex;
+  gap: 0.25rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 0.25rem;
+  background: hsl(var(--card));
+}
+
+.viewToggleButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border: none;
+  background: none;
+  color: hsl(var(--muted-foreground));
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.viewToggleButton:hover {
+  background: hsl(var(--muted)/0.5);
+  color: hsl(var(--foreground));
+}
+
+.viewToggleButton.active {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.viewToggleButton svg {
+  width: 18px;
+  height: 18px;
+}
+
+.sortButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--muted-foreground));
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sortButton:hover {
+  background: hsl(var(--muted)/0.5);
+  color: hsl(var(--foreground));
+}
+
+.sortButton.active {
+  background: hsl(var(--primary)/0.1);
+  color: hsl(var(--primary));
+  border-color: hsl(var(--primary)/0.3);
+}
+
+.sortButton svg {
+  width: 18px;
+  height: 18px;
 }
 
 .filterButton {
@@ -794,11 +879,8 @@
     width: 100%;
   }
   
-  .tradersGrid {
-    grid-template-columns: 1fr;
-  }
-  
-  .cardActions {
+  .mainFiltersRow {
+    justify-content: center;
     flex-direction: row;
     gap: 0.5rem;
   }
@@ -815,4 +897,52 @@
     padding: 0.75rem 1.5rem;
     font-size: 0.9rem;
   }
+  
+  .mainFiltersRow {
+    justify-content: center;
+    flex-direction: row;
+    gap: 0.75rem;
+  }
+  
+  .viewControlsRow {
+    justify-content: center;
+    margin-top: 0.5rem;
+  }
+}
+
+/* Dark Mode Support */
+:global(.dark) .viewToggle {
+  background: hsl(220, 13%, 18%);
+  border-color: hsl(217, 32%, 35%);
+}
+
+:global(.dark) .viewToggleButton {
+  color: hsl(215, 20%, 65%);
+}
+
+:global(.dark) .viewToggleButton:hover {
+  background: hsl(217, 32%, 25%);
+  color: hsl(210, 40%, 98%);
+}
+
+:global(.dark) .viewToggleButton.active {
+  background: hsl(45, 100%, 70%);
+  color: hsl(220, 13%, 18%);
+}
+
+:global(.dark) .sortButton {
+  background: hsl(220, 13%, 18%);
+  border-color: hsl(217, 32%, 35%);
+  color: hsl(215, 20%, 65%);
+}
+
+:global(.dark) .sortButton:hover {
+  background: hsl(217, 32%, 25%);
+  color: hsl(210, 40%, 98%);
+}
+
+:global(.dark) .sortButton.active {
+  background: hsl(45, 100%, 70%, 0.1);
+  color: hsl(45, 100%, 70%);
+  border-color: hsl(45, 100%, 70%, 0.3);
 }

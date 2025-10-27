@@ -1,7 +1,7 @@
 'use client';
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
-import { calculatePostStats } from '@/lib/utils';
+import { calculatePostStats, calculateSuccessRate } from '@/lib/utils';
 
 type Post = any;
 
@@ -22,6 +22,9 @@ type PostsContextType = {
   fetchMyPosts: () => Promise<void>;
   loadMoreMyPosts: () => Promise<void>;
   postStats: { totalPosts: number; successfulPosts: number; lossPosts: number; successRate: number };
+  // DB-accurate stats for current user (independent of pagination)
+  myStats: { totalPosts: number; successfulPosts: number; lossPosts: number; openPosts: number; successRate: number };
+  refreshMyStats: () => Promise<void>;
   createPost: (postData: any) => Promise<Post>;
   onPostCreated: (cb: (post: Post) => void) => () => void;
   updateUserPosts: (userPosts: Post[]) => void;
@@ -49,6 +52,60 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
   const MY_PAGE_SIZE = 25; // initial page size for current user's posts (dashboard/profile)
   // Whether to exclude current user's posts for the consumer feed (Home)
   const [excludeSelf, setExcludeSelf] = useState<boolean>(false);
+
+  // Accurate DB-backed stats for the current user's posts
+  const [myStats, setMyStats] = useState({ totalPosts: 0, successfulPosts: 0, lossPosts: 0, openPosts: 0, successRate: 0 });
+  const statsRefreshTimeoutRef = useRef<any>(null);
+
+  const refreshMyStats = useCallback(async () => {
+    if (!user?.id) {
+      setMyStats({ totalPosts: 0, successfulPosts: 0, lossPosts: 0, openPosts: 0, successRate: 0 });
+      return;
+    }
+    try {
+      const [totalRes, successRes, lossRes] = await Promise.all([
+        supabase
+          .from('posts_with_stats')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id),
+        supabase
+          .from('posts_with_stats')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .or('status.eq.success,target_reached.is.true'),
+        supabase
+          .from('posts_with_stats')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .or('status.eq.loss,stop_loss_triggered.is.true'),
+      ]);
+
+      const total = totalRes.count || 0;
+      const successful = successRes.count || 0;
+      const losses = lossRes.count || 0;
+      const open = Math.max(0, total - successful - losses);
+      const sr = calculateSuccessRate(successful, losses);
+      setMyStats({ totalPosts: total, successfulPosts: successful, lossPosts: losses, openPosts: open, successRate: sr });
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[PostProvider] refreshMyStats failed', err);
+      }
+    }
+  }, [supabase, user?.id]);
+
+  const scheduleRefreshMyStats = useCallback((delay: number = 300) => {
+    try { if (statsRefreshTimeoutRef.current) clearTimeout(statsRefreshTimeoutRef.current); } catch {}
+    statsRefreshTimeoutRef.current = setTimeout(() => {
+      refreshMyStats();
+    }, delay);
+  }, [refreshMyStats]);
+
+  // Cleanup any scheduled refresh timers on unmount
+  useEffect(() => {
+    return () => {
+      try { if (statsRefreshTimeoutRef.current) clearTimeout(statsRefreshTimeoutRef.current); } catch {}
+    };
+  }, []);
 
   // Fetch a single post from the view with stats and attach profile
   const fetchPostWithStats = useCallback(async (postId: string) => {
@@ -222,6 +279,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       setMyPostsState(list);
       myBeforeCursorRef.current = list.length > 0 ? String(list[list.length - 1].created_at) : null;
       setMyHasMore(list.length === MY_PAGE_SIZE);
+      await refreshMyStats();
     } catch (e: any) {
       setError(e?.message || 'Failed to fetch my posts');
       setMyPostsState([]);
@@ -229,7 +287,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setMyLoading(false);
     }
-  }, [getPostsPage, user?.id]);
+  }, [getPostsPage, user?.id, refreshMyStats]);
 
   // Load more for current user's posts
   const loadMoreMyPosts = useCallback(async () => {
@@ -244,12 +302,13 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       setMyPostsState(prev => [...prev, ...list]);
       myBeforeCursorRef.current = list.length > 0 ? String(list[list.length - 1].created_at) : null;
       setMyHasMore(list.length === PAGE_SIZE);
+      await refreshMyStats();
     } catch (e: any) {
       setError(e?.message || 'Failed to load more my posts');
     } finally {
       setMyLoading(false);
     }
-  }, [getPostsPage, myLoading, user?.id]);
+  }, [getPostsPage, myLoading, user?.id, refreshMyStats]);
 
   // Subscribe to realtime updates for posts (price checks, status changes)
   useEffect(() => {
@@ -291,6 +350,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
                 if (prev.some(p => p.id === full.id)) return prev;
                 return [full, ...prev];
               });
+              scheduleRefreshMyStats(0);
             }
           }).catch(() => {});
         } else if (evt === 'UPDATE' && newRow) {
@@ -334,11 +394,15 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
               }
               return next;
             });
+            scheduleRefreshMyStats(300);
           }
         } else if (evt === 'DELETE' && oldRow) {
           setPosts(prev => prev.filter(p => p.id !== oldRow.id));
           if (user?.id) {
             setMyPostsState(prev => prev.filter(p => p.id !== oldRow.id));
+            if (oldRow.user_id && oldRow.user_id === user.id) {
+              scheduleRefreshMyStats(0);
+            }
           }
         }
       })
@@ -398,6 +462,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       // Also update myPostsState if it's my own post
       if (saved?.user_id && user?.id && saved.user_id === user.id) {
         setMyPostsState(prev => [saved, ...prev]);
+        scheduleRefreshMyStats(0);
       }
       notifyCreated(saved);
       return saved;
@@ -478,6 +543,8 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       const list = Array.isArray(myPostsState) ? myPostsState : [];
       return calculatePostStats(list as any);
     }, [myPostsState]),
+    myStats,
+    refreshMyStats,
     createPost,
     onPostCreated,
     updateUserPosts,

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { useBackgroundPostCreation } from '@/providers/BackgroundPostCreationProvider';
 import { useBackgroundProfileEdit } from '@/providers/BackgroundProfileEditProvider';
 import { useBackgroundPriceCheck } from '@/providers/BackgroundPriceCheckProvider';
@@ -56,6 +57,7 @@ interface HistoricalProcess extends Process {
 }
 
 export default function UnifiedBackgroundProcessDrawer() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('processes');
   const [activeHistoryTab, setActiveHistoryTab] = useState<HistoryTabType>('posts');
@@ -71,6 +73,7 @@ export default function UnifiedBackgroundProcessDrawer() {
   const [historicalPriceChecks, setHistoricalPriceChecks] = useState<any[]>([]);
   const [lastHistoryFetch, setLastHistoryFetch] = useState<Record<string, number>>({});
   const [telegramTasks, setTelegramTasks] = useState<Process[]>([]);
+  const [manuallyClosedForSession, setManuallyClosedForSession] = useState(false);
   
   // Get subscription data with proper typing
   let subscription: any;
@@ -978,9 +981,6 @@ export default function UnifiedBackgroundProcessDrawer() {
     setProcesses(uniqueProcesses);
   }, [postTasks, profileTasks, priceCheckTasks, telegramTasks, ensureDate]);
 
-  // Auto-open drawer when there are active processes (only if not manually closed)
-  const [manuallyClosedForSession, setManuallyClosedForSession] = useState(false);
-  
   // Auto-opening disabled to prevent floating progress interruption
   // useEffect(() => {
   //   const hasActiveProcesses = processes.some(p => 
@@ -1365,6 +1365,11 @@ export default function UnifiedBackgroundProcessDrawer() {
   const handleCloseDrawer = useCallback(() => {
     logger.debug('Closing drawer...', null, 'DRAWER');
     setIsOpen(false);
+    // Ensure any child dialogs are closed when drawer closes
+    setShowActivityDialog(false);
+    setSelectedActivity(null);
+    setShowPriceCheckDialog(false);
+    setSelectedPriceCheckData(null);
     setManuallyClosedForSession(true);
     // Reset manual close flag after 30 seconds
     setTimeout(() => {
@@ -1378,6 +1383,16 @@ export default function UnifiedBackgroundProcessDrawer() {
     setIsOpen(true);
     setManuallyClosedForSession(false);
   }, []);
+
+  // Close drawer and any dialogs when navigating between routes
+  useEffect(() => {
+    // On route change, ensure everything is closed/cleared
+    setIsOpen(false);
+    setShowActivityDialog(false);
+    setSelectedActivity(null);
+    setShowPriceCheckDialog(false);
+    setSelectedPriceCheckData(null);
+  }, [pathname]);
 
   // Listen for completed background tasks and show results dialog
   const showCompletedTaskResults = useCallback((completedTask: any) => {
@@ -1741,17 +1756,6 @@ export default function UnifiedBackgroundProcessDrawer() {
                         {expandedProcesses.has(process.id) ? '📄' : '📋'}
                       </button>
                       
-                      {/* Cancel button for active processes */}
-                      {!['completed', 'failed', 'success', 'error', 'canceled'].includes(process.status) && (
-                        <button 
-                          className={styles.cancelButton}
-                          onClick={() => handleCancelProcess(process.id, process.type)}
-                          title="Cancel this process"
-                          aria-label="Cancel process"
-                        >
-                          ❌
-                        </button>
-                      )}
                       {['failed', 'error'].includes(process.status) && (
                         <button 
                           className={styles.retryButton}
@@ -1763,8 +1767,24 @@ export default function UnifiedBackgroundProcessDrawer() {
                       )}
                       <button 
                         className={styles.removeButton}
-                        onClick={() => handleRemoveProcess(process.id, process.type)}
-                        aria-label="Remove"
+                        onClick={() => {
+                          // If process is running, cancel it. Otherwise, remove it.
+                          if (!['completed', 'failed', 'success', 'error', 'canceled'].includes(process.status)) {
+                            handleCancelProcess(process.id, process.type);
+                          } else {
+                            handleRemoveProcess(process.id, process.type);
+                          }
+                        }}
+                        title={
+                          !['completed', 'failed', 'success', 'error', 'canceled'].includes(process.status) 
+                            ? "Cancel this process" 
+                            : "Remove from list"
+                        }
+                        aria-label={
+                          !['completed', 'failed', 'success', 'error', 'canceled'].includes(process.status) 
+                            ? "Cancel process" 
+                            : "Remove process"
+                        }
                       >
                         ✕
                       </button>

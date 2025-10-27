@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "setup-db": "node setup.js",
-    "clean": "rimraf .next && next clean"
+    "clean": "rimraf .next && next clean",
+    "telegram:setup": "node scripts/setup-telegram-domain.js",
+    "telegram:test": "node scripts/setup-telegram-domain.js --test"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.3",

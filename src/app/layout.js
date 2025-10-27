@@ -20,6 +20,7 @@ import { BackgroundProfileEditProvider } from '@/providers/BackgroundProfileEdit
 import { BackgroundPriceCheckProvider } from '@/providers/BackgroundPriceCheckProvider';
 import { SubscriptionProvider } from '@/providers/SubscriptionProvider';
 import { PriceCheckResultsProvider } from '@/providers/PriceCheckResultsProvider';
+import { StrategiesProvider } from '@/providers/StrategiesProvider';
 import GlobalPriceCheckHandler from '@/components/internal/GlobalPriceCheckHandler';
 import UnifiedBackgroundProcessDrawer from '@/components/background/UnifiedBackgroundProcessDrawer';
 import { Toaster } from 'sonner';
@@ -291,8 +292,9 @@ export default function RootLayout({ children }) {
           <UserProvider>
             <ProfileProvider>
               <SubscriptionProvider>
-                <TradersProvider>
-                  <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={false}>
+                <StrategiesProvider>
+                  <TradersProvider>
+                    <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={false}>
                     <CreatePostFormProvider>
                       <ClientSideLayout>
                         <AuthGuard>
@@ -320,7 +322,8 @@ export default function RootLayout({ children }) {
                       </ClientSideLayout>
                     </CreatePostFormProvider>
                   </ThemeProvider>
-                </TradersProvider>
+                  </TradersProvider>
+                </StrategiesProvider>
               </SubscriptionProvider>
             </ProfileProvider>
           </UserProvider>

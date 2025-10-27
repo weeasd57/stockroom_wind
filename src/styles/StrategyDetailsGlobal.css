@@ -1,0 +1,156 @@
+/* Global styles for Strategy Details Modal components */
+
+/* Sections and modern padding */
+.smd-section {
+  margin-top: 1rem;
+  padding-top: 0.5rem;
+}
+
+.smd-sectionTitle {
+  margin: 0 0 0.75rem 0;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.smd-metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.smd-metricCard {
+  padding: 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  background: linear-gradient(180deg, hsl(var(--muted)/0.2), transparent);
+}
+
+.smd-metricLabel {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+
+.smd-metricValue {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.smd-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.smd-chip {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid hsl(var(--border));
+}
+
+.smd-chipSuccess {
+  background: #183d2b;
+  color: #a7efc5;
+  border-color: #1e5138;
+}
+
+.smd-chipLoss {
+  background: #3d1b1b;
+  color: #f5a3a3;
+  border-color: #592222;
+}
+
+.smd-chipActive {
+  background: #1b2e3d;
+  color: #a3d4f5;
+  border-color: #244257;
+}
+
+.smd-stackedBar {
+  height: 12px;
+  border-radius: 6px;
+  display: flex;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+}
+
+.smd-segSuccess { 
+  background: #1f7a4a; 
+}
+
+.smd-segLoss { 
+  background: #a33a3a; 
+}
+
+.smd-segActive { 
+  background: #2f5b7a; 
+}
+
+.smd-postsList {
+  display: grid;
+  gap: 8px;
+}
+
+.smd-postItem {
+  padding: 10px 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  align-items: center;
+}
+
+.smd-postSymbol {
+  font-weight: 600;
+}
+
+.smd-postCompany {
+  color: hsl(var(--muted-foreground));
+}
+
+.smd-postRight {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Dark mode support for all global smd classes */
+:global(.dark) .smd-sectionTitle {
+  color: hsl(210, 40%, 98%);
+}
+
+:global(.dark) .smd-metricCard {
+  background-color: hsl(220, 13%, 18%);
+  border-color: hsl(217, 32%, 35%);
+}
+
+:global(.dark) .smd-metricLabel {
+  color: hsl(215, 20%, 65%);
+}
+
+:global(.dark) .smd-metricValue {
+  color: hsl(210, 40%, 98%);
+}
+
+:global(.dark) .smd-chip {
+  background-color: hsl(220, 13%, 18%);
+  color: hsl(210, 40%, 98%);
+  border-color: hsl(217, 32%, 35%);
+}
+
+:global(.dark) .smd-postItem {
+  background-color: hsl(220, 13%, 18%);
+  border-color: hsl(217, 32%, 35%);
+}
+
+:global(.dark) .smd-postSymbol {
+  color: hsl(210, 40%, 98%);
+}
+
+:global(.dark) .smd-postCompany {
+  color: hsl(215, 20%, 65%);
+}
+
+:global(.dark) .smd-stackedBar {
+  border-color: hsl(217, 32%, 35%);
+}

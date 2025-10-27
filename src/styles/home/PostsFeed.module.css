@@ -116,7 +116,69 @@
     display: flex;
     gap: 8px;
   }
+
+  /* Centered filter row under title */
+  .centeredFiltersRow {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr; /* left: view toggle, center: filters, right: spacer */
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0; /* extra padding as requested */
+    margin-bottom: 8px;
+  }
+
+  /* Place the view toggle on the left side */
+  .viewToggleLeft {
+    justify-self: start;
+  }
+
+  /* Keep the filter buttons perfectly centered */
+  .filtersCentered {
+    justify-self: center;
+  }
+  /* Optional spacer on the right to balance layout */
+  .rightSpacer {
+    justify-self: end;
+  }
+
+  /* New Home Page Layout - Feed buttons centered, view toggle at bottom right */
+  .homeFiltersAndViewContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 12px 0;
+    margin-bottom: 8px;
+  }
+
+  .homeFiltersRow {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
   
+  .homeFiltersAdvancedRow {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .filtersRight {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .homeViewRow {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+  }
+
+  .viewToggleRight {
+    /* View toggle positioned at bottom right */
+  }
+
   .filterButton {
     padding: 8px 16px;
     border: 1px solid var(--border-color, #e5e7eb);
@@ -837,14 +899,29 @@
     .viewToggle {
       padding: 2px;
     }
-    
+    .centeredFiltersRow {
+      grid-template-columns: auto 1fr; /* left: toggle, center: filters */
+      gap: 8px;
+    }
+    .viewToggleLeft {
+      grid-column: 1;
+    }
+    .filtersCentered {
+      grid-column: 2;
+      justify-self: center;
+    }
+
+    .rightSpacer {
+      display: none;
+    }
+  
     .viewButton {
       padding: 6px 10px;
       font-size: 0.875rem;
       min-width: 36px;
     }
   }
-  
+
   @media (max-width: 480px) {
     .userInfo {
       gap: 8px;

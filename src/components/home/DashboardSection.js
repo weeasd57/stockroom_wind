@@ -16,8 +16,8 @@ export function DashboardSection() {
     following: followingList,
   } = useProfile();
   
-  // Get posts and computed stats from PostProvider
-  const { myPosts, postStats, myLoading, onPostCreated } = usePosts();
+  // Get posts and stats from PostProvider (myStats is DB-accurate)
+  const { myPosts, postStats, myStats, myLoading, onPostCreated, refreshMyStats } = usePosts();
   
   const [stats, setStats] = useState({
     totalPosts: 0,
@@ -42,12 +42,12 @@ export function DashboardSection() {
     setDialogContent({ title: '', content: '' });
   };
 
-  // Update stats whenever provider myPosts/postStats change
+  // Update stats whenever provider myStats change (DB-accurate) or fallback to postStats
   useEffect(() => {
     if (!user?.id || !profileData?.id) return;
-
     const userPosts = Array.isArray(myPosts) ? myPosts : [];
-    const computed = postStats;
+    // Prefer DB-backed myStats; fallback to computed postStats when needed
+    const computed = (myStats && typeof myStats.totalPosts === 'number') ? myStats : postStats;
     
     // Calculate follower/following counts
     const followersCount = Array.isArray(followersList)
@@ -70,9 +70,10 @@ export function DashboardSection() {
     console.log('[DASHBOARD] Stats updated:', {
       userPostsCount: userPosts.length,
       totalPosts: computed.totalPosts,
-      fromMyPosts: true
+      fromMyPosts: true,
+      usingMyStats: !!myStats
     });
-  }, [user?.id, profileData, myPosts, postStats, myLoading, followersList, followingList]);
+  }, [user?.id, profileData, myPosts, postStats, myStats, myLoading, followersList, followingList]);
 
   // Listen for new posts to update stats immediately
   useEffect(() => {
@@ -82,18 +83,26 @@ export function DashboardSection() {
       // Only update if it's the current user's post
       if (newPost.user_id === user.id) {
         console.log('[DASHBOARD] New post created, updating stats from myPosts');
-        // Provider will update postStats via context; reflect immediately
-        setStats(prev => ({ ...prev, ...postStats }));
+        // Refresh DB stats to ensure accurate totals independent of pagination
+        try { refreshMyStats(); } catch {}
+        // Provider will also update postStats via context; reflect immediately as a fallback
+        setStats(prev => ({ ...prev, ...(myStats || postStats) }));
         
         console.log('[DASHBOARD] Stats after new post:', {
-          totalPosts: postStats.totalPosts,
+          totalPosts: (myStats ? myStats.totalPosts : postStats.totalPosts),
           newPostId: newPost.id
         });
       }
     });
 
     return unsubscribe;
-  }, [onPostCreated, user?.id, myPosts, postStats]);
+  }, [onPostCreated, user?.id, myPosts, postStats, myStats, refreshMyStats]);
+
+  // Ensure stats are fetched on mount for authenticated user
+  useEffect(() => {
+    if (!user?.id) return;
+    try { refreshMyStats(); } catch {}
+  }, [user?.id, refreshMyStats]);
 
   if (loading) {
     return (

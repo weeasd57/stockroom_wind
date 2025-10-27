@@ -3,11 +3,13 @@
 * upgrade to next 15
 
 TESTS list {
+  should create post show all my stratgeys
 }
 
-* add in landing page the count sympol for every country 
+
 ** add  telegram count follower in view profile 
-** add stratgyes tap in view profile page
 ** add analysis page for every trader howmatch earn      
    persentage for sussces post and lose post and more statics
    and some charts
+
+

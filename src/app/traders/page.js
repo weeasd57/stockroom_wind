@@ -270,49 +270,14 @@ export default function TradersPage() {
           </svg>
         </div>
         
-        <div className={styles.filterButtons}>
-          <button 
-            className={`${styles.filterButton} ${filter === 'all' ? styles.active : ''}`}
-            onClick={() => setFilter('all')}
-          >
-            All Traders
-          </button>
-          <button 
-            className={`${styles.filterButton} ${filter === 'top' ? styles.active : ''}`}
-            onClick={() => setFilter('top')}
-          >
-            Top Traders
-          </button>
-          <button 
-            className={`${styles.filterButton} ${filter === 'trending' ? styles.active : ''}`}
-            onClick={() => setFilter('trending')}
-          >
-            Trending
-          </button>
+        {/* Row 1: Main filters centered */}
+        <div className={styles.mainFiltersRow}>
           <button 
             className={`${styles.filterButton} ${filter === 'telegram' ? styles.active : ''}`}
-            onClick={() => setFilter('telegram')}
+            onClick={() => setFilter(filter === 'telegram' ? '' : 'telegram')}
           >
             📱 With Telegram Bot
           </button>
-        </div>
-
-        {/* Controls: view toggle, sort, order, country */}
-        <div className={styles.controlsRow}>
-          <div className={styles.viewToggle}>
-            <button
-              className={`${styles.toggleButton} ${viewMode === 'grid' ? styles.active : ''}`}
-              onClick={() => setViewMode('grid')}
-            >
-              Grid
-            </button>
-            <button
-              className={`${styles.toggleButton} ${viewMode === 'list' ? styles.active : ''}`}
-              onClick={() => setViewMode('list')}
-            >
-              List
-            </button>
-          </div>
           <select
             className={styles.select}
             value={sortKey}
@@ -324,12 +289,6 @@ export default function TradersPage() {
             <option value="followers">Followers</option>
             <option value="post_count">Posts</option>
           </select>
-          <button
-            className={styles.toggleButton}
-            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-          >
-            {sortOrder === 'asc' ? 'Asc' : 'Desc'}
-          </button>
           <select
             className={styles.select}
             value={country}
@@ -340,6 +299,59 @@ export default function TradersPage() {
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
+        </div>
+
+        {/* Row 2: View controls on the right */}
+        <div className={styles.viewControlsRow}>
+          <div className={styles.viewToggle}>
+            <button
+              className={`${styles.viewToggleButton} ${viewMode === 'grid' ? styles.active : ''}`}
+              onClick={() => setViewMode('grid')}
+              title="Grid view"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+            </button>
+            <button
+              className={`${styles.viewToggleButton} ${viewMode === 'list' ? styles.active : ''}`}
+              onClick={() => setViewMode('list')}
+              title="List view"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="8" y1="6" x2="21" y2="6"></line>
+                <line x1="8" y1="12" x2="21" y2="12"></line>
+                <line x1="8" y1="18" x2="21" y2="18"></line>
+                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <button
+            className={`${styles.sortButton} ${sortOrder === 'desc' ? styles.active : ''}`}
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+          >
+            {sortOrder === 'asc' ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m3 16 4 4 4-4"></path>
+                <path d="M7 20V4"></path>
+                <path d="m21 8-4-4-4 4"></path>
+                <path d="M17 4v16"></path>
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m3 8 4-4 4 4"></path>
+                <path d="M7 4v16"></path>
+                <path d="m21 16-4 4-4-4"></path>
+                <path d="M17 20V4"></path>
+              </svg>
+            )}
+          </button>
         </div>
       </div>
       
@@ -376,7 +388,7 @@ export default function TradersPage() {
                         </div>
                         <div className={styles.traderInfo}>
                           <div className={styles.traderNameRow}>
-                            <h3>{trader.full_name || trader.username || 'Trader'}</h3>
+                            <h3>{trader.full_name || 'Trader'}</h3>
                             {telegramBots[trader.id]?.hasBot && (
                               <div className={styles.telegramBadge} title="Has active Telegram bot">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -471,7 +483,7 @@ export default function TradersPage() {
                       </div>
                       <div className={styles.traderInfo}>
                         <div className={styles.traderNameRow}>
-                          <h3>{trader.full_name || trader.username || 'Trader'}</h3>
+                          <h3>{trader.full_name || 'Trader'}</h3>
                           {telegramBots[trader.id]?.hasBot && (
                             <div className={styles.telegramBadge} title="Has active Telegram bot">
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">

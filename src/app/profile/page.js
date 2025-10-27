@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
+import { useStrategies } from '@/providers/StrategiesProvider';
 import { useSubscription } from '@/providers/SubscriptionProvider';
 // No longer needed since we're using the ProfileProvider
 // import useProfileStore from '@/store/profileStore';
@@ -22,55 +23,44 @@ import TelegramBotManagement from '@/components/telegram/TelegramBotManagement';
 import { DashboardSection } from '@/components/home/DashboardSection';
 import { useTheme } from '@/providers/theme-provider';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
-import { useBackgroundProfileEdit } from '@/providers/BackgroundProfileEditProvider';
-// Background indicators removed - now handled by UnifiedBackgroundProcessDrawer
-import SocialLinks from '@/components/profile/SocialLinks';
 import FollowersDialog from '@/components/profile/FollowersDialog';
 import logger from '@/utils/logger';
+import SocialLinks from '@/components/profile/SocialLinks';
+import { useBackgroundProfileEdit } from '@/providers/BackgroundProfileEditProvider';
 
 export default function Profile() {
-  const { user, isAuthenticated, loading: authLoading } = useSupabase();
-  const searchParams = useSearchParams();
-  const { theme } = useTheme();
-  const { 
-    subscriptionInfo,
-    loading: subscriptionLoading,
-    syncing: subscriptionSyncing,
-    canPerformPriceCheck,
-    canCreatePost,
-    getUsageInfo,
-    isPro,
-    getSubscriptionMessage,
-    refreshSubscription
-  } = useSubscription();
+  const { supabase, user, isAuthenticated, isLoading: authLoading } = useSupabase();
   const { 
     profile, 
-    loading: profileLoading,
-    avatarUrl: contextAvatarUrl,
-    backgroundUrl: contextBackgroundUrl,
-    updateProfile,
-    // Additional values from ProfileProvider that were previously in useProfileStore
-    posts,
-    followers,
-    following,
-    activeTab,
-    isLoading,
-    error,
+    posts, 
+    followers, 
+    following, 
+    activeTab, 
+    isLoading, 
+    error, 
     isInitialized,
-    setActiveTab,
-    initializeData,
+    setActiveTab, 
     refreshData,
+    initializeData,
+    lastFetched,
+    isRefreshing,
     selectedStrategy,
     setSelectedStrategy,
     clearSelectedStrategy,
-    strategies, // Add this line to get the strategies from the ProfileProvider
-    lastFetched, // Added lastFetched
-    isRefreshing // Added isRefreshing
+    updateProfile,
+    avatarUrl: contextAvatarUrl,
+    backgroundUrl: contextBackgroundUrl,
+    getState,
+    refreshPostsQuickly,
   } = useProfile();
+  const { subscription, isLoading: subscriptionLoading } = useSubscription();
+  const { strategies, createStrategy, deleteStrategy, fetchStrategies } = useStrategies();
   
   // Get dialog state at the component level - MUST be before any conditions
   const { isOpen, closeDialog } = useCreatePostForm();
-  const { submitProfileEdit, isProcessing } = useBackgroundProfileEdit();
+  const { submitProfileEdit } = useBackgroundProfileEdit();
+  // Read URL query params (e.g., ?tab=telegram)
+  const searchParams = useSearchParams();
 
   // Debug authentication on mount
   useEffect(() => {
@@ -79,15 +69,15 @@ export default function Profile() {
       user: !!user, 
       userId: user?.id,
       authLoading,
-      profileLoading
+      isLoading
     }, 'AUTH');
     
     // Debug subscription data
-    logger.debug("Subscription Info:", subscriptionInfo, 'AUTH');
+    logger.debug("Subscription Info:", subscription, 'AUTH');
     logger.debug("Subscription Info Details:", {
-      remaining_checks: subscriptionInfo?.remaining_checks,
-      price_checks_used: subscriptionInfo?.price_checks_used,
-      price_check_limit: subscriptionInfo?.price_check_limit,
+      remaining_checks: subscription?.remaining_checks,
+      price_checks_used: subscription?.price_checks_used,
+      price_check_limit: subscription?.price_check_limit,
       subscriptionLoading
     }, 'AUTH');
     
@@ -105,19 +95,37 @@ export default function Profile() {
     } else {
       logger.debug("No profile data available", null, 'AUTH');
     }
-  }, [isAuthenticated, user, authLoading, profileLoading, profile, subscriptionInfo, subscriptionLoading]);
+  }, [isAuthenticated, user, authLoading, isLoading, profile, subscription, subscriptionLoading]);
 
   // Initialize active tab from query param (e.g., /profile?tab=telegram)
   useEffect(() => {
     try {
       const tab = searchParams?.get('tab');
-      const allowed = ['posts', 'followers', 'following', 'strategies', 'telegram'];
+      const allowed = ['posts', 'strategies', 'telegram'];
       if (tab && allowed.includes(tab) && tab !== activeTab) {
         setActiveTab(tab);
       }
     } catch {}
     // We intentionally depend on searchParams so this reacts to URL changes
   }, [searchParams, activeTab, setActiveTab]);
+
+  // Apply view mode from query param (?view=table|grid|list or ?vm=table)
+  useEffect(() => {
+    try {
+      const v = (searchParams?.get('view') || searchParams?.get('vm') || '').toLowerCase();
+      if (v === 'table' || v === 'grid' || v === 'list') {
+        setViewMode(v);
+      }
+    } catch {}
+  }, [searchParams]);
+
+  // Guard: ensure activeTab is one of the allowed tabs
+  useEffect(() => {
+    const allowed = ['posts', 'strategies', 'telegram'];
+    if (!allowed.includes(activeTab)) {
+      setActiveTab('posts');
+    }
+  }, [activeTab, setActiveTab]);
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [formData, setFormData] = useState({
@@ -150,11 +158,29 @@ export default function Profile() {
   const [discoveredSymbols, setDiscoveredSymbols] = useState([]);
   const [selectedStrategyForDetails, setSelectedStrategyForDetails] = useState(null);
   const [isStrategyModalOpen, setIsStrategyModalOpen] = useState(false);
+  const [strategyModalPosts, setStrategyModalPosts] = useState([]);
+  const [strategyModalLoading, setStrategyModalLoading] = useState(false);
+  // Local overrides to reflect image updates instantly before provider refresh completes
+  const [strategyImageOverrides, setStrategyImageOverrides] = useState({});
+  
+  // Add new strategy form states
+  const [showCreateStrategyForm, setShowCreateStrategyForm] = useState(false);
+  const [newStrategyName, setNewStrategyName] = useState('');
+  const [newStrategyDescription, setNewStrategyDescription] = useState('');
+  const [newStrategyImage, setNewStrategyImage] = useState(null);
+  const [newStrategyImagePreview, setNewStrategyImagePreview] = useState('');
+  const [createStrategyError, setCreateStrategyError] = useState('');
+  const [isCreatingStrategy, setIsCreatingStrategy] = useState(false);
+  const [isDeletingStrategy, setIsDeletingStrategy] = useState({});
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedCountry, setSelectedCountry] = useState('');
   const [filterLoading, setFilterLoading] = useState(false);
+  // Delete strategy dialog states
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [strategyToDelete, setStrategyToDelete] = useState(null);
+  const [strategyPostsCount, setStrategyPostsCount] = useState(0);
   const [backgroundUploadProgress, setBackgroundUploadProgress] = useState(0);
-  const [viewMode, setViewMode] = useState('list'); // 'grid' or 'list'
+  const [viewMode, setViewMode] = useState('table'); // 'table' | 'grid' | 'list'
   const [mounted, setMounted] = useState(false);
   const [followersDialogOpen, setFollowersDialogOpen] = useState(false);
   const [followingDialogOpen, setFollowingDialogOpen] = useState(false);
@@ -178,7 +204,7 @@ export default function Profile() {
     setMounted(true);
     try {
       const storedViewMode = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
-      if (storedViewMode && (storedViewMode === 'list' || storedViewMode === 'grid')) {
+      if (storedViewMode && (storedViewMode === 'list' || storedViewMode === 'grid' || storedViewMode === 'table')) {
         setViewMode(storedViewMode);
       }
     } catch (error) {
@@ -228,7 +254,7 @@ export default function Profile() {
     getLatestExperienceData();
     
     // Update form data with profile details when they become available
-    if (profile && !profileLoading) {
+    if (profile && !isLoading) {
       setFormData(sanitizeFormData(profile));
       setAvatarUrl(contextAvatarUrl || '/default-avatar.svg');
       setBackgroundUrl(contextBackgroundUrl || '/profile-bg.jpg');
@@ -241,7 +267,7 @@ export default function Profile() {
         dataAvailable: !!profile
       });
     }
-  }, [user?.id, isAuthenticated, isInitialized, lastFetched, refreshData, profile, profileLoading, contextAvatarUrl, contextBackgroundUrl]);
+  }, [user?.id, isAuthenticated, isInitialized, lastFetched, refreshData, profile, isLoading, contextAvatarUrl, contextBackgroundUrl]);
 
   // Derive discovered countries and symbols from posts when posts update
   useEffect(() => {
@@ -345,21 +371,36 @@ export default function Profile() {
       console.warn('Subscription tab has been removed from profile');
       return;
     }
-    
-    // If we're coming from strategies tab to posts tab,
-    // and there's a selectedStrategyForDetails, use that as the strategy filter
-    if (tab === 'posts' && activeTab === 'strategies' && selectedStrategyForDetails) {
-      console.log(`Setting strategy filter to ${selectedStrategyForDetails} from strategy details`);
-      handleStrategyChange({ target: { value: selectedStrategyForDetails } });
-      setSelectedStrategyForDetails(null); // Clear after using
-    }
-    
-    // Always update the active tab
+
+    // Do not auto-apply strategy filters when switching tabs.
+    // Only the "View Posts" button should set filters explicitly.
     setActiveTab(tab);
-    
-    // If switching to a tab other than posts, we don't need to do anything with filters
-    // as they'll only apply when we come back to the posts tab
-  }, [activeTab, selectedStrategyForDetails]);
+  }, [setActiveTab]);
+
+  // Load related posts for the selected strategy to show stats & list in modal
+  useEffect(() => {
+    if (!isStrategyModalOpen || !selectedStrategyForDetails || !supabase || !user?.id) return;
+    let canceled = false;
+    setStrategyModalLoading(true);
+    supabase
+      .from('posts_with_stats')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('strategy', selectedStrategyForDetails)
+      .order('created_at', { ascending: false })
+      .limit(25)
+      .then(({ data, error }) => {
+        if (canceled) return;
+        if (error) {
+          console.error('[PROFILE] Strategy posts fetch error:', error);
+          setStrategyModalPosts([]);
+          return;
+        }
+        setStrategyModalPosts(Array.isArray(data) ? data : []);
+      })
+      .finally(() => { if (!canceled) setStrategyModalLoading(false); });
+    return () => { canceled = true; };
+  }, [isStrategyModalOpen, selectedStrategyForDetails, supabase, user?.id]);
 
   const handleCloseModal = useCallback(() => {
     setShowEditModal(false);
@@ -415,7 +456,7 @@ export default function Profile() {
   }, [selectedStrategy]);
 
   // Only show loading state during initial load
-  if (authLoading || (profileLoading && !isInitialized)) {
+  if (authLoading || (isLoading && !isInitialized)) {
     return <div className={styles.loading}>Loading...</div>;
   }
 
@@ -433,7 +474,7 @@ export default function Profile() {
               <li>Authentication State: {String(isAuthenticated)}</li>
               <li>User Present: {String(!!user)}</li>
               <li>Auth Loading: {String(authLoading)}</li>
-              <li>Profile Loading: {String(profileLoading)}</li>
+              <li>Profile Loading: {String(isLoading)}</li>
               <li>Session Time: {new Date().toISOString()}</li>
             </ul>
           </div>
@@ -859,6 +900,291 @@ export default function Profile() {
     setTimeout(checkLoadingComplete, 100);
   };
 
+  // Handle strategy image upload
+  const handleStrategyImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setCreateStrategyError('Please select a valid image file');
+      return;
+    }
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setCreateStrategyError('Image size must be less than 5MB');
+      return;
+    }
+    
+    setNewStrategyImage(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setNewStrategyImagePreview(e.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Create new strategy handler
+  const handleCreateNewStrategy = async (e) => {
+    e.preventDefault();
+    
+    if (!newStrategyName.trim()) {
+      setCreateStrategyError('Strategy name is required');
+      return;
+    }
+    
+    if (!newStrategyDescription.trim()) {
+      setCreateStrategyError('Strategy description is required');
+      return;
+    }
+    
+    if (newStrategyName.trim().length < 3) {
+      setCreateStrategyError('Strategy name must be at least 3 characters long');
+      return;
+    }
+    
+    if (newStrategyDescription.trim().length < 10) {
+      setCreateStrategyError('Strategy description must be at least 10 characters long');
+      return;
+    }
+    
+    try {
+      setIsCreatingStrategy(true);
+      setCreateStrategyError('');
+      
+      let imageUrl = null;
+      
+      // Upload image if provided
+      if (newStrategyImage) {
+        try {
+          console.log('[STRATEGY] Uploading strategy image...');
+          
+          // Generate stable filename for strategy (so new uploads replace the old)
+          const fileExt = newStrategyImage.name.split('.').pop().toLowerCase();
+          const safeStrategyName = newStrategyName.trim().replace(/\s+/g, '_');
+          const fileName = `${user.id}/strategy_${safeStrategyName}.${fileExt}`;
+
+          // Best-effort: remove any previous files for this strategy (different extensions or old timestamps)
+          try {
+            const { data: existingFiles } = await supabase.storage
+              .from('strategy-images')
+              .list(user.id);
+            const toDelete = (existingFiles || [])
+              .filter(f => f.name && f.name.startsWith(`strategy_${safeStrategyName}`))
+              .map(f => `${user.id}/${f.name}`);
+            if (toDelete.length > 0) {
+              try { await supabase.storage.from('strategy-images').remove(toDelete); } catch {}
+            }
+          } catch {}
+
+          // Upload strategy image to the dedicated bucket (stable path)
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('strategy-images')
+            .upload(fileName, newStrategyImage, {
+              cacheControl: '3600',
+              upsert: true
+            });
+            
+          if (uploadError) {
+            console.error('Error uploading strategy image:', uploadError);
+            setCreateStrategyError(`Failed to upload image: ${uploadError.message || 'Please try again.'}`);
+            return;
+          }
+          
+          // Get public URL
+          const { data: urlData } = supabase.storage
+            .from('strategy-images')
+            .getPublicUrl(fileName);
+          
+          if (!urlData?.publicUrl) {
+            console.error('No public URL returned from image upload');
+            setCreateStrategyError('Failed to get image URL. Please try again.');
+            return;
+          }
+          
+          imageUrl = urlData.publicUrl;
+          console.log('[STRATEGY] Strategy image uploaded successfully:', imageUrl);
+          
+        } catch (uploadError) {
+          console.error('Error uploading strategy image:', uploadError);
+          setCreateStrategyError(`Upload failed: ${uploadError.message || 'Please try again.'}`);
+          return;
+        }
+      }
+      
+      // Save strategy using provider
+      const data = await createStrategy({
+        strategy_name: newStrategyName.trim(),
+        description: newStrategyDescription.trim(),
+        image_url: imageUrl
+      });
+      
+      console.log('Strategy created successfully:', data);
+      // Ensure provider list is in sync
+      if (fetchStrategies) {
+        await fetchStrategies();
+      }
+      
+      // Reset form
+      setNewStrategyName('');
+      setNewStrategyDescription('');
+      setNewStrategyImage(null);
+      setNewStrategyImagePreview('');
+      setShowCreateStrategyForm(false);
+      
+      // Refresh posts to show the new strategy when used in posts
+      if (refreshData) {
+        refreshData(user?.id);
+      }
+      
+    } catch (error) {
+      console.error('Error creating strategy:', error);
+      setCreateStrategyError('Failed to create strategy. Please try again.');
+    } finally {
+      setIsCreatingStrategy(false);
+    }
+  };
+
+  // Open delete strategy dialog
+  const handleDeleteStrategyClick = async (strategyName) => {
+    try {
+      // Immediate local count from current posts state (fallback in case DB count lags)
+      const localCount = Array.isArray(posts)
+        ? posts.filter(p => String(p.strategy || '') === String(strategyName)).length
+        : 0;
+      setStrategyPostsCount(localCount);
+
+      // Also count posts using this strategy from DB to be precise
+      const { data: postsData, error: postsError } = await supabase
+        .from('posts')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('strategy', strategyName);
+      if (!postsError) {
+        setStrategyPostsCount(postsData?.length || localCount);
+      } else {
+        console.error('Error counting strategy posts:', postsError);
+      }
+      
+      setStrategyToDelete(strategyName);
+      setShowDeleteDialog(true);
+    } catch (error) {
+      console.error('Error preparing delete dialog:', error);
+      setStrategyPostsCount(0);
+      setStrategyToDelete(strategyName);
+      setShowDeleteDialog(true);
+    }
+  };
+
+  // Confirm delete strategy
+  const handleConfirmDeleteStrategy = async () => {
+    if (!strategyToDelete) return;
+    
+    try {
+      setIsDeletingStrategy(prev => ({ ...prev, [strategyToDelete]: true }));
+      
+      // If strategy has posts, move them to "BUY" strategy
+      if (strategyPostsCount > 0) {
+        console.log(`[STRATEGY] Moving ${strategyPostsCount} posts from "${strategyToDelete}" to "BUY" strategy`);
+        
+        const { error: updatePostsError } = await supabase
+          .from('posts')
+          .update({ strategy: 'BUY' })
+          .eq('user_id', user.id)
+          .eq('strategy', strategyToDelete);
+          
+        if (updatePostsError) {
+          console.error('Error moving posts to BUY strategy:', updatePostsError);
+          throw new Error('Failed to move posts to BUY strategy');
+        }
+        
+        console.log('[STRATEGY] Posts moved to BUY strategy successfully');
+      }
+      
+      // Get strategy details first to get image URL
+      const { data: strategyData, error: fetchError } = await supabase
+        .from('user_strategies')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('strategy_name', strategyToDelete)
+        .single();
+        
+      if (fetchError) {
+        console.error('Error fetching strategy for deletion:', fetchError);
+        throw new Error('Failed to fetch strategy details');
+      }
+      
+      // Delete from database using provider
+      await deleteStrategy(strategyToDelete);
+      // Refresh provider list after deletion
+      if (fetchStrategies) {
+        await fetchStrategies();
+      }
+      
+      // Delete associated image if exists
+      if (strategyData.image_url) {
+        try {
+          // Extract bucket and object path from public URL
+          const urlObj = new URL(strategyData.image_url);
+          const segments = urlObj.pathname.split('/');
+          // Expected: /storage/v1/object/public/{bucket}/{userId}/filename
+          const bucketName = segments[5];
+          const objectPath = segments.slice(6).join('/');
+          
+          if (bucketName && objectPath) {
+            console.log('[STRATEGY] Deleting strategy image:', { bucketName, objectPath });
+            const { error: imageDeleteError } = await supabase.storage
+              .from(bucketName)
+              .remove([objectPath]);
+            if (imageDeleteError) {
+              console.error('Error deleting strategy image:', imageDeleteError);
+            } else {
+              console.log('[STRATEGY] Strategy image deleted successfully');
+            }
+          }
+        } catch (imageError) {
+          console.error('Error deleting strategy image:', imageError);
+        }
+      }
+      
+      console.log('[STRATEGY] Strategy deleted successfully:', strategyToDelete);
+      
+      // Close dialog
+      setShowDeleteDialog(false);
+      setStrategyToDelete(null);
+      setStrategyPostsCount(0);
+      
+      // Refresh data
+      if (refreshData) {
+        refreshData(user?.id);
+      }
+      // Force a quick posts refresh to reflect new BUY strategies immediately
+      if (refreshPostsQuickly) {
+        refreshPostsQuickly(user?.id);
+      }
+      // If the deleted strategy is currently selected as a filter, switch to BUY so posts remain visible
+      if (localSelectedStrategy && localSelectedStrategy === strategyToDelete) {
+        handleStrategyChange({ target: { value: 'BUY' } });
+      }
+      
+    } catch (error) {
+      console.error('Error deleting strategy:', error);
+      setCreateStrategyError(`Failed to delete strategy: ${error.message}`);
+    } finally {
+      setIsDeletingStrategy(prev => ({ ...prev, [strategyToDelete]: false }));
+    }
+  };
+
+  // Cancel delete strategy
+  const handleCancelDeleteStrategy = () => {
+    setShowDeleteDialog(false);
+    setStrategyToDelete(null);
+    setStrategyPostsCount(0);
+  };
+
   // We'll handle the dialog rendering directly in the JSX rather than using portals
   // This avoids the need for additional hooks that might cause issues
 
@@ -948,7 +1274,7 @@ export default function Profile() {
       {error && (
         <div className={styles.errorToast}>
           {typeof error === 'object' ? (error.message || JSON.stringify(error)) : error}
-          <button onClick={() => useProfile.getState().setError(null)}>×</button>
+          <button onClick={() => getState && getState().setError(null)}>×</button>
         </div>
       )}
 
@@ -1052,30 +1378,34 @@ export default function Profile() {
           className={`${styles.tabButton} ${activeTab === 'posts' ? styles.activeTab : ''}`}
           onClick={() => handleTabChange('posts')}
         >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14,2 14,8 20,8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10,9 9,9 8,9"></polyline>
+          </svg>
           Posts
         </button>
         <button 
           className={`${styles.tabButton} ${activeTab === 'strategies' ? styles.activeTab : ''}`}
           onClick={() => handleTabChange('strategies')}
         >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
           Strategies
-        </button>
-        <button 
-          className={`${styles.tabButton} ${activeTab === 'followers' ? styles.activeTab : ''}`}
-          onClick={() => handleTabChange('followers')}
-        >
-          Followers
-        </button>
-        <button 
-          className={`${styles.tabButton} ${activeTab === 'following' ? styles.activeTab : ''}`}
-          onClick={() => handleTabChange('following')}
-        >
-          Following
         </button>
         <button 
           className={`${styles.tabButton} ${activeTab === 'telegram' ? styles.activeTab : ''}`}
           onClick={() => handleTabChange('telegram')}
         >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            <path d="M8 10h.01"></path>
+            <path d="M12 10h.01"></path>
+            <path d="M16 10h.01"></path>
+          </svg>
           Telegram Bot
         </button>
       </div>
@@ -1087,42 +1417,11 @@ export default function Profile() {
             {/* زر التحقق من أسعار المنشورات */}
             <CheckPostPricesButton userId={user?.id} />
             
-            {/* View Mode Toggle */}
-            <div className={styles.viewControls}>
-              <div className={styles.viewToggle}>
-                <button
-                  className={`${styles.viewButton} ${viewMode === 'list' ? styles.activeView : ''}`}
-                  onClick={() => setViewMode('list')}
-                  aria-label="List view"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="8" y1="6" x2="21" y2="6"></line>
-                    <line x1="8" y1="12" x2="21" y2="12"></line>
-                    <line x1="8" y1="18" x2="21" y2="18"></line>
-                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                  </svg>
-                  List
-                </button>
-                <button
-                  className={`${styles.viewButton} ${viewMode === 'grid' ? styles.activeView : ''}`}
-                  onClick={() => setViewMode('grid')}
-                  aria-label="Grid view"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="7" height="7"></rect>
-                    <rect x="14" y="3" width="7" height="7"></rect>
-                    <rect x="14" y="14" width="7" height="7"></rect>
-                    <rect x="3" y="14" width="7" height="7"></rect>
-                  </svg>
-                  Grid
-                </button>
-              </div>
-            </div>
-
-            <div className={styles.filterControls}>
-              <div className={styles.filterItem}>
+            {/* Filters and View Controls Container */}
+            <div className={styles.filtersAndViewContainer}>
+              {/* Filters Section */}
+              <div className={styles.filterControls}>
+                <div className={styles.filterItem}>
                 <label htmlFor="strategyFilter" className={styles.filterLabel}>Strategy:</label>
                 <div className={styles.filterSelectContainer}>
                   <select
@@ -1325,16 +1624,69 @@ export default function Profile() {
                   Clear All Filters
                 </button>
               )}
-              
               {filterLoading && (
                 <div className={styles.filterLoading}>
                   <div className={styles.filterSpinner}></div>
                 </div>
               )}
+              </div>
+              
+            </div>
+            {/* Posts header with view toggle (same style as view-profile) */}
+            <div className={styles.postsHeaderRow}>
+              <h2>Recent Posts</h2>
+              <div className={styles.viewToggle}>
+                <button
+                  className={`${styles.viewButton} ${viewMode === 'list' ? styles.viewButtonActive : ''}`}
+                  onClick={() => setViewMode('list')}
+                  title="List View"
+                  aria-label="List view"
+                  type="button"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                  </svg>
+                </button>
+                <button
+                  className={`${styles.viewButton} ${viewMode === 'grid' ? styles.viewButtonActive : ''}`}
+                  onClick={() => setViewMode('grid')}
+                  title="Grid View"
+                  aria-label="Grid view"
+                  type="button"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                  </svg>
+                </button>
+                <button
+                  className={`${styles.viewButton} ${viewMode === 'table' ? styles.viewButtonActive : ''}`}
+                  onClick={() => setViewMode('table')}
+                  title="Table View"
+                  aria-label="Table view"
+                  type="button"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="3" y1="9" x2="21" y2="9"></line>
+                    <line x1="3" y1="15" x2="21" y2="15"></line>
+                    <line x1="9" y1="3" x2="9" y2="21"></line>
+                    <line x1="15" y1="3" x2="15" y2="21"></line>
+                  </svg>
+                </button>
+              </div>
             </div>
 
             <PostsFeed
               mode="profile"
+              title=" "
               userId={profile?.id || user?.id}
               hideControls={true}
               showFlagBackground={true}
@@ -1348,77 +1700,6 @@ export default function Profile() {
           </>
         )}
         
-        {activeTab === 'followers' && (
-          <div className={styles.usersGrid}>
-            {followers.length > 0 ? (
-              followers.map((follower) => (
-                <div key={follower.follower_id} className={styles.userCard}>
-                  <Link href={`/view-profile/${follower.profiles?.id || follower.follower_id}`} className={styles.userLink}>
-                    <div className={styles.userCardInner}>
-                      <div className={styles.userAvatarContainer}>
-                        <img 
-                          src={follower.profiles?.avatar_url || '/default-avatar.svg'} 
-                          alt={follower.profiles?.username || 'User'} 
-                          className={styles.userAvatar}
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = '/default-avatar.svg';
-                          }}
-                        />
-                      </div>
-                      <div className={styles.userInfo}>
-                        <h3 className={styles.userName}>{follower.profiles?.username || 'User'}</h3>
-                      </div>
-                    </div>
-                  </Link>
-                </div>
-              ))
-            ) : (
-              <div className={styles.emptyStateContainer}>
-                <div className={styles.emptyState}>
-                  <h3>No followers yet</h3>
-                  <p>When people follow you, they'll appear here</p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        
-        {activeTab === 'following' && (
-          <div className={styles.usersGrid}>
-            {following.length > 0 ? (
-              following.map((follow) => (
-                <div key={follow.following_id} className={styles.userCard}>
-                  <Link href={`/view-profile/${follow.profiles?.id || follow.following_id}`} className={styles.userLink}>
-                    <div className={styles.userCardInner}>
-                      <div className={styles.userAvatarContainer}>
-                        <img 
-                          src={follow.profiles?.avatar_url || '/default-avatar.svg'} 
-                          alt={follow.profiles?.username || 'User'} 
-                          className={styles.userAvatar}
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = '/default-avatar.svg';
-                          }}
-                        />
-                      </div>
-                      <div className={styles.userInfo}>
-                        <h3 className={styles.userName}>{follow.profiles?.username || 'User'}</h3>
-                      </div>
-                    </div>
-                  </Link>
-                </div>
-              ))
-            ) : (
-              <div className={styles.emptyStateContainer}>
-                <div className={styles.emptyState}>
-                  <h3>You're not following anyone yet</h3>
-                  <p>When you follow people, they'll appear here</p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
 
         {activeTab === 'strategies' && (
@@ -1430,54 +1711,204 @@ export default function Profile() {
               </div>
             ) : (
               <>
-                {/* Get unique strategies from posts */}
+                {/* Create New Strategy Button */}
+                <div className={styles.strategiesHeader}>
+                  <h2>My Trading Strategies</h2>
+                  <button 
+                    className={styles.createStrategyButton}
+                    onClick={() => setShowCreateStrategyForm(true)}
+                    disabled={isCreatingStrategy}
+                  >
+                    {isCreatingStrategy ? 'Creating...' : '+ Create New Strategy'}
+                  </button>
+                </div>
+
+                {/* Create Strategy Form */}
+                {showCreateStrategyForm && (
+                  <div className={styles.createStrategyForm}>
+                    <div className={styles.formCard}>
+                      <h3>Create New Trading Strategy</h3>
+                      <form onSubmit={handleCreateNewStrategy}>
+                        <div className={styles.formGroup}>
+                          <label htmlFor="strategyName" className={styles.formLabel}>
+                            Strategy Name <span className={styles.required}>*</span>
+                          </label>
+                          <input
+                            type="text"
+                            id="strategyName"
+                            value={newStrategyName}
+                            onChange={(e) => setNewStrategyName(e.target.value)}
+                            placeholder="e.g., Day Trading, Swing Trading, Breakout Strategy"
+                            className={styles.formInput}
+                            maxLength={50}
+                            required
+                          />
+                          <small className={styles.formHint}>
+                            Minimum 3 characters, maximum 50 characters
+                          </small>
+                        </div>
+
+                        <div className={styles.formGroup}>
+                          <label htmlFor="strategyDescription" className={styles.formLabel}>
+                            Strategy Description <span className={styles.required}>*</span>
+                          </label>
+                          <textarea
+                            id="strategyDescription"
+                            value={newStrategyDescription}
+                            onChange={(e) => setNewStrategyDescription(e.target.value)}
+                            placeholder="Describe your trading strategy, including entry/exit rules, risk management, and key indicators you use..."
+                            className={styles.formTextarea}
+                            rows={4}
+                            maxLength={500}
+                            required
+                          />
+                          <small className={styles.formHint}>
+                            Minimum 10 characters, maximum 500 characters ({newStrategyDescription.length}/500)
+                          </small>
+                        </div>
+
+                        <div className={styles.formGroup}>
+                          <label htmlFor="strategyImage" className={styles.formLabel}>
+                            Strategy Image (Optional)
+                          </label>
+                          <input
+                            type="file"
+                            id="strategyImage"
+                            accept="image/*"
+                            onChange={handleStrategyImageChange}
+                            className={styles.formInput}
+                          />
+                          <small className={styles.formHint}>
+                            Upload an image to represent your strategy (JPG, PNG, GIF - Max 5MB)
+                          </small>
+                          {newStrategyImagePreview && (
+                            <div className={styles.imagePreview}>
+                              <img src={newStrategyImagePreview} alt="Strategy preview" />
+                            </div>
+                          )}
+                        </div>
+
+                        {createStrategyError && (
+                          <div className={styles.errorMessage}>
+                            {createStrategyError}
+                          </div>
+                        )}
+
+                        <div className={styles.formActions}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCreateStrategyForm(false);
+                              setNewStrategyName('');
+                              setNewStrategyDescription('');
+                              setNewStrategyImage(null);
+                              setNewStrategyImagePreview('');
+                              setCreateStrategyError('');
+                            }}
+                            className={styles.cancelButton}
+                            disabled={isCreatingStrategy}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            className={styles.submitButton}
+                            disabled={isCreatingStrategy || !newStrategyName.trim() || !newStrategyDescription.trim()}
+                          >
+                            {isCreatingStrategy ? 'Creating Strategy...' : 'Create Strategy'}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                )}
+
+                {/* Strategies list: merge provider strategies with post usage counts */}
                 {(() => {
-                  // Extract all strategies from posts and count their occurrences
+                  // 1) Count occurrences from posts
                   const strategyCounts = posts.reduce((acc, post) => {
-                    if (post.strategy) {
-                      acc[post.strategy] = (acc[post.strategy] || 0) + 1;
-                    }
+                    const name = post?.strategy;
+                    if (name) acc[name] = (acc[name] || 0) + 1;
                     return acc;
                   }, {});
-                  
-                  // Convert to array and sort by count (descending)
-                  const sortedStrategies = Object.entries(strategyCounts)
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([strategy, count]) => ({ strategy, count }));
-                  
-                  if (sortedStrategies.length === 0) {
+
+                  // 2) Collect all strategy names from provider and posts
+                  const providerNames = Array.isArray(strategies)
+                    ? strategies.map(s => s.strategy_name).filter(Boolean)
+                    : [];
+                  const postNames = Object.keys(strategyCounts);
+                  const allNamesSet = new Set([...providerNames, ...postNames]);
+
+                  // 3) Build combined list with counts (0 default) and provider data
+                  const combined = Array.from(allNamesSet).map(name => ({
+                    strategy: name,
+                    count: strategyCounts[name] || 0,
+                    data: Array.isArray(strategies) ? strategies.find(s => s.strategy_name === name) : null,
+                  }));
+
+                  // 4) Sort by count desc then by name asc
+                  const sortedCombined = combined.sort((a, b) => {
+                    if (b.count !== a.count) return b.count - a.count;
+                    return String(a.strategy).localeCompare(String(b.strategy));
+                  });
+
+                  if (sortedCombined.length === 0) {
                     return (
                       <div className={styles.emptyStateContainer}>
                         <div className={styles.emptyState}>
-                          <h3>No strategies used yet</h3>
-                          <p>Create posts with trading strategies to see them here</p>
+                          <h3>No strategies yet</h3>
+                          <p>Create a strategy or add one while creating a post</p>
                           <CreatePostButton />
                         </div>
                       </div>
                     );
                   }
-                  
+
                   return (
                     <div className={styles.strategiesGrid}>
-                      {sortedStrategies.map(({ strategy, count }) => (
+                      {sortedCombined.map(({ strategy, count, data: strategyData }) => (
                         <div key={strategy} className={styles.strategyCard}>
+                          {/* Strategy Image */}
+                          {strategyData?.image_url && (
+                            <div className={styles.strategyImageContainer}>
+                              <img 
+                                src={strategyData.image_url} 
+                                alt={`${strategy} strategy`}
+                                className={styles.strategyImage}
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                            </div>
+                          )}
+
                           <div className={styles.strategyHeader}>
                             <h3 className={styles.strategyName}>{strategy}</h3>
-                            <span className={styles.strategyCount}>{count} post{count !== 1 ? 's' : ''}</span>
+                            <div className={styles.strategyHeaderActions}>
+                              <span className={styles.strategyCount}>{count} post{count !== 1 ? 's' : ''}</span>
+                              {strategyData && (
+                                <button
+                                  className={styles.deleteStrategyButton}
+                                  onClick={() => handleDeleteStrategyClick(strategy)}
+                                  disabled={isDeletingStrategy[strategy]}
+                                  title="Delete Strategy"
+                                >
+                                  {isDeletingStrategy[strategy] ? '⏳' : '🗑️'}
+                                </button>
+                              )}
+                            </div>
                           </div>
+
+                          {strategyData?.description && (
+                            <div className={styles.strategyDescription}>
+                              <p>{strategyData.description}</p>
+                            </div>
+                          )}
+
                           <div className={styles.strategyActions}>
                             <button 
                               className={styles.viewPostsButton}
                               onClick={() => {
-                                // Set the strategy filter
                                 handleStrategyChange({ target: { value: strategy } });
-                                
-                                // Switch to posts tab if not already there
-                                if (activeTab !== 'posts') {
-                                  setActiveTab('posts');
-                                }
-                                
-                                // Reset other filters for a cleaner view
+                                if (activeTab !== 'posts') setActiveTab('posts');
                                 setSelectedStatus('');
                                 setSelectedCountry('');
                               }}
@@ -1503,10 +1934,6 @@ export default function Profile() {
             )}
           </div>
         )}
-
-        {activeTab === 'telegram' && (
-          <TelegramBotManagement />
-        )}
       </div>
       
       {/* Strategy Details Modal */}
@@ -1514,12 +1941,125 @@ export default function Profile() {
         strategy={selectedStrategyForDetails}
         isOpen={isStrategyModalOpen}
         onClose={() => setIsStrategyModalOpen(false)}
-        onSave={(strategy, description) => {
+        userId={user?.id}
+        onSave={(strategy, description, meta) => {
           console.log(`Updated documentation for strategy: ${strategy}`);
+          // If image updated/removed, optimistically reflect it in the modal children
+          if (meta && Object.prototype.hasOwnProperty.call(meta, 'imageUrl')) {
+            setStrategyImageOverrides(prev => ({
+              ...prev,
+              [strategy]: meta.imageUrl ? addCacheBuster(meta.imageUrl) : null,
+            }));
+          }
           // Refresh data to get updated strategy information
-          refreshData(user?.id);
+          if (refreshData) {
+            refreshData(user?.id);
+          }
+          // Also refetch strategies to sync provider state
+          if (fetchStrategies) {
+            fetchStrategies();
+          }
         }}
-      />
+      >
+        {(() => {
+          // compute stats
+          const total = strategyModalPosts.length || 0;
+          const success = strategyModalPosts.filter(p => !!p?.target_reached).length;
+          const loss = strategyModalPosts.filter(p => !!p?.stop_loss_triggered).length;
+          const active = Math.max(0, total - success - loss);
+          const pct = (n) => (total ? Math.round((n * 100) / total) : 0);
+          const successPct = pct(success);
+          const lossPct = pct(loss);
+          const activePct = pct(active);
+          const successRate = total ? Math.round((success / total) * 100) : 0;
+
+          const strategyData = Array.isArray(strategies)
+            ? strategies.find(s => s.strategy_name === selectedStrategyForDetails)
+            : null;
+
+          return (
+            <>
+              {/* Optional strategy image */}
+              {(strategyImageOverrides?.[selectedStrategyForDetails] ?? strategyData?.image_url) && (
+                <div className="smd-section" style={{ marginTop: 8 }}>
+                  <img 
+                    src={strategyImageOverrides?.[selectedStrategyForDetails] ?? strategyData.image_url}
+                    alt={`${selectedStrategyForDetails} strategy`}
+                    style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 12 }}
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                </div>
+              )}
+
+              <div className="smd-section">
+                <h3 className="smd-sectionTitle">Results</h3>
+                <div className="smd-metricsGrid">
+                  <div className="smd-metricCard">
+                    <div className="smd-metricLabel">Total Posts</div>
+                    <div className="smd-metricValue">{total}</div>
+                  </div>
+                  <div className="smd-metricCard">
+                    <div className="smd-metricLabel">Success</div>
+                    <div className="smd-metricValue">{success} ({successPct}%)</div>
+                  </div>
+                  <div className="smd-metricCard">
+                    <div className="smd-metricLabel">Loss</div>
+                    <div className="smd-metricValue">{loss} ({lossPct}%)</div>
+                  </div>
+                  <div className="smd-metricCard">
+                    <div className="smd-metricLabel">Active</div>
+                    <div className="smd-metricValue">{active} ({activePct}%)</div>
+                  </div>
+                  <div className="smd-metricCard">
+                    <div className="smd-metricLabel">Success Rate</div>
+                    <div className="smd-metricValue">{successRate}%</div>
+                  </div>
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <div className="smd-stackedBar">
+                    <div className="smd-segSuccess" style={{ width: `${successPct}%` }} />
+                    <div className="smd-segLoss" style={{ width: `${lossPct}%` }} />
+                    <div className="smd-segActive" style={{ width: `${activePct}%` }} />
+                  </div>
+                  <div className="smd-chips" style={{ marginTop: 8 }}>
+                    <span className="smd-chip smd-chipSuccess">TargetReached: {success}</span>
+                    <span className="smd-chip smd-chipLoss">Stop Loss: {loss}</span>
+                    <span className="smd-chip smd-chipActive">Active: {active}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="smd-section">
+                <h3 className="smd-sectionTitle">Related Posts</h3>
+                {strategyModalLoading ? (
+                  <p>Loading posts...</p>
+                ) : total === 0 ? (
+                  <p>No posts found for this strategy.</p>
+                ) : (
+                  <div className="smd-postsList">
+                    {strategyModalPosts.map((p) => {
+                      const isSuccess = !!p?.target_reached;
+                      const isLoss = !!p?.stop_loss_triggered;
+                      return (
+                        <div key={p.id} className="smd-postItem">
+                          <div className="smd-postSymbol">{p.symbol || '-'}</div>
+                          <div className="smd-postCompany">{p.company_name || ''}</div>
+                          <div className="smd-postRight">
+                            <span className={`smd-chip ${isSuccess ? 'smd-chipSuccess' : isLoss ? 'smd-chipLoss' : 'smd-chipActive'}`}>
+                              {isSuccess ? 'Target' : isLoss ? 'Stop' : 'Active'}
+                            </span>
+                            <a href={`/posts/${p.id}`} className="smd-chip">Open</a>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          );
+        })()}
+      </StrategyDetailsModal>
       
       {/* Followers/Following Dialogs */}
       <FollowersDialog
@@ -1528,7 +2068,7 @@ export default function Profile() {
         followers={followers}
         following={following}
         type="followers"
-        loading={profileLoading}
+        loading={isLoading}
       />
       
       <FollowersDialog
@@ -1537,7 +2077,7 @@ export default function Profile() {
         followers={followers}
         following={following}
         type="following"
-        loading={profileLoading}
+        loading={isLoading}
       />
       
       {/* Edit Profile Modal */}
@@ -1795,6 +2335,44 @@ export default function Profile() {
         </div>
       )}
       
+      {/* Delete Strategy Confirmation Dialog (rendered via portal to avoid stacking issues) */}
+      {showDeleteDialog && typeof document !== 'undefined' && createPortal(
+        (
+          <div className={styles.dialogOverlay} role="dialog" aria-modal="true" aria-label="Delete Strategy Confirmation">
+            <div className={styles.confirmDialog}>
+              <h4>Delete Strategy "{strategyToDelete}"?</h4>
+              {strategyPostsCount > 0 ? (
+                <p>
+                  This strategy is used in <strong>{strategyPostsCount}</strong> post{strategyPostsCount !== 1 ? 's' : ''}. 
+                  These posts will be moved to the <strong>"BUY"</strong> strategy before deletion.
+                </p>
+              ) : (
+                <p>
+                  Are you sure you want to delete this strategy? This action cannot be undone.
+                </p>
+              )}
+              <div className={styles.dialogActions}>
+                <button 
+                  className={styles.cancelDialogButton}
+                  onClick={handleCancelDeleteStrategy}
+                  disabled={isDeletingStrategy[strategyToDelete]}
+                >
+                  Cancel
+                </button>
+                <button 
+                  className={styles.confirmButton}
+                  onClick={handleConfirmDeleteStrategy}
+                  disabled={isDeletingStrategy[strategyToDelete]}
+                >
+                  {isDeletingStrategy[strategyToDelete] ? 'Deleting...' : 'Delete Strategy'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ),
+        document.body
+      )}
+
       {/* Background indicators removed - now handled by UnifiedBackgroundProcessDrawer */}
     </div>
   );

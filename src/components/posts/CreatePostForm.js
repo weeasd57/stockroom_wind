@@ -405,7 +405,7 @@ export default function CreatePostForm() {
       }
       
       // Reset the input field
-      setNewStrategy('');
+      updateField('newStrategy', '');
       updateField('showStrategyInput', false);
     } catch (error) {
       console.error('Error creating strategy:', error);
@@ -2544,8 +2544,8 @@ export default function CreatePostForm() {
             </div>
             
             <div className="strategy-dialog-content">
-              {/* عرض الاستراتيجيات الافتراضية */}
-              {DEFAULT_STRATEGIES.map((strategy, index) => (
+              {/* Show strategies (user or defaults) */}
+              {(Array.isArray(strategies) && strategies.length > 0 ? strategies : DEFAULT_STRATEGIES).map((strategy, index) => (
                 <div 
                   key={`strategy-${index}`}
                   className={`strategy-option ${selectedStrategy === strategy ? 'selected' : ''}`}
@@ -2561,7 +2561,6 @@ export default function CreatePostForm() {
                   <div className="strategy-option-desc">Trading strategy</div>
                 </div>
               ))}
-              
               {/* Add strategy section */}
               <div className="add-strategy-container">
                 <div className="add-strategy-header">Add New Strategy</div>

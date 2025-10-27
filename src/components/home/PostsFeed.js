@@ -4,7 +4,9 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { usePosts } from '@/providers/PostProvider'; // Add PostProvider for real-time updates
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import PostCard from '@/components/posts/PostCard';
+import PostsTableView from '@/components/posts/PostsTableView';
 import styles from '@/styles/home/PostsFeed.module.css';
+import profileStyles from '@/styles/profile.module.css';
 
 // Unified PostsFeed component reusable across Home/Profile/View-Profile
 // Props:
@@ -52,12 +54,56 @@ export function PostsFeed({
   const [filter, setFilter] = useState('following'); // following, all, trending
   const [sortBy, setSortBy] = useState('date_desc'); // date_desc, date_asc, engagement, price_change
   const [categoryFilter, setCategoryFilter] = useState('all'); // all, buy, sell, analysis
-  const [internalViewMode, setInternalViewMode] = useState('list'); // list, grid
+  const [internalViewMode, setInternalViewMode] = useState('list'); // list, grid, table
   const [mounted, setMounted] = useState(false);
+  // Advanced filters (Home mode)
+  const [homeSelectedStrategy, setHomeSelectedStrategy] = useState('');
+  const [homeSelectedStatus, setHomeSelectedStatus] = useState('');
+  const [homeSelectedCountry, setHomeSelectedCountry] = useState('');
+  const [homeSelectedSymbol, setHomeSelectedSymbol] = useState('');
+  const [homeFilterLoading, setHomeFilterLoading] = useState(false);
   // Use external viewMode if provided, otherwise use internal state
   const viewMode = externalViewMode || internalViewMode;
   // In profile page, we always render the current user's posts
   const isSelfProfile = mode === 'profile';
+  // Effective selected filters
+  const effSelectedStrategy = (mode === 'home') ? homeSelectedStrategy : selectedStrategy;
+  const effSelectedStatus = (mode === 'home') ? homeSelectedStatus : selectedStatus;
+  const effSelectedCountry = (mode === 'home') ? homeSelectedCountry : selectedCountry;
+  const effSelectedSymbol = (mode === 'home') ? homeSelectedSymbol : selectedSymbol;
+
+  // Option lists for Home advanced filters
+  const strategiesHome = useMemo(() => {
+    const set = new Set();
+    providerPosts.forEach(p => { if (p?.strategy) set.add(String(p.strategy)); });
+    return Array.from(set);
+  }, [providerPosts]);
+
+  const discoveredCountriesHome = useMemo(() => {
+    const set = new Set();
+    providerPosts.forEach(p => {
+      const code = normalizeCountryCode(getPostCountry(p));
+      if (code) set.add(code);
+    });
+    return Array.from(set);
+  }, [providerPosts]);
+
+  const symbolsHome = useMemo(() => {
+    const map = new Map();
+    providerPosts.forEach(p => {
+      if (!p?.symbol) return;
+      const sym = normalizeBaseSymbol(p.symbol);
+      const ctry = normalizeCountryCode(getPostCountry(p));
+      if (!sym) return;
+      if (!map.has(sym)) {
+        map.set(sym, ctry ? { Symbol: sym, Country: ctry } : { Symbol: sym });
+      } else {
+        const existing = map.get(sym);
+        if (!existing.Country && ctry) map.set(sym, { Symbol: sym, Country: ctry });
+      }
+    });
+    return Array.from(map.values());
+  }, [providerPosts]);
 
   // User-specific feed (for profile/view-profile). We fetch directly by userId to avoid pagination mismatch.
   const [userPosts, setUserPosts] = useState([]);
@@ -80,42 +126,41 @@ export function PostsFeed({
   };
 
   // Extract country code from post (either explicit country or from symbol suffix like AAPL.US)
-  const getPostCountry = (post) => {
+  function getPostCountry(post) {
     if (post?.country) return String(post.country);
     if (post?.symbol) {
       const parts = String(post.symbol).split('.');
       if (parts.length > 1) return parts[1];
     }
     return '';
-  };
+  }
 
-  const normalizeCountryCode = (val) => {
+  function normalizeCountryCode(val) {
     if (!val) return '';
     const v = String(val).trim();
     if (v.length === 2) return v.toLowerCase();
     // if value is a name, we can't map here without a dict; fallback to lowercased value
     return v.toLowerCase();
-  };
+  }
 
-  const matchesCountry = (post, countryFilter) => {
+  function matchesCountry(post, countryFilter) {
     if (!countryFilter) return true;
     return normalizeCountryCode(getPostCountry(post)) === normalizeCountryCode(countryFilter);
-  };
+  }
 
-  const normalizeBaseSymbol = (s) => String(s || '').toUpperCase().split('.')[0];
-  const matchesSymbol = (post, symbolFilter) => {
+  function normalizeBaseSymbol(s) { return String(s || '').toUpperCase().split('.')[0]; }
+  function matchesSymbol(post, symbolFilter) {
     if (!symbolFilter) return true;
     return normalizeBaseSymbol(post.symbol) === normalizeBaseSymbol(symbolFilter);
-  };
+  }
 
   // Local following list removed to prevent double-filtering and races
-
   // Initialize view mode from localStorage only after component is mounted
   useEffect(() => {
     setMounted(true);
     try {
       const storedViewMode = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
-      if (storedViewMode && (storedViewMode === 'list' || storedViewMode === 'grid')) {
+      if (storedViewMode && (storedViewMode === 'list' || storedViewMode === 'grid' || storedViewMode === 'table')) {
         setInternalViewMode(storedViewMode);
       }
     } catch (error) {
@@ -245,18 +290,18 @@ export function PostsFeed({
       filtered = filtered.filter(post => post.sentiment === 'bearish');
     }
 
-    // Apply external filters when provided (profile/view-profile)
-    if (selectedStrategy) {
-      filtered = filtered.filter(post => String(post.strategy || '') === String(selectedStrategy));
+    // Apply advanced filters (effective values)
+    if (effSelectedStrategy) {
+      filtered = filtered.filter(post => String(post.strategy || '') === String(effSelectedStrategy));
     }
-    if (selectedStatus) {
-      filtered = filtered.filter(post => matchesStatus(post, selectedStatus));
+    if (effSelectedStatus) {
+      filtered = filtered.filter(post => matchesStatus(post, effSelectedStatus));
     }
-    if (selectedCountry) {
-      filtered = filtered.filter(post => matchesCountry(post, selectedCountry));
+    if (effSelectedCountry) {
+      filtered = filtered.filter(post => matchesCountry(post, effSelectedCountry));
     }
-    if (selectedSymbol) {
-      filtered = filtered.filter(post => matchesSymbol(post, selectedSymbol));
+    if (effSelectedSymbol) {
+      filtered = filtered.filter(post => matchesSymbol(post, effSelectedSymbol));
     }
 
     // Apply sorting
@@ -288,7 +333,7 @@ export function PostsFeed({
     }
 
     return filtered; // No client-side limit; pagination handled via PostProvider + Load More
-  }, [providerPosts, filter, sortBy, categoryFilter, userId, selectedStrategy, selectedStatus, selectedCountry, selectedSymbol]);
+  }, [providerPosts, filter, sortBy, categoryFilter, userId, effSelectedStrategy, effSelectedStatus, effSelectedCountry, effSelectedSymbol]);
 
   // Source posts for profile mode (provider-owned for self, local for others)
   const profileSourcePosts = isSelfProfile ? myPosts : userPosts;
@@ -455,9 +500,12 @@ export function PostsFeed({
                 ? (mode === 'profile' || mode === 'view-profile' ? 'Recent Posts' : 'User Posts')
                 : (filter === 'following' ? 'Following Posts' : 'Recent Posts'))}
           </h2>
-          {!(hideControls || userId) && (
-            <div className={styles.controls}>
-              <div className={styles.filters}>
+        </div>
+        {!(hideControls || userId) && (
+          <div className={styles.homeFiltersAndViewContainer}>
+            {/* Filters Row - Top */}
+            <div className={styles.homeFiltersRow}>
+              <div className={`${styles.filters} ${styles.filtersRight}`}>
                 <button 
                   className={`${styles.filterButton} ${filter === 'following' ? styles.active : ''}`}
                   onClick={() => setFilter('following')}
@@ -478,8 +526,198 @@ export function PostsFeed({
                 </button>
               </div>
             </div>
-          )}
-        </div>
+            {/* Advanced Filters (Strategy/Status/Country/Symbol) */}
+            <div className={styles.homeFiltersAdvancedRow}>
+              <div className={profileStyles.filterControls} style={{ justifyContent: 'center' }}>
+                {/* Strategy */}
+                <div className={profileStyles.filterItem}>
+                  <label htmlFor="homeStrategyFilter" className={profileStyles.filterLabel}>Strategy:</label>
+                  <div className={profileStyles.filterSelectContainer}>
+                    <select
+                      id="homeStrategyFilter"
+                      className={`${profileStyles.filterSelect} ${homeSelectedStrategy ? profileStyles.activeFilter : ''}`}
+                      value={homeSelectedStrategy}
+                      onChange={(e) => { setHomeSelectedStrategy(e.target.value); setHomeFilterLoading(true); setTimeout(() => setHomeFilterLoading(false), 250); }}
+                      disabled={homeFilterLoading}
+                    >
+                      <option value="">All Strategies</option>
+                      {strategiesHome.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                    {homeSelectedStrategy && !homeFilterLoading && (
+                      <button
+                        className={profileStyles.clearFilterButton}
+                        onClick={() => { setHomeSelectedStrategy(''); setHomeFilterLoading(true); setTimeout(() => setHomeFilterLoading(false), 200); }}
+                        aria-label="Clear strategy filter"
+                        type="button"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div className={profileStyles.filterItem}>
+                  <label htmlFor="homeStatusFilter" className={profileStyles.filterLabel}>Status:</label>
+                  <div className={profileStyles.filterSelectContainer}>
+                    <select
+                      id="homeStatusFilter"
+                      className={`${profileStyles.filterSelect} ${homeSelectedStatus ? profileStyles.activeFilter : ''}`}
+                      value={homeSelectedStatus}
+                      onChange={(e) => { setHomeSelectedStatus(e.target.value); setHomeFilterLoading(true); setTimeout(() => setHomeFilterLoading(false), 200); }}
+                      disabled={homeFilterLoading}
+                    >
+                      <option value="">All Status</option>
+                      <option value="success">Success</option>
+                      <option value="loss">Loss</option>
+                      <option value="open">Open</option>
+                    </select>
+                    {homeSelectedStatus && !homeFilterLoading && (
+                      <button
+                        className={profileStyles.clearFilterButton}
+                        onClick={() => { setHomeSelectedStatus(''); setHomeFilterLoading(true); setTimeout(() => setHomeFilterLoading(false), 200); }}
+                        aria-label="Clear status filter"
+                        type="button"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Country */}
+                <div className={profileStyles.filterItem}>
+                  <label htmlFor="homeCountryFilter" className={profileStyles.filterLabel}>Country:</label>
+                  <div className={profileStyles.filterSelectContainer}>
+                    <select
+                      id="homeCountryFilter"
+                      className={`${profileStyles.filterSelect} ${homeSelectedCountry ? profileStyles.activeFilter : ''}`}
+                      value={homeSelectedCountry}
+                      onChange={(e) => { setHomeSelectedCountry(e.target.value); setHomeFilterLoading(true); setTimeout(() => setHomeFilterLoading(false), 200); }}
+                      disabled={homeFilterLoading}
+                    >
+                      <option value="">All Countries</option>
+                      {discoveredCountriesHome.slice().sort().map(code => (
+                        <option key={code} value={code}>{String(code).toUpperCase()}</option>
+                      ))}
+                    </select>
+                    {homeSelectedCountry && !homeFilterLoading && (
+                      <button
+                        className={profileStyles.clearFilterButton}
+                        onClick={() => { setHomeSelectedCountry(''); setHomeFilterLoading(true); setTimeout(() => setHomeFilterLoading(false), 200); }}
+                        aria-label="Clear country filter"
+                        type="button"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Symbol */}
+                <div className={profileStyles.filterItem}>
+                  <label htmlFor="homeSymbolFilter" className={profileStyles.filterLabel}>Symbol:</label>
+                  <div className={profileStyles.filterSelectContainer}>
+                    <select
+                      id="homeSymbolFilter"
+                      className={`${profileStyles.filterSelect} ${homeSelectedSymbol ? profileStyles.activeFilter : ''}`}
+                      value={homeSelectedSymbol}
+                      onChange={(e) => { setHomeSelectedSymbol(e.target.value); setHomeFilterLoading(true); setTimeout(() => setHomeFilterLoading(false), 200); }}
+                      disabled={homeFilterLoading}
+                    >
+                      <option value="">All Symbols</option>
+                      {symbolsHome.map((s) => (
+                        <option key={s.Symbol} value={s.Symbol}>{s.Symbol}</option>
+                      ))}
+                    </select>
+                    {homeSelectedSymbol && !homeFilterLoading && (
+                      <button
+                        className={profileStyles.clearFilterButton}
+                        onClick={() => { setHomeSelectedSymbol(''); setHomeFilterLoading(true); setTimeout(() => setHomeFilterLoading(false), 200); }}
+                        aria-label="Clear symbol filter"
+                        type="button"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {(homeSelectedStrategy || homeSelectedStatus || homeSelectedCountry || homeSelectedSymbol) && !homeFilterLoading && (
+                  <button 
+                    className={profileStyles.clearAllFiltersButton}
+                    onClick={() => {
+                      setHomeSelectedStrategy('');
+                      setHomeSelectedStatus('');
+                      setHomeSelectedCountry('');
+                      setHomeSelectedSymbol('');
+                      setHomeFilterLoading(true);
+                      setTimeout(() => setHomeFilterLoading(false), 200);
+                    }}
+                    aria-label="Clear all filters"
+                  >
+                    Clear All Filters
+                  </button>
+                )}
+
+                {homeFilterLoading && (
+                  <div className={profileStyles.filterLoading}>
+                    <div className={profileStyles.filterSpinner}></div>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* View Controls Row - Bottom */}
+            {!externalViewMode && (
+              <div className={styles.homeViewRow}>
+                <div className={`${profileStyles.viewToggle} ${styles.viewToggleRight}`}>
+                  <button 
+                    className={`${profileStyles.viewButton} ${internalViewMode === 'list' ? profileStyles.activeView : ''}`}
+                    onClick={() => setInternalViewMode('list')}
+                    title="List View"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="8" y1="6" x2="21" y2="6"></line>
+                      <line x1="8" y1="12" x2="21" y2="12"></line>
+                      <line x1="8" y1="18" x2="21" y2="18"></line>
+                      <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                      <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                      <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                    </svg>
+                  </button>
+                  <button 
+                    className={`${profileStyles.viewButton} ${internalViewMode === 'grid' ? profileStyles.activeView : ''}`}
+                    onClick={() => setInternalViewMode('grid')}
+                    title="Grid View"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="14" width="7" height="7"></rect>
+                      <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                  </button>
+                  <button 
+                    className={`${profileStyles.viewButton} ${internalViewMode === 'table' ? profileStyles.activeView : ''}`}
+                    onClick={() => setInternalViewMode('table')}
+                    title="Table View"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                      <line x1="3" y1="9" x2="21" y2="9"></line>
+                      <line x1="3" y1="15" x2="21" y2="15"></line>
+                      <line x1="9" y1="3" x2="9" y2="21"></line>
+                      <line x1="15" y1="3" x2="15" y2="21"></line>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         <div className={styles.emptyState}>
           <p>
             {userId
@@ -503,77 +741,246 @@ export function PostsFeed({
               ? (mode === 'profile' || mode === 'view-profile' ? 'Recent Posts' : 'User Posts')
               : (filter === 'following' ? 'Following Posts' : 'Recent Posts'))}
         </h2>
-        {!(hideControls || userId) && (
-          <div className={styles.controls}>
-            <div className={styles.filtersAndView}>
-              <div className={styles.filters}>
-                <button 
-                  className={`${styles.filterButton} ${filter === 'following' ? styles.active : ''}`}
-                  onClick={() => setFilter('following')}
-                >
-                  Following
-                </button>
-                <button 
-                  className={`${styles.filterButton} ${filter === 'all' ? styles.active : ''}`}
-                  onClick={() => setFilter('all')}
-                >
-                  All
-                </button>
-                <button 
-                  className={`${styles.filterButton} ${filter === 'trending' ? styles.active : ''}`}
-                  onClick={() => setFilter('trending')}
-                >
-                  Trending
-                </button>
+      </div>
+      {!(hideControls || userId) && (
+        <div className={styles.homeFiltersAndViewContainer}>
+          {/* Filters Row - Top */}
+          <div className={styles.homeFiltersRow}>
+            <div className={`${styles.filters} ${styles.filtersRight}`}>
+              <button 
+                className={`${styles.filterButton} ${filter === 'following' ? styles.active : ''}`}
+                onClick={() => setFilter('following')}
+              >
+                Following
+              </button>
+              <button 
+                className={`${styles.filterButton} ${filter === 'all' ? styles.active : ''}`}
+                onClick={() => setFilter('all')}
+              >
+                All
+              </button>
+              <button 
+                className={`${styles.filterButton} ${filter === 'trending' ? styles.active : ''}`}
+                onClick={() => setFilter('trending')}
+              >
+                Trending
+              </button>
+            </div>
+          </div>
+          {/* Advanced Filters (Strategy/Status/Country/Symbol) */}
+          <div className={styles.homeFiltersAdvancedRow}>
+            <div className={profileStyles.filterControls} style={{ justifyContent: 'center' }}>
+              {/* Strategy */}
+              <div className={profileStyles.filterItem}>
+                <label htmlFor="homeStrategyFilter" className={profileStyles.filterLabel}>Strategy:</label>
+                <div className={profileStyles.filterSelectContainer}>
+                  <select
+                    id="homeStrategyFilter"
+                    className={`${profileStyles.filterSelect} ${homeSelectedStrategy ? profileStyles.activeFilter : ''}`}
+                    value={homeSelectedStrategy}
+                    onChange={(e) => { setHomeSelectedStrategy(e.target.value); setHomeFilterLoading(true); setTimeout(() => setHomeFilterLoading(false), 250); }}
+                    disabled={homeFilterLoading}
+                  >
+                    <option value="">All Strategies</option>
+                    {strategiesHome.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                  {homeSelectedStrategy && !homeFilterLoading && (
+                    <button
+                      className={profileStyles.clearFilterButton}
+                      onClick={() => { setHomeSelectedStrategy(''); setHomeFilterLoading(true); setTimeout(() => setHomeFilterLoading(false), 200); }}
+                      aria-label="Clear strategy filter"
+                      type="button"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               </div>
-              {!externalViewMode && (
-                <div className={styles.viewToggle}>
-                  <button 
-                    className={`${styles.viewButton} ${internalViewMode === 'list' ? styles.active : ''}`}
-                    onClick={() => setInternalViewMode('list')}
-                    title="List View"
+
+              {/* Status */}
+              <div className={profileStyles.filterItem}>
+                <label htmlFor="homeStatusFilter" className={profileStyles.filterLabel}>Status:</label>
+                <div className={profileStyles.filterSelectContainer}>
+                  <select
+                    id="homeStatusFilter"
+                    className={`${profileStyles.filterSelect} ${homeSelectedStatus ? profileStyles.activeFilter : ''}`}
+                    value={homeSelectedStatus}
+                    onChange={(e) => { setHomeSelectedStatus(e.target.value); setHomeFilterLoading(true); setTimeout(() => setHomeFilterLoading(false), 200); }}
+                    disabled={homeFilterLoading}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="8" y1="6" x2="21" y2="6"></line>
-                      <line x1="8" y1="12" x2="21" y2="12"></line>
-                      <line x1="8" y1="18" x2="21" y2="18"></line>
-                      <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                      <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                      <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                    </svg>
-                  </button>
-                  <button 
-                    className={`${styles.viewButton} ${internalViewMode === 'grid' ? styles.active : ''}`}
-                    onClick={() => setInternalViewMode('grid')}
-                    title="Grid View"
+                    <option value="">All Status</option>
+                    <option value="success">Success</option>
+                    <option value="loss">Loss</option>
+                    <option value="open">Open</option>
+                  </select>
+                  {homeSelectedStatus && !homeFilterLoading && (
+                    <button
+                      className={profileStyles.clearFilterButton}
+                      onClick={() => { setHomeSelectedStatus(''); setHomeFilterLoading(true); setTimeout(() => setHomeFilterLoading(false), 200); }}
+                      aria-label="Clear status filter"
+                      type="button"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Country */}
+              <div className={profileStyles.filterItem}>
+                <label htmlFor="homeCountryFilter" className={profileStyles.filterLabel}>Country:</label>
+                <div className={profileStyles.filterSelectContainer}>
+                  <select
+                    id="homeCountryFilter"
+                    className={`${profileStyles.filterSelect} ${homeSelectedCountry ? profileStyles.activeFilter : ''}`}
+                    value={homeSelectedCountry}
+                    onChange={(e) => { setHomeSelectedCountry(e.target.value); setHomeFilterLoading(true); setTimeout(() => setHomeFilterLoading(false), 200); }}
+                    disabled={homeFilterLoading}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="7" height="7"></rect>
-                      <rect x="14" y="3" width="7" height="7"></rect>
-                      <rect x="14" y="14" width="7" height="7"></rect>
-                      <rect x="3" y="14" width="7" height="7"></rect>
-                    </svg>
-                  </button>
+                    <option value="">All Countries</option>
+                    {discoveredCountriesHome.slice().sort().map(code => (
+                      <option key={code} value={code}>{String(code).toUpperCase()}</option>
+                    ))}
+                  </select>
+                  {homeSelectedCountry && !homeFilterLoading && (
+                    <button
+                      className={profileStyles.clearFilterButton}
+                      onClick={() => { setHomeSelectedCountry(''); setHomeFilterLoading(true); setTimeout(() => setHomeFilterLoading(false), 200); }}
+                      aria-label="Clear country filter"
+                      type="button"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Symbol */}
+              <div className={profileStyles.filterItem}>
+                <label htmlFor="homeSymbolFilter" className={profileStyles.filterLabel}>Symbol:</label>
+                <div className={profileStyles.filterSelectContainer}>
+                  <select
+                    id="homeSymbolFilter"
+                    className={`${profileStyles.filterSelect} ${homeSelectedSymbol ? profileStyles.activeFilter : ''}`}
+                    value={homeSelectedSymbol}
+                    onChange={(e) => { setHomeSelectedSymbol(e.target.value); setHomeFilterLoading(true); setTimeout(() => setHomeFilterLoading(false), 200); }}
+                    disabled={homeFilterLoading}
+                  >
+                    <option value="">All Symbols</option>
+                    {symbolsHome
+                      .filter(s => !homeSelectedCountry || (String(s.Country || '').toLowerCase() === String(homeSelectedCountry).toLowerCase()))
+                      .map((s) => (
+                        <option key={s.Symbol} value={s.Symbol}>{s.Symbol}</option>
+                      ))}
+                  </select>
+                  {homeSelectedSymbol && !homeFilterLoading && (
+                    <button
+                      className={profileStyles.clearFilterButton}
+                      onClick={() => { setHomeSelectedSymbol(''); setHomeFilterLoading(true); setTimeout(() => setHomeFilterLoading(false), 200); }}
+                      aria-label="Clear symbol filter"
+                      type="button"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {(homeSelectedStrategy || homeSelectedStatus || homeSelectedCountry || homeSelectedSymbol) && !homeFilterLoading && (
+                <button 
+                  className={profileStyles.clearAllFiltersButton}
+                  onClick={() => {
+                    setHomeSelectedStrategy('');
+                    setHomeSelectedStatus('');
+                    setHomeSelectedCountry('');
+                    setHomeSelectedSymbol('');
+                    setHomeFilterLoading(true);
+                    setTimeout(() => setHomeFilterLoading(false), 200);
+                  }}
+                  aria-label="Clear all filters"
+                >
+                  Clear All Filters
+                </button>
+              )}
+
+              {homeFilterLoading && (
+                <div className={profileStyles.filterLoading}>
+                  <div className={profileStyles.filterSpinner}></div>
                 </div>
               )}
             </div>
           </div>
-        )}
-      </div>
 
-      <div 
-        className={`${styles.postsContainer} ${viewMode === 'grid' ? styles.gridView : styles.listView}`}
-        style={viewMode === 'grid' ? {
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-          gap: '20px',
-          alignItems: 'start'
-        } : {}}
-      >
-        {posts.map((post) => (
-          <PostCard key={post.id} post={post} showFlagBackground={showFlagBackground} hideUserInfo={hideUserInfo} viewMode={viewMode} />
-        ))}
-      </div>
+          {/* View Controls Row - Bottom */}
+          {!externalViewMode && (
+            <div className={styles.homeViewRow}>
+              <div className={`${profileStyles.viewToggle} ${styles.viewToggleRight}`}>
+                <button 
+                  className={`${profileStyles.viewButton} ${internalViewMode === 'list' ? profileStyles.activeView : ''}`}
+                  onClick={() => setInternalViewMode('list')}
+                  title="List View"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                  </svg>
+                </button>
+                <button 
+                  className={`${profileStyles.viewButton} ${internalViewMode === 'grid' ? profileStyles.activeView : ''}`}
+                  onClick={() => setInternalViewMode('grid')}
+                  title="Grid View"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                  </svg>
+                </button>
+                <button 
+                  className={`${profileStyles.viewButton} ${internalViewMode === 'table' ? profileStyles.activeView : ''}`}
+                  onClick={() => setInternalViewMode('table')}
+                  title="Table View"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="3" y1="9" x2="21" y2="9"></line>
+                    <line x1="3" y1="15" x2="21" y2="15"></line>
+                    <line x1="9" y1="3" x2="9" y2="21"></line>
+                    <line x1="15" y1="3" x2="15" y2="21"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {viewMode === 'table' ? (
+        <div className={styles.postsContainer}>
+          <PostsTableView posts={posts} hidePublisher={mode === 'profile'} />
+        </div>
+      ) : (
+        <div 
+          className={`${styles.postsContainer} ${viewMode === 'grid' ? styles.gridView : styles.listView}`}
+          style={viewMode === 'grid' ? {
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+            gap: '20px',
+            alignItems: 'start'
+          } : {}}
+        >
+          {posts.map((post) => (
+            <PostCard key={post.id} post={post} showFlagBackground={showFlagBackground} hideUserInfo={hideUserInfo} viewMode={viewMode} />
+          ))}
+        </div>
+      )}
 
       {(isSelfProfile || userId) ? (
         isSelfProfile
