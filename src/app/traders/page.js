@@ -444,21 +444,20 @@ export default function TradersPage() {
                       {/* Follow button and Telegram Subscribe */}
                       <div className={styles.cardActions}>
                         {isAuthenticated && user?.id !== trader.id && (
-                          <>
-                            <button
+                          <div className={styles.buttonsContainer}>
+                            <button 
                               className={followings[trader.id] ? styles.unfollowButton : styles.followButton}
                               onClick={(e) => handleFollowClick(e, trader.id)}
                             >
                               {followings[trader.id] ? 'Unfollow' : 'Follow'}
                             </button>
-                            <div style={{ marginTop: '8px' }}>
-                              <TelegramSubscribeButton 
-                                brokerUserId={trader.id} 
-                                brokerName={trader.full_name || trader.username}
-                                compact={true}
-                              />
-                            </div>
-                          </>
+                            <TelegramSubscribeButton 
+                              brokerUserId={trader.id} 
+                              brokerName={trader.full_name || trader.username}
+                              compact={true}
+                              showNotAvailable={true}
+                            />
+                          </div>
                         )}
                       </div>
                     </div>
@@ -532,24 +531,22 @@ export default function TradersPage() {
                         ))}
                     </div>
                     
-                    {/* Actions at bottom of the card */}
                     <div className={styles.cardActions}>
                       {isAuthenticated && user?.id !== trader.id && (
-                        <>
-                          <button
+                        <div className={styles.buttonsContainer}>
+                          <button 
                             className={followings[trader.id] ? styles.unfollowButton : styles.followButton}
                             onClick={(e) => handleFollowClick(e, trader.id)}
                           >
                             {followings[trader.id] ? 'Unfollow' : 'Follow'}
                           </button>
-                          <div style={{ marginTop: '8px', width: '100%' }}>
-                            <TelegramSubscribeButton 
-                              brokerUserId={trader.id} 
-                              brokerName={trader.full_name || trader.username}
-                              compact={true}
-                            />
-                          </div>
-                        </>
+                          <TelegramSubscribeButton 
+                            brokerUserId={trader.id} 
+                            brokerName={trader.full_name || trader.username}
+                            compact={true}
+                            showNotAvailable={true}
+                          />
+                        </div>
                       )}
                     </div>
                   </>

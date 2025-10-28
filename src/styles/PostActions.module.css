@@ -82,12 +82,13 @@
 }
 
 .icon {
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
 }
 
 .iconEmoji {
-  font-size: 18px;
+  font-size: 24px;
   line-height: 1;
   display: flex;
   align-items: center;
@@ -167,8 +168,8 @@
   }
   
   .icon {
-    width: 16px;
-    height: 16px;
+    width: 20px;
+    height: 20px;
   }
 }
 

@@ -26,6 +26,26 @@ function ProtectedContent({ children, pathname }: { children: React.ReactNode; p
     }
   }, [loading]);
 
+  // Handle navigation redirects in useEffect to avoid render phase updates
+  useEffect(() => {
+    if (loading || !isInitialized) return;
+
+    const isPublicPath = PUBLIC_PATHS.includes(pathname) || 
+      PUBLIC_PATH_PREFIXES.some(prefix => pathname.startsWith(prefix));
+
+    // If user is authenticated and tries to access login/register, redirect to profile
+    if (user && AUTH_REDIRECT_TO_PROFILE_PATHS.includes(pathname)) {
+      router.replace('/profile');
+      return;
+    }
+
+    // If not authenticated and trying to access protected route, redirect to landing
+    if (!user && !isPublicPath) {
+      router.replace('/landing');
+      return;
+    }
+  }, [loading, isInitialized, user, pathname, router]);
+
   // Show loading while authentication state is being determined
   if (loading || !isInitialized) {
     return (
@@ -42,9 +62,8 @@ function ProtectedContent({ children, pathname }: { children: React.ReactNode; p
   const isPublicPath = PUBLIC_PATHS.includes(pathname) || 
     PUBLIC_PATH_PREFIXES.some(prefix => pathname.startsWith(prefix));
 
-  // If user is authenticated and tries to access login/register, redirect to profile
+  // If user is authenticated and tries to access login/register, show loading during redirect
   if (user && AUTH_REDIRECT_TO_PROFILE_PATHS.includes(pathname)) {
-    router.replace('/profile');
     return (
       <div className="auth-loading-screen">
         <div className="auth-loading-content">
@@ -55,14 +74,13 @@ function ProtectedContent({ children, pathname }: { children: React.ReactNode; p
     );
   }
 
-  // If not authenticated and trying to access protected route, redirect to landing
+  // If not authenticated and trying to access protected route, show loading during redirect
   if (!user && !isPublicPath) {
-    router.replace('/landing');
     return (
       <div className="auth-loading-screen">
         <div className="auth-loading-content">
           <div className="auth-loading-spinner"></div>
-          <p>Redirecting to login...</p>
+          <p>Redirecting...</p>
         </div>
       </div>
     );

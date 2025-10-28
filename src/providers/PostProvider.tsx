@@ -58,35 +58,88 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
   const statsRefreshTimeoutRef = useRef<any>(null);
 
   const refreshMyStats = useCallback(async () => {
+    console.log('🔄 [POST_PROVIDER] refreshMyStats called for user:', user?.id);
+    
     if (!user?.id) {
+      console.warn('🚨 [POST_PROVIDER] No user ID, setting empty stats');
       setMyStats({ totalPosts: 0, successfulPosts: 0, lossPosts: 0, openPosts: 0, successRate: 0 });
       return;
     }
+    
     try {
+      console.log('📊 [POST_PROVIDER] Fetching stats from database for user:', user.id);
+      
+      // Debug: Check what status values actually exist - try posts table first
+      const statusDebugRes = await supabase
+        .from('posts')
+        .select('id, status, target_reached, stop_loss_triggered')
+        .eq('user_id', user.id)
+        .limit(5);
+      
+      console.log('🔍 [POST_PROVIDER] Status debug sample from posts table:', statusDebugRes);
+      
+      // Try posts_with_stats as well
+      const statusDebugRes2 = await supabase
+        .from('posts_with_stats')
+        .select('id, status, target_reached, stop_loss_triggered')
+        .eq('user_id', user.id)
+        .limit(5);
+      
+      console.log('🔍 [POST_PROVIDER] Status debug sample from posts_with_stats:', statusDebugRes2);
+      
       const [totalRes, successRes, lossRes] = await Promise.all([
         supabase
-          .from('posts_with_stats')
+          .from('posts')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id),
         supabase
-          .from('posts_with_stats')
+          .from('posts')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
-          .or('status.eq.success,target_reached.is.true'),
+          .or('status.eq.success,target_reached.eq.true'),
         supabase
-          .from('posts_with_stats')
+          .from('posts')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
-          .or('status.eq.loss,stop_loss_triggered.is.true'),
+          .or('status.eq.loss,stop_loss_triggered.eq.true'),
       ]);
+
+      console.log('📈 [POST_PROVIDER] Database query results:', {
+        totalRes: { count: totalRes.count, error: totalRes.error },
+        successRes: { count: successRes.count, error: successRes.error },
+        lossRes: { count: lossRes.count, error: lossRes.error }
+      });
 
       const total = totalRes.count || 0;
       const successful = successRes.count || 0;
       const losses = lossRes.count || 0;
       const open = Math.max(0, total - successful - losses);
       const sr = calculateSuccessRate(successful, losses);
-      setMyStats({ totalPosts: total, successfulPosts: successful, lossPosts: losses, openPosts: open, successRate: sr });
+      
+      const newStats = { totalPosts: total, successfulPosts: successful, lossPosts: losses, openPosts: open, successRate: sr };
+      console.log('✅ [POST_PROVIDER] Calculated new stats from DB:', newStats);
+      
+      // If database stats are empty but we have posts in myPostsState, use computed stats as fallback
+      if ((successful === 0 && losses === 0) && Array.isArray(myPostsState) && myPostsState.length > 0) {
+        console.log('⚠️ [POST_PROVIDER] DB stats are empty, falling back to computed stats from myPosts');
+        const computedStats = calculatePostStats(myPostsState);
+        const fallbackStats = { 
+          totalPosts: total, // Keep DB total count
+          successfulPosts: computedStats.successfulPosts, 
+          lossPosts: computedStats.lossPosts, 
+          openPosts: Math.max(0, total - computedStats.successfulPosts - computedStats.lossPosts),
+          successRate: computedStats.successRate 
+        };
+        console.log('🔄 [POST_PROVIDER] Using fallback computed stats:', fallbackStats);
+        setMyStats(fallbackStats);
+      } else {
+        setMyStats(newStats);
+      }
+      
+      console.log('💾 [POST_PROVIDER] Stats saved to state');
+      
     } catch (err) {
+      console.error('❌ [POST_PROVIDER] refreshMyStats failed:', err);
       if (process.env.NODE_ENV === 'development') {
         console.warn('[PostProvider] refreshMyStats failed', err);
       }
@@ -266,28 +319,52 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch current user's posts (profile/dashboard owner)
   const fetchMyPosts = useCallback(async () => {
+    console.log('📋 [POST_PROVIDER] fetchMyPosts called for user:', user?.id);
+    
     if (!user?.id) {
+      console.warn('🚨 [POST_PROVIDER] No user ID, clearing my posts');
       setMyPostsState([]);
       setMyHasMore(false);
       myBeforeCursorRef.current = null;
       return;
     }
+    
+    console.log('🔄 [POST_PROVIDER] Setting myLoading to true');
     setMyLoading(true);
+    
     try {
+      console.log('📊 [POST_PROVIDER] Calling getPostsPage with:', {
+        limit: MY_PAGE_SIZE,
+        before: null,
+        userIds: [user.id]
+      });
+      
       const page = await getPostsPage({ limit: MY_PAGE_SIZE, before: null, userIds: [user.id] });
       const list = Array.isArray(page) ? page : [];
+      
+      console.log('✅ [POST_PROVIDER] Fetched user posts:', {
+        pageIsArray: Array.isArray(page),
+        listLength: list.length,
+        posts: list.map(p => ({ id: p.id, symbol: p.symbol, created_at: p.created_at }))
+      });
+      
       setMyPostsState(list);
       myBeforeCursorRef.current = list.length > 0 ? String(list[list.length - 1].created_at) : null;
       setMyHasMore(list.length === MY_PAGE_SIZE);
+      
+      console.log('📊 [POST_PROVIDER] Now calling refreshMyStats after fetchMyPosts...');
       await refreshMyStats();
+      
     } catch (e: any) {
+      console.error('❌ [POST_PROVIDER] fetchMyPosts failed:', e);
       setError(e?.message || 'Failed to fetch my posts');
       setMyPostsState([]);
       setMyHasMore(false);
     } finally {
+      console.log('✅ [POST_PROVIDER] Setting myLoading to false');
       setMyLoading(false);
     }
-  }, [getPostsPage, user?.id, refreshMyStats]);
+  }, [getPostsPage, user?.id]);
 
   // Load more for current user's posts
   const loadMoreMyPosts = useCallback(async () => {
@@ -308,7 +385,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setMyLoading(false);
     }
-  }, [getPostsPage, myLoading, user?.id, refreshMyStats]);
+  }, [getPostsPage, myLoading, user?.id]);
 
   // Subscribe to realtime updates for posts (price checks, status changes)
   useEffect(() => {
@@ -508,7 +585,8 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     fetchMyPosts();
-  }, [user?.id, fetchMyPosts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]); // Only depend on user?.id to prevent infinite loop
 
   const value: PostsContextType = {
     posts,

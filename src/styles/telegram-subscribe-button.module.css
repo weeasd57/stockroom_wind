@@ -56,6 +56,83 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
+/* Unsubscribe Button */
+.unsubscribeButton {
+  background: linear-gradient(135deg, #dc3545, #c82333) !important;
+}
+
+.unsubscribeButton:hover {
+  background: linear-gradient(135deg, #c82333, #a71e2a) !important;
+}
+
+/* Compact Mode */
+.compact {
+  min-width: 120px !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  min-height: 36px !important;
+  flex: 1 !important;
+}
+
+.compact .buttonText {
+  font-size: 13px !important;
+}
+
+.compact.notAvailableButton {
+  min-height: 36px !important;
+  flex: 1 !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+}
+
+/* In row view (trader card row) telegram button should take full width */
+:global(.traderCardRow) .compact {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* Disabled State */
+.telegramButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Not Available Button */
+.notAvailableButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+  color: white;
+  font-weight: 500;
+  font-size: 14px;
+  border: none;
+  cursor: not-allowed;
+  opacity: 0.7;
+  width: 100%;
+  max-width: 300px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Responsive Design for Compact Mode */
+@media (max-width: 768px) {
+  .compact {
+    min-width: 100px !important;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+  }
+  
+  .compact .telegramIcon {
+    width: 16px !important;
+    height: 16px !important;
+  }
+}
+
 .telegramIcon {
   width: 20px;
   height: 20px;
@@ -68,20 +145,21 @@
   letter-spacing: 0.3px;
 }
 
-/* Dialog Styles */
+/* Dialog Overlay */
 .dialogOverlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2147483647; /* Maximum z-index value */
+  z-index: 2147483647;
   backdrop-filter: blur(8px);
   animation: fadeIn 0.3s ease;
+  padding: 20px;
 }
 
 /* Theme Support */
@@ -318,32 +396,41 @@
   color: #e0e0e0;
 }
 
-.note {
+.infoBox {
   font-size: 13px;
-  padding: 12px;
+  padding: 12px 16px;
   border-radius: 8px;
-  margin-bottom: 20px;
-  border-left: 3px solid #4285f4;
+  margin-top: 20px;
+  border-left: 4px solid #4285f4;
+  background: linear-gradient(135deg, rgba(66, 133, 244, 0.1), rgba(66, 133, 244, 0.05));
 }
 
-.lightDialog .note {
-  color: hsl(var(--muted-foreground));
-  background: hsl(var(--muted));
+.infoBox p {
+  margin: 0;
+  font-weight: 500;
+  color: #1a73e8;
 }
 
-.darkDialog .note {
-  color: #e0e0e0;
-  background: #2a2a2a;
+.lightDialog .infoBox {
+  background: linear-gradient(135deg, rgba(66, 133, 244, 0.15), rgba(66, 133, 244, 0.08));
+}
+
+.darkDialog .infoBox {
+  background: linear-gradient(135deg, rgba(66, 133, 244, 0.2), rgba(66, 133, 244, 0.1));
+}
+
+.darkDialog .infoBox p {
+  color: #64b5f6;
 }
 
 .dialogActions {
   display: flex;
-  gap: 16px;
-  justify-content: flex-end;
+  flex-direction: column;
+  gap: 12px;
   padding: 20px 24px;
   background: rgba(0, 0, 0, 0.02);
   border-top: 1px solid rgba(0, 0, 0, 0.1);
-  flex-shrink: 0; /* Prevent shrinking */
+  flex-shrink: 0;
   position: sticky;
   bottom: 0;
   backdrop-filter: blur(8px);
@@ -359,6 +446,77 @@
   border-top: 1px solid hsl(var(--border));
 }
 
+/* Open Telegram Button (Primary) */
+.openTelegramButton {
+  background: linear-gradient(135deg, #0088cc, #00a8e8);
+  color: white;
+  border: none;
+  padding: 14px 24px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  box-shadow: 0 3px 8px rgba(0, 136, 204, 0.3);
+}
+
+.openTelegramButton:hover {
+  background: linear-gradient(135deg, #0077b3, #0096d6);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 136, 204, 0.4);
+}
+
+.openTelegramButton:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 8px rgba(0, 136, 204, 0.3);
+}
+
+/* Open Telegram Web Button (Secondary) */
+.openTelegramWebButton {
+  background: transparent;
+  color: #0088cc;
+  border: 2px solid #0088cc;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.openTelegramWebButton:hover {
+  background: rgba(0, 136, 204, 0.1);
+  border-color: #0077b3;
+  color: #0077b3;
+  transform: translateY(-1px);
+}
+
+.openTelegramWebButton:active {
+  transform: translateY(0);
+}
+
+/* Dark mode support for new buttons */
+:global(.dark) .openTelegramWebButton {
+  color: #4fc3f7;
+  border-color: #4fc3f7;
+}
+
+:global(.dark) .openTelegramWebButton:hover {
+  background: rgba(79, 195, 247, 0.15);
+  border-color: #64b5f6;
+  color: #64b5f6;
+}
+
+/* Old button styles (keep for backward compatibility) */
 .confirmButton {
   background: linear-gradient(135deg, #1a73e8, #4285f4);
   color: white;
@@ -507,24 +665,18 @@
   }
   
   .dialogActions {
-    flex-direction: column-reverse;
-    gap: 12px;
+    gap: 10px;
     padding: 16px 20px;
   }
   
+  .openTelegramButton,
+  .openTelegramWebButton,
   .confirmButton,
   .cancelButton {
     width: 100%;
     justify-content: center;
     min-height: 48px;
     font-size: 16px;
-  }
-  
-  .confirmButton {
-    order: 1;
-  }
-  
-  .cancelButton {
-    order: 2;
+    padding: 14px 20px;
   }
 }

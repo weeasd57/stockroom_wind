@@ -1934,6 +1934,10 @@ export default function Profile() {
             )}
           </div>
         )}
+
+        {activeTab === 'telegram' && (
+          <TelegramBotManagement />
+        )}
       </div>
       
       {/* Strategy Details Modal */}

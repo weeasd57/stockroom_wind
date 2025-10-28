@@ -4,9 +4,27 @@ import { useState, useEffect } from 'react';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import styles from '@/styles/TelegramBotManagement.module.css';
 import { toast } from 'sonner';
+import { createPortal } from 'react-dom';
 
 export default function TelegramBotManagement() {
-  const { user } = useSupabase();
+  const { user, supabase } = useSupabase();
+  console.log('[TelegramBotManagement] Component rendered with user:', user?.id);
+  
+  // Check Supabase session
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      console.log('[TelegramBotManagement] Supabase session:', {
+        hasSession: !!session,
+        accessToken: session?.access_token ? 'Present' : 'Missing',
+        refreshToken: session?.refresh_token ? 'Present' : 'Missing',
+        error: error?.message
+      });
+    };
+    if (user && supabase) {
+      checkSession();
+    }
+  }, [user, supabase]);
   const [botInfo, setBotInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -19,20 +37,60 @@ export default function TelegramBotManagement() {
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
   const [showBroadcastForm, setShowBroadcastForm] = useState(false);
   const [stats, setStats] = useState({ totalSubscribers: 0, activeSubscribers: 0, recentBroadcasts: 0, lastWeekNewSubscribers: 0 });
+  const [showPostsDialog, setShowPostsDialog] = useState(false);
+  const [showRecipientsDialog, setShowRecipientsDialog] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    console.log('[TelegramBotManagement] useEffect triggered with user:', user?.id, user?.email);
     if (user) {
+      // Check authentication state
+      console.log('[TelegramBotManagement] User is authenticated, fetching data...');
       fetchBotInfo();
       fetchSubscribers();
       fetchUserPosts();
       fetchStats();
+    } else {
+      console.log('[TelegramBotManagement] No user found, skipping fetch');
     }
   }, [user]);
 
   const fetchBotInfo = async () => {
     try {
-      const response = await fetch('/api/telegram/bot-setup');
+      console.log('[TelegramBotManagement] Fetching bot info...');
+      console.log('[TelegramBotManagement] Document cookies:', document.cookie);
+      
+      // Check specifically for Supabase cookies
+      const supabaseCookies = document.cookie.split(';').filter(cookie => 
+        cookie.trim().startsWith('sb-') || cookie.trim().includes('supabase')
+      );
+      console.log('[TelegramBotManagement] Supabase cookies found:', supabaseCookies);
+      
+      // Get access token from Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Add Authorization header if we have access token
+      if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`;
+        console.log('[TelegramBotManagement] Added Authorization header with access token');
+      } else {
+        console.log('[TelegramBotManagement] No access token found in session');
+      }
+      
+      const response = await fetch('/api/telegram/bot-setup', {
+        credentials: 'include',
+        headers
+      });
+      console.log('[TelegramBotManagement] Bot info response status:', response.status);
       const data = await response.json();
+      console.log('[TelegramBotManagement] Bot info data:', data);
       setBotInfo(data.bot);
     } catch (error) {
       console.error('Error fetching bot info:', error);
@@ -43,8 +101,26 @@ export default function TelegramBotManagement() {
 
   const fetchSubscribers = async () => {
     try {
-      const response = await fetch('/api/telegram/subscribers');
+      console.log('[TelegramBotManagement] Fetching subscribers...');
+      
+      // Get access token from Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Add Authorization header if we have access token
+      if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`;
+      }
+      
+      const response = await fetch('/api/telegram/subscribers', {
+        credentials: 'include',
+        headers
+      });
+      console.log('[TelegramBotManagement] Subscribers response status:', response.status);
       const data = await response.json();
+      console.log('[TelegramBotManagement] Subscribers data:', data);
       setSubscribers(data.subscribers || []);
     } catch (error) {
       console.error('Error fetching subscribers:', error);
@@ -53,7 +129,9 @@ export default function TelegramBotManagement() {
 
   const fetchUserPosts = async () => {
     try {
-      const response = await fetch(`/api/posts?userId=${user.id}&limit=100`);
+      const response = await fetch(`/api/posts?userId=${user.id}&limit=100`, {
+        credentials: 'include'
+      });
       const data = await response.json();
       setPosts(data.data || data.posts || []);
     } catch (error) {
@@ -63,9 +141,19 @@ export default function TelegramBotManagement() {
 
   const fetchStats = async () => {
     try {
+      // Get access token from Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers = { 'Content-Type': 'application/json' };
+      
+      // Add Authorization header if we have access token
+      if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`;
+      }
+      
       const response = await fetch('/api/telegram/subscribers', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers,
         body: JSON.stringify({ action: 'get_stats' })
       });
       const data = await response.json();
@@ -79,7 +167,20 @@ export default function TelegramBotManagement() {
     e?.preventDefault?.();
     setSaving(true);
     try {
-      const response = await fetch('/api/telegram/bot-setup', { method: 'POST' });
+      // Get access token from Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers = { 'Content-Type': 'application/json' };
+      
+      // Add Authorization header if we have access token
+      if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`;
+      }
+      
+      const response = await fetch('/api/telegram/bot-setup', { 
+        method: 'POST',
+        credentials: 'include',
+        headers
+      });
 
       const data = await response.json();
       
@@ -114,9 +215,19 @@ export default function TelegramBotManagement() {
 
     setSendingBroadcast(true);
     try {
+      // Get access token from Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers = { 'Content-Type': 'application/json' };
+      
+      // Add Authorization header if we have access token
+      if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`;
+      }
+      
       const response = await fetch('/api/telegram/send-broadcast', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers,
         body: JSON.stringify({
           title: broadcastTitle,
           message: broadcastMessage,
@@ -159,6 +270,7 @@ export default function TelegramBotManagement() {
   }
 
   return (
+    <>
     <div className={styles.container}>
       <div className={styles.header}>
         <h2>🤖 Telegram Bot Management</h2>
@@ -269,91 +381,38 @@ export default function TelegramBotManagement() {
 
                 <div className={styles.formGroup}>
                   <label>Attached posts (optional):</label>
-                  <div className={styles.postsList}>
-                    {posts.length === 0 ? (
-                      <p>No posts available</p>
-                    ) : (
-                      <>
-                        <div className={styles.selectAllButton}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (selectedPosts.length === posts.length) {
-                                setSelectedPosts([]);
-                              } else {
-                                setSelectedPosts(posts.map(p => p.id));
-                              }
-                            }}
-                            disabled={sendingBroadcast}
-                          >
-                            {selectedPosts.length === posts.length ? 'Unselect all posts' : 'Select all posts'}
-                          </button>
-                        </div>
-                        {posts.map(post => (
-                          <div key={post.id} className={styles.postItem}>
-                            <input
-                              type="checkbox"
-                              checked={selectedPosts.includes(post.id)}
-                              onChange={() => {
-                                setSelectedPosts(prev => 
-                                  prev.includes(post.id) 
-                                    ? prev.filter(id => id !== post.id)
-                                    : [...prev, post.id]
-                                );
-                              }}
-                              disabled={sendingBroadcast}
-                            />
-                            <span>{post.symbol} - {post.company_name}</span>
-                          </div>
-                        ))}
-                      </>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    className={styles.selectButton}
+                    onClick={() => setShowPostsDialog(true)}
+                    disabled={sendingBroadcast}
+                  >
+                    <span className={styles.selectButtonIcon}>📊</span>
+                    <span className={styles.selectButtonText}>
+                      {selectedPosts.length === 0 
+                        ? 'Select posts to attach' 
+                        : `${selectedPosts.length} post${selectedPosts.length > 1 ? 's' : ''} selected`}
+                    </span>
+                    <span className={styles.selectButtonArrow}>→</span>
+                  </button>
                 </div>
 
                 <div className={styles.formGroup}>
-                  <label>Recipients:</label>
-                  <div className={styles.recipientsList}>
-                    <div className={styles.selectAllButton}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (selectedRecipients.length === subscribers.length) {
-                            setSelectedRecipients([]);
-                          } else {
-                            setSelectedRecipients(subscribers.map(s => s.id));
-                          }
-                        }}
-                        disabled={sendingBroadcast}
-                      >
-                        {selectedRecipients.length === subscribers.length ? 'Unselect all' : 'Select all'}
-                      </button>
-                    </div>
-                    {subscribers.length === 0 ? (
-                      <p>No subscribers</p>
-                    ) : (
-                      subscribers.map(subscriber => (
-                        <div key={subscriber.id} className={styles.recipientItem}>
-                          <input
-                            type="checkbox"
-                            checked={selectedRecipients.includes(subscriber.id)}
-                            onChange={() => {
-                              setSelectedRecipients(prev => 
-                                prev.includes(subscriber.id) 
-                                  ? prev.filter(id => id !== subscriber.id)
-                                  : [...prev, subscriber.id]
-                              );
-                            }}
-                            disabled={sendingBroadcast}
-                          />
-                          <span>
-                            {subscriber.telegram_first_name}
-                            {subscriber.telegram_username && ` (@${subscriber.telegram_username})`}
-                          </span>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                  <label>Recipients: <span className={styles.required}>*</span></label>
+                  <button
+                    type="button"
+                    className={styles.selectButton}
+                    onClick={() => setShowRecipientsDialog(true)}
+                    disabled={sendingBroadcast}
+                  >
+                    <span className={styles.selectButtonIcon}>👥</span>
+                    <span className={styles.selectButtonText}>
+                      {selectedRecipients.length === 0 
+                        ? 'Select subscribers to notify' 
+                        : `${selectedRecipients.length} subscriber${selectedRecipients.length > 1 ? 's' : ''} selected`}
+                    </span>
+                    <span className={styles.selectButtonArrow}>→</span>
+                  </button>
                 </div>
 
                 <div className={styles.formActions}>
@@ -395,6 +454,197 @@ export default function TelegramBotManagement() {
           )}
         </div>
       )}
+      {/* Posts Selection Dialog */}
+      {mounted && showPostsDialog && createPortal(
+        <div className={styles.dialogOverlay} onClick={() => setShowPostsDialog(false)}>
+          <div className={styles.dialogContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.dialogHeader}>
+              <h3>📊 Select Posts to Attach</h3>
+              <button 
+                className={styles.dialogClose}
+                onClick={() => setShowPostsDialog(false)}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className={styles.dialogBody}>
+              {posts.length === 0 ? (
+                <div className={styles.emptyDialog}>
+                  <span className={styles.emptyIcon}>📭</span>
+                  <p>No posts available</p>
+                </div>
+              ) : (
+                <>
+                  <div className={styles.dialogActions}>
+                    <button
+                      type="button"
+                      className={styles.selectAllBtn}
+                      onClick={() => {
+                        if (selectedPosts.length === posts.length) {
+                          setSelectedPosts([]);
+                        } else {
+                          setSelectedPosts(posts.map(p => p.id));
+                        }
+                      }}
+                    >
+                      {selectedPosts.length === posts.length ? '✓ Unselect all' : 'Select all'}
+                    </button>
+                    <span className={styles.selectedCount}>
+                      {selectedPosts.length} of {posts.length} selected
+                    </span>
+                  </div>
+                  <div className={styles.postsGrid}>
+                    {posts.map(post => (
+                      <div 
+                        key={post.id} 
+                        className={`${styles.postCard} ${selectedPosts.includes(post.id) ? styles.selected : ''}`}
+                        onClick={() => {
+                          setSelectedPosts(prev => 
+                            prev.includes(post.id) 
+                              ? prev.filter(id => id !== post.id)
+                              : [...prev, post.id]
+                          );
+                        }}
+                      >
+                        <div className={styles.postCardCheckbox}>
+                          <input
+                            type="checkbox"
+                            checked={selectedPosts.includes(post.id)}
+                            onChange={() => {}}
+                          />
+                        </div>
+                        <div className={styles.postCardContent}>
+                          <div className={styles.postCardHeader}>
+                            <span className={styles.postSymbol}>{post.symbol}</span>
+                            <span className={styles.postPrice}>${post.current_price}</span>
+                          </div>
+                          <div className={styles.postCardBody}>
+                            <p className={styles.postCompany}>{post.company_name}</p>
+                            <div className={styles.postPrices}>
+                              <span className={styles.priceTarget}>🎯 ${post.target_price}</span>
+                              <span className={styles.priceStop}>🛑 ${post.stop_loss_price}</span>
+                            </div>
+                          </div>
+                          {post.strategy && (
+                            <div className={styles.postStrategy}>
+                              <span>📈</span> {post.strategy}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            
+            <div className={styles.dialogFooter}>
+              <button 
+                className={styles.dialogButtonPrimary}
+                onClick={() => setShowPostsDialog(false)}
+              >
+                Done ({selectedPosts.length} selected)
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Recipients Selection Dialog */}
+      {mounted && showRecipientsDialog && createPortal(
+        <div className={styles.dialogOverlay} onClick={() => setShowRecipientsDialog(false)}>
+          <div className={styles.dialogContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.dialogHeader}>
+              <h3>👥 Select Recipients</h3>
+              <button 
+                className={styles.dialogClose}
+                onClick={() => setShowRecipientsDialog(false)}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className={styles.dialogBody}>
+              {subscribers.length === 0 ? (
+                <div className={styles.emptyDialog}>
+                  <span className={styles.emptyIcon}>👤</span>
+                  <p>No subscribers yet</p>
+                </div>
+              ) : (
+                <>
+                  <div className={styles.dialogActions}>
+                    <button
+                      type="button"
+                      className={styles.selectAllBtn}
+                      onClick={() => {
+                        if (selectedRecipients.length === subscribers.length) {
+                          setSelectedRecipients([]);
+                        } else {
+                          setSelectedRecipients(subscribers.map(s => s.id));
+                        }
+                      }}
+                    >
+                      {selectedRecipients.length === subscribers.length ? '✓ Unselect all' : 'Select all'}
+                    </button>
+                    <span className={styles.selectedCount}>
+                      {selectedRecipients.length} of {subscribers.length} selected
+                    </span>
+                  </div>
+                  <div className={styles.recipientsList}>
+                    {subscribers.map(subscriber => (
+                      <div 
+                        key={subscriber.id}
+                        className={`${styles.recipientCard} ${selectedRecipients.includes(subscriber.id) ? styles.selected : ''}`}
+                        onClick={() => {
+                          setSelectedRecipients(prev => 
+                            prev.includes(subscriber.id) 
+                              ? prev.filter(id => id !== subscriber.id)
+                              : [...prev, subscriber.id]
+                          );
+                        }}
+                      >
+                        <div className={styles.recipientCheckbox}>
+                          <input
+                            type="checkbox"
+                            checked={selectedRecipients.includes(subscriber.id)}
+                            onChange={() => {}}
+                          />
+                        </div>
+                        <div className={styles.recipientInfo}>
+                          <div className={styles.recipientAvatar}>
+                            {subscriber.telegram_first_name?.charAt(0) || '👤'}
+                          </div>
+                          <div className={styles.recipientDetails}>
+                            <strong>{subscriber.telegram_first_name}</strong>
+                            {subscriber.telegram_username && (
+                              <span className={styles.recipientUsername}>@{subscriber.telegram_username}</span>
+                            )}
+                            <small>Joined {new Date(subscriber.subscribed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</small>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            
+            <div className={styles.dialogFooter}>
+              <button 
+                className={styles.dialogButtonPrimary}
+                onClick={() => setShowRecipientsDialog(false)}
+                disabled={selectedRecipients.length === 0}
+              >
+                Done ({selectedRecipients.length} selected)
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
+    </>
   );
 }

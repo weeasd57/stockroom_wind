@@ -329,10 +329,23 @@ export default function CreatePostForm() {
             // For other errors, set default strategies
             setStrategies(DEFAULT_STRATEGIES);
           } else if (data && data.length > 0) {
-            // console.log('Retrieved user strategies from database:', data);
-            setStrategies(data.map(item => item.strategy_name));
+            console.log('📊 [CREATE_POST] Retrieved user strategies from database:', data);
+            const userStrategies = data.map(item => item.strategy_name);
+            // Combine default strategies with user strategies, avoiding duplicates
+            const combinedStrategies = [...DEFAULT_STRATEGIES, ...userStrategies.filter(strategy => !DEFAULT_STRATEGIES.includes(strategy))];
+            console.log('✅ [CREATE_POST] Combined strategies:', {
+              defaultCount: DEFAULT_STRATEGIES.length,
+              userCount: userStrategies.length,
+              combinedCount: combinedStrategies.length,
+              strategies: combinedStrategies
+            });
+            setStrategies(combinedStrategies);
           } else {
-            // console.log('No user strategies found, using default strategies');
+            console.log('📝 [CREATE_POST] No user strategies found, using default strategies');
+            console.log('✅ [CREATE_POST] Default strategies loaded:', {
+              count: DEFAULT_STRATEGIES.length,
+              strategies: DEFAULT_STRATEGIES
+            });
             setStrategies(DEFAULT_STRATEGIES);
           }
         } catch (error) {
@@ -2545,7 +2558,16 @@ export default function CreatePostForm() {
             
             <div className="strategy-dialog-content">
               {/* Show strategies (user or defaults) */}
-              {(Array.isArray(strategies) && strategies.length > 0 ? strategies : DEFAULT_STRATEGIES).map((strategy, index) => (
+              {(() => {
+                const displayStrategies = Array.isArray(strategies) && strategies.length > 0 ? strategies : DEFAULT_STRATEGIES;
+                console.log('🎯 [CREATE_POST] Rendering strategies:', {
+                  strategiesLength: strategies?.length || 0,
+                  strategiesArray: strategies,
+                  displayStrategiesLength: displayStrategies.length,
+                  displayStrategies: displayStrategies
+                });
+                return displayStrategies;
+              })().map((strategy, index) => (
                 <div 
                   key={`strategy-${index}`}
                   className={`strategy-option ${selectedStrategy === strategy ? 'selected' : ''}`}

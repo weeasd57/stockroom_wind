@@ -3,6 +3,8 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
 
+export const dynamic = 'force-dynamic';
+
 // Validate bot token with Telegram getMe
 async function validateTelegramBot(botToken) {
   try {
@@ -55,8 +57,10 @@ async function setupBotCommands(_supabase, _botId, botToken) {
 
 export async function POST(request) {
   try {
+    console.log('[bot-setup POST] Request received');
     // Auth via cookies first
     const cookieStore = cookies();
+    console.log('[bot-setup POST] Cookies available:', cookieStore.getAll().map(c => c.name));
     let supabase = createRouteHandlerClient({ cookies: () => cookieStore });
     let user = null;
     let authError = null;
@@ -64,6 +68,7 @@ export async function POST(request) {
     const cookieAuth = await supabase.auth.getUser();
     user = cookieAuth.data?.user;
     authError = cookieAuth.error;
+    console.log('[bot-setup POST] Cookie auth result:', { userId: user?.id, error: authError?.message });
 
     // Fallback to Authorization: Bearer token
     if (authError || !user) {
@@ -88,8 +93,10 @@ export async function POST(request) {
     }
 
     if (authError || !user) {
+      console.log('[bot-setup POST] Authentication failed:', { authError, hasUser: !!user });
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    console.log('[bot-setup POST] Authentication successful for user:', user.id);
 
     // Plan A: read bot token from environment (single platform bot)
     const botToken = process.env.TELEGRAMBOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
@@ -189,8 +196,10 @@ export async function POST(request) {
 
 export async function GET(request) {
   try {
+    console.log('[bot-setup GET] Request received');
     // Auth via cookies first
     const cookieStore = cookies();
+    console.log('[bot-setup GET] Cookies available:', cookieStore.getAll().map(c => c.name));
     let supabase = createRouteHandlerClient({ cookies: () => cookieStore });
     let user = null;
     let authError = null;
@@ -198,6 +207,7 @@ export async function GET(request) {
     const cookieAuth = await supabase.auth.getUser();
     user = cookieAuth.data?.user;
     authError = cookieAuth.error;
+    console.log('[bot-setup GET] Cookie auth result:', { userId: user?.id, error: authError?.message });
 
     // Fallback to Authorization: Bearer token
     if (authError || !user) {
@@ -222,8 +232,10 @@ export async function GET(request) {
     }
 
     if (authError || !user) {
+      console.log('[bot-setup GET] Authentication failed:', { authError, hasUser: !!user });
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    console.log('[bot-setup GET] Authentication successful for user:', user.id);
 
     const { data: bot } = await supabase
       .from('telegram_bots')

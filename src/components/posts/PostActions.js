@@ -5,6 +5,7 @@ import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useComments } from '@/providers/CommentProvider';
 import { isValidUUID, isTempId } from '@/lib/utils';
 import styles from '../../styles/PostActions.module.css';
+import Image from 'next/image';
 
 export default function PostActions({ postId, initialBuyCount = 0, initialSellCount = 0, onVoteChange, autoSubscribe = false }) {
   const { user, supabase } = useSupabase();
@@ -133,14 +134,14 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
       <div className={styles.actionsContainer}>
         <div className={styles.buttonsContainer}>
           <div className={styles.actionButton}>
-            <span className={styles.iconEmoji}>👍</span>
+            <Image src="/buy.ico" alt="Buy" width={24} height={24} className={styles.icon} />
             <span className={styles.actionText}>
               <span className={styles.actionLabel}>Buy</span>
               <span className={styles.actionCount}>{buyCount}</span>
             </span>
           </div>
           <div className={styles.actionButton}>
-            <span className={styles.iconEmoji}>👎</span>
+            <Image src="/sell.ico" alt="Sell" width={24} height={24} className={styles.icon} />
             <span className={styles.actionText}>
               <span className={styles.actionLabel}>Sell</span>
               <span className={styles.actionCount}>{sellCount}</span>
@@ -166,7 +167,7 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
           disabled={isLoading || !isRealId}
           title={userAction === 'buy' ? 'Remove Buy Vote' : 'Vote Buy'}
         >
-          <span className={styles.iconEmoji}>👍</span>
+          <Image src="/buy.ico" alt="Buy" width={18} height={18} className={styles.icon} />
           <span className={styles.actionText}>
             <span className={styles.actionLabel}>Buy</span>
             <span className={styles.actionCount}>{buyCount}</span>
@@ -182,7 +183,7 @@ export default function PostActions({ postId, initialBuyCount = 0, initialSellCo
           disabled={isLoading || !isRealId}
           title={userAction === 'sell' ? 'Remove Sell Vote' : 'Vote Sell'}
         >
-          <span className={styles.iconEmoji}>👎</span>
+          <Image src="/sell.ico" alt="Sell" width={18} height={18} className={styles.icon} />
           <span className={styles.actionText}>
             <span className={styles.actionLabel}>Sell</span>
             <span className={styles.actionCount}>{sellCount}</span>

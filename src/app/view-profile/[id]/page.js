@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useRef, useState, useEffect, useMemo } from 'react';
@@ -562,15 +562,13 @@ if (error) {
                   >
                     {followLoading ? (isFollowing ? 'Unfollowing...' : 'Following...') : (isFollowing ? 'Unfollow' : 'Follow')}
                   </button>
-                  {/* Show Telegram button always */}
-                  {telegramBotLoading ? (
-                    <div className={styles.telegramButtonSkeleton}></div>
-                  ) : (
-                    <TelegramSubscribeButton 
-                      userId={userId} 
-                      username={profileData?.username || 'User'} 
-                    />
-                  )}
+                  {/* Telegram button - always visible with not-available state when no bot */}
+                  <TelegramSubscribeButton 
+                    userId={userId} 
+                    username={profileData?.username || 'User'} 
+                    compact={true}
+                    showNotAvailable={true}
+                  />
                   <div style={{ marginTop: '1rem' }}>
                     <SocialLinks profile={profileData} size="small" />
                   </div>
@@ -584,15 +582,13 @@ if (error) {
                 >
                   Login to follow
                 </button>
-                {/* Show Telegram button always */}
-                {telegramBotLoading ? (
-                  <div className={styles.telegramButtonSkeleton}></div>
-                ) : (
-                  <TelegramSubscribeButton 
-                    userId={userId} 
-                    username={profileData?.username || 'User'} 
-                  />
-                )}
+                {/* Telegram button - always visible with not-available state when no bot */}
+                <TelegramSubscribeButton 
+                  userId={userId} 
+                  username={profileData?.username || 'User'} 
+                  compact={true}
+                  showNotAvailable={true}
+                />
                 <div style={{ marginTop: '1rem' }}>
                   <SocialLinks profile={profileData} size="small" />
                 </div>
