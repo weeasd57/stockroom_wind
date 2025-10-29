@@ -6,17 +6,46 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    let supabase;
+    let user = null;
+    let authError = null;
+
+    // Try Authorization header first (client-side token)
+    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+    if (bearerToken) {
+      console.log('🔑 [Broadcast] Using Authorization header for auth');
+      const { createClient } = await import('@supabase/supabase-js');
+      supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        { global: { headers: { Authorization: `Bearer ${bearerToken}` } } }
+      );
+      const { data, error } = await supabase.auth.getUser(bearerToken);
+      if (!error && data?.user) {
+        user = data.user;
+      } else {
+        authError = error;
+      }
+    } else {
+      console.log('🍪 [Broadcast] Using cookies for auth');
+      const cookieStore = cookies();
+      supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+      const { data, error } = await supabase.auth.getUser();
+      user = data?.user;
+      authError = error;
+    }
     
     if (authError || !user) {
+      console.error('[Broadcast] Auth failed:', authError);
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
+
+    console.log('[Broadcast] ✅ Authenticated user:', user.id);
 
     const body = await request.json();
     const { 

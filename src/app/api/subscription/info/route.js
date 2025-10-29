@@ -37,9 +37,13 @@ export async function GET(request) {
 
     const userId = user.id;
 
-    // Try to get subscription info - if it fails, default to free plan
+    // Try to get subscription info - if it fails, create free plan
     let subscriptionData = null;
     try {
+      // Add timestamp to prevent caching
+      const timestamp = Date.now();
+      console.log(`[SubscriptionInfo] Fetching subscription for user ${userId} at ${timestamp}`);
+      
       const { data, error: subError } = await supabase
         .from('user_subscriptions')
         .select(`
@@ -50,11 +54,75 @@ export async function GET(request) {
         .eq('status', 'active')
         .single();
       
-      if (!subError) {
+      if (!subError && data) {
+        console.log('[SubscriptionInfo] ✅ Subscription found:', {
+          user_id: data.user_id,
+          plan_name: data.subscription_plans?.name,
+          price_checks_used: data.price_checks_used,
+          posts_created: data.posts_created
+        });
         subscriptionData = data;
+      } else if (subError?.code === 'PGRST116') {
+        // PGRST116 = No rows found - create free plan
+        console.log('[SubscriptionInfo] No subscription found, creating free plan for user:', userId);
+        
+        // Get free plan ID
+        const { data: freePlan, error: freePlanError } = await supabase
+          .from('subscription_plans')
+          .select('id')
+          .eq('name', 'free')
+          .single();
+        
+        if (!freePlanError && freePlan) {
+          // Create free subscription
+          const { data: newSub, error: createError } = await supabase
+            .from('user_subscriptions')
+            .insert({
+              user_id: userId,
+              plan_id: freePlan.id,
+              status: 'active',
+              price_checks_used: 0,
+              posts_created: 0
+            })
+            .select(`
+              *,
+              subscription_plans(*)
+            `)
+            .single();
+          
+          if (!createError && newSub) {
+            console.log('[SubscriptionInfo] ✅ Free plan created successfully');
+            subscriptionData = newSub;
+          } else if (createError?.code === '23505') {
+            // 23505 = unique_violation - subscription already exists (race condition)
+            console.log('[SubscriptionInfo] Subscription already exists (race condition), retrying fetch...');
+            
+            // Retry fetch
+            const { data: retryData } = await supabase
+              .from('user_subscriptions')
+              .select(`
+                *,
+                subscription_plans(*)
+              `)
+              .eq('user_id', userId)
+              .eq('status', 'active')
+              .single();
+            
+            if (retryData) {
+              subscriptionData = retryData;
+            }
+          } else {
+            console.error('[SubscriptionInfo] ❌ Failed to create free plan:', createError);
+          }
+        } else {
+          console.error('[SubscriptionInfo] ❌ Free plan not found:', freePlanError);
+        }
+      } else {
+        // Other error
+        console.error('[SubscriptionInfo] Subscription query error:', subError);
       }
     } catch (err) {
-      console.log('No active subscription found, defaulting to free plan');
+      console.error('[SubscriptionInfo] Error:', err);
     }
 
     // Default to free plan if no active subscription

@@ -182,7 +182,7 @@ export default function CheckPostPricesButton({ userId }) {
       if (!response.ok) {
         // Special handling for API key errors
         if (response.status === 429) {
-          setError(data.message || 'You have reached the maximum checks for today. Try again tomorrow.');
+          setError(data.message || 'You have reached the maximum checks for this month. Try again next month.');
         } else if (data.error === 'missing_api_key') {
           throw new Error('API key not configured. Please contact the administrator to set up the stock data API.');
         } else {
@@ -280,8 +280,8 @@ export default function CheckPostPricesButton({ userId }) {
     if (remaining <= 0) {
       console.error('[CHECK POST PRICES] Limit reached. Remaining checks is 0');
       setConfirmDialogContent({
-        title: 'Daily Check Limit Reached',
-        message: 'You have reached the maximum price checks for today. Please upgrade your plan or try again tomorrow.',
+        title: 'Monthly Check Limit Reached',
+        message: 'You have reached the maximum price checks for this month. Please upgrade your plan or try again next month.',
         confirmAction: () => setShowConfirmDialog(false),
         confirmText: 'Got it',
         showCancelButton: false
@@ -290,7 +290,7 @@ export default function CheckPostPricesButton({ userId }) {
       return;
     }
 
-    const remainingText = ` You have ${remaining} checks left for today.`;
+    const remainingText = ` You have ${remaining} checks left for this month.`;
     setConfirmDialogContent({
       title: 'Confirm Price Check',
       message: `This will check the latest prices for your posts and update their statuses accordingly.${remainingText}`,
@@ -363,11 +363,18 @@ export default function CheckPostPricesButton({ userId }) {
     
     setSendingBroadcast(true);
     try {
+      // Get access token
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`;
+      }
+
       const response = await fetch('/api/telegram/send-broadcast', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify({
           postIds: selectedForBroadcast,
           title: tgTitle || 'Price Check Update',
@@ -513,7 +520,7 @@ export default function CheckPostPricesButton({ userId }) {
               {/* Summary Section */}
               <div className={styles.resultsSummary}>
                 <div className={dialogStyles.dialogItem}>
-                  <span className={dialogStyles.dialogLabel}>Checks Today:</span>
+                  <span className={dialogStyles.dialogLabel}>Checks This Month:</span>
                   <span className={dialogStyles.dialogValue}>{checkStats.usageCount}</span>
                 </div>
                 {typeof checkStats.remainingChecks !== 'undefined' && checkStats.remainingChecks !== null && (

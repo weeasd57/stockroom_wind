@@ -88,6 +88,25 @@ ALTER TABLE posts
 ALTER TABLE posts
   ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'open';
 
+-- Update existing posts to have a status based on their state
+DO $$
+BEGIN
+    -- Update existing posts to have a status based on their state
+    UPDATE public.posts 
+    SET status = CASE 
+        WHEN target_reached = TRUE THEN 'target_reached'
+        WHEN stop_loss_triggered = TRUE THEN 'stop_loss'
+        WHEN closed = TRUE THEN 'closed'
+        ELSE 'open'
+    END
+    WHERE status IS NULL OR status = 'open';
+    
+    RAISE NOTICE '✅ Updated status values for existing posts';
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE '⚠️ Status update skipped or already done';
+END $$;
+
 -- ===================================================================
 -- Table: USER_STRATEGIES (0 rows)
 -- ===================================================================
@@ -410,6 +429,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ===================================================================
 
 -- View for posts with action counts and comment counts
+-- Drop existing view first to ensure clean recreation
+DROP VIEW IF EXISTS public.posts_with_stats CASCADE;
+
 CREATE OR REPLACE VIEW posts_with_stats
 WITH (security_invoker = on) AS
 SELECT 
@@ -445,6 +467,7 @@ SELECT
     p.price_checks,
     p.closed_date,
     p.status,
+    p.is_public,
     COALESCE(buy_counts.buy_count, 0) as buy_count,
     COALESCE(sell_counts.sell_count, 0) as sell_count,
     COALESCE(comment_counts.comment_count, 0) as comment_count
@@ -470,6 +493,10 @@ LEFT JOIN (
     FROM comments 
     GROUP BY post_id
 ) comment_counts ON p.id = comment_counts.post_id;
+
+-- Grant permissions
+GRANT SELECT ON public.posts_with_stats TO authenticated;
+GRANT SELECT ON public.posts_with_stats TO anon;
 
 -- View for comments with user info
 CREATE OR REPLACE VIEW comments_with_user_info

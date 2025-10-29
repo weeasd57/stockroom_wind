@@ -8,6 +8,15 @@ export default function CheckoutSuccessPage() {
   const router = useRouter();
 
   useEffect(() => {
+    // Dispatch subscription upgrade event for real-time updates
+    if (typeof window !== 'undefined') {
+      const event = new CustomEvent('subscriptionUpgraded', {
+        detail: { plan: 'pro', timestamp: new Date().toISOString() }
+      });
+      window.dispatchEvent(event);
+      console.log('[CheckoutSuccess] Dispatched subscriptionUpgraded event');
+    }
+
     // Redirect to profile after 3 seconds
     const timer = setTimeout(() => {
       router.push('/profile');

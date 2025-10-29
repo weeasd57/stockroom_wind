@@ -65,11 +65,30 @@ export default function PriceCheckResultsDialog({
     
     setSendingBroadcast(true);
     try {
+      // Get access token from localStorage
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (typeof window !== 'undefined') {
+        const keys = Object.keys(localStorage);
+        const authKey = keys.find(k => k.includes('sb-') && k.includes('auth-token'));
+        if (authKey) {
+          try {
+            const authData = JSON.parse(localStorage.getItem(authKey));
+            const token = authData?.access_token || authData?.accessToken;
+            if (token) {
+              headers.Authorization = `Bearer ${token}`;
+            }
+          } catch (e) {
+            console.warn('[PriceCheckDialog] Could not parse auth token:', e);
+          }
+        }
+      }
+
       const response = await fetch('/api/telegram/send-broadcast', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify({
           postIds: selectedForBroadcast,
           title: tgTitle || 'Price Check Update',
@@ -129,7 +148,7 @@ export default function PriceCheckResultsDialog({
             <div className={styles.summarySection}>
               <div className={styles.summaryGrid}>
                 <div className={styles.summaryItem}>
-                  <span className={styles.summaryLabel}>Checks Today:</span>
+                  <span className={styles.summaryLabel}>Checks This Month:</span>
                   <span className={styles.summaryValue}>{stats.usageCount || 0}</span>
                 </div>
                 {typeof stats.remainingChecks !== 'undefined' && (

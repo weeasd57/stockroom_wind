@@ -1408,6 +1408,46 @@ export default function UnifiedBackgroundProcessDrawer() {
     }
   }, []);
 
+  // 🔄 Real-time subscription refresh when processes complete
+  useEffect(() => {
+    if (!subscription?.refreshSubscription) return;
+    
+    const hasCompletedPriceCheck = priceCheckTasks.some(task => 
+      ['completed', 'success'].includes(task.status)
+    );
+    
+    const hasCompletedPost = postTasks.some(task => 
+      ['completed', 'success'].includes(task.status)
+    );
+    
+    if (hasCompletedPriceCheck || hasCompletedPost) {
+      console.log('[Drawer] ✅ Process completed, refreshing subscription...');
+      subscription.refreshSubscription();
+    }
+  }, [priceCheckTasks, postTasks, subscription]);
+
+  // 🔄 Listen for plan upgrade events
+  useEffect(() => {
+    if (!subscription?.refreshSubscription) return;
+
+    const handlePlanChange = () => {
+      console.log('[Drawer] 🔄 Plan changed, refreshing subscription...');
+      subscription.refreshSubscription();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('subscriptionUpgraded', handlePlanChange);
+      window.addEventListener('subscriptionChanged', handlePlanChange);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('subscriptionUpgraded', handlePlanChange);
+        window.removeEventListener('subscriptionChanged', handlePlanChange);
+      }
+    };
+  }, [subscription]);
+
   // Watch for completed processes
   useEffect(() => {
     const recentlyCompleted = processes.filter(p => 

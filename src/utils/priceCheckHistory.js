@@ -287,11 +287,30 @@ export const triggerHistoricalTelegramNotifications = async (userId, historyEntr
       if (significantPosts.length === 0) continue;
       
       try {
+        // Get access token from localStorage
+        const headers = {
+          'Content-Type': 'application/json'
+        };
+        
+        if (typeof window !== 'undefined') {
+          const keys = Object.keys(localStorage);
+          const authKey = keys.find(k => k.includes('sb-') && k.includes('auth-token'));
+          if (authKey) {
+            try {
+              const authData = JSON.parse(localStorage.getItem(authKey));
+              const token = authData?.access_token || authData?.accessToken;
+              if (token) {
+                headers.Authorization = `Bearer ${token}`;
+              }
+            } catch (e) {
+              console.warn('[PriceCheckHistory] Could not parse auth token:', e);
+            }
+          }
+        }
+
         const response = await fetch('/api/telegram/send-broadcast', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers,
           body: JSON.stringify({
             postIds: significantPosts.map(p => p.id),
             title: `Historical Price Update - ${new Date(entry.timestamp).toLocaleDateString()}`,

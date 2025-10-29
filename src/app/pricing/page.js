@@ -122,6 +122,15 @@ export default function PricingPage() {
 
       toast.success('Successfully switched to Free Plan! Your Pro subscription has been cancelled.');
       
+      // Dispatch subscription change event for real-time updates
+      if (typeof window !== 'undefined') {
+        const event = new CustomEvent('subscriptionChanged', {
+          detail: { plan: 'free', action: 'downgrade', timestamp: new Date().toISOString() }
+        });
+        window.dispatchEvent(event);
+        console.log('[Pricing] Dispatched subscriptionChanged event');
+      }
+      
       // Refresh subscription info
       if (refreshSubscription) {
         await refreshSubscription();

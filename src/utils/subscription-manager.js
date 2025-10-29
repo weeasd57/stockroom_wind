@@ -151,7 +151,8 @@ export async function cancelSubscription({
       };
     }
 
-    if (currentSub.plan_type === 'free') {
+    const currentPlanName = currentSub?.subscription_plans?.name || null;
+    if (currentPlanName === 'free') {
       return {
         success: true,
         message: 'User is already on free plan',
@@ -169,6 +170,25 @@ export async function cancelSubscription({
 
     // 3. تحديث قاعدة البيانات: استهدف الصف النشط فقط، واستخدم أعمدة صحيحة
     console.log(`[Subscription] Updating subscription for user ${userId}...`);
+    const { data: existingCancelledRows, error: existingCancelledError } = await _supabase
+      .from('user_subscriptions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('status', 'cancelled')
+      .limit(1);
+
+    if (!existingCancelledError && Array.isArray(existingCancelledRows) && existingCancelledRows.length > 0) {
+      const existingCancelledId = existingCancelledRows[0]?.id;
+      if (existingCancelledId) {
+        await _supabase
+          .from('user_subscriptions')
+          .update({
+            status: 'expired',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingCancelledId);
+      }
+    }
     const { data: updateData, error: updateError } = await _supabase
       .from('user_subscriptions')
       .update({
@@ -225,7 +245,7 @@ export async function cancelSubscription({
       success: true,
       message: 'Subscription cancelled successfully',
       data: {
-        previous_plan: currentSub.plan_type,
+        previous_plan: currentPlanName || 'pro',
         new_plan: 'free',
         cancelled_at: new Date().toISOString(),
         paypal_cancelled: paypalCancelled,

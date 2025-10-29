@@ -246,6 +246,8 @@ export async function POST(request) {
     // Log post creation if successful and user is authenticated
     if (post && postPayload.user_id && token) {
       try {
+        console.log('[PostAPI] 📊 Logging post creation for user:', postPayload.user_id);
+        
         const authClient = createClient(supabaseUrl, supabaseAnonKey, {
           global: {
             headers: {
@@ -254,15 +256,19 @@ export async function POST(request) {
           }
         });
         
-        const { error: logError } = await authClient
+        const { data: logResult, error: logError } = await authClient
           .rpc('log_post_creation', { p_user_id: postPayload.user_id });
         
         if (logError) {
-          console.warn('Failed to log post creation:', logError);
+          console.error('[PostAPI] ❌ Failed to log post creation:', logError);
+        } else {
+          console.log('[PostAPI] ✅ Post creation logged successfully. Result:', logResult);
         }
       } catch (err) {
-        console.warn('Error logging post creation:', err);
+        console.error('[PostAPI] ❌ Error logging post creation:', err);
       }
+    } else {
+      console.warn('[PostAPI] ⚠️ Skipping post creation log. post:', !!post, 'user_id:', !!postPayload.user_id, 'token:', !!token);
     }
 
     return NextResponse.json({ data: post, success: true });

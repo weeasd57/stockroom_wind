@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscription API Tester</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .test-group {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .result {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { color: #4ade80; }
+        .error { color: #f87171; }
+        .info { color: #60a5fa; }
+        .token-info {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .token-status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .token-valid { background: #4ade80; color: #000; }
+        .token-invalid { background: #f87171; color: #000; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Subscription API Tester</h1>
+        
+        <div class="token-info">
+            <h3>🔑 Authentication Status</h3>
+            <p>
+                Token Status: <span id="tokenStatus" class="token-status token-invalid">Not Authenticated</span>
+            </p>
+            <p style="font-size: 12px; opacity: 0.8;">
+                Make sure you're logged in to the application. This page will automatically use your session.
+            </p>
+        </div>
+
+        <div class="test-group">
+            <h3>📊 Subscription Info</h3>
+            <button onclick="getSubscriptionInfo()">Get Current Subscription</button>
+            <div id="infoResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-group">
+            <h3>🔄 Switch to Free Plan</h3>
+            <button onclick="switchToFree()">Switch to Free (with confirmation)</button>
+            <div id="switchResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-group">
+            <h3>❌ Cancel Subscription</h3>
+            <button onclick="cancelSubscription()">Cancel Active Subscription</button>
+            <div id="cancelResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-group">
+            <h3>🔍 PayPal Operations</h3>
+            <button onclick="syncWithPayPal()">Sync with PayPal</button>
+            <button onclick="validatePayPal()">Validate PayPal Subscription</button>
+            <div id="paypalResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Check authentication status on load
+        window.addEventListener('load', checkAuth);
+
+        // Get access token from localStorage (Supabase stores it there)
+        function getAccessToken() {
+            try {
+                // Check all possible localStorage keys for Supabase auth token
+                const keys = Object.keys(localStorage);
+                console.log('🔍 All localStorage keys:', keys);
+                
+                // Find Supabase auth token key (format: sb-{project-ref}-auth-token)
+                const authKey = keys.find(k => k.includes('sb-') && k.includes('auth-token'));
+                
+                if (authKey) {
+                    const authData = localStorage.getItem(authKey);
+                    console.log('🔑 Found auth key:', authKey);
+                    
+                    if (authData) {
+                        try {
+                            const parsed = JSON.parse(authData);
+                            const token = parsed?.access_token || parsed?.accessToken;
+                            console.log('✅ Access token extracted:', token ? token.substring(0, 20) + '...' : 'null');
+                            return token;
+                        } catch (e) {
+                            console.error('Failed to parse auth data:', e);
+                        }
+                    }
+                }
+                
+                console.warn('⚠️ No Supabase auth token found in localStorage');
+                return null;
+            } catch (error) {
+                console.error('Error getting access token:', error);
+                return null;
+            }
+        }
+
+        async function checkAuth() {
+            const token = getAccessToken();
+            console.log('🎫 Token available:', !!token);
+            
+            try {
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                // Add Authorization header if we have a token
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+                
+                const response = await fetch('/api/subscription/info', {
+                    credentials: 'include',
+                    headers
+                });
+                const data = await response.json();
+                
+                console.log('📡 Response:', { status: response.status, data });
+                
+                const statusEl = document.getElementById('tokenStatus');
+                if (response.ok && data.success) {
+                    statusEl.textContent = `✅ Authenticated (${data.data.plan_display_name})`;
+                    statusEl.className = 'token-status token-valid';
+                } else {
+                    statusEl.textContent = '❌ Not Authenticated - ' + (data.message || 'Please login');
+                    statusEl.className = 'token-status token-invalid';
+                    
+                    // Show login button
+                    if (!token) {
+                        statusEl.textContent += ' | Click here to login';
+                        statusEl.style.cursor = 'pointer';
+                        statusEl.onclick = () => {
+                            window.location.href = '/login?redirect=/test-subscription-browser.html';
+                        };
+                    }
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                const statusEl = document.getElementById('tokenStatus');
+                statusEl.textContent = '❌ Error: ' + error.message;
+                statusEl.className = 'token-status token-invalid';
+            }
+        }
+
+        function showResult(elementId, data, isError = false) {
+            const el = document.getElementById(elementId);
+            el.style.display = 'block';
+            el.className = isError ? 'result error' : 'result success';
+            el.textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function getSubscriptionInfo() {
+            try {
+                const token = getAccessToken();
+                console.log('📊 [getSubscriptionInfo] Token:', token ? token.substring(0, 20) + '...' : 'null');
+                
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                    console.log('📊 [getSubscriptionInfo] Authorization header set');
+                } else {
+                    console.warn('⚠️ [getSubscriptionInfo] No token available!');
+                }
+                
+                console.log('📊 [getSubscriptionInfo] Sending request...');
+                const response = await fetch('/api/subscription/info', {
+                    credentials: 'include',
+                    headers
+                });
+                const data = await response.json();
+                console.log('📊 [getSubscriptionInfo] Response:', response.status, data);
+                showResult('infoResult', data, !response.ok);
+            } catch (error) {
+                console.error('❌ [getSubscriptionInfo] Error:', error);
+                showResult('infoResult', { error: error.message }, true);
+            }
+        }
+
+        async function switchToFree() {
+            if (!confirm('⚠️ Are you sure you want to switch to the Free plan? This will cancel your Pro subscription.')) {
+                return;
+            }
+
+            try {
+                const token = getAccessToken();
+                console.log('🔄 [switchToFree] Token:', token ? token.substring(0, 20) + '...' : 'null');
+                
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                    console.log('🔄 [switchToFree] Authorization header set');
+                } else {
+                    console.warn('⚠️ [switchToFree] No token available!');
+                }
+                
+                const payload = {
+                    action: 'switch_to_free',
+                    confirmCancellation: true,
+                    reason: 'User switched from browser test tool',
+                    metadata: {
+                        source: 'browser_test_tool',
+                        timestamp: new Date().toISOString()
+                    }
+                };
+                
+                console.log('🔄 [switchToFree] Request payload:', payload);
+                console.log('🔄 [switchToFree] Request headers:', headers);
+                console.log('🔄 [switchToFree] Sending request to /api/subscription/manage...');
+                
+                const response = await fetch('/api/subscription/manage', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers,
+                    body: JSON.stringify(payload)
+                });
+                
+                console.log('🔄 [switchToFree] Response status:', response.status);
+                const data = await response.json();
+                console.log('🔄 [switchToFree] Response data:', data);
+                
+                showResult('switchResult', data, !response.ok);
+                
+                // Refresh auth status
+                if (response.ok && data.success) {
+                    console.log('✅ [switchToFree] Success! Refreshing auth status...');
+                    setTimeout(checkAuth, 1000);
+                }
+            } catch (error) {
+                console.error('❌ [switchToFree] Error:', error);
+                showResult('switchResult', { error: error.message }, true);
+            }
+        }
+
+        async function cancelSubscription() {
+            if (!confirm('⚠️ Are you sure you want to cancel your subscription?')) {
+                return;
+            }
+
+            try {
+                const token = getAccessToken();
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+                
+                const response = await fetch('/api/subscription/manage', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers,
+                    body: JSON.stringify({
+                        action: 'cancel',
+                        reason: 'User cancelled from browser test tool',
+                        shouldCancelPayPal: true,
+                        metadata: {
+                            source: 'browser_test_tool',
+                            timestamp: new Date().toISOString()
+                        }
+                    })
+                });
+                const data = await response.json();
+                showResult('cancelResult', data, !response.ok);
+                
+                // Refresh auth status
+                if (response.ok && data.success) {
+                    setTimeout(checkAuth, 1000);
+                }
+            } catch (error) {
+                showResult('cancelResult', { error: error.message }, true);
+            }
+        }
+
+        async function syncWithPayPal() {
+            try {
+                const token = getAccessToken();
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+                
+                const response = await fetch('/api/subscription/manage', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers,
+                    body: JSON.stringify({
+                        action: 'sync_with_paypal'
+                    })
+                });
+                const data = await response.json();
+                showResult('paypalResult', data, !response.ok);
+            } catch (error) {
+                showResult('paypalResult', { error: error.message }, true);
+            }
+        }
+
+        async function validatePayPal() {
+            const subId = prompt('Enter PayPal Subscription ID (I-XXXXXXXXXXXXXXXXXX):');
+            if (!subId) return;
+
+            try {
+                const token = getAccessToken();
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+                
+                const response = await fetch('/api/subscription/manage', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers,
+                    body: JSON.stringify({
+                        action: 'validate_paypal',
+                        subscriptionId: subId
+                    })
+                });
+                const data = await response.json();
+                showResult('paypalResult', data, !response.ok);
+            } catch (error) {
+                showResult('paypalResult', { error: error.message }, true);
+            }
+        }
+    </script>
+</body>
+</html>

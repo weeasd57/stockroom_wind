@@ -81,9 +81,9 @@ export function SubscriptionProvider({ children }) {
       return;
     }
 
-    // Cache for 30 seconds to avoid excessive API calls
+    // Cache for 10 seconds to avoid excessive API calls (reduced from 30s)
     const now = Date.now();
-    if (!forceRefresh && (now - lastFetchTime.current) < 30000) {
+    if (!forceRefresh && (now - lastFetchTime.current) < 10000) {
       console.log('[SUBSCRIPTION PROVIDER] Cache still valid, skipping fetch');
       return;
     }
