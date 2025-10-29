@@ -153,12 +153,35 @@ export default function HomePage() {
     };
   }, [isOpen]);
 
+  // Initialize Google AdSense ads
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && window.adsbygoogle) {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      }
+    } catch (error) {
+      console.error('AdSense error:', error);
+    }
+  }, []);
+
 
   return (
     <div className={`${styles.homePage} ${visible ? styles.visible : ''}`}>
-      <div className={styles.homeContent}>
-        {/* Dashboard Section */}
-        <DashboardSection />
+        <div className={styles.homeContent}>
+          {/* Dashboard Section */}
+          <DashboardSection />
+
+          {/* Google AdSense Ad Unit */}
+          <div className={styles.adContainer} style={{ margin: '20px 0', textAlign: 'center' }}>
+            <ins
+              className="adsbygoogle"
+              style={{ display: 'block' }}
+              data-ad-client="ca-pub-6192742001147947"
+              data-ad-slot="auto"
+              data-ad-format="auto"
+              data-full-width-responsive="true"
+            />
+          </div>
 
         {/* Create Post Section */}
         <div className={styles.createPostSection}>
