@@ -18,7 +18,6 @@ import { CommentProvider } from '@/providers/CommentProvider';
 import { BackgroundPostCreationProvider } from '@/providers/BackgroundPostCreationProvider';
 import { BackgroundProfileEditProvider } from '@/providers/BackgroundProfileEditProvider';
 import { BackgroundPriceCheckProvider } from '@/providers/BackgroundPriceCheckProvider';
-import { SubscriptionProvider } from '@/providers/SubscriptionProvider';
 import { PriceCheckResultsProvider } from '@/providers/PriceCheckResultsProvider';
 import { StrategiesProvider } from '@/providers/StrategiesProvider';
 import GlobalPriceCheckHandler from '@/components/internal/GlobalPriceCheckHandler';
@@ -297,7 +296,6 @@ export default function RootLayout({ children }) {
         <SimpleSupabaseProvider>
           <UserProvider>
             <ProfileProvider>
-              <SubscriptionProvider>
                 <StrategiesProvider>
                   <TradersProvider>
                     <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={false}>
@@ -330,10 +328,9 @@ export default function RootLayout({ children }) {
                   </ThemeProvider>
                   </TradersProvider>
                 </StrategiesProvider>
-              </SubscriptionProvider>
-            </ProfileProvider>
-          </UserProvider>
-        </SimpleSupabaseProvider>
+              </ProfileProvider>
+            </UserProvider>
+          </SimpleSupabaseProvider>
       </body>
     </html>
   );

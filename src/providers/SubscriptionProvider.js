@@ -7,10 +7,232 @@ const SubscriptionContext = createContext({});
 
 export const useSubscription = () => {
   const context = useContext(SubscriptionContext);
-  if (!context) {
-    throw new Error('useSubscription must be used within a SubscriptionProvider');
-  }
-  return context;
+  const hasProvider = Boolean(context && context.__isSubscriptionProvider);
+  const { supabase, user, isAuthenticated } = useSupabase();
+
+  // Standalone fallback state (used when no Provider is mounted)
+  const [subInfo, setSubInfo] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState(null);
+  const fetchingRef = useRef(false);
+  const lastFetchTime = useRef(0);
+
+  const fallbackDefault = useMemo(() => ({
+    user_id: null,
+    plan_id: null,
+    plan_name: 'free',
+    plan_display_name: 'Free',
+    price_check_limit: 50,
+    price_checks_used: 0,
+    remaining_checks: 50,
+    post_creation_limit: 100,
+    posts_created: 0,
+    remaining_posts: 100,
+    subscription_status: 'active',
+    start_date: null,
+    end_date: null
+  }), []);
+
+  const fetchInfo = useCallback(async (forceRefresh = false, options = { silent: false }) => {
+    if (hasProvider) return;
+    if (!user?.id || !supabase) {
+      setSubInfo(fallbackDefault);
+      setLoading(false);
+      return;
+    }
+    if (fetchingRef.current) return;
+    const now = Date.now();
+    if (!forceRefresh && (now - lastFetchTime.current) < 10000) return;
+    
+    try {
+      fetchingRef.current = true;
+      if (options.silent) setSyncing(true); else setLoading(true);
+      setError(null);
+      
+      // Get access token from session or localStorage
+      let accessToken = null;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        accessToken = session?.access_token;
+      } catch (e) {
+        console.warn('[useSubscription] getSession failed, trying localStorage:', e);
+      }
+      
+      // Fallback: read from localStorage if session is not available
+      if (!accessToken && typeof window !== 'undefined') {
+        try {
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+          const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\./)?.[1] || '';
+          const storageKey = `sb-${projectRef}-auth-token`;
+          const stored = localStorage.getItem(storageKey);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            accessToken = parsed?.access_token || parsed?.currentSession?.access_token;
+          }
+        } catch (e) {
+          console.warn('[useSubscription] localStorage read failed:', e);
+        }
+      }
+      
+      const headers = { 'Content-Type': 'application/json' };
+      if (accessToken) {
+        headers.Authorization = `Bearer ${accessToken}`;
+      }
+      
+      const res = await fetch('/api/subscription/info', {
+        method: 'GET',
+        headers,
+        credentials: 'include'
+      });
+      
+      if (!res.ok) throw new Error(`API Error: ${res.status}`);
+      const json = await res.json();
+      
+      if (json.success && json.data) {
+        setSubInfo(json.data);
+        lastFetchTime.current = now;
+      } else {
+        setSubInfo({ ...fallbackDefault, user_id: user.id });
+      }
+    } catch (e) {
+      setError(e.message);
+      setSubInfo({ ...fallbackDefault, user_id: user?.id || null });
+    } finally {
+      setLoading(false);
+      setSyncing(false);
+      fetchingRef.current = false;
+    }
+  }, [hasProvider, user?.id, supabase, fallbackDefault]);
+
+  const refresh = useCallback(async () => {
+    if (hasProvider) return;
+    await fetchInfo(true);
+  }, [hasProvider, fetchInfo]);
+
+  const getRemainingPosts = useCallback(() => {
+    const s = hasProvider ? context.subscriptionInfo : subInfo;
+    if (!s) return 100;
+    const used = s.posts_created || 0;
+    const limit = s.post_creation_limit || 100;
+    return Math.max(0, limit - used);
+  }, [hasProvider, context, subInfo]);
+
+  const canPerformPriceCheck = useCallback(() => {
+    const s = hasProvider ? context.subscriptionInfo : subInfo;
+    if (!s) return false;
+    return (s.remaining_checks || 0) > 0;
+  }, [hasProvider, context, subInfo]);
+
+  const getUsageInfo = useCallback(() => {
+    const s = hasProvider ? context.subscriptionInfo : subInfo;
+    if (!s) return null;
+    return {
+      priceChecks: {
+        used: s.price_checks_used || 0,
+        limit: s.price_check_limit || 50,
+        remaining: s.remaining_checks || Math.max((s.price_check_limit || 0) - (s.price_checks_used || 0), 0)
+      },
+      posts: {
+        used: s.posts_created || 0,
+        limit: s.post_creation_limit || 100,
+        remaining: getRemainingPosts()
+      },
+      planName: s.plan_name || 'free',
+      planDisplayName: s.plan_display_name || 'Free',
+      subscriptionStatus: s.subscription_status,
+      startDate: s.start_date,
+      endDate: s.end_date
+    };
+  }, [hasProvider, context, subInfo, getRemainingPosts]);
+
+  const incrementPostUsage = useCallback(async () => {
+    console.log('[incrementPostUsage] Called', { hasProvider, userId: user?.id });
+    if (hasProvider) return context.incrementPostUsage();
+    if (!user?.id) return { success: false, error: 'No user logged in' };
+    try {
+      console.log('[incrementPostUsage] Calling log_post_creation RPC...');
+      const { data: rpcData, error: rpcError } = await supabase.rpc('log_post_creation', { p_user_id: user.id });
+      console.log('[incrementPostUsage] RPC result:', { rpcData, rpcError });
+      if (rpcError) throw rpcError;
+      await fetchInfo(true, { silent: true });
+      return { success: true };
+    } catch (e) {
+      console.error('[incrementPostUsage] Error:', e);
+      await fetchInfo(true, { silent: true });
+      return { success: false, error: e.message };
+    }
+  }, [hasProvider, context, user?.id, supabase, fetchInfo]);
+
+  const incrementPriceCheckUsage = useCallback(async () => {
+    if (hasProvider) return context.incrementPriceCheckUsage();
+    if (!user?.id) return { success: false, error: 'No user logged in' };
+    try {
+      const { data: canCheck, error: checkError } = await supabase.rpc('check_price_limit', { p_user_id: user.id });
+      if (checkError) throw checkError;
+      if (canCheck === false) return { success: false, error: 'Price check limit exceeded' };
+      const { error: logError } = await supabase.rpc('log_price_check', { p_user_id: user.id, p_symbol: 'API_CALL', p_exchange: null, p_country: null });
+      if (logError) throw logError;
+      await fetchInfo(true, { silent: true });
+      return { success: true };
+    } catch (e) {
+      await fetchInfo(true, { silent: true });
+      return { success: false, error: e.message };
+    }
+  }, [hasProvider, context, user?.id, supabase, fetchInfo]);
+
+  useEffect(() => {
+    if (hasProvider) return;
+    if (user?.id) {
+      fetchInfo(false, { silent: true });
+    } else {
+      setSubInfo(fallbackDefault);
+      setLoading(false);
+      setError(null);
+    }
+  }, [hasProvider, user?.id, fetchInfo, fallbackDefault]);
+
+  const fallbackValue = useMemo(() => {
+    const currentInfo = subInfo || fallbackDefault;
+    // Removed verbose logging to reduce console noise
+    
+    return {
+      subscriptionInfo: currentInfo,
+      subscription: currentInfo,
+      loading,
+      isLoading: loading,
+      syncing,
+      error,
+      analytics: { postsCount: 0, successPosts: 0, lossPosts: 0, experienceScore: 0 },
+      fetchSubscriptionInfo: fetchInfo,
+      refreshSubscription: refresh,
+      upgradeToProSubscription: async () => ({ success: false, error: 'Not implemented' }),
+      cancelSubscription: async () => ({ success: false, error: 'Not implemented' }),
+      canPerformPriceCheck,
+      canCreatePost: () => (getRemainingPosts() > 0),
+      isProPlan: () => ((currentInfo?.plan_name || 'free') === 'pro'),
+      getRemainingPriceChecks: () => (currentInfo?.remaining_checks || 0),
+      getRemainingPosts,
+      getUsageInfo,
+      getSubscriptionMessage: () => null,
+      remaining_checks: currentInfo?.remaining_checks,
+      price_checks_used: currentInfo?.price_checks_used,
+      price_check_limit: currentInfo?.price_check_limit,
+      remaining_posts: currentInfo?.remaining_posts ?? Math.max(0, (currentInfo?.post_creation_limit || 100) - (currentInfo?.posts_created || 0)),
+      posts_created: currentInfo?.posts_created,
+      post_creation_limit: currentInfo?.post_creation_limit,
+      subscriptionLoading: loading,
+      incrementPostUsage,
+      incrementPriceCheckUsage,
+      isPro: (currentInfo?.plan_name || 'free') === 'pro',
+      usageInfo: getUsageInfo(),
+      subscriptionMessage: null
+    };
+  }, [subInfo, fallbackDefault, loading, syncing, error, fetchInfo, refresh, canPerformPriceCheck, getRemainingPosts, getUsageInfo, incrementPostUsage, incrementPriceCheckUsage]);
+
+  const value = hasProvider ? context : fallbackValue;
+
+  return value;
 };
 
 export function SubscriptionProvider({ children }) {
@@ -70,13 +292,14 @@ export function SubscriptionProvider({ children }) {
 
     if (!user?.id || !supabase) {
       console.log('[SUBSCRIPTION PROVIDER] No user or supabase, skipping fetch');
-      setSubscriptionInfo(null);
+      // Keep a valid default structure so downstream consumers don't see undefined
+      setSubscriptionInfo(prev => prev || defaultFreePlan);
       setLoading(false);
       return;
     }
 
-    // Prevent concurrent fetches
-    if (fetchingRef.current && !forceRefresh) {
+    // Prevent concurrent fetches (even if forceRefresh)
+    if (fetchingRef.current) {
       console.log('[SUBSCRIPTION PROVIDER] Fetch already in progress, skipping');
       return;
     }
@@ -129,6 +352,16 @@ export function SubscriptionProvider({ children }) {
       
       if (result.success && result.data) {
         console.log('[SUBSCRIPTION PROVIDER] Setting subscription info:', result.data);
+        console.log('[SUBSCRIPTION PROVIDER] Post Creation Data:', {
+          posts_created: result.data.posts_created,
+          post_creation_limit: result.data.post_creation_limit,
+          remaining_posts: result.data.remaining_posts
+        });
+        console.log('[SUBSCRIPTION PROVIDER] Price Check Data:', {
+          price_checks_used: result.data.price_checks_used,
+          price_check_limit: result.data.price_check_limit,
+          remaining_checks: result.data.remaining_checks
+        });
         setSubscriptionInfo(result.data);
         lastFetchTime.current = now;
       } else {
@@ -384,29 +617,33 @@ export function SubscriptionProvider({ children }) {
         console.log('[SUBSCRIPTION PROVIDER] Optimistic post increment:', optimisticUpdate.posts_created);
       }
       
-      // Get current active subscription
-      const { data: userSubData } = await supabase
-        .from('user_subscriptions')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .single();
-      
-      if (userSubData) {
-        // Increment posts_created counter
-        const { error } = await supabase
-          .from('user_subscriptions')
-          .update({ 
-            posts_created: (userSubData.posts_created || 0) + 1,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', userSubData.id);
-          
-        if (error) throw error;
+      // Atomically log post creation usage via RPC to avoid race conditions
+      const { data: rpcData, error: rpcError } = await supabase
+        .rpc('log_post_creation', { p_user_id: user.id });
+
+      if (rpcError) {
+        console.error('[SUBSCRIPTION PROVIDER] Failed to log_post_creation RPC:', rpcError);
+        throw rpcError;
+      }
+
+      if (rpcData) {
+        setSubscriptionInfo(prev => {
+          const used = typeof rpcData.posts_created === 'number' ? rpcData.posts_created : (prev?.posts_created || 0);
+          const limit = typeof rpcData.post_creation_limit === 'number' ? rpcData.post_creation_limit : (prev?.post_creation_limit || 100);
+          return {
+            ...prev,
+            posts_created: used,
+            post_creation_limit: limit,
+            remaining_posts: Math.max(limit - used, 0),
+            plan_name: rpcData.plan_name || prev?.plan_name
+          };
+        });
       }
       
       // Silent refresh to sync with server
+      console.log('[SUBSCRIPTION PROVIDER] Refreshing subscription info from API...');
       await fetchSubscriptionInfo(true, { silent: true });
+      console.log('[SUBSCRIPTION PROVIDER] ✅ Subscription info refreshed');
       
       return { success: true };
     } catch (error) {
@@ -565,9 +802,14 @@ export function SubscriptionProvider({ children }) {
   }, [user?.id, supabase, fetchSubscriptionInfo]);
 
   const value = {
+    __isSubscriptionProvider: true,
     // State
     subscriptionInfo,
+    // Backward-compat alias for legacy consumers expecting 'subscription'
+    subscription: subscriptionInfo,
     loading,
+    // Backward-compat alias for components destructuring { isLoading }
+    isLoading: loading,
     syncing,
     error,
     analytics,
@@ -588,6 +830,18 @@ export function SubscriptionProvider({ children }) {
     getRemainingPosts,
     getUsageInfo,
     getSubscriptionMessage,
+    
+    // Backward-compat proxy fields (for existing consumers expecting flat fields)
+    // Price checks
+    remaining_checks: subscriptionInfo?.remaining_checks,
+    price_checks_used: subscriptionInfo?.price_checks_used,
+    price_check_limit: subscriptionInfo?.price_check_limit,
+    // Post creation
+    remaining_posts: subscriptionInfo?.remaining_posts,
+    posts_created: subscriptionInfo?.posts_created,
+    post_creation_limit: subscriptionInfo?.post_creation_limit,
+    // Loading state
+    subscriptionLoading: loading,
     
     // Usage incrementers
     incrementPostUsage,

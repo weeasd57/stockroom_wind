@@ -1,7 +1,6 @@
 -- Delete subscription schema - Remove all subscription-related tables, functions, views, and policies
 
--- Drop views first
-DROP VIEW IF EXISTS public.user_subscription_info CASCADE;
+-- No legacy views to drop
 
 -- Drop triggers (guarded by table existence to avoid errors)
 DO $$ BEGIN
@@ -108,10 +107,7 @@ BEGIN
         REVOKE ALL ON TABLE payment_transactions FROM authenticated;
     END IF;
     
-    -- Revoke view permissions (check if view exists first)
-    IF to_regclass('public.user_subscription_info') IS NOT NULL THEN
-        REVOKE ALL ON TABLE user_subscription_info FROM authenticated;
-    END IF;
+    -- No view permissions to revoke
 EXCEPTION 
     WHEN undefined_object THEN 
         -- Ignore if objects don't exist

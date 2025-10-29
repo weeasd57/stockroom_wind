@@ -868,15 +868,16 @@ async function createPost(post, userId) {
     
     if (canCreate === false) {
       // Get subscription info for error message
-      const { data: subscriptionData } = await supabase
-        .from('user_subscription_info')
-        .select('*')
-        .eq('user_id', userId);
+      const { data: activeSub } = await supabase
+        .from('user_subscriptions')
+        .select('*, subscription_plans(*)')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .single();
       
-      const subscriptionInfo = subscriptionData && subscriptionData.length > 0 ? subscriptionData[0] : null;
-      const maxPosts = subscriptionInfo?.post_creation_limit || 100;
-      const usedPosts = subscriptionInfo?.posts_created || 0;
-      const planName = subscriptionInfo?.plan_name || 'free';
+      const maxPosts = activeSub?.subscription_plans?.post_creation_limit ?? 100;
+      const usedPosts = activeSub?.posts_created ?? 0;
+      const planName = activeSub?.subscription_plans?.name || 'free';
       
       const errorMessage = planName === 'free' 
         ? `لقد وصلت إلى الحد الأقصى للمنشورات (${maxPosts} منشور شهريًا). يرجى الترقية إلى Pro للحصول على المزيد.`

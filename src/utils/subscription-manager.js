@@ -300,9 +300,10 @@ export async function validatePayPalSubscription(subscriptionId) {
 export async function syncSubscriptionWithPayPal(userId) {
   try {
     const { data: userSub } = await _supabase
-      .from('user_subscription_info')
-      .select('*')
+      .from('user_subscriptions')
+      .select('id, status, paypal_subscription_id')
       .eq('user_id', userId)
+      .eq('status', 'active')
       .single();
 
     if (!userSub?.paypal_subscription_id) {
@@ -317,22 +318,19 @@ export async function syncSubscriptionWithPayPal(userId) {
 
     // تحديث الحالة إذا كانت مختلفة
     const paypalStatus = validation.status.toLowerCase();
-    const dbStatus = userSub.subscription_status?.toLowerCase();
+    const dbStatus = userSub.status?.toLowerCase();
 
     if (paypalStatus !== dbStatus) {
       console.log(`[Subscription] Syncing status: ${dbStatus} -> ${paypalStatus}`);
       
       let updateData = {
-        subscription_status: paypalStatus,
+        status: paypalStatus,
         updated_at: new Date().toISOString()
       };
 
       if (paypalStatus === 'cancelled' || paypalStatus === 'expired') {
         updateData = {
           ...updateData,
-          plan_type: 'free',
-          plan_name: 'free',
-          status: paypalStatus,
           cancelled_at: new Date().toISOString(),
           cancellation_source: 'paypal_sync'
         };
@@ -341,7 +339,8 @@ export async function syncSubscriptionWithPayPal(userId) {
       await _supabase
         .from('user_subscriptions')
         .update(updateData)
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .eq('status', 'active');
 
       return { 
         synced: true, 

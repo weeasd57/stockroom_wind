@@ -180,6 +180,7 @@ export default function HomePage() {
               data-ad-slot="auto"
               data-ad-format="auto"
               data-full-width-responsive="true"
+              data-adtest={process.env.NODE_ENV === 'development' ? 'on' : 'off'}
             />
           </div>
 

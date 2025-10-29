@@ -106,17 +106,16 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'User ID not available' }, { status: 401 });
     }
 
-    // Get user's subscription info (may not exist for new users)
-    const { data: subscriptionData, error: subError } = await supabase
-      .from('user_subscription_info')
-      .select('*')
-      .eq('user_id', userId);
-    
-    const subscriptionInfo = subscriptionData && subscriptionData.length > 0 ? subscriptionData[0] : null;
+    const { data: activeSub, error: subError } = await supabase
+      .from('user_subscriptions')
+      .select('*, subscription_plans(*)')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .single();
 
-    // Default to free plan limits if no subscription found
-    const maxMonthlyChecks = subscriptionInfo?.price_check_limit || 50;
-    const usedChecks = subscriptionInfo?.price_checks_used || 0;
+    const plan = activeSub?.subscription_plans || null;
+    const maxMonthlyChecks = (plan && plan.price_check_limit != null) ? plan.price_check_limit : 50;
+    const usedChecks = activeSub?.price_checks_used ?? 0;
     const remainingChecks = Math.max(maxMonthlyChecks - usedChecks, 0);
 
     return NextResponse.json({ 
@@ -124,7 +123,7 @@ export async function GET(request) {
       usageCount: usedChecks, 
       remainingChecks, 
       maxMonthlyChecks,
-      planName: subscriptionInfo?.plan_name || 'free'
+      planName: plan?.name || 'free'
     });
   } catch (error) {
     console.error('Error in GET /api/posts/check-prices:', error);
@@ -232,16 +231,18 @@ export async function POST(request) {
     
     if (canCheck === false) {
       // Get subscription info for error message (may not exist for new users)
-      const { data: subscriptionData } = await supabase
-        .from('user_subscription_info')
-        .select('*')
-        .eq('user_id', userId);
+      const { data: activeSub } = await supabase
+        .from('user_subscriptions')
+        .select('*, subscription_plans(*)')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .single();
       
-      const subscriptionInfo = subscriptionData && subscriptionData.length > 0 ? subscriptionData[0] : null;
+      const plan = activeSub?.subscription_plans || null;
       
-      const maxChecks = subscriptionInfo?.price_check_limit || 50;
-      const usedChecks = subscriptionInfo?.price_checks_used || 0;
-      const planName = subscriptionInfo?.plan_name || 'free';
+      const maxChecks = (plan && plan.price_check_limit != null) ? plan.price_check_limit : 50;
+      const usedChecks = activeSub?.price_checks_used ?? 0;
+      const planName = plan?.name || 'free';
       
       if (DEBUG) console.log(`[DEBUG] User has reached maximum checks (${usedChecks}/${maxChecks})`);
       return NextResponse.json(
@@ -383,6 +384,21 @@ export async function POST(request) {
           
           if (!response.ok) {
             console.error(`[ERROR] API error for ${symbol}: ${response.status} ${response.statusText}`);
+            // Special-case upstream 402 Payment Required: bubble up to client so UI can alert and stop
+            if (response.status === 402) {
+              if (includeApiDetails) {
+                apiDetails.push({ ...apiRequestInfo, responseType: 'Error', errorCode: 402 });
+              }
+              return NextResponse.json(
+                {
+                  success: false,
+                  code: 'payment_required',
+                  message: 'Upstream data provider returned 402 Payment Required. Please upgrade your plan or try again later.',
+                  symbol
+                },
+                { status: 402 }
+              );
+            }
             apiRequestInfo.responseType = 'Error';
             apiRequestInfo.errorCode = response.status;
             
@@ -1062,15 +1078,24 @@ export async function POST(request) {
     }
     
     // Get user's subscription limits from Supabase (may not exist for new users)
-    const { data: subscriptionData } = await supabase
-      .from('user_subscription_info')
-      .select('*')
-      .eq('user_id', userId);
+    const { data: activeSubBefore } = await supabase
+      .from('user_subscriptions')
+      .select('*, subscription_plans(*)')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .single();
     
-    const subscriptionInfo = subscriptionData && subscriptionData.length > 0 ? subscriptionData[0] : null;
+    const subscriptionInfo = activeSubBefore ? {
+      price_check_limit: activeSubBefore?.subscription_plans?.price_check_limit ?? 50,
+      price_checks_used: activeSubBefore?.price_checks_used ?? 0,
+      plan_name: activeSubBefore?.subscription_plans?.name || 'free'
+    } : null;
     
     // Log the price check using the RPC function to update usage counter
+    // RPC now returns JSON with updated subscription info (no race condition!)
     console.log(`[LOG_PRICE_CHECK] Attempting to log price check usage for user ${userId}`);
+    let updatedSubscriptionInfo = null;
+    
     try {
       const { data: logData, error: logError } = await supabase
         .rpc('log_price_check', { 
@@ -1088,11 +1113,40 @@ export async function POST(request) {
           details: logError.details,
           hint: logError.hint
         });
-        // Don't fail the whole operation, just log the error
+        // Fallback: fetch subscription data if RPC fails
+        console.log('[LOG_PRICE_CHECK] Falling back to direct subscription fetch...');
+        const { data: fallbackSub } = await supabase
+          .from('user_subscriptions')
+          .select('*, subscription_plans(*)')
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .single();
+        
+        if (fallbackSub) {
+          updatedSubscriptionInfo = {
+            price_check_limit: fallbackSub?.subscription_plans?.price_check_limit ?? 50,
+            price_checks_used: fallbackSub?.price_checks_used ?? 0,
+            plan_name: fallbackSub?.subscription_plans?.name || 'free'
+          };
+        }
       } else {
-        console.log(`[LOG_PRICE_CHECK] Price check usage logged successfully for user ${userId}`, {
+        // SUCCESS: Use the data returned from RPC (no race condition!)
+        console.log(`[LOG_PRICE_CHECK] ✅ Price check logged successfully with updated data:`, {
           logData,
           timestamp: new Date().toISOString()
+        });
+        
+        // Extract subscription info from RPC return value
+        updatedSubscriptionInfo = {
+          price_check_limit: logData?.price_check_limit ?? 50,
+          price_checks_used: logData?.price_checks_used ?? 0,
+          plan_name: logData?.plan_name || 'free'
+        };
+        
+        console.log(`[SUBSCRIPTION_INFO] Using data from RPC return (no separate fetch needed):`, {
+          userId,
+          subscriptionInfo: updatedSubscriptionInfo,
+          source: 'RPC_RETURN_VALUE'
         });
       }
     } catch (logPriceCheckError) {
@@ -1101,32 +1155,34 @@ export async function POST(request) {
         message: logPriceCheckError?.message,
         stack: logPriceCheckError?.stack
       });
+      
+      // Fallback: try to get current subscription data
+      try {
+        const { data: fallbackSub } = await supabase
+          .from('user_subscriptions')
+          .select('*, subscription_plans(*)')
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .single();
+        
+        if (fallbackSub) {
+          updatedSubscriptionInfo = {
+            price_check_limit: fallbackSub?.subscription_plans?.price_check_limit ?? 50,
+            price_checks_used: fallbackSub?.price_checks_used ?? 0,
+            plan_name: fallbackSub?.subscription_plans?.name || 'free'
+          };
+        }
+      } catch (fallbackError) {
+        console.error('[LOG_PRICE_CHECK] Fallback subscription fetch also failed:', fallbackError);
+      }
     }
-
-    // Get updated subscription limits after logging the usage
-    console.log(`[SUBSCRIPTION_INFO] Fetching updated subscription info for user ${userId}`);
-    const { data: updatedSubscriptionData, error: subscriptionError } = await supabase
-      .from('user_subscription_info')
-      .select('*')
-      .eq('user_id', userId);
     
-    if (subscriptionError) {
-      console.error('[SUBSCRIPTION_INFO] Error fetching subscription info:', subscriptionError);
-    }
-    
-    const updatedSubscriptionInfo = updatedSubscriptionData && updatedSubscriptionData.length > 0 ? updatedSubscriptionData[0] : null;
-    console.log(`[SUBSCRIPTION_INFO] Current subscription data:`, {
-      userId,
-      subscriptionInfo: updatedSubscriptionInfo,
-      hasData: !!updatedSubscriptionInfo,
-      dataLength: updatedSubscriptionData?.length || 0
-    });
-    
+    // Calculate usage from the data we got (either from RPC or fallback)
     const maxMonthlyChecks = updatedSubscriptionInfo?.price_check_limit || 50;
     const usageCount = updatedSubscriptionInfo?.price_checks_used || 0;
     const remainingChecks = Math.max(maxMonthlyChecks - usageCount, 0);
     
-    console.log(`[SUBSCRIPTION_INFO] Usage calculation:`, {
+    console.log(`[SUBSCRIPTION_INFO] Final usage calculation:`, {
       maxMonthlyChecks,
       usageCount,
       remainingChecks,

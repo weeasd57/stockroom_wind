@@ -7,10 +7,15 @@ TESTS list {
 }
 
 
-* fix telegram bodcast
+* add tap for primum posts in profile
+   and showing just the results for this posts 
+* when chek post should showing list free , primume 
+* in feedpost showing tap for premium have filtering list brokers
 
-* add 2 pro plane 7 for get 30% fee from subscribtions 
-   and  15 for 0 fee
+إضافة UI للـ premium posts في profile
+إضافة toggle للـ is_premium_only عند إنشاء post
+تحديث الـ filtering logic في PostsFeed
+
 
 ** add  telegram count follower in view profile 
 ** add analysis page for every trader howmatch earn

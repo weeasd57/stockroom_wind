@@ -180,6 +180,12 @@ export default function CheckPostPricesButton({ userId }) {
       }
       
       if (!response.ok) {
+        // Special handling for quota/plan enforcement
+        if (response.status === 402) {
+          setError(data.message || 'Payment required by data provider. Please upgrade your plan or try again later.');
+          setIsChecking(false);
+          return;
+        }
         // Special handling for API key errors
         if (response.status === 429) {
           setError(data.message || 'You have reached the maximum checks for this month. Try again next month.');

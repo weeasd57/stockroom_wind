@@ -16,7 +16,6 @@
 - `subscription_plans`: جدول الخطط المتاحة
 - `user_subscriptions`: اشتراكات المستخدمين
 - `payment_transactions`: سجل المعاملات المالية
-- `user_subscription_info`: View لمعلومات الاشتراك
 
 #### الصفحات
 - `/pricing`: عرض الخطط المتاحة
@@ -118,13 +117,21 @@ fetch('/api/posts/check-prices', {
 
 ### مراقبة الاشتراكات
 ```sql
--- عرض الاشتراكات النشطة
-SELECT * FROM user_subscription_info WHERE subscription_status = 'active';
+-- الاشتراكات النشطة مع تفاصيل الخطة
+SELECT s.user_id, s.status, s.price_checks_used, s.posts_created,
+       p.name AS plan_name, p.display_name, p.price_check_limit, p.post_creation_limit
+FROM user_subscriptions s
+JOIN subscription_plans p ON p.id = s.plan_id
+WHERE s.status = 'active';
 
--- عرض استخدام الفحص اليومي
-SELECT user_id, price_checks_used, price_check_limit 
-FROM user_subscription_info 
-WHERE price_checks_used > 0;
+-- استخدام حدود الفحص (شهرياً)
+SELECT s.user_id,
+       p.price_check_limit,
+       s.price_checks_used,
+       GREATEST(p.price_check_limit - s.price_checks_used, 0) AS remaining_checks
+FROM user_subscriptions s
+JOIN subscription_plans p ON p.id = s.plan_id
+WHERE s.status = 'active' AND s.price_checks_used > 0;
 ```
 
 ### إدارة الاشتراكات المنتهية
@@ -148,9 +155,9 @@ WHERE expires_at < NOW() AND status = 'active';
 - تأكد من webhook verification
 
 ### حدود الفحص لا تعمل
-- تحقق من `user_subscription_info` view
-- تأكد من أن `price_checks_used` يتم تحديثه
-- راجع cron job لإعادة التعيين اليومي
+- تأكد أن `user_subscriptions.price_checks_used` يتم تحديثه (RPC `log_price_check`)
+- راجع أن `subscription_plans.price_check_limit` مظبوط
+- راجع job إعادة التعيين الشهري `reset_monthly_usage`
 
 ## المراجع
 - [PayPal JavaScript SDK](https://developer.paypal.com/docs/checkout/)

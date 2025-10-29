@@ -192,6 +192,18 @@ export function BackgroundPriceCheckProvider({ children }: BackgroundPriceCheckP
           clearTimeout(timeoutId);
           abortControllersRef.current.delete(taskId);
 
+          // Special-case: Upstream 402 Payment Required bubbled from API route
+          if (response.status === 402) {
+            const errorData = await response.json().catch(() => ({ message: 'Payment required' }));
+            const message = errorData?.message || 'Payment required by data provider. Please upgrade your plan or try again later.';
+            // Mark task failed and stop processing
+            updateTaskStatus('failed', 0, { error: message });
+            if (typeof window !== 'undefined' && window.showNotification) {
+              window.showNotification(`❌ ${message}`, 'error');
+            }
+            return; // Do not continue further
+          }
+
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
             throw new Error(errorData.message || `HTTP ${response.status}`);

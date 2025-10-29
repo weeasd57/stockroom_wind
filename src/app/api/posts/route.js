@@ -244,6 +244,7 @@ export async function POST(request) {
     }
 
     // Log post creation if successful and user is authenticated
+    let rpcUsage = null; // will hold JSON returned from log_post_creation
     if (post && postPayload.user_id && token) {
       try {
         console.log('[PostAPI] 📊 Logging post creation for user:', postPayload.user_id);
@@ -263,6 +264,7 @@ export async function POST(request) {
           console.error('[PostAPI] ❌ Failed to log post creation:', logError);
         } else {
           console.log('[PostAPI] ✅ Post creation logged successfully. Result:', logResult);
+          rpcUsage = logResult;
         }
       } catch (err) {
         console.error('[PostAPI] ❌ Error logging post creation:', err);
@@ -271,7 +273,8 @@ export async function POST(request) {
       console.warn('[PostAPI] ⚠️ Skipping post creation log. post:', !!post, 'user_id:', !!postPayload.user_id, 'token:', !!token);
     }
 
-    return NextResponse.json({ data: post, success: true });
+    // Include updated subscription usage (if available) in the response to avoid stale reads on client
+    return NextResponse.json({ data: post, success: true /* backward compat */, usage: rpcUsage });
   } catch (error) {
     console.error('Unhandled error in POST /api/posts:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

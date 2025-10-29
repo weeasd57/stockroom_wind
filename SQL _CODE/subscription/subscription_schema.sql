@@ -79,6 +79,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Drop existing triggers if they exist to avoid duplicate errors
+DROP TRIGGER IF EXISTS update_subscription_plans_updated_at ON subscription_plans;
+DROP TRIGGER IF EXISTS update_user_subscriptions_updated_at ON user_subscriptions;
+DROP TRIGGER IF EXISTS update_payment_transactions_updated_at ON payment_transactions;
+
+-- Create triggers
 CREATE TRIGGER update_subscription_plans_updated_at BEFORE UPDATE ON subscription_plans FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_user_subscriptions_updated_at BEFORE UPDATE ON user_subscriptions FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_payment_transactions_updated_at BEFORE UPDATE ON payment_transactions FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
@@ -145,6 +151,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Function to log a price check
+-- Returns JSON with updated subscription info to avoid race conditions
 CREATE OR REPLACE FUNCTION log_price_check(
     p_user_id UUID,
     p_symbol VARCHAR(20),
@@ -153,16 +160,28 @@ CREATE OR REPLACE FUNCTION log_price_check(
     p_ip_address INET DEFAULT NULL,
     p_user_agent TEXT DEFAULT NULL
 )
-RETURNS BOOLEAN AS $$
+RETURNS JSON AS $$
 DECLARE
     v_can_check BOOLEAN;
     v_subscription_exists BOOLEAN;
+    v_result JSON;
 BEGIN
     -- Check if user can make the price check
     SELECT check_price_limit(p_user_id) INTO v_can_check;
     
     IF NOT v_can_check THEN
-        RETURN FALSE;
+        -- Return current subscription info even if check fails
+        SELECT json_build_object(
+            'success', FALSE,
+            'price_checks_used', us.price_checks_used,
+            'price_check_limit', sp.price_check_limit,
+            'plan_name', sp.name
+        ) INTO v_result
+        FROM user_subscriptions us
+        JOIN subscription_plans sp ON us.plan_id = sp.id
+        WHERE us.user_id = p_user_id AND us.status = 'active';
+        
+        RETURN COALESCE(v_result, '{"success": false, "price_checks_used": 0}'::JSON);
     END IF;
     
     -- Check if user has an active subscription
@@ -171,15 +190,23 @@ BEGIN
         WHERE user_id = p_user_id AND status = 'active'
     ) INTO v_subscription_exists;
     
-    -- If user has active subscription, increment the counter
+    -- If user has active subscription, increment the counter and return updated data
     IF v_subscription_exists THEN
         UPDATE user_subscriptions 
         SET 
             price_checks_used = COALESCE(price_checks_used, 0) + 1,
             updated_at = NOW()
-        WHERE user_id = p_user_id AND status = 'active';
+        WHERE user_id = p_user_id AND status = 'active'
+        RETURNING (
+            SELECT json_build_object(
+                'success', TRUE,
+                'price_checks_used', price_checks_used,
+                'price_check_limit', (SELECT price_check_limit FROM subscription_plans WHERE id = plan_id),
+                'plan_name', (SELECT name FROM subscription_plans WHERE id = plan_id)
+            )
+        ) INTO v_result;
     ELSE
-        -- Create free subscription if none exists
+        -- Create free subscription if none exists and return new data
         INSERT INTO user_subscriptions (user_id, plan_id, status, price_checks_used, posts_created)
         SELECT p_user_id, sp.id, 'active', 1, 0
         FROM subscription_plans sp
@@ -187,10 +214,18 @@ BEGIN
         ON CONFLICT (user_id, status)
         DO UPDATE SET 
             price_checks_used = COALESCE(user_subscriptions.price_checks_used, 0) + 1,
-            updated_at = NOW();
+            updated_at = NOW()
+        RETURNING (
+            SELECT json_build_object(
+                'success', TRUE,
+                'price_checks_used', user_subscriptions.price_checks_used,
+                'price_check_limit', (SELECT price_check_limit FROM subscription_plans sp WHERE sp.name = 'free'),
+                'plan_name', 'free'
+            )
+        ) INTO v_result;
     END IF;
     
-    RETURN TRUE;
+    RETURN v_result;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -242,28 +277,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create view for easy access to user subscription info
-CREATE OR REPLACE VIEW user_subscription_info AS
-SELECT 
-  u.id as user_id,
-  u.email,
-  s.plan_id,
-  COALESCE(p.name, 'free') as plan_name,
-  COALESCE(p.display_name, 'Free') as plan_display_name,
-  COALESCE(p.price_check_limit, 50) as price_check_limit,
-  COALESCE(s.price_checks_used, 0) as price_checks_used,
-  COALESCE(p.price_check_limit, 50) - COALESCE(s.price_checks_used, 0) as remaining_checks,
-  COALESCE(p.post_creation_limit, 100) as post_creation_limit,
-  COALESCE(s.posts_created, 0) as posts_created,
-  COALESCE(p.post_creation_limit, 100) - COALESCE(s.posts_created, 0) as remaining_posts,
-  s.status as subscription_status,
-  s.started_at as start_date,
-  s.expires_at as end_date
-FROM 
-  auth.users u
-  LEFT JOIN user_subscriptions s ON u.id = s.user_id AND s.status = 'active'
-  LEFT JOIN subscription_plans p ON s.plan_id = p.id;
-
 -- Function to check if user has reached their post creation limit
 CREATE OR REPLACE FUNCTION check_post_limit(p_user_id UUID)
 RETURNS BOOLEAN AS $$
@@ -276,10 +289,9 @@ BEGIN
         COALESCE(p.post_creation_limit, 100),
         COALESCE(s.posts_created, 0)
     INTO v_limit, v_used
-    FROM auth.users u
-    LEFT JOIN user_subscriptions s ON u.id = s.user_id AND s.status = 'active'
+    FROM user_subscriptions s
     LEFT JOIN subscription_plans p ON s.plan_id = p.id
-    WHERE u.id = p_user_id;
+    WHERE s.user_id = p_user_id AND s.status = 'active';
     
     -- Return true if user can create more posts
     RETURN v_used < v_limit;
@@ -288,16 +300,28 @@ $$ LANGUAGE plpgsql;
 
 -- Function to log a post creation
 CREATE OR REPLACE FUNCTION log_post_creation(p_user_id UUID)
-RETURNS BOOLEAN AS $$
+RETURNS JSON AS $$
 DECLARE
     v_can_create BOOLEAN;
     v_subscription_exists BOOLEAN;
+    v_result JSON;
 BEGIN
     -- Check if user can create the post
     SELECT check_post_limit(p_user_id) INTO v_can_create;
     
     IF NOT v_can_create THEN
-        RETURN FALSE;
+        -- Return current subscription info even if check fails
+        SELECT json_build_object(
+            'success', FALSE,
+            'posts_created', us.posts_created,
+            'post_creation_limit', sp.post_creation_limit,
+            'plan_name', sp.name
+        ) INTO v_result
+        FROM user_subscriptions us
+        JOIN subscription_plans sp ON us.plan_id = sp.id
+        WHERE us.user_id = p_user_id AND us.status = 'active';
+        
+        RETURN COALESCE(v_result, '{"success": false, "posts_created": 0}'::JSON);
     END IF;
     
     -- Check if user has an active subscription
@@ -306,15 +330,23 @@ BEGIN
         WHERE user_id = p_user_id AND status = 'active'
     ) INTO v_subscription_exists;
     
-    -- Increment the usage counter
+    -- Increment the usage counter and return updated info with row lock
     IF v_subscription_exists THEN
         UPDATE user_subscriptions 
         SET 
             posts_created = COALESCE(posts_created, 0) + 1,
             updated_at = NOW()
-        WHERE user_id = p_user_id AND status = 'active';
+        WHERE user_id = p_user_id AND status = 'active'
+        RETURNING (
+            SELECT json_build_object(
+                'success', TRUE,
+                'posts_created', user_subscriptions.posts_created,
+                'post_creation_limit', (SELECT post_creation_limit FROM subscription_plans WHERE id = user_subscriptions.plan_id),
+                'plan_name', (SELECT name FROM subscription_plans WHERE id = user_subscriptions.plan_id)
+            )
+        ) INTO v_result;
     ELSE
-        -- Create free subscription if none exists
+        -- Create free subscription if none exists and return new data
         INSERT INTO user_subscriptions (user_id, plan_id, status, price_checks_used, posts_created)
         SELECT p_user_id, sp.id, 'active', 0, 1
         FROM subscription_plans sp
@@ -322,10 +354,18 @@ BEGIN
         ON CONFLICT (user_id, status)
         DO UPDATE SET 
             posts_created = COALESCE(user_subscriptions.posts_created, 0) + 1,
-            updated_at = NOW();
+            updated_at = NOW()
+        RETURNING (
+            SELECT json_build_object(
+                'success', TRUE,
+                'posts_created', user_subscriptions.posts_created,
+                'post_creation_limit', (SELECT post_creation_limit FROM subscription_plans sp WHERE sp.name = 'free'),
+                'plan_name', 'free'
+            )
+        ) INTO v_result;
     END IF;
     
-    RETURN TRUE;
+    RETURN v_result;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -377,6 +417,9 @@ EXCEPTION
     WHEN undefined_object THEN 
         -- Ignore if policies don't exist
         NULL;
+    WHEN undefined_table THEN
+        -- Ignore if tables don't exist yet
+        NULL;
 END $$;
 
 -- Plans are readable by all
@@ -424,7 +467,6 @@ GRANT SELECT ON subscription_plans TO authenticated;
 GRANT SELECT, UPDATE, INSERT ON user_subscriptions TO authenticated;
 GRANT SELECT, INSERT ON price_check_logs TO authenticated;
 GRANT SELECT, INSERT ON payment_transactions TO authenticated;
-GRANT SELECT ON user_subscription_info TO authenticated;
 GRANT EXECUTE ON FUNCTION check_price_limit TO authenticated;
 GRANT EXECUTE ON FUNCTION log_price_check TO authenticated;
 GRANT EXECUTE ON FUNCTION check_post_limit TO authenticated;

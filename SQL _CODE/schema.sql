@@ -468,6 +468,7 @@ SELECT
     p.closed_date,
     p.status,
     p.is_public,
+    p.is_premium_only,
     COALESCE(buy_counts.buy_count, 0) as buy_count,
     COALESCE(sell_counts.sell_count, 0) as sell_count,
     COALESCE(comment_counts.comment_count, 0) as comment_count

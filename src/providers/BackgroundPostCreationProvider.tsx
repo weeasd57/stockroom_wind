@@ -40,7 +40,7 @@ export type StartBackgroundPostCreationInput = {
   imageFile?: File | null; // optional - if provided, provider will upload
   existingImageUrl?: string | null; // optional - if provided, upload is skipped
   title?: string; // optional label for UI
-  onSuccess?: () => void; // callback when post is successfully created
+  onSuccess?: () => void | Promise<void>; // callback when post is successfully created
 };
 
 export type BackgroundPostCreationContextType = {
@@ -209,7 +209,7 @@ export function BackgroundPostCreationProvider({ children }: { children: React.R
         // Call onSuccess callback if provided
         if (input.onSuccess) {
           try {
-            input.onSuccess();
+            await input.onSuccess();
           } catch (err) {
             console.warn('[BackgroundPostCreation] onSuccess callback error:', err);
           }

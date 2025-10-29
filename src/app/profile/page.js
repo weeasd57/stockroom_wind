@@ -75,9 +75,15 @@ export default function Profile() {
     // Debug subscription data
     logger.debug("Subscription Info:", subscription, 'AUTH');
     logger.debug("Subscription Info Details:", {
+      // Price checks
       remaining_checks: subscription?.remaining_checks,
       price_checks_used: subscription?.price_checks_used,
       price_check_limit: subscription?.price_check_limit,
+      // Post creation
+      remaining_posts: subscription?.remaining_posts,
+      posts_created: subscription?.posts_created,
+      post_creation_limit: subscription?.post_creation_limit,
+      // General
       subscriptionLoading
     }, 'AUTH');
     
