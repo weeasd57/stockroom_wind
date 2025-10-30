@@ -5,6 +5,22 @@ import { useSupabase } from './SimpleSupabaseProvider';
 
 const SubscriptionContext = createContext({});
 
+// Default free plan structure
+const defaultFreePlan = {
+  user_id: null,
+  plan_name: 'free',
+  plan_display_name: 'Free',
+  subscription_status: 'active',
+  posts_created: 0,
+  post_creation_limit: 100,
+  remaining_posts: 100,
+  price_checks_used: 0,
+  price_check_limit: 50,
+  remaining_checks: 50,
+  start_date: null,
+  end_date: null
+};
+
 export const useSubscription = () => {
   const context = useContext(SubscriptionContext);
   const hasProvider = Boolean(context && context.__isSubscriptionProvider);

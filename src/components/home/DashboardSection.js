@@ -44,45 +44,26 @@ export function DashboardSection() {
 
   // Update stats whenever provider myStats change (DB-accurate) or fallback to postStats
   useEffect(() => {
-    // Enhanced Debug Logging - LOG EVERYTHING for diagnosis
-    console.group('🔍 [DASHBOARD DEBUG] Stats Update Triggered');
-    console.log('User ID:', user?.id);
-    console.log('Profile Data:', profileData);
-    console.log('My Posts (Array):', {
-      isArray: Array.isArray(myPosts),
-      length: myPosts?.length,
-      posts: myPosts
-    });
-    console.log('My Stats (DB):', myStats);
-    console.log('Post Stats (Computed):', postStats);
-    console.log('My Loading:', myLoading);
-    console.log('Followers List:', {
-      isArray: Array.isArray(followersList),
-      length: followersList?.length,
-      list: followersList
-    });
-    console.log('Following List:', {
-      isArray: Array.isArray(followingList),
-      length: followingList?.length,
-      list: followingList
-    });
-    console.groupEnd();
+    // Only log in development mode to reduce console spam
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📊 [DASHBOARD] Stats update triggered', {
+        hasUser: !!user?.id,
+        hasProfile: !!profileData?.id,
+        myPostsCount: myPosts?.length,
+        hasMyStats: !!myStats
+      });
+    }
 
     if (!user?.id || !profileData?.id) {
-      console.warn('🚨 [DASHBOARD] Missing user or profile data!');
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('🚨 [DASHBOARD] Missing user or profile data!');
+      }
       return;
     }
     
     const userPosts = Array.isArray(myPosts) ? myPosts : [];
     // Prefer DB-backed myStats; fallback to computed postStats when needed
     const computed = (myStats && typeof myStats.totalPosts === 'number') ? myStats : postStats;
-    
-    console.log('📊 [DASHBOARD] Stats Calculation:', {
-      usingMyStats: !!myStats && typeof myStats.totalPosts === 'number',
-      myStatsData: myStats,
-      postStatsData: postStats,
-      finalComputed: computed
-    });
     
     // Calculate follower/following counts
     const followersCount = Array.isArray(followersList)
@@ -92,12 +73,6 @@ export function DashboardSection() {
       ? followingList.length
       : (profileData?.following || 0);
 
-    console.log('👥 [DASHBOARD] Social Counts:', {
-      followersCount,
-      followingCount,
-      experienceScore: profileData?.experience_score || 0
-    });
-
     const finalStats = {
       ...computed,
       followers: followersCount,
@@ -105,76 +80,31 @@ export function DashboardSection() {
       experienceScore: profileData?.experience_score || 0
     };
 
-    console.log('✅ [DASHBOARD] Final Stats Set:', finalStats);
     setStats(finalStats);
-
     setLoading(Boolean(myLoading));
-    
-    console.log('📈 [DASHBOARD] Dashboard Updated:', {
-      userPostsCount: userPosts.length,
-      totalPosts: computed.totalPosts,
-      successfulPosts: computed.successfulPosts,
-      lossPosts: computed.lossPosts,
-      successRate: computed.successRate,
-      followers: followersCount,
-      following: followingCount,
-      experienceScore: profileData?.experience_score || 0,
-      isLoading: Boolean(myLoading),
-      usingMyStats: !!myStats
-    });
   }, [user?.id, profileData, myPosts, postStats, myStats, myLoading, followersList, followingList]);
 
   // Listen for new posts to update stats immediately
   useEffect(() => {
-    console.log('🎧 [DASHBOARD] Setting up post creation listener:', {
-      hasOnPostCreated: !!onPostCreated,
-      userId: user?.id
-    });
-    
     if (!onPostCreated || !user?.id) {
-      console.warn('🚨 [DASHBOARD] Missing onPostCreated or user ID!');
       return;
     }
 
     const unsubscribe = onPostCreated((newPost) => {
-      console.log('🆕 [DASHBOARD] New post event received:', {
-        newPostId: newPost.id,
-        newPostUserId: newPost.user_id,
-        currentUserId: user.id,
-        isMyPost: newPost.user_id === user.id
-      });
-      
       // Only update if it's the current user's post
       if (newPost.user_id === user.id) {
-        console.log('✅ [DASHBOARD] New post is mine, updating stats from myPosts');
-        
         // Refresh DB stats to ensure accurate totals independent of pagination
         try { 
-          console.log('🔄 [DASHBOARD] Refreshing myStats from DB...');
           refreshMyStats();
         } catch (error) {
-          console.error('❌ [DASHBOARD] Error refreshing stats:', error);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('❌ [DASHBOARD] Error refreshing stats:', error);
+          }
         }
         
         // Provider will also update postStats via context; reflect immediately as a fallback
         const currentStats = myStats || postStats;
-        console.log('📊 [DASHBOARD] Updating stats immediately:', {
-          currentMyStats: myStats,
-          currentPostStats: postStats,
-          usingStats: currentStats
-        });
-        
-        setStats(prev => {
-          const newStats = { ...prev, ...currentStats };
-          console.log('📈 [DASHBOARD] Stats updated from prev:', prev, 'to new:', newStats);
-          return newStats;
-        });
-        
-        console.log('✅ [DASHBOARD] Stats after new post:', {
-          totalPosts: (myStats ? myStats.totalPosts : postStats.totalPosts),
-          successfulPosts: (myStats ? myStats.successfulPosts : postStats.successfulPosts),
-          newPostId: newPost.id
-        });
+        setStats(prev => ({ ...prev, ...currentStats }));
       }
     });
 
@@ -183,21 +113,16 @@ export function DashboardSection() {
 
   // Ensure stats are fetched on mount for authenticated user
   useEffect(() => {
-    console.log('🚀 [DASHBOARD] Mount effect - ensuring stats fetch:', {
-      userId: user?.id,
-      hasRefreshMyStats: !!refreshMyStats
-    });
-    
     if (!user?.id) {
-      console.warn('🚨 [DASHBOARD] No user ID on mount!');
       return;
     }
     
     try { 
-      console.log('📊 [DASHBOARD] Calling refreshMyStats on mount...');
       refreshMyStats();
     } catch (error) {
-      console.error('❌ [DASHBOARD] Error refreshing stats on mount:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ [DASHBOARD] Error refreshing stats on mount:', error);
+      }
     }
   }, [user?.id, refreshMyStats]);
 

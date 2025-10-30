@@ -299,50 +299,43 @@ export function ProfileProvider({ children }) {
 
 
   useEffect(() => {
-    console.log('🚀 [PROFILE_PROVIDER] Initial profile fetch useEffect triggered');
-    console.log('🔍 [PROFILE_PROVIDER] Context available:', supabaseContextAvailable);
-    console.log('👤 [PROFILE_PROVIDER] User:', user);
-    
     // Skip if SupabaseProvider is not available or user is not logged in
-    if (!supabaseContextAvailable || !user) {
-      console.warn('🚨 [PROFILE_PROVIDER] Skipping profile fetch - no context or user');
+    if (!supabaseContextAvailable || !user?.id) {
+      if (process.env.NODE_ENV === 'development' && !supabaseContextAvailable) {
+        console.warn('🚨 [PROFILE_PROVIDER] Skipping profile fetch - no context or user');
+      }
       // If we're not in a SupabaseProvider context, just set loading to false
       if (!supabaseContextAvailable) {
-        console.log('📄 [PROFILE_PROVIDER] Setting loading to false (no context)');
         setLoading(false);
       }
       return;
     }
     
-    console.log('📋 [PROFILE_PROVIDER] Calling getUserProfile for user:', user.id);
-    
     getUserProfile(user.id)
       .then((response) => {
-        console.log('✅ [PROFILE_PROVIDER] getUserProfile response:', response);
-        
         if (response.data) {
           // Fix: Ensure we're extracting the profile data correctly from the array
           const profileData = Array.isArray(response.data) ? response.data[0] : response.data;
-          console.log('📈 [PROFILE_PROVIDER] Setting profile data:', profileData);
           setProfile(profileData);
           
           // Check if username exists, if not, ensure it's created
           if (!profileData.username) {
-            console.log('🔧 [PROFILE_PROVIDER] No username found, ensuring username creation');
             ensureUsername(user.id);
           }
         } else if (response.error) {
-          console.error('❌ [PROFILE_PROVIDER] Error in profile response:', response.error);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('❌ [PROFILE_PROVIDER] Error in profile response:', response.error);
+          }
           setError(handleError(response.error));
         }
         
-        console.log('✅ [PROFILE_PROVIDER] Setting loading to false (success)');
         setLoading(false);
       })
       .catch((error) => {
-        console.error('❌ [PROFILE_PROVIDER] Error fetching profile data:', error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ [PROFILE_PROVIDER] Error fetching profile data:', error);
+        }
         setError(handleError(error));
-        console.log('✅ [PROFILE_PROVIDER] Setting loading to false (error)');
         setLoading(false);
       });
   }, [user, supabaseContextAvailable]);

@@ -4,6 +4,7 @@ import 'flag-icons/css/flag-icons.min.css';
 import { ThemeProvider } from "@/providers/theme-provider";
 import { SimpleSupabaseProvider } from '@/providers/SimpleSupabaseProvider';
 import { UserProvider } from '@/providers/UserProvider';
+import { SubscriptionProvider } from '@/providers/SubscriptionProvider';
 import { CreatePostFormProvider } from '@/providers/CreatePostFormProvider';
 import { ProfileProvider } from '@/providers/ProfileProvider';
 import { TradersProvider } from '@/providers/TradersProvider';
@@ -295,7 +296,8 @@ export default function RootLayout({ children }) {
         </Script>
         <SimpleSupabaseProvider>
           <UserProvider>
-            <ProfileProvider>
+            <SubscriptionProvider>
+              <ProfileProvider>
                 <StrategiesProvider>
                   <TradersProvider>
                     <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={false}>
@@ -329,8 +331,9 @@ export default function RootLayout({ children }) {
                   </TradersProvider>
                 </StrategiesProvider>
               </ProfileProvider>
-            </UserProvider>
-          </SimpleSupabaseProvider>
+            </SubscriptionProvider>
+          </UserProvider>
+        </SimpleSupabaseProvider>
       </body>
     </html>
   );
