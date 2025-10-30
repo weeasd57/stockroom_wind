@@ -57,7 +57,7 @@ const currencySymbolFor = (countryOrCode) => {
 export default function CreatePostForm() {
   const { user, supabase } = useSupabase(); // Get the supabase client from the provider
   const { profile, getEffectiveAvatarUrl } = useProfile();
-  const { canCreatePost, incrementPostUsage, getRemainingPosts } = useSubscription();
+  const { canCreatePost, incrementPostUsage, getRemainingPosts, refreshSubscription } = useSubscription();
   const router = useRouter();
   const { tasks, startBackgroundPostCreation, cancelTask } = useBackgroundPostCreation();
   const [initialPrice, setInitialPrice] = useState(null); // Added initialPrice state
@@ -1294,6 +1294,7 @@ export default function CreatePostForm() {
           const result = await incrementPostUsage();
           if (result.success) {
             console.log('[handleSubmit] Post usage incremented successfully');
+            try { await refreshSubscription?.(); } catch (_) {}
           } else {
             console.warn('[handleSubmit] Failed to increment post usage:', result.error);
           }

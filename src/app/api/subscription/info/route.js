@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0; // تعطيل الـ cache تماماً
 
 export async function GET(request) {
   try {
@@ -26,15 +27,36 @@ export async function GET(request) {
 
     const userId = user.id;
 
-    // Use RPC for atomic read - bypasses Supabase query cache
-    const { data: rpcData, error: rpcError } = await supabase
+    // استخدم Service Role مع تعطيل الـ cache تماماً
+    const admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      { 
+        auth: { 
+          persistSession: false, 
+          autoRefreshToken: false, 
+          detectSessionInUrl: false 
+        },
+        // أضف هذا لتعطيل الـ cache في Supabase
+        db: {
+          schema: 'public'
+        },
+        global: {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
+        }
+      }
+    );
+
+    const { data: rpcData, error: adminError } = await admin
       .rpc('get_subscription_info', { p_user_id: userId });
-    
-    if (rpcError) {
-      console.error('[API] RPC error:', rpcError);
+
+    if (adminError) {
       return NextResponse.json({ success: false, message: 'Failed to fetch subscription' }, { status: 500 });
     }
-    
+
     const subscriptionData = rpcData ? {
       user_id: rpcData.user_id,
       plan_id: rpcData.plan_id,
@@ -50,8 +72,6 @@ export async function GET(request) {
       started_at: rpcData.start_date,
       expires_at: rpcData.end_date
     } : null;
-    
-    console.log(`[API] posts_created from RPC: ${subscriptionData?.posts_created}`);
 
     // Default to free plan if no active subscription
     const subscriptionInfo = {
@@ -68,7 +88,9 @@ export async function GET(request) {
       // status and dates
       subscription_status: subscriptionData?.status || null,
       start_date: subscriptionData?.started_at || null,
-      end_date: subscriptionData?.expires_at || null
+      end_date: subscriptionData?.expires_at || null,
+      // أضف timestamp للتحقق
+      fetched_at: new Date().toISOString()
     };
 
     // Calculate remaining usage
@@ -79,9 +101,17 @@ export async function GET(request) {
       (subscriptionInfo.post_creation_limit || 0) - (subscriptionInfo.posts_created || 0), 0
     );
 
-    return NextResponse.json({ success: true, data: subscriptionInfo }, {
-      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' }
-    });
+    return NextResponse.json(
+      { success: true, data: subscriptionInfo }, 
+      {
+        headers: { 
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'Surrogate-Control': 'no-store'
+        }
+      }
+    );
 
   } catch (error) {
     console.error('Error fetching subscription info:', error);

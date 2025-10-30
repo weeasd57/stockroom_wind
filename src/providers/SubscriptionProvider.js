@@ -82,15 +82,31 @@ export const useSubscription = () => {
       
       const res = await fetch('/api/subscription/info', {
         method: 'GET',
-        headers,
-        credentials: 'include'
+        headers: {
+          ...headers,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        credentials: 'include',
+        cache: 'no-store' // مهم جداً - يعطل cache المتصفح
       });
       
       if (!res.ok) throw new Error(`API Error: ${res.status}`);
       const json = await res.json();
       
       if (json.success && json.data) {
-        setSubInfo(json.data);
+        setSubInfo((prev) => {
+          const prevUsed = prev?.posts_created ?? 0;
+          const apiUsed = json.data.posts_created ?? 0;
+          const used = Math.max(prevUsed, apiUsed);
+          const limit = json.data.post_creation_limit ?? prev?.post_creation_limit ?? 100;
+          return {
+            ...json.data,
+            posts_created: used,
+            post_creation_limit: limit,
+            remaining_posts: Math.max(limit - used, 0)
+          };
+        });
         lastFetchTime.current = now;
       } else {
         setSubInfo({ ...fallbackDefault, user_id: user.id });
@@ -155,6 +171,23 @@ export const useSubscription = () => {
       const { data: rpcData, error: rpcError } = await supabase.rpc('log_post_creation', { p_user_id: user.id });
       console.log('[incrementPostUsage] RPC result:', { rpcData, rpcError });
       if (rpcError) throw rpcError;
+
+      // Optimistic UI: apply server-returned posts_created immediately
+      if (rpcData && typeof rpcData.posts_created === 'number') {
+        setSubInfo((prev) => {
+          const limit = prev?.post_creation_limit ?? (typeof rpcData.post_creation_limit === 'number' ? rpcData.post_creation_limit : 100);
+          const used = rpcData.posts_created;
+          return {
+            ...(prev || {}),
+            user_id: user.id,
+            posts_created: used,
+            post_creation_limit: limit,
+            remaining_posts: Math.max(limit - used, 0),
+            plan_name: rpcData.plan_name || prev?.plan_name || 'free'
+          };
+        });
+      }
+
       await fetchInfo(true, { silent: true });
       return { success: true };
     } catch (e) {
@@ -330,8 +363,11 @@ export function SubscriptionProvider({ children }) {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-        }
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        cache: 'no-store' // مهم جداً - يعطل cache المتصفح
       });
 
       console.log('[SUBSCRIPTION PROVIDER] API response received', { status: response.status, ok: response.ok });
@@ -351,18 +387,18 @@ export function SubscriptionProvider({ children }) {
       console.log('[SUBSCRIPTION PROVIDER] API response data:', result);
       
       if (result.success && result.data) {
-        console.log('[SUBSCRIPTION PROVIDER] Setting subscription info:', result.data);
-        console.log('[SUBSCRIPTION PROVIDER] Post Creation Data:', {
-          posts_created: result.data.posts_created,
-          post_creation_limit: result.data.post_creation_limit,
-          remaining_posts: result.data.remaining_posts
+        setSubscriptionInfo((prev) => {
+          const prevUsed = prev?.posts_created ?? 0;
+          const apiUsed = result.data.posts_created ?? 0;
+          const used = Math.max(prevUsed, apiUsed);
+          const limit = result.data.post_creation_limit ?? prev?.post_creation_limit ?? 100;
+          return {
+            ...result.data,
+            posts_created: used,
+            post_creation_limit: limit,
+            remaining_posts: Math.max(limit - used, 0)
+          };
         });
-        console.log('[SUBSCRIPTION PROVIDER] Price Check Data:', {
-          price_checks_used: result.data.price_checks_used,
-          price_check_limit: result.data.price_check_limit,
-          remaining_checks: result.data.remaining_checks
-        });
-        setSubscriptionInfo(result.data);
         lastFetchTime.current = now;
       } else {
         console.log('[SUBSCRIPTION PROVIDER] API response invalid or no data, using fallback');
