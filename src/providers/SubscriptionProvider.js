@@ -18,27 +18,14 @@ export const useSubscription = () => {
   const fetchingRef = useRef(false);
   const lastFetchTime = useRef(0);
 
-  const fallbackDefault = useMemo(() => ({
-    user_id: null,
-    plan_id: null,
-    plan_name: 'free',
-    plan_display_name: 'Free',
-    price_check_limit: 50,
-    price_checks_used: 0,
-    remaining_checks: 50,
-    post_creation_limit: 100,
-    posts_created: 0,
-    remaining_posts: 100,
-    subscription_status: 'active',
-    start_date: null,
-    end_date: null
-  }), []);
+  // No more fallback defaults - data always comes from API
 
   const fetchInfo = useCallback(async (forceRefresh = false, options = { silent: false }) => {
     if (hasProvider) return;
     if (!user?.id || !supabase) {
-      setSubInfo(fallbackDefault);
+      setSubInfo(null);
       setLoading(false);
+      setError('Not authenticated. Please log in.');
       return;
     }
     if (fetchingRef.current) return;
@@ -99,7 +86,7 @@ export const useSubscription = () => {
           const prevUsed = prev?.posts_created ?? 0;
           const apiUsed = json.data.posts_created ?? 0;
           const used = Math.max(prevUsed, apiUsed);
-          const limit = json.data.post_creation_limit ?? prev?.post_creation_limit ?? 100;
+          const limit = json.data.post_creation_limit ?? 100;
           return {
             ...json.data,
             posts_created: used,
@@ -108,18 +95,20 @@ export const useSubscription = () => {
           };
         });
         lastFetchTime.current = now;
+        setError(null);
       } else {
-        setSubInfo({ ...fallbackDefault, user_id: user.id });
+        throw new Error(json.message || 'Failed to fetch subscription data from API');
       }
     } catch (e) {
-      setError(e.message);
-      setSubInfo({ ...fallbackDefault, user_id: user?.id || null });
+      console.error('[useSubscription] Error:', e.message);
+      setError(e.message || 'Failed to load subscription data');
+      setSubInfo(null);
     } finally {
       setLoading(false);
       setSyncing(false);
       fetchingRef.current = false;
     }
-  }, [hasProvider, user?.id, supabase, fallbackDefault]);
+  }, [hasProvider, user?.id, supabase]);
 
   const refresh = useCallback(async () => {
     if (hasProvider) return;
@@ -128,9 +117,9 @@ export const useSubscription = () => {
 
   const getRemainingPosts = useCallback(() => {
     const s = hasProvider ? context.subscriptionInfo : subInfo;
-    if (!s) return 100;
+    if (!s) return 0;
     const used = s.posts_created || 0;
-    const limit = s.post_creation_limit || 100;
+    const limit = s.post_creation_limit || 0;
     return Math.max(0, limit - used);
   }, [hasProvider, context, subInfo]);
 
@@ -219,15 +208,14 @@ export const useSubscription = () => {
     if (user?.id) {
       fetchInfo(false, { silent: true });
     } else {
-      setSubInfo(fallbackDefault);
+      setSubInfo(null);
       setLoading(false);
       setError(null);
     }
-  }, [hasProvider, user?.id, fetchInfo, fallbackDefault]);
+  }, [hasProvider, user?.id, fetchInfo]);
 
   const fallbackValue = useMemo(() => {
-    const currentInfo = subInfo || fallbackDefault;
-    // Removed verbose logging to reduce console noise
+    const currentInfo = subInfo;
     
     return {
       subscriptionInfo: currentInfo,
@@ -242,26 +230,26 @@ export const useSubscription = () => {
       upgradeToProSubscription: async () => ({ success: false, error: 'Not implemented' }),
       cancelSubscription: async () => ({ success: false, error: 'Not implemented' }),
       canPerformPriceCheck,
-      canCreatePost: () => (getRemainingPosts() > 0),
-      isProPlan: () => ((currentInfo?.plan_name || 'free') === 'pro'),
-      getRemainingPriceChecks: () => (currentInfo?.remaining_checks || 0),
+      canCreatePost: () => (currentInfo ? getRemainingPosts() > 0 : false),
+      isProPlan: () => (currentInfo?.plan_name === 'pro'),
+      getRemainingPriceChecks: () => (currentInfo?.remaining_checks ?? 0),
       getRemainingPosts,
       getUsageInfo,
       getSubscriptionMessage: () => null,
       remaining_checks: currentInfo?.remaining_checks,
       price_checks_used: currentInfo?.price_checks_used,
       price_check_limit: currentInfo?.price_check_limit,
-      remaining_posts: currentInfo?.remaining_posts ?? Math.max(0, (currentInfo?.post_creation_limit || 100) - (currentInfo?.posts_created || 0)),
-      posts_created: currentInfo?.posts_created,
-      post_creation_limit: currentInfo?.post_creation_limit,
+      remaining_posts: currentInfo?.remaining_posts ?? (currentInfo ? Math.max(0, (currentInfo.post_creation_limit ?? 0) - (currentInfo.posts_created ?? 0)) : 0),
+      posts_created: currentInfo?.posts_created ?? 0,
+      post_creation_limit: currentInfo?.post_creation_limit ?? 0,
       subscriptionLoading: loading,
       incrementPostUsage,
       incrementPriceCheckUsage,
-      isPro: (currentInfo?.plan_name || 'free') === 'pro',
+      isPro: currentInfo?.plan_name === 'pro',
       usageInfo: getUsageInfo(),
       subscriptionMessage: null
     };
-  }, [subInfo, fallbackDefault, loading, syncing, error, fetchInfo, refresh, canPerformPriceCheck, getRemainingPosts, getUsageInfo, incrementPostUsage, incrementPriceCheckUsage]);
+  }, [subInfo, loading, syncing, error, fetchInfo, refresh, canPerformPriceCheck, getRemainingPosts, getUsageInfo, incrementPostUsage, incrementPriceCheckUsage]);
 
   const value = hasProvider ? context : fallbackValue;
 
@@ -271,33 +259,8 @@ export const useSubscription = () => {
 export function SubscriptionProvider({ children }) {
   const { supabase, user, isAuthenticated } = useSupabase();
   
-  // Debug logging
-  console.log('[SUBSCRIPTION PROVIDER] Component initialized', { 
-    hasUser: !!user, 
-    userId: user?.id, 
-    hasSupabase: !!supabase,
-    isAuthenticated 
-  });
-  
-  // Default free plan state for immediate UI response (memoized)
-  const defaultFreePlan = useMemo(() => ({
-    user_id: null,
-    plan_id: null,
-    plan_name: 'free',
-    plan_display_name: 'Free',
-    price_check_limit: 50,
-    price_checks_used: 0,
-    remaining_checks: 50,
-    post_creation_limit: 100,
-    posts_created: 0,
-    remaining_posts: 100,
-    subscription_status: 'active',
-    start_date: null,
-    end_date: null
-  }), []);
-
-  // State for subscription info - start with default free plan
-  const [subscriptionInfo, setSubscriptionInfo] = useState(defaultFreePlan);
+  // State for subscription info - will be populated from API
+  const [subscriptionInfo, setSubscriptionInfo] = useState(null);
   const [loading, setLoading] = useState(false); // Start as false since we have default data
   const [syncing, setSyncing] = useState(false); // Background sync
   const [error, setError] = useState(null);
@@ -316,31 +279,39 @@ export function SubscriptionProvider({ children }) {
 
   // Optimized fetch subscription info from API with caching
   const fetchSubscriptionInfo = useCallback(async (forceRefresh = false, options = { silent: false }) => {
-    console.log('[SUBSCRIPTION PROVIDER] fetchSubscriptionInfo called', { 
-      userId: user?.id, 
-      hasSupabase: !!supabase,
-      forceRefresh,
-      silent: options.silent
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[SUBSCRIPTION PROVIDER] fetchSubscriptionInfo called', { 
+        userId: user?.id, 
+        hasSupabase: !!supabase,
+        forceRefresh,
+        silent: options.silent
+      });
+    }
 
     if (!user?.id || !supabase) {
-      console.log('[SUBSCRIPTION PROVIDER] No user or supabase, skipping fetch');
-      // Keep a valid default structure so downstream consumers don't see undefined
-      setSubscriptionInfo(prev => prev || defaultFreePlan);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[SUBSCRIPTION PROVIDER] No user or supabase, skipping fetch');
+      }
+      setSubscriptionInfo(null);
       setLoading(false);
+      setError('Not authenticated');
       return;
     }
 
     // Prevent concurrent fetches (even if forceRefresh)
     if (fetchingRef.current) {
-      console.log('[SUBSCRIPTION PROVIDER] Fetch already in progress, skipping');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[SUBSCRIPTION PROVIDER] Fetch already in progress, skipping');
+      }
       return;
     }
 
     // Cache for 10 seconds to avoid excessive API calls (reduced from 30s)
     const now = Date.now();
     if (!forceRefresh && (now - lastFetchTime.current) < 10000) {
-      console.log('[SUBSCRIPTION PROVIDER] Cache still valid, skipping fetch');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[SUBSCRIPTION PROVIDER] Cache still valid, skipping fetch');
+      }
       return;
     }
 
@@ -356,7 +327,9 @@ export function SubscriptionProvider({ children }) {
       
       setError(null);
 
-      console.log('[SUBSCRIPTION PROVIDER] Starting API call to /api/subscription/info');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[SUBSCRIPTION PROVIDER] Starting API call to /api/subscription/info');
+      }
 
       // Use the existing API endpoint for subscription info
       const response = await fetch('/api/subscription/info', {
@@ -370,7 +343,9 @@ export function SubscriptionProvider({ children }) {
         cache: 'no-store' // مهم جداً - يعطل cache المتصفح
       });
 
-      console.log('[SUBSCRIPTION PROVIDER] API response received', { status: response.status, ok: response.ok });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[SUBSCRIPTION PROVIDER] API response received', { status: response.status, ok: response.ok });
+      }
 
       if (!response.ok) {
         // Handle unauthorized error - redirect to login if session expired
@@ -384,7 +359,9 @@ export function SubscriptionProvider({ children }) {
 
       const result = await response.json();
       
-      console.log('[SUBSCRIPTION PROVIDER] API response data:', result);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[SUBSCRIPTION PROVIDER] API response data:', result);
+      }
       
       if (result.success && result.data) {
         setSubscriptionInfo((prev) => {
@@ -400,45 +377,14 @@ export function SubscriptionProvider({ children }) {
           };
         });
         lastFetchTime.current = now;
+        setError(null);
       } else {
-        console.log('[SUBSCRIPTION PROVIDER] API response invalid or no data, using fallback');
-        // Fallback to default free plan
-        const defaultInfo = {
-          user_id: user.id,
-          plan_name: 'free',
-          plan_display_name: 'Free',
-          price_check_limit: 50,
-          price_checks_used: 0,
-          remaining_checks: 50,
-          post_creation_limit: 100,
-          posts_created: 0,
-          remaining_posts: 100,
-          subscription_status: null,
-          start_date: null,
-          end_date: null
-        };
-        setSubscriptionInfo(defaultInfo);
+        throw new Error(result.message || 'No subscription data returned from API');
       }
     } catch (err) {
-      console.error('Error fetching subscription info:', err);
-      setError(err.message);
-      
-      // Set default free plan on error
-      const defaultInfo = {
-        user_id: user.id,
-        plan_name: 'free',
-        plan_display_name: 'Free',
-        price_check_limit: 50,
-        price_checks_used: 0,
-        remaining_checks: 50,
-        post_creation_limit: 100,
-        posts_created: 0,
-        remaining_posts: 100,
-        subscription_status: null,
-        start_date: null,
-        end_date: null
-      };
-      setSubscriptionInfo(defaultInfo);
+      console.error('[SUBSCRIPTION PROVIDER] Error fetching subscription:', err.message);
+      setError(err.message || 'Failed to load subscription data');
+      setSubscriptionInfo(null);
     } finally {
       setLoading(false);
       setSyncing(false);

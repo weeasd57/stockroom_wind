@@ -55,7 +55,7 @@ export async function GET(request) {
       .rpc('get_subscription_info', { p_user_id: userId });
 
     if (adminError) {
-      console.error('[Subscription API] RPC Error:', adminError);
+      console.error('[Subscription API] RPC Error:', adminError.message);
       return NextResponse.json({ 
         success: false, 
         message: 'Failed to fetch subscription',
@@ -64,13 +64,7 @@ export async function GET(request) {
     }
 
     if (!rpcData) {
-      console.error('[Subscription API] No data returned from RPC');
-      console.error('[Subscription API] User ID:', userId);
-      console.error('[Subscription API] This means:');
-      console.error('  1. Function did not auto-create subscription, OR');
-      console.error('  2. Free plan does not exist in subscription_plans, OR');
-      console.error('  3. Old function version is still active');
-      console.error('  → Run DIAGNOSE_ISSUE.sql in Supabase to investigate');
+      console.error(`[Subscription API] No data for user ${userId} - Run DIAGNOSE_ISSUE.sql`);
       
       return NextResponse.json({ 
         success: false, 
@@ -112,13 +106,9 @@ export async function GET(request) {
       subscriptionInfo.post_creation_limit - subscriptionInfo.posts_created, 0
     );
 
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[Subscription API] Data fetched from Supabase:', {
-        userId,
-        plan: subscriptionInfo.plan_name,
-        remaining_checks: subscriptionInfo.remaining_checks,
-        remaining_posts: subscriptionInfo.remaining_posts
-      });
+    // Success - silent (no logging unless DEBUG=true)
+    if (process.env.DEBUG === 'true') {
+      console.log(`[Subscription API] ✓ ${subscriptionInfo.plan_name} - ${subscriptionInfo.remaining_checks}/${subscriptionInfo.price_check_limit} checks`);
     }
 
     return NextResponse.json(
@@ -134,7 +124,7 @@ export async function GET(request) {
     );
 
   } catch (error) {
-    console.error('Error fetching subscription info:', error);
+    console.error('[Subscription API] Error:', error.message);
     return NextResponse.json({ 
       success: false, 
       message: 'Internal Server Error' 
