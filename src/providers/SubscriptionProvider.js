@@ -327,8 +327,21 @@ export function SubscriptionProvider({ children }) {
       
       setError(null);
 
+      // Get session first to ensure we have valid token
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session?.access_token) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[SUBSCRIPTION PROVIDER] No valid session found:', sessionError?.message || 'No access token');
+        }
+        throw new Error('Not authenticated');
+      }
+
       if (process.env.NODE_ENV === 'development') {
-        console.log('[SUBSCRIPTION PROVIDER] Starting API call to /api/subscription/info');
+        console.log('[SUBSCRIPTION PROVIDER] Starting API call to /api/subscription/info', {
+          hasToken: !!session.access_token,
+          tokenPrefix: session.access_token?.substring(0, 20) + '...'
+        });
       }
 
       // Use the existing API endpoint for subscription info
@@ -336,11 +349,11 @@ export function SubscriptionProvider({ children }) {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          'Authorization': `Bearer ${session.access_token}`,
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         },
-        cache: 'no-store' // مهم جداً - يعطل cache المتصفح
+        cache: 'no-store'
       });
 
       if (process.env.NODE_ENV === 'development') {
