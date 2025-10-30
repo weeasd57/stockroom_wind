@@ -1,13 +1,23 @@
--- تحديث الـ function لتكون VOLATILE بدلاً من STABLE
--- هذا يجبر PostgreSQL على إعادة التنفيذ في كل مرة بدون cache
+-- ===================================================================
+-- ⚠️ DEPRECATED - DO NOT USE THIS FILE
+-- ===================================================================
+-- This file has been replaced by: APPLY_FIX_NOW.sql
+-- 
+-- Issue with this implementation:
+-- - Does NOT create subscription records in database
+-- - Returns JSON defaults instead of actual database rows
+-- - New users will NOT have entries in user_subscriptions table
+--
+-- Use instead: APPLY_FIX_NOW.sql
+-- ===================================================================
 
+-- OLD IMPLEMENTATION (DEPRECATED)
 ALTER FUNCTION public.get_subscription_info(UUID) VOLATILE;
 
--- أو إذا كنت تريد إعادة إنشاء الـ function بالكامل:
 CREATE OR REPLACE FUNCTION public.get_subscription_info(p_user_id UUID)
 RETURNS JSON
 LANGUAGE plpgsql
-VOLATILE -- مهم: يجبر PostgreSQL على إعادة التنفيذ في كل مرة
+VOLATILE
 AS $$
 DECLARE
   v_result JSON;
@@ -34,6 +44,7 @@ BEGIN
       'start_date', s.started_at,
       'end_date', s.expires_at
     ),
+    -- ⚠️ PROBLEM: This returns defaults WITHOUT creating database record
     (
       SELECT json_build_object(
         'user_id', p_user_id,

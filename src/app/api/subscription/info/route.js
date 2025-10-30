@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 0; // تعطيل الـ cache تماماً
+export const revalidate = 0;
 
 export async function GET(request) {
   try {
@@ -27,7 +27,7 @@ export async function GET(request) {
 
     const userId = user.id;
 
-    // استخدم Service Role مع تعطيل الـ cache تماماً
+    // Use Service Role with VOLATILE RPC function (no caching)
     const admin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -37,75 +37,95 @@ export async function GET(request) {
           autoRefreshToken: false, 
           detectSessionInUrl: false 
         },
-        // أضف هذا لتعطيل الـ cache في Supabase
         db: {
           schema: 'public'
         },
         global: {
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache'
+            'Pragma': 'no-cache',
+            'Expires': '0'
           }
         }
       }
     );
 
+    // Call RPC function - it will auto-create free subscription if needed
     const { data: rpcData, error: adminError } = await admin
       .rpc('get_subscription_info', { p_user_id: userId });
 
     if (adminError) {
-      return NextResponse.json({ success: false, message: 'Failed to fetch subscription' }, { status: 500 });
+      console.error('[Subscription API] RPC Error:', adminError);
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Failed to fetch subscription',
+        error: adminError.message 
+      }, { status: 500 });
     }
 
-    const subscriptionData = rpcData ? {
+    if (!rpcData) {
+      console.error('[Subscription API] No data returned from RPC');
+      console.error('[Subscription API] User ID:', userId);
+      console.error('[Subscription API] This means:');
+      console.error('  1. Function did not auto-create subscription, OR');
+      console.error('  2. Free plan does not exist in subscription_plans, OR');
+      console.error('  3. Old function version is still active');
+      console.error('  → Run DIAGNOSE_ISSUE.sql in Supabase to investigate');
+      
+      return NextResponse.json({ 
+        success: false, 
+        message: 'No subscription data found',
+        debug: {
+          userId,
+          hint: 'Run SQL _CODE/subscription/DIAGNOSE_ISSUE.sql in Supabase SQL Editor',
+          possibleCauses: [
+            'Function did not auto-create subscription',
+            'Free plan missing in subscription_plans table',
+            'Old function version still active (not VOLATILE)',
+            'APPLY_FIX_NOW.sql was not executed in Supabase'
+          ]
+        }
+      }, { status: 500 });
+    }
+
+    // Data comes DIRECTLY from database (no fallbacks, no native code)
+    const subscriptionInfo = {
       user_id: rpcData.user_id,
       plan_id: rpcData.plan_id,
-      subscription_plans: {
-        name: rpcData.plan_name,
-        display_name: rpcData.plan_display_name,
-        price_check_limit: rpcData.price_check_limit,
-        post_creation_limit: rpcData.post_creation_limit
-      },
+      plan_name: rpcData.plan_name,
+      plan_display_name: rpcData.plan_display_name,
+      price_check_limit: rpcData.price_check_limit,
       price_checks_used: rpcData.price_checks_used,
+      post_creation_limit: rpcData.post_creation_limit,
       posts_created: rpcData.posts_created,
-      status: rpcData.subscription_status,
-      started_at: rpcData.start_date,
-      expires_at: rpcData.end_date
-    } : null;
-
-    // Default to free plan if no active subscription
-    const subscriptionInfo = {
-      user_id: userId,
-      plan_id: subscriptionData?.plan_id || null,
-      plan_name: subscriptionData?.subscription_plans?.name || 'free',
-      plan_display_name: subscriptionData?.subscription_plans?.display_name || 'Free',
-      // price checks
-      price_check_limit: subscriptionData?.subscription_plans?.price_check_limit ?? 50,
-      price_checks_used: subscriptionData?.price_checks_used ?? 0,
-      // posts limits
-      post_creation_limit: subscriptionData?.subscription_plans?.post_creation_limit ?? 100,
-      posts_created: subscriptionData?.posts_created ?? 0,
-      // status and dates
-      subscription_status: subscriptionData?.status || null,
-      start_date: subscriptionData?.started_at || null,
-      end_date: subscriptionData?.expires_at || null,
-      // أضف timestamp للتحقق
+      subscription_status: rpcData.subscription_status,
+      start_date: rpcData.start_date,
+      end_date: rpcData.end_date,
       fetched_at: new Date().toISOString()
     };
 
-    // Calculate remaining usage
+    // Calculate remaining usage from database values
     subscriptionInfo.remaining_checks = Math.max(
-      (subscriptionInfo.price_check_limit || 0) - (subscriptionInfo.price_checks_used || 0), 0
+      subscriptionInfo.price_check_limit - subscriptionInfo.price_checks_used, 0
     );
     subscriptionInfo.remaining_posts = Math.max(
-      (subscriptionInfo.post_creation_limit || 0) - (subscriptionInfo.posts_created || 0), 0
+      subscriptionInfo.post_creation_limit - subscriptionInfo.posts_created, 0
     );
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Subscription API] Data fetched from Supabase:', {
+        userId,
+        plan: subscriptionInfo.plan_name,
+        remaining_checks: subscriptionInfo.remaining_checks,
+        remaining_posts: subscriptionInfo.remaining_posts
+      });
+    }
 
     return NextResponse.json(
       { success: true, data: subscriptionInfo }, 
       {
         headers: { 
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
           'Pragma': 'no-cache',
           'Expires': '0',
           'Surrogate-Control': 'no-store'
