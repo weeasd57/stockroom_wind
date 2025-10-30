@@ -57,7 +57,7 @@ const currencySymbolFor = (countryOrCode) => {
 export default function CreatePostForm() {
   const { user, supabase } = useSupabase(); // Get the supabase client from the provider
   const { profile, getEffectiveAvatarUrl } = useProfile();
-  const { canCreatePost, incrementPostUsage, getRemainingPosts, refreshSubscription } = useSubscription();
+  const { canCreatePost, incrementPostUsage, getRemainingPosts, refreshSubscription, subscription, isPro } = useSubscription();
   const router = useRouter();
   const { tasks, startBackgroundPostCreation, cancelTask } = useBackgroundPostCreation();
   const [initialPrice, setInitialPrice] = useState(null); // Added initialPrice state
@@ -121,6 +121,7 @@ export default function CreatePostForm() {
     setSelectedImageFile,
     selectedImageFile, // Add this missing variable
     setShowStrategyDialog,
+    isPremiumOnly,
   } = useCreatePostForm() || {};
 
   // Create alias for contextDescription to maintain compatibility
@@ -1257,6 +1258,7 @@ export default function CreatePostForm() {
         image_url: candidateUrlDirect || null,
         strategy: selectedStrategy || null,
         is_public: isPublic,
+        is_premium_only: Boolean(isPremiumOnly),
         status: 'open',
         // Human-readable status message required by schema
         status_message: 'open',
@@ -2507,6 +2509,42 @@ export default function CreatePostForm() {
                     </ul>
                   </div>
                 )}
+              </div>
+            )}
+            
+            {(subscription?.plan_name === 'pro' || isPro) && (
+              <div className="form-group">
+                <label className="form-label">Post Access</label>
+                <div
+                  className="form-control"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '10px 12px',
+                  }}
+                >
+                  <input
+                    id="isPremiumOnly"
+                    type="checkbox"
+                    checked={!!isPremiumOnly}
+                    onChange={(e) => updateField('isPremiumOnly', e.target.checked)}
+                    style={{ marginRight: 8 }}
+                  />
+                  <label htmlFor="isPremiumOnly" style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    backgroundColor: '#fef3c7',
+                    color: '#f59e0b',
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    fontWeight: 600
+                  }}>
+                    <span aria-hidden>⭐</span>
+                    Premium Post
+                  </label>
+                </div>
               </div>
             )}
           </div>

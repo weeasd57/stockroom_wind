@@ -143,8 +143,16 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
               </div>
             )
           )}
-          <div className={`${styles.status} ${getStatusColor(post)}`}>
-            {getStatusText(post)}
+          <div className={styles.headerBadges}>
+            {post?.is_premium_only && (
+              <span className={styles.premiumBadge} title="Premium Post">
+                <span aria-hidden>⭐</span>
+                Premium
+              </span>
+            )}
+            <div className={`${styles.status} ${getStatusColor(post)}`}>
+              {getStatusText(post)}
+            </div>
           </div>
         </div>
 

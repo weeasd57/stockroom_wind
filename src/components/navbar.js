@@ -15,11 +15,13 @@ const navigationConfig = {
     { href: '/home', label: 'Home'},
     { href: '/traders', label: 'Traders' },
     { href: '/pricing', label: 'Pricing' },
+    { href: '/contact', label: 'Contact Us' },
   ],
   unauthenticated: [
     { href: '/landing', label: 'Home' },
     { href: '/traders', label: 'Traders' },
     { href: '/pricing', label: 'Pricing' },
+    { href: '/contact', label: 'Contact Us' },
   ]
 };
 

@@ -648,8 +648,8 @@
 /* Simplified toggle button */
 .themeToggleBtn {
   background: var(--button-bg);
-  color: var(--text);
-  border: none;
+  color: var(--primary);
+  border: 1px solid var(--card-border);
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -659,11 +659,23 @@
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 1.25rem;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
 }
 
 .themeToggleBtn:hover {
   background: var(--button-hover);
-  transform: translateY(-2px);
+  transform: translateY(-2px) scale(1.03);
+}
+
+:global(.dark) .themeToggleBtn {
+  color: #ca8a04;
+  border-color: rgba(202, 138, 4, 0.35);
+  background: rgba(202, 138, 4, 0.08);
+  box-shadow: 0 8px 24px rgba(202, 138, 4, 0.2);
+}
+
+:global(.dark) .themeToggleBtn:hover {
+  background: rgba(202, 138, 4, 0.12);
 }
 /* Hero logo responsive size */
 .heroLogo {

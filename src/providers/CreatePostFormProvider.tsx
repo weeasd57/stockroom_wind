@@ -36,6 +36,7 @@ interface CreatePostFormState {
   isSubmitting: boolean;
   dialogOpen: boolean;
   selectedImageFile: File | null; // Added selectedImageFile
+  isPremiumOnly: boolean; // Premium posts flag
 }
 
 interface CreatePostFormContextType extends CreatePostFormState {
@@ -46,6 +47,7 @@ interface CreatePostFormContextType extends CreatePostFormState {
   setIsSubmitting: (value: boolean) => void;
   openDialog: () => void;
   closeDialog: () => void;
+  isOpen: boolean;
   globalStatus: {
     visible: boolean;
     type: string;
@@ -56,7 +58,6 @@ interface CreatePostFormContextType extends CreatePostFormState {
   resetSubmitState: () => void;
   setPriceError: (error: string | null) => void; // Added setPriceError
   setSelectedImageFile: (file: File | null) => void; // Added setSelectedImageFile
-  isOpen: boolean;
 }
 
 const initialState: CreatePostFormState = {
@@ -92,6 +93,7 @@ const initialState: CreatePostFormState = {
   isSubmitting: false,
   dialogOpen: false,
   selectedImageFile: null,
+  isPremiumOnly: false,
 };
 
 const CreatePostFormContext = createContext<CreatePostFormContextType | undefined>(undefined);

@@ -4,17 +4,17 @@
 
 TESTS list {
   
+      * add tap for premium posts in profile
+         and showing just the results for this posts 
+      * when chek post should showing list free , premium 
+      * in feedpost showing tap for premium have filtering list brokers
+
+      إضافة UI للـ premium posts في profile
+      إضافة toggle للـ is_premium_only عند إنشاء post
+      تحديث الـ filtering logic في PostsFeed
+
 }
 
-
-* add tap for primum posts in profile
-   and showing just the results for this posts 
-* when chek post should showing list free , primume 
-* in feedpost showing tap for premium have filtering list brokers
-
-إضافة UI للـ premium posts في profile
-إضافة toggle للـ is_premium_only عند إنشاء post
-تحديث الـ filtering logic في PostsFeed
 
 
 ** add  telegram count follower in view profile 

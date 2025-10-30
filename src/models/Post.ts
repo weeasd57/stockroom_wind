@@ -18,6 +18,7 @@ export interface Post {
   updated_at: Date;
   description?: string;
   is_public: boolean;
+  is_premium_only: boolean;
   status: string;
   target_reached: boolean;
   stop_loss_triggered: boolean;
@@ -59,6 +60,7 @@ export class PostModel implements Post {
   updated_at: Date;
   description?: string;
   is_public: boolean;
+  is_premium_only: boolean;
   status: string;
   target_reached: boolean;
   stop_loss_triggered: boolean;
@@ -99,6 +101,7 @@ export class PostModel implements Post {
     this.updated_at = data.updated_at || new Date();
     this.description = data.description;
     this.is_public = data.is_public || false;
+    this.is_premium_only = (data as any).is_premium_only || false;
     this.status = data.status || '';
     this.target_reached = data.target_reached || false;
     this.stop_loss_triggered = data.stop_loss_triggered || false;
