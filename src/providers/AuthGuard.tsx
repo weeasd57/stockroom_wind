@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useSupabase } from './SimpleSupabaseProvider';
 import '@/styles/auth.css';
 
@@ -16,7 +16,6 @@ const ERROR_PATHS = ['/404', '/500', '/not-found', '/error', '/_error'];
 const AUTH_REDIRECT_TO_PROFILE_PATHS = ['/login', '/register'];
 
 function ProtectedContent({ children, pathname }: { children: React.ReactNode; pathname: string }) {
-  const router = useRouter();
   const { user, loading } = useSupabase();
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -35,16 +34,18 @@ function ProtectedContent({ children, pathname }: { children: React.ReactNode; p
 
     // If user is authenticated and tries to access login/register, redirect to profile
     if (user && AUTH_REDIRECT_TO_PROFILE_PATHS.includes(pathname)) {
-      router.replace('/profile');
+      // Use native browser navigation for instant redirect
+      window.location.href = '/profile';
       return;
     }
 
     // If not authenticated and trying to access protected route, redirect to landing
     if (!user && !isPublicPath) {
-      router.replace('/landing');
+      // Use native browser navigation for instant redirect
+      window.location.href = '/landing';
       return;
     }
-  }, [loading, isInitialized, user, pathname, router]);
+  }, [loading, isInitialized, user, pathname]);
 
   // Show loading while authentication state is being determined
   if (loading || !isInitialized) {

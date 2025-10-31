@@ -1,0 +1,1968 @@
+.analysisContainer {
+  width: 100%;
+  padding: 1.5rem;
+  background: hsl(var(--background));
+}
+
+/* Statistics Grid */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.statCard {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 1.25rem;
+  transition: all 0.3s ease;
+}
+
+.statCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.statLabel {
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.statValue {
+  font-size: 2rem;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  line-height: 1.2;
+}
+
+.statSubtext {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.5rem;
+}
+
+.positive {
+  color: hsl(142, 71%, 45%);
+}
+
+.negative {
+  color: hsl(0, 84%, 60%);
+}
+
+/* Filters (now integrated in viewControls) */
+.filterGroup {
+  display: flex;
+  min-width: 150px;
+  flex: 1;
+}
+
+.filterSelect,
+.filterInput {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.filterSelect:focus,
+.filterInput:focus {
+  outline: none;
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.1);
+}
+
+.filterInput::placeholder {
+  color: hsl(var(--muted-foreground));
+  opacity: 0.6;
+}
+
+/* Data Table */
+.tableContainer {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.tableWrapper {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 600px;
+}
+
+.dataTable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.875rem;
+}
+
+.dataTable thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: hsl(var(--muted));
+}
+
+.dataTable thead th {
+  padding: 0.875rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  border-bottom: 2px solid hsl(var(--border));
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: background-color 0.2s ease;
+}
+
+.dataTable thead th:hover {
+  background: hsl(var(--muted) / 0.8);
+}
+
+.dataTable tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.dataTable tbody tr:hover {
+  background: hsl(var(--muted) / 0.3);
+}
+
+.dataTable tbody tr:nth-child(even) {
+  background: hsl(var(--muted) / 0.1);
+}
+
+.dataTable tbody tr:nth-child(even):hover {
+  background: hsl(var(--muted) / 0.4);
+}
+
+.dataTable tbody td {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+}
+
+/* Table Cell Styles */
+.dateCell {
+  min-width: 180px;
+  font-size: 0.8125rem;
+}
+
+.symbolCell {
+  min-width: 100px;
+  font-weight: 600;
+  color: hsl(var(--primary));
+}
+
+.companyCell {
+  min-width: 180px;
+}
+
+.strategyCell {
+  min-width: 140px;
+}
+
+.countryCell {
+  min-width: 100px;
+}
+
+.sentimentCell {
+  min-width: 100px;
+}
+
+.numberCell {
+  min-width: 100px;
+  text-align: right;
+  font-family: 'Courier New', monospace;
+}
+
+.voteCell {
+  min-width: 80px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.commentCell {
+  min-width: 80px;
+  text-align: center;
+}
+
+.statusCell {
+  min-width: 100px;
+}
+
+.emptyRow {
+  text-align: center;
+  padding: 2rem !important;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badgeSuccess {
+  background: hsl(142, 71%, 45% / 0.1);
+  color: hsl(142, 71%, 45%);
+  border: 1px solid hsl(142, 71%, 45% / 0.3);
+}
+
+.badgeLoss {
+  background: hsl(0, 84%, 60% / 0.1);
+  color: hsl(0, 84%, 60%);
+  border: 1px solid hsl(0, 84%, 60% / 0.3);
+}
+
+.badgeOpen {
+  background: hsl(217, 91%, 60% / 0.1);
+  color: hsl(217, 91%, 60%);
+  border: 1px solid hsl(217, 91%, 60% / 0.3);
+}
+
+/* Sentiment Styles */
+.sentiment {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.sentiment.bullish {
+  background: hsl(142, 71%, 45% / 0.15);
+  color: hsl(142, 71%, 45%);
+}
+
+.sentiment.bearish {
+  background: hsl(0, 84%, 60% / 0.15);
+  color: hsl(0, 84%, 60%);
+}
+
+.sentiment.neutral {
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+}
+
+/* Filters Section */
+.filtersSection {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  align-items: center;
+}
+
+.filtersRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  flex: 1;
+  align-items: center;
+}
+
+/* View Toggle Section */
+.viewToggleSection {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.viewToggleGroup {
+  display: flex;
+  gap: 0.75rem;
+  background: hsl(var(--muted) / 0.5);
+  padding: 0.5rem;
+  border-radius: 8px;
+}
+
+.viewToggleBtn,
+.chartsToggleBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  color: hsl(var(--foreground));
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.viewToggleBtn:hover,
+.chartsToggleBtn:hover {
+  background: hsl(var(--muted));
+  border-color: hsl(var(--primary));
+}
+
+.viewToggleBtn.active {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
+}
+
+.chartsToggleBtn.active {
+  background: hsl(var(--primary) / 0.1);
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary));
+}
+
+/* Charts Section */
+.chartsSection {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+}
+
+.chartsSectionTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  margin-bottom: 1.5rem;
+}
+
+.chartsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+.chartCard {
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.chartHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.chartTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  margin: 0;
+}
+
+.chartToggle {
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.chartToggle:hover {
+  background: hsl(var(--destructive) / 0.1);
+  color: hsl(var(--destructive));
+  border-color: hsl(var(--destructive));
+}
+
+.noData {
+  padding: 2rem;
+  text-align: center;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+  font-size: 0.875rem;
+}
+
+/* Bar Chart - 2D Grouped */
+.barChart2D {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 1rem;
+  height: 250px;
+  padding: 1rem 0;
+  position: relative;
+}
+
+.barGroup2D {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.barCluster {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.25rem;
+  height: 100%;
+  width: 100%;
+  justify-content: center;
+}
+
+.bar2DSuccess,
+.bar2DLoss,
+.bar2DOpen {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 24px;
+  min-height: 10px;
+  border-radius: 4px 4px 0 0;
+  transition: all 0.3s ease;
+  position: relative;
+  padding-bottom: 2px;
+}
+
+.bar2DSuccess {
+  background: linear-gradient(180deg, hsl(142, 71%, 55%) 0%, hsl(142, 71%, 45%) 100%);
+  box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+}
+
+.bar2DLoss {
+  background: linear-gradient(180deg, hsl(0, 84%, 70%) 0%, hsl(0, 84%, 60%) 100%);
+  box-shadow: 0 2px 4px rgba(244, 67, 54, 0.3);
+}
+
+.bar2DOpen {
+  background: linear-gradient(180deg, hsl(217, 91%, 70%) 0%, hsl(217, 91%, 60%) 100%);
+  box-shadow: 0 2px 4px rgba(33, 150, 243, 0.3);
+}
+
+.bar2DSuccess:hover,
+.bar2DLoss:hover,
+.bar2DOpen:hover {
+  transform: translateY(-4px) scale(1.05);
+  filter: brightness(1.1);
+}
+
+.barValue2D {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  margin-bottom: 2px;
+}
+
+.chart2DLegend {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.chart2DLegend .legendItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: hsl(var(--foreground));
+}
+
+.chart2DLegend .legendColor {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Old Bar Chart (kept for other uses) */
+.barChart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 0.5rem;
+  height: 250px;
+  padding: 1rem 0;
+  position: relative;
+}
+
+.barGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 40px;
+}
+
+.barStack {
+  width: 100%;
+  max-width: 50px;
+  min-height: 30px;
+  border-radius: 4px 4px 0 0;
+  position: relative;
+  display: flex;
+  flex-direction: column-reverse;
+  transition: all 0.3s ease;
+  overflow: hidden;
+  background: hsl(var(--muted) / 0.3);
+}
+
+.barStack:hover {
+  transform: translateY(-4px);
+}
+
+.barSuccess {
+  background: hsl(142, 71%, 45%);
+  min-height: 4px;
+  transition: all 0.3s ease;
+}
+
+.barLoss {
+  background: hsl(0, 84%, 60%);
+  min-height: 4px;
+  transition: all 0.3s ease;
+}
+
+.barOpen {
+  background: hsl(217, 91%, 60%);
+  min-height: 4px;
+  transition: all 0.3s ease;
+}
+
+.barSuccess:first-child {
+  border-radius: 4px 4px 0 0;
+}
+
+.barStack:hover .barSuccess,
+.barStack:hover .barLoss,
+.barStack:hover .barOpen {
+  opacity: 0.85;
+}
+
+.barLabel {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  text-align: center;
+}
+
+.barValue {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+/* Line Chart */
+.lineChart {
+  position: relative;
+}
+
+.lineChartSvg {
+  width: 100%;
+  height: 200px;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  background-image: 
+    repeating-linear-gradient(0deg, transparent, transparent 19px, hsl(var(--border) / 0.3) 19px, hsl(var(--border) / 0.3) 20px),
+    repeating-linear-gradient(90deg, transparent, transparent 19px, hsl(var(--border) / 0.3) 19px, hsl(var(--border) / 0.3) 20px);
+  background-size: 20px 20px;
+}
+
+.chartLabels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.chartLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  color: hsl(var(--muted-foreground));
+  text-align: center;
+}
+
+.chartLabel span:last-child {
+  font-weight: 600;
+  color: hsl(142, 71%, 45%);
+}
+
+/* Pie/Strategy Chart */
+.pieChartContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+.pieItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pieBar {
+  width: 100%;
+  height: 24px;
+  background: hsl(var(--muted));
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.pieBarFill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.pieLabel {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+
+.pieName {
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.pieValue {
+  color: hsl(var(--muted-foreground));
+}
+
+/* Horizontal Bar Chart (Country) */
+.horizontalBarChart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+.hBarItem {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.hBarLabel {
+  min-width: 80px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  text-align: right;
+}
+
+.hBarContainer {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hBar {
+  height: 24px;
+  background: hsl(var(--muted));
+  border-radius: 4px;
+  display: flex;
+  overflow: hidden;
+  transition: width 0.3s ease;
+}
+
+.hBarSuccess {
+  background: hsl(142, 71%, 45%);
+  height: 100%;
+}
+
+.hBarLoss {
+  background: hsl(0, 84%, 60%);
+  height: 100%;
+}
+
+.hBarValue {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  min-width: 30px;
+}
+
+/* Donut/Sentiment Chart */
+.donutChart {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.donutItem {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.donutIndicator {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.donutLabel {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.donutName {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  text-transform: capitalize;
+}
+
+.donutValue {
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Multi-Line Chart (Engagement) */
+.multiLineChart {
+  position: relative;
+}
+
+.multiLineChart polyline {
+  opacity: 1;
+}
+
+.multiLineChart circle {
+  opacity: 1;
+  cursor: pointer;
+}
+
+.multiLineChart circle:hover {
+  r: 6;
+  opacity: 0.8;
+}
+
+.engagementLegend {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: hsl(var(--foreground));
+}
+
+.legendColor {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+/* Pie Chart */
+.pieChartSvg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.svgPie {
+  width: 200px;
+  height: 200px;
+}
+
+.pieChartLegend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+/* Treemap */
+.treemapContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-height: 200px;
+  padding: 0.5rem;
+}
+
+.treemapBox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  padding: 1rem;
+  min-width: 80px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  border: 2px solid hsl(var(--background));
+}
+
+.treemapBox:hover {
+  transform: scale(1.05);
+  opacity: 0.9;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.treemapLabel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  color: white;
+  text-align: center;
+}
+
+.treemapStrategy {
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.treemapValue {
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.treemapPercent {
+  font-size: 0.75rem;
+  opacity: 0.9;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Sunburst */
+.sunburstContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem;
+}
+
+.svgSunburst {
+  width: 300px;
+  height: 300px;
+}
+
+.sunburstLegend {
+  display: flex;
+  gap: 2rem;
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.sunburstLegendSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sunburstLegendSection strong {
+  font-size: 0.875rem;
+  color: hsl(var(--foreground));
+  margin-bottom: 0.25rem;
+}
+
+/* Chart Builder Button */
+.chartBuilderBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.chartBuilderBtn:hover {
+  background: hsl(var(--primary) / 0.9);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.chartBuilderBtn:active {
+  transform: translateY(0);
+}
+
+/* Modal Styles */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1rem;
+  backdrop-filter: blur(4px);
+}
+
+.modalContent {
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  max-width: 90vw;
+  width: 90vw;
+  max-height: 90vh;
+  height: 90vh;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid hsl(var(--border));
+  flex-shrink: 0;
+}
+
+.modalTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  margin: 0;
+}
+
+.modalClose {
+  background: hsl(var(--muted));
+  border: none;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.25rem;
+  color: hsl(var(--foreground));
+  transition: all 0.2s ease;
+}
+
+.modalClose:hover {
+  background: hsl(var(--muted) / 0.7);
+  transform: scale(1.05);
+}
+
+.modalBody {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: row;
+  gap: 2rem;
+  flex: 1;
+  overflow: hidden;
+}
+
+.formSide {
+  flex: 0 0 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  overflow-y: auto;
+  padding-right: 1rem;
+}
+
+.previewSide {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.formLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.formInput,
+.formSelect {
+  padding: 0.75rem 1rem;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  color: hsl(var(--foreground));
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.formInput:focus,
+.formSelect:focus {
+  outline: none;
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+}
+
+.previewSection {
+  margin-top: 1rem;
+}
+
+.previewContainer {
+  min-height: 500px;
+  padding: 1.5rem;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.modalFooter {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border-top: 1px solid hsl(var(--border));
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.cancelBtn,
+.createBtn {
+  padding: 0.625rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cancelBtn {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.cancelBtn:hover {
+  background: hsl(var(--muted) / 0.8);
+}
+
+.createBtn {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.createBtn:hover {
+  background: hsl(var(--primary) / 0.9);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Hidden Charts Section */
+.hiddenCharts {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid hsl(var(--border));
+}
+
+.hiddenChartsTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 1rem;
+}
+
+.hiddenChartsButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.showChartBtn {
+  padding: 0.5rem 1rem;
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  color: hsl(var(--foreground));
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.showChartBtn:hover {
+  background: hsl(var(--primary) / 0.1);
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary));
+  transform: translateY(-1px);
+}
+
+/* Calendar View */
+.calendarContainer {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.weekRow {
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.weekRow:last-child {
+  border-bottom: none;
+}
+
+.weekHeader {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: hsl(var(--muted) / 0.5);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.weekHeader:hover {
+  background: hsl(var(--muted) / 0.7);
+}
+
+.collapseBtn {
+  background: none;
+  border: none;
+  color: hsl(var(--foreground));
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  transition: transform 0.2s ease;
+}
+
+.weekLabel {
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  font-size: 0.9375rem;
+}
+
+.weekSummary {
+  margin-left: auto;
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.daysGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1px;
+  background: hsl(var(--border));
+  border-top: 1px solid hsl(var(--border));
+}
+
+.dayColumn {
+  background: hsl(var(--background));
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dayHeader {
+  padding: 0.75rem;
+  background: hsl(var(--muted) / 0.3);
+  border-bottom: 1px solid hsl(var(--border));
+  text-align: center;
+}
+
+.dayName {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  text-transform: uppercase;
+}
+
+.dayDate {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  margin: 0.25rem 0;
+}
+
+.dayCount {
+  font-size: 0.75rem;
+  color: hsl(var(--primary));
+  font-weight: 600;
+}
+
+.dayPosts {
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.calendarPost {
+  background: hsl(var(--muted) / 0.2);
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  padding: 0.5rem;
+  font-size: 0.8125rem;
+  transition: all 0.2s ease;
+}
+
+.calendarPost:hover {
+  background: hsl(var(--muted) / 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.postSymbol {
+  font-weight: 700;
+  color: hsl(var(--primary));
+  margin-bottom: 0.25rem;
+}
+
+.postPrice {
+  font-size: 0.75rem;
+  color: hsl(var(--foreground));
+  font-family: 'Courier New', monospace;
+  margin-bottom: 0.25rem;
+}
+
+.postStatus .badge {
+  font-size: 0.625rem;
+  padding: 0.125rem 0.5rem;
+}
+
+.emptyCalendar {
+  padding: 3rem;
+  text-align: center;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+
+/* Export Section */
+.exportSection {
+  display: flex;
+  justify-content: flex-end;
+  padding: 1rem 0;
+}
+
+.exportButton {
+  padding: 0.75rem 1.5rem;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.exportButton:hover {
+  background: hsl(var(--primary) / 0.9);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px hsl(var(--primary) / 0.3);
+}
+
+.exportButton:active {
+  transform: translateY(0);
+}
+
+/* Dark Mode Adjustments */
+:global(.dark) .statCard {
+  background: hsl(var(--card));
+  border-color: hsl(var(--border));
+}
+
+:global(.dark) .viewToggleSection {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark) .dataTable thead th {
+  background: hsl(240, 10%, 15%);
+  border-bottom-color: hsl(var(--border));
+}
+
+:global(.dark) .dataTable tbody tr:nth-child(even) {
+  background: hsl(240, 10%, 12%);
+}
+
+:global(.dark) .dataTable tbody tr:hover {
+  background: hsl(240, 10%, 18%);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .statsGrid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  
+  .statValue {
+    font-size: 1.5rem;
+  }
+  
+  .tableWrapper {
+    max-height: 500px;
+  }
+  
+  .chartsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .analysisContainer {
+    padding: 1rem;
+  }
+  
+  .statsGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+  
+  .statCard {
+    padding: 1rem;
+  }
+  
+  .statValue {
+    font-size: 1.25rem;
+  }
+  
+  .dataTable {
+    font-size: 0.75rem;
+  }
+  
+  .dataTable thead th,
+  .dataTable tbody td {
+    padding: 0.625rem 0.75rem;
+  }
+  
+  .tableWrapper {
+    max-height: 400px;
+  }
+  
+  /* Charts Responsive */
+  .filtersSection {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+  
+  .filtersRow {
+    width: 100%;
+    flex-direction: column;
+  }
+  
+  .viewToggleSection {
+    padding: 0.75rem;
+    justify-content: center;
+  }
+  
+  .viewToggleGroup {
+    width: auto;
+  }
+  
+  .viewToggleBtn,
+  .chartsToggleBtn {
+    flex: 1;
+    justify-content: center;
+  }
+  
+  .chartsGrid {
+    grid-template-columns: 1fr;
+  }
+  
+  .chartCard {
+    min-width: 0;
+  }
+  
+  .barChart,
+  .barChart2D {
+    height: 200px;
+    gap: 0.5rem;
+  }
+  
+  .bar2DSuccess,
+  .bar2DLoss,
+  .bar2DOpen {
+    width: 20px;
+  }
+  
+  .barLabel {
+    font-size: 0.625rem;
+  }
+  
+  .chart2DLegend {
+    gap: 1rem;
+  }
+  
+  .hBarLabel {
+    min-width: 60px;
+    font-size: 0.75rem;
+  }
+  
+  .pieChartContainer,
+  .horizontalBarChart,
+  .donutChart {
+    font-size: 0.8125rem;
+  }
+  
+  .svgPie {
+    width: 180px;
+    height: 180px;
+  }
+  
+  .treemapContainer {
+    min-height: 180px;
+  }
+  
+  .svgSunburst {
+    width: 260px;
+    height: 260px;
+  }
+  
+  /* Calendar Responsive */
+  .daysGrid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
+  
+  .dayHeader {
+    padding: 0.5rem;
+  }
+  
+  .dayDate {
+    font-size: 1rem;
+  }
+  
+  .weekHeader {
+    padding: 0.75rem 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+  
+  .dataTable thead th,
+  .dataTable tbody td {
+    padding: 0.5rem;
+  }
+  
+  .dateCell {
+    min-width: 140px;
+    font-size: 0.75rem;
+  }
+  
+  .daysGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .barChart,
+  .barChart2D {
+    height: 180px;
+    gap: 0.25rem;
+  }
+  
+  .bar2DSuccess,
+  .bar2DLoss,
+  .bar2DOpen {
+    width: 16px;
+  }
+  
+  .barValue2D {
+    font-size: 0.5rem;
+  }
+  
+  .chart2DLegend {
+    gap: 0.75rem;
+    font-size: 0.8125rem;
+  }
+  
+  .chart2DLegend .legendColor {
+    width: 12px;
+    height: 12px;
+  }
+  
+  .barStack {
+    min-height: 20px;
+  }
+  
+  .chartLabels {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .hBarLabel {
+    min-width: 50px;
+    font-size: 0.75rem;
+  }
+  
+  .hBarValue {
+    font-size: 0.75rem;
+  }
+  
+  .engagementLegend {
+    gap: 0.75rem;
+    font-size: 0.75rem;
+  }
+  
+  .hiddenChartsButtons {
+    gap: 0.5rem;
+  }
+  
+  .showChartBtn {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+  
+  .svgPie {
+    width: 160px;
+    height: 160px;
+  }
+  
+  .treemapContainer {
+    min-height: 150px;
+  }
+  
+  .treemapBox {
+    min-width: 60px;
+    padding: 0.75rem;
+  }
+  
+  .treemapStrategy {
+    font-size: 0.75rem;
+  }
+  
+  .treemapValue {
+    font-size: 1rem;
+  }
+  
+  .svgSunburst {
+    width: 220px;
+    height: 220px;
+  }
+  
+  .sunburstLegend {
+    gap: 1rem;
+  }
+  
+  .sunburstLegendSection {
+    font-size: 0.8125rem;
+  }
+  
+  .modalContent {
+    max-width: 95vw;
+    width: 95vw;
+    max-height: 90vh;
+    height: 90vh;
+  }
+  
+  .modalHeader,
+  .modalBody,
+  .modalFooter {
+    padding: 1rem;
+  }
+  
+  .modalTitle {
+    font-size: 1.125rem;
+  }
+  
+  .chartBuilderBtn {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8125rem;
+  }
+  
+  .previewContainer {
+    min-height: 300px;
+  }
+  
+  .modalBody {
+    flex-direction: column;
+    gap: 1rem;
+    overflow-y: auto;
+  }
+  
+  .formSide {
+    flex: 1;
+    padding-right: 0;
+  }
+  
+  .previewSide {
+    flex: 1;
+  }
+}
+
+/* Grid View Styles */
+.gridContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
+
+.gridCard {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  padding: 1.25rem;
+  transition: all 0.2s ease;
+}
+
+.gridCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  border-color: hsl(var(--primary));
+}
+
+.gridCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.gridSymbol {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: hsl(var(--primary));
+}
+
+.gridCardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.gridCompany {
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.gridPrice {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.gridMeta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  padding-top: 0.5rem;
+  border-top: 1px solid hsl(var(--border));
+}
+
+/* Timeline View Styles */
+.timelineContainer {
+  padding: 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.timelineItem {
+  display: grid;
+  grid-template-columns: 120px 40px 1fr;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.timelineDate {
+  text-align: right;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  padding-top: 0.5rem;
+}
+
+.timelineDot {
+  width: 16px;
+  height: 16px;
+  background: hsl(var(--primary));
+  border-radius: 50%;
+  border: 3px solid hsl(var(--background));
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2);
+  position: relative;
+  margin-top: 0.5rem;
+}
+
+.timelineDot::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: calc(100% + 2rem);
+  background: linear-gradient(to bottom, hsl(var(--primary)), transparent);
+}
+
+.timelineItem:last-child .timelineDot::after {
+  display: none;
+}
+
+.timelineContent {
+  padding-bottom: 1rem;
+}
+
+.timelineCard {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  padding: 1.25rem;
+  transition: all 0.2s ease;
+}
+
+.timelineCard:hover {
+  transform: translateX(8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  border-color: hsl(var(--primary));
+}
+
+.timelineHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.timelineSymbol {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: hsl(var(--primary));
+}
+
+.timelineBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.timelineCompany {
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.timelineDetails {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.5rem;
+  border-top: 1px solid hsl(var(--border));
+}
+
+.timelinePrice {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.timelineStrategy {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Kanban View Styles */
+.kanbanContainer {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
+
+.kanbanColumn {
+  background: hsl(var(--muted) / 0.3);
+  border-radius: 12px;
+  padding: 1rem;
+  min-height: 400px;
+}
+
+.kanbanHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: hsl(var(--card));
+  border-radius: 8px;
+  border: 1px solid hsl(var(--border));
+}
+
+.kanbanTitle {
+  font-weight: 700;
+  font-size: 1rem;
+  color: hsl(var(--foreground));
+}
+
+.kanbanCount {
+  background: hsl(var(--primary));
+  color: white;
+  padding: 0.25rem 0.625rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.kanbanCards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.kanbanCard {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 1rem;
+  transition: all 0.2s ease;
+  cursor: grab;
+}
+
+.kanbanCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: hsl(var(--primary));
+}
+
+.kanbanCard:active {
+  cursor: grabbing;
+}
+
+.kanbanSymbol {
+  font-weight: 700;
+  font-size: 1rem;
+  color: hsl(var(--primary));
+  margin-bottom: 0.5rem;
+}
+
+.kanbanCompany {
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 0.75rem;
+}
+
+.kanbanPrice {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  margin-bottom: 0.5rem;
+}
+
+.kanbanStrategy {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  padding-top: 0.5rem;
+  border-top: 1px solid hsl(var(--border));
+}
+
+/* Empty State */
+.emptyState {
+  padding: 3rem;
+  text-align: center;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.9375rem;
+}
+
+/* Responsive Styles for New Views */
+@media (max-width: 1024px) {
+  .kanbanContainer {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .timelineItem {
+    grid-template-columns: 100px 30px 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .gridContainer {
+    grid-template-columns: 1fr;
+    padding: 1rem;
+  }
+  
+  .timelineContainer {
+    padding: 1rem;
+  }
+  
+  .timelineItem {
+    grid-template-columns: 80px 24px 1fr;
+    gap: 0.75rem;
+  }
+  
+  .kanbanContainer {
+    padding: 1rem;
+  }
+  
+  .modalBody {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  
+  .formSide {
+    flex: 1;
+    min-width: 100%;
+    padding-right: 0;
+  }
+  
+  .previewSide {
+    flex: 1;
+    min-width: 100%;
+  }
+}

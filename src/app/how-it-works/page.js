@@ -98,6 +98,34 @@ export default function HowItWorksPage() {
         'Social media links',
         'Telegram bot subscription'
       ]
+    },
+    {
+      id: 'analysis-charts',
+      title: 'Analysis Tab & Performance Charts',
+      description: 'Visualize your trading data with comprehensive analytics dashboard. View 6 interactive charts including posts per month, success rate over time, posts by strategy, country distribution, sentiment analysis, and engagement metrics.',
+      image: '/how work it/screencapture-localhost-3000-profile-2025-10-31-20_42_00.png',
+      highlights: [
+        'Interactive performance charts',
+        'Posts per month visualization',
+        'Success rate tracking over time',
+        'Strategy and country breakdowns',
+        'Sentiment analysis indicators',
+        'Engagement metrics monitoring'
+      ]
+    },
+    {
+      id: 'custom-charts',
+      title: 'Create Custom Charts',
+      description: 'Build your own custom charts to analyze your trading data exactly how you want. Choose from multiple chart types (pie, bar, line) and data sources to create personalized visualizations that matter to you.',
+      image: '/how work it/create custom chart.png',
+      highlights: [
+        'Multiple chart types (Pie, Bar, Line)',
+        'Flexible data sources selection',
+        'Real-time chart preview',
+        'Customize chart names',
+        'Analyze post status, strategies, and more',
+        'Save and manage your custom charts'
+      ]
     }
   ];
 

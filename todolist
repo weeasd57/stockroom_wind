@@ -17,9 +17,10 @@ TESTS list {
 
 
 
-** add  telegram count follower in view profile 
-** add analysis page for every trader howmatch earn
-   persentage for sussces post and lose post and more statics
-   and some charts
 
-
+*** long errors ***
+{
+  * SSR [15 day] ueseffect in supabase provider,
+  * update remining planes [2 days] from rpc sql funcation ,
+}
+********************

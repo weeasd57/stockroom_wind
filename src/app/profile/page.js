@@ -27,6 +27,7 @@ import FollowersDialog from '@/components/profile/FollowersDialog';
 import logger from '@/utils/logger';
 import SocialLinks from '@/components/profile/SocialLinks';
 import { useBackgroundProfileEdit } from '@/providers/BackgroundProfileEditProvider';
+import AnalysisTab from '@/components/profile/AnalysisTab';
 
 export default function Profile() {
   const { supabase, user, isAuthenticated, isLoading: authLoading } = useSupabase();
@@ -59,7 +60,7 @@ export default function Profile() {
   // Get dialog state at the component level - MUST be before any conditions
   const { isOpen, closeDialog } = useCreatePostForm();
   const { submitProfileEdit } = useBackgroundProfileEdit();
-  // Read URL query params (e.g., ?tab=telegram)
+  // Read URL query params (e.g., ?tab=telegram or ?tab=analysis)
   const searchParams = useSearchParams();
 
   // Debug authentication on mount
@@ -103,11 +104,11 @@ export default function Profile() {
     }
   }, [isAuthenticated, user, authLoading, isLoading, profile, subscription, subscriptionLoading]);
 
-  // Initialize active tab from query param (e.g., /profile?tab=telegram)
+  // Initialize active tab from query param (e.g., /profile?tab=telegram or ?tab=analysis)
   useEffect(() => {
     try {
       const tab = searchParams?.get('tab');
-      const allowed = ['posts', 'strategies', 'telegram'];
+      const allowed = ['posts', 'strategies', 'telegram', 'analysis'];
       if (tab && allowed.includes(tab) && tab !== activeTab) {
         setActiveTab(tab);
       }
@@ -127,7 +128,7 @@ export default function Profile() {
 
   // Guard: ensure activeTab is one of the allowed tabs
   useEffect(() => {
-    const allowed = ['posts', 'strategies', 'telegram'];
+    const allowed = ['posts', 'strategies', 'telegram', 'analysis'];
     if (!allowed.includes(activeTab)) {
       setActiveTab('posts');
     }
@@ -1414,6 +1415,18 @@ export default function Profile() {
           </svg>
           Telegram Bot
         </button>
+        <button 
+          className={`${styles.tabButton} ${activeTab === 'analysis' ? styles.activeTab : ''}`}
+          onClick={() => handleTabChange('analysis')}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 3v18h18"></path>
+            <path d="M18 17V9"></path>
+            <path d="M13 17V5"></path>
+            <path d="M8 17v-3"></path>
+          </svg>
+          Analysis
+        </button>
       </div>
 
       {/* Content Section */}
@@ -1943,6 +1956,10 @@ export default function Profile() {
 
         {activeTab === 'telegram' && (
           <TelegramBotManagement />
+        )}
+
+        {activeTab === 'analysis' && (
+          <AnalysisTab userId={user?.id} posts={posts} />
         )}
       </div>
       
