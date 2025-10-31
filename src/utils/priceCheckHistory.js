@@ -308,13 +308,35 @@ export const triggerHistoricalTelegramNotifications = async (userId, historyEntr
           }
         }
 
+        // Get subscribers first
+        const subsResponse = await fetch('/api/telegram/subscribers', {
+          credentials: 'include',
+          headers
+        });
+
+        if (!subsResponse.ok) {
+          console.warn(`[PriceCheckHistory] ⚠️ Failed to fetch subscribers for entry ${entry.id}`);
+          continue;
+        }
+
+        const subsData = await subsResponse.json();
+        const subscribers = subsData.subscribers || [];
+
+        if (subscribers.length === 0) {
+          console.warn(`[PriceCheckHistory] ⚠️ No subscribers found for entry ${entry.id}`);
+          continue;
+        }
+
+        // Send broadcast with correct parameter names
         const response = await fetch('/api/telegram/send-broadcast', {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            postIds: significantPosts.map(p => p.id),
+            selectedPosts: significantPosts.map(p => p.id),  // ✅ Correct name
             title: `Historical Price Update - ${new Date(entry.timestamp).toLocaleDateString()}`,
-            comment: `Automated notification for ${significantPosts.length} posts with price targets/stop losses triggered`,
+            message: `Automated notification for ${significantPosts.length} posts with price targets/stop losses triggered`,  // ✅ Correct name
+            selectedRecipients: subscribers.map(s => s.id),  // ✅ Required field
+            recipientType: 'followers',
             isHistoricalNotification: true
           }),
           credentials: 'include'

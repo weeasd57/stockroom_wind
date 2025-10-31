@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@/providers/theme-provider';
+import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import dynamic from 'next/dynamic';
 import styles from '@/styles/landing.module.css';
 import { getCountrySymbolCounts } from '@/utils/symbolSearch';
@@ -19,12 +20,20 @@ export default function LandingPage() {
   const [hoverButton, setHoverButton] = useState(null);
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const { user, loading } = useSupabase();
   const [countsLoading, setCountsLoading] = useState(true);
   const [counts, setCounts] = useState(null);
   const [displayedCount, setDisplayedCount] = useState(12); // Show 12 countries initially
 
   // Optimize scroll listener with useCallback and requestAnimationFrame
   const [scrollPosition, setScrollPosition] = useState(0);
+
+  // Redirect authenticated users to home
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace('/home');
+    }
+  }, [user, loading, router]);
   
   const handleScroll = useCallback(() => {
     // Use requestAnimationFrame to limit scroll updates
@@ -154,6 +163,30 @@ export default function LandingPage() {
     setDisplayedCount(prev => prev + 12); // Load 12 more countries
   };
   
+  // Show loading while checking authentication
+  if (loading) {
+    return (
+      <div className="auth-loading-screen">
+        <div className="auth-loading-content">
+          <div className="auth-loading-spinner"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render landing page if user is authenticated (redirect in progress)
+  if (user) {
+    return (
+      <div className="auth-loading-screen">
+        <div className="auth-loading-content">
+          <div className="auth-loading-spinner"></div>
+          <p>Redirecting...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.variables} style={{ opacity: visible ? 1 : 0, transition: 'opacity 0.3s ease' }}>
       <div className={styles.pageWrapper}>

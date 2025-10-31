@@ -86,13 +86,33 @@ export default function PriceCheckResultsDialog({
         }
       }
 
+      // First, get subscribers for the broadcast
+      const subsResponse = await fetch('/api/telegram/subscribers', {
+        credentials: 'include',
+        headers
+      });
+
+      if (!subsResponse.ok) {
+        throw new Error('Failed to fetch subscribers. Please ensure your Telegram bot is set up.');
+      }
+
+      const subsData = await subsResponse.json();
+      const subscribers = subsData.subscribers || [];
+
+      if (subscribers.length === 0) {
+        throw new Error('No subscribers found. Please ensure users have subscribed to your Telegram bot.');
+      }
+
+      // Send broadcast with correct parameter names
       const response = await fetch('/api/telegram/send-broadcast', {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          postIds: selectedForBroadcast,
+          selectedPosts: selectedForBroadcast,  // ✅ Correct name
           title: tgTitle || 'Price Check Update',
-          comment: tgComment
+          message: tgComment || '',  // ✅ Correct name
+          selectedRecipients: subscribers.map(s => s.id),  // ✅ Required field
+          recipientType: 'followers'
         }),
         credentials: 'include'
       });
