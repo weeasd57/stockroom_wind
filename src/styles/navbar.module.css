@@ -441,6 +441,7 @@
     left: 0;
     right: 0;
     height: calc(100vh - var(--navbar-height)); /* Calculate height dynamically */
+    max-height: calc(100vh - var(--navbar-height)); /* Prevent overflow */
     background-color: var(--navbar-bg); /* Changed to solid red background */
     /* backdrop-filter: blur(var(--navbar-blur)); */ /* Removed backdrop-filter for full opacity */
     /* border: 1px solid var(--navbar-border); */ /* Removed border */
@@ -449,6 +450,7 @@
     visibility: hidden;
     transition: all var(--animation-normal) var(--animation-ease);
     z-index: 9999; /* Adjusted z-index to ensure it covers all content */
+    overflow: hidden; /* Prevent body scroll when menu is closed */
   }
 
 .mobileMenu.open {
@@ -460,10 +462,16 @@
 .mobileMenuContent {
   height: 100%;
   width: 100%;
+  max-height: 100%;
   box-sizing: border-box; /* Include padding in height calculation */
   display: flex;
   flex-direction: column;
-  padding: 2rem 1rem;
+  padding: 1.5rem 1rem;
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom)); /* Safe area for bottom */
+  overflow-y: auto; /* Enable vertical scrolling */
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  scroll-behavior: smooth;
 }
 
 .mobileNav {
@@ -480,8 +488,9 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 2rem;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  flex-shrink: 0; /* Prevent shrinking when scrolling */
 }
 
 .mobileNavItem {
@@ -491,9 +500,11 @@
 }
 
 .mobileMenu.open .mobileNavItem:nth-child(1) { animation-delay: 100ms; }
-.mobileMenu.open .mobileNavItem:nth-child(2) { animation-delay: 200ms; }
-.mobileMenu.open .mobileNavItem:nth-child(3) { animation-delay: 300ms; }
-.mobileMenu.open .mobileNavItem:nth-child(4) { animation-delay: 400ms; }
+.mobileMenu.open .mobileNavItem:nth-child(2) { animation-delay: 150ms; }
+.mobileMenu.open .mobileNavItem:nth-child(3) { animation-delay: 200ms; }
+.mobileMenu.open .mobileNavItem:nth-child(4) { animation-delay: 250ms; }
+.mobileMenu.open .mobileNavItem:nth-child(5) { animation-delay: 300ms; }
+.mobileMenu.open .mobileNavItem:nth-child(6) { animation-delay: 350ms; }
 
 .mobileNavLink {
   display: flex;
@@ -529,8 +540,34 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  padding-top: 1rem;
+  padding-top: 1.5rem;
+  padding-bottom: 0.5rem;
   border-top: 1px solid hsl(var(--border));
+  flex-shrink: 0; /* Prevent shrinking */
+}
+
+/* Custom Scrollbar for Mobile Menu */
+.mobileMenuContent::-webkit-scrollbar {
+  width: 6px;
+}
+
+.mobileMenuContent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mobileMenuContent::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+
+.mobileMenuContent::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* For Firefox */
+.mobileMenuContent {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
 }
 
 .mobileThemeToggle {
@@ -779,16 +816,73 @@
   /* Better mobile menu spacing */
   .mobileMenuContent {
     padding: 1.25rem 0.75rem;
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom)); /* Safe area for notch devices */
   }
 
   .mobileNavList {
-    gap: 0.375rem;
+    gap: 0.5rem;
     margin-bottom: 1.25rem;
   }
 
   .mobileNavLink {
+    padding: 0.875rem 0.75rem;
+    font-size: 1rem;
+  }
+
+  .mobileActions {
+    gap: 0.75rem;
+    padding-top: 1rem;
+  }
+
+  .mobileProfileButton,
+  .mobileLogoutButton,
+  .mobileSignInButton {
     padding: 0.75rem;
     font-size: 0.95rem;
+  }
+}
+
+/* Extra small devices (very small phones) */
+@media (max-width: 360px) {
+  .mobileMenuContent {
+    padding: 1rem 0.5rem;
+  }
+
+  .mobileNavList {
+    gap: 0.375rem;
+  }
+
+  .mobileNavLink {
+    padding: 0.75rem 0.625rem;
+    font-size: 0.9rem;
+  }
+
+  .logoText {
+    font-size: 1rem;
+  }
+
+  .mobileActions {
+    gap: 0.5rem;
+  }
+}
+
+/* Landscape orientation on mobile */
+@media (max-width: 899px) and (orientation: landscape) {
+  .mobileMenuContent {
+    padding: 1rem;
+  }
+
+  .mobileNavList {
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .mobileNavLink {
+    padding: 0.625rem 0.875rem;
+  }
+
+  .mobileActions {
+    padding-top: 1rem;
   }
 }
 

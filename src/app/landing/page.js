@@ -236,7 +236,12 @@ export default function LandingPage() {
               >
                 Get Started
               </button>
-              
+              <button 
+                className={styles.secondaryButton}
+                onClick={() => router.push('/how-it-works')}
+              >
+                How it Works
+              </button>
             </div>
             
             {/* Core Features Grid */}
