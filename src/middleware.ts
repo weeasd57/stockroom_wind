@@ -18,14 +18,32 @@ function generateNonce(): string {
   return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
+// Public routes that don't require authentication
+const publicRoutes = [
+  '/',
+  '/landing',
+  '/login',
+  '/signup',
+  '/auth/callback',
+  '/pricing',
+  '/how-it-works',
+  '/contact',
+  '/admin', // Admin has its own authentication
+  '/api/admin', // Admin API routes
+]
+
 export async function middleware(req: NextRequest) {
   const nonce = generateNonce()
   const isDev = process.env.NODE_ENV !== 'production'
   const isApiRoute = req.nextUrl.pathname.startsWith('/api/')
+  const isPublicRoute = publicRoutes.some(route => 
+    req.nextUrl.pathname === route || req.nextUrl.pathname.startsWith(route + '/')
+  )
 
   // Pass nonce to the rest of the app via request headers
   const requestHeaders = new Headers(req.headers)
   requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set('x-is-public-route', isPublicRoute ? 'true' : 'false')
 
   const paypal = "https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com"
   const googleFonts = "https://fonts.googleapis.com https://fonts.gstatic.com"

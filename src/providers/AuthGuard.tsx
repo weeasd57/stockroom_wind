@@ -9,7 +9,8 @@ import '@/styles/auth.css';
 const PUBLIC_PATHS = ['/landing', '/login', '/register', '/auth/callback', '/traders', '/pricing', '/checkout', '/contact', '/how-it-works'];
 
 // Define path prefixes that should be public (for dynamic routes)
-const PUBLIC_PATH_PREFIXES = ['/view-profile/'];
+// Include '/admin' so admin routes handle their own auth inside the page
+const PUBLIC_PATH_PREFIXES = ['/view-profile/', '/admin'];
 // Define error paths that should bypass authentication completely
 const ERROR_PATHS = ['/404', '/500', '/not-found', '/error', '/_error'];
 
@@ -18,6 +19,9 @@ const AUTH_REDIRECT_TO_PROFILE_PATHS = ['/login', '/register'];
 function ProtectedContent({ children, pathname }: { children: React.ReactNode; pathname: string }) {
   const { user, loading } = useSupabase();
   const [isInitialized, setIsInitialized] = useState(false);
+  // Compute public path once and reuse everywhere
+  const isPublicPath = PUBLIC_PATHS.includes(pathname) || 
+    PUBLIC_PATH_PREFIXES.some(prefix => pathname.startsWith(prefix));
 
   useEffect(() => {
     if (!loading) {
@@ -27,10 +31,7 @@ function ProtectedContent({ children, pathname }: { children: React.ReactNode; p
 
   // Handle navigation redirects in useEffect to avoid render phase updates
   useEffect(() => {
-    if (loading || !isInitialized) return;
-
-    const isPublicPath = PUBLIC_PATHS.includes(pathname) || 
-      PUBLIC_PATH_PREFIXES.some(prefix => pathname.startsWith(prefix));
+    if (loading || !isInitialized || isPublicPath) return;
 
     // If user is authenticated and tries to access login/register, redirect to profile
     if (user && AUTH_REDIRECT_TO_PROFILE_PATHS.includes(pathname)) {
@@ -47,8 +48,8 @@ function ProtectedContent({ children, pathname }: { children: React.ReactNode; p
     }
   }, [loading, isInitialized, user, pathname]);
 
-  // Show loading while authentication state is being determined
-  if (loading || !isInitialized) {
+  // Show loading while authentication state is being determined (only for protected paths)
+  if (!isPublicPath && (loading || !isInitialized)) {
     return (
       <div className="auth-loading-screen">
         <div className="auth-loading-content">
@@ -59,9 +60,9 @@ function ProtectedContent({ children, pathname }: { children: React.ReactNode; p
     );
   }
 
-  // Check if current path is public
-  const isPublicPath = PUBLIC_PATHS.includes(pathname) || 
-    PUBLIC_PATH_PREFIXES.some(prefix => pathname.startsWith(prefix));
+  // Check if current path is public (computed above)
+  // const isPublicPath = PUBLIC_PATHS.includes(pathname) || 
+  //   PUBLIC_PATH_PREFIXES.some(prefix => pathname.startsWith(prefix));
 
   // If user is authenticated and tries to access login/register, show loading during redirect
   if (user && AUTH_REDIRECT_TO_PROFILE_PATHS.includes(pathname)) {
