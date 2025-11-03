@@ -475,64 +475,38 @@ export function SubscriptionProvider({ children }) {
     }
 
     try {
-      console.log('[SUBSCRIPTION] Calling create_pro_subscription RPC function');
-      
-      // Add timeout to RPC call to prevent hanging
-      const rpcPromise = supabase.rpc('create_pro_subscription', {
-        p_user_id: user.id,
-        p_paypal_order_id: paymentDetails.paypal_order_id || 'manual'
+      // Obtain access token to authenticate server route
+      const { data: sess } = await supabase.auth.getSession();
+      const accessToken = sess?.session?.access_token || null;
+
+      const res = await fetch('/api/subscription/upgrade', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+        },
+        body: JSON.stringify({
+          orderId: paymentDetails.paypal_order_id || paymentDetails.orderId || 'manual',
+          captureId: paymentDetails.paypal_capture_id || paymentDetails.captureId || null,
+          amount: parseFloat(paymentDetails.amount) || 7.00,
+          currency: paymentDetails.currency || 'USD'
+        })
       });
 
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('RPC timeout after 60 seconds')), 60000)
-      );
-
-      const { data, error } = await Promise.race([rpcPromise, timeoutPromise]);
-
-      console.log('[SUBSCRIPTION] RPC response:', { data, error });
-
-      if (error) {
-        console.error('[SUBSCRIPTION] RPC function failed:', error);
-        console.error('[SUBSCRIPTION] Error details:', JSON.stringify(error, null, 2));
-        
-        // Check if it's a permissions error
-        if (error.code === 'PGRST116' || error.message?.includes('permission')) {
-          throw new Error('ليس لديك صلاحية لترقية الاشتراك. تحقق من تسجيل الدخول.');
-        }
-        
-        throw new Error(`خطأ في قاعدة البيانات: ${error.message || error}`);
-      }
-
-      console.log('[SUBSCRIPTION] Subscription created with ID:', data);
-
-      // Log payment transaction
-      console.log('[SUBSCRIPTION] Logging payment transaction');
-      const { error: transactionError } = await supabase
-        .from('payment_transactions')
-        .insert({
-          user_id: user.id,
-          subscription_id: data,
-          amount: parseFloat(paymentDetails.amount) || 7.00,
-          currency: paymentDetails.currency || 'USD',
-          paypal_order_id: paymentDetails.paypal_order_id,
-          paypal_capture_id: paymentDetails.paypal_capture_id,
-          status: 'completed',
-          transaction_type: paymentDetails.transaction_type || 'payment',
-          metadata: paymentDetails
-        });
-
-      if (transactionError) {
-        console.warn('[SUBSCRIPTION] Failed to log transaction:', transactionError);
-        // Don't fail the upgrade if transaction logging fails
-      } else {
-        console.log('[SUBSCRIPTION] Payment transaction logged successfully');
+      const json = await res.json();
+      if (!res.ok || !json?.success) {
+        const msg = json?.message || 'Upgrade failed';
+        throw new Error(msg);
       }
 
       // Force refresh subscription state
-      console.log('[SUBSCRIPTION] Refreshing subscription info');
       await fetchSubscriptionInfo(true);
       
-      return { success: true, subscriptionId: data };
+      return {
+        success: true,
+        subscriptionId: json?.data?.subscriptionId,
+        transactionId: json?.data?.transactionId
+      };
     } catch (error) {
       console.error('Error upgrading subscription:', error);
       return { success: false, error: error.message };

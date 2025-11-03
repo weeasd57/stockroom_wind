@@ -28,6 +28,7 @@ import logger from '@/utils/logger';
 import SocialLinks from '@/components/profile/SocialLinks';
 import { useBackgroundProfileEdit } from '@/providers/BackgroundProfileEditProvider';
 import AnalysisTab from '@/components/profile/AnalysisTab';
+import SubscribersTab from '@/components/profile/SubscribersTab';
 
 export default function Profile() {
   const { supabase, user, isAuthenticated, isLoading: authLoading } = useSupabase();
@@ -108,7 +109,7 @@ export default function Profile() {
   useEffect(() => {
     try {
       const tab = searchParams?.get('tab');
-      const allowed = ['posts', 'strategies', 'telegram', 'analysis'];
+      const allowed = ['posts', 'strategies', 'telegram', 'analysis', 'subscribers'];
       if (tab && allowed.includes(tab) && tab !== activeTab) {
         setActiveTab(tab);
       }
@@ -128,7 +129,7 @@ export default function Profile() {
 
   // Guard: ensure activeTab is one of the allowed tabs
   useEffect(() => {
-    const allowed = ['posts', 'strategies', 'telegram', 'analysis'];
+    const allowed = ['posts', 'strategies', 'telegram', 'analysis', 'subscribers'];
     if (!allowed.includes(activeTab)) {
       setActiveTab('posts');
     }
@@ -181,6 +182,7 @@ export default function Profile() {
   const [isDeletingStrategy, setIsDeletingStrategy] = useState({});
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedCountry, setSelectedCountry] = useState('');
+  const [selectedAccessType, setSelectedAccessType] = useState(''); // 'free', 'premium', or ''
   const [filterLoading, setFilterLoading] = useState(false);
   // Delete strategy dialog states
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -1427,6 +1429,30 @@ export default function Profile() {
           </svg>
           Analysis
         </button>
+        <button 
+          className={`${styles.tabButton} ${activeTab === 'subscribers' ? styles.activeTab : ''}`}
+          onClick={() => handleTabChange('subscribers')}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          Subscribers
+          {subscription?.plan_name === 'pro' && (
+            <span style={{
+              marginLeft: '6px',
+              padding: '2px 6px',
+              background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+              borderRadius: '4px',
+              fontSize: '10px',
+              fontWeight: 700,
+              color: '#92400e',
+              lineHeight: 1
+            }}>⭐</span>
+          )}
+        </button>
       </div>
 
       {/* Content Section */}
@@ -1619,8 +1645,44 @@ export default function Profile() {
                   )}
                 </div>
               </div>
+
+              <div className={styles.filterItem}>
+                <label htmlFor="accessTypeFilter" className={styles.filterLabel}>Access:</label>
+                <div className={styles.filterSelectContainer}>
+                  <select
+                    id="accessTypeFilter"
+                    className={`${styles.filterSelect} ${selectedAccessType ? styles.activeFilter : ''}`}
+                    value={selectedAccessType}
+                    onChange={(e) => {
+                      setSelectedAccessType(e.target.value);
+                      setFilterLoading(true);
+                      setTimeout(() => setFilterLoading(false), 300);
+                    }}
+                    disabled={filterLoading}
+                  >
+                    <option value="">All Posts</option>
+                    <option value="free">Free Posts</option>
+                    <option value="premium">Premium Posts ⭐</option>
+                  </select>
+
+                  {selectedAccessType && !filterLoading && (
+                    <button
+                      className={styles.clearFilterButton}
+                      onClick={() => {
+                        setSelectedAccessType('');
+                        setFilterLoading(true);
+                        setTimeout(() => setFilterLoading(false), 300);
+                      }}
+                      aria-label="Clear access type filter"
+                      type="button"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
               
-              {(localSelectedStrategy || selectedStatus || selectedCountry || selectedSymbol) && !filterLoading && (
+              {(localSelectedStrategy || selectedStatus || selectedCountry || selectedSymbol || selectedAccessType) && !filterLoading && (
                 <button 
                   className={styles.clearAllFiltersButton}
                   onClick={() => {
@@ -1629,6 +1691,7 @@ export default function Profile() {
                     setSelectedStatus('');
                     setSelectedCountry('');
                     setSelectedSymbol('');
+                    setSelectedAccessType('');
                     setFilterLoading(true);
                     
                     // If we're not on the posts tab, switch to it to show all posts
@@ -1714,6 +1777,7 @@ export default function Profile() {
               selectedStatus={selectedStatus}
               selectedCountry={selectedCountry}
               selectedSymbol={selectedSymbol}
+              selectedAccessType={selectedAccessType}
               viewMode={viewMode}
             />
           </>
@@ -1960,6 +2024,14 @@ export default function Profile() {
 
         {activeTab === 'analysis' && (
           <AnalysisTab userId={user?.id} posts={posts} />
+        )}
+
+        {activeTab === 'subscribers' && (
+          <SubscribersTab 
+            userId={user?.id} 
+            isPro={subscription?.plan_name === 'pro'}
+            subscription={subscription}
+          />
         )}
       </div>
       

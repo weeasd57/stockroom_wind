@@ -27,6 +27,7 @@ export function PostsFeed({
   selectedStatus = '',
   selectedCountry = '',
   selectedSymbol = '',
+  selectedAccessType = '', // 'free', 'premium', or ''
   // Optional external viewMode (used by profile/view-profile)
   viewMode: externalViewMode = null,
 } = {}) {
@@ -35,7 +36,8 @@ export function PostsFeed({
   const { 
     fetchPosts, 
     loading: providerLoading, 
-    posts: providerPosts, 
+    posts: providerPosts,
+    feedPosts, // feedPosts excludes current user when excludeCurrentUser is true
     error: providerError,
     onPostCreated,
     myPosts,
@@ -72,25 +74,25 @@ export function PostsFeed({
   const effSelectedCountry = (mode === 'home') ? homeSelectedCountry : selectedCountry;
   const effSelectedSymbol = (mode === 'home') ? homeSelectedSymbol : selectedSymbol;
 
-  // Option lists for Home advanced filters
+  // Option lists for Home advanced filters (use feedPosts to exclude current user)
   const strategiesHome = useMemo(() => {
     const set = new Set();
-    providerPosts.forEach(p => { if (p?.strategy) set.add(String(p.strategy)); });
+    feedPosts.forEach(p => { if (p?.strategy) set.add(String(p.strategy)); });
     return Array.from(set);
-  }, [providerPosts]);
+  }, [feedPosts]);
 
   const discoveredCountriesHome = useMemo(() => {
     const set = new Set();
-    providerPosts.forEach(p => {
+    feedPosts.forEach(p => {
       const code = normalizeCountryCode(getPostCountry(p));
       if (code) set.add(code);
     });
     return Array.from(set);
-  }, [providerPosts]);
+  }, [feedPosts]);
 
   const symbolsHome = useMemo(() => {
     const map = new Map();
-    providerPosts.forEach(p => {
+    feedPosts.forEach(p => {
       if (!p?.symbol) return;
       const sym = normalizeBaseSymbol(p.symbol);
       const ctry = normalizeCountryCode(getPostCountry(p));
@@ -103,7 +105,7 @@ export function PostsFeed({
       }
     });
     return Array.from(map.values());
-  }, [providerPosts]);
+  }, [feedPosts]);
 
   // User-specific feed (for profile/view-profile). We fetch directly by userId to avoid pagination mismatch.
   const [userPosts, setUserPosts] = useState([]);
@@ -188,8 +190,8 @@ export function PostsFeed({
       // For profile/view-profile, we fetch directly via getPostsPage in a separate effect.
       return;
     } else if (filter === 'following') {
-      // Following feed: normally won't include self; keep explicit mode
-      fetchPosts('following', { excludeCurrentUser: false });
+      // Following feed: exclude current user's posts from home feed
+      fetchPosts('following', { excludeCurrentUser: true });
     } else if (filter === 'trending') {
       // Home Trending: exclude current user's posts
       fetchPosts('trending', { excludeCurrentUser: true });
@@ -245,11 +247,12 @@ export function PostsFeed({
     } else if (userId) {
       derivedLoading = userLoading && (Array.isArray(userPosts) ? userPosts.length === 0 : true);
     } else {
-      derivedLoading = providerLoading && (Array.isArray(providerPosts) ? providerPosts.length === 0 : true);
+      // Use feedPosts for home mode
+      derivedLoading = providerLoading && (Array.isArray(feedPosts) ? feedPosts.length === 0 : true);
     }
     setLoading(derivedLoading);
     setError(providerError);
-  }, [providerLoading, providerError, providerPosts, isSelfProfile, userId, myLoading, myPosts, userLoading, userPosts]);
+  }, [providerLoading, providerError, feedPosts, isSelfProfile, userId, myLoading, myPosts, userLoading, userPosts]);
 
   // Listen for new posts to update userPosts when in profile/view-profile mode
   useEffect(() => {
@@ -270,7 +273,9 @@ export function PostsFeed({
 
   // Filter and sort posts based on current settings
   const filteredAndSortedPosts = useMemo(() => {
-    let filtered = [...providerPosts];
+    // Use feedPosts in home mode (excludes current user), providerPosts otherwise
+    const sourcePosts = (isSelfProfile || userId) ? providerPosts : feedPosts;
+    let filtered = [...sourcePosts];
 
     // Apply user-specific filter first when userId is provided
     if (userId) {
@@ -333,7 +338,7 @@ export function PostsFeed({
     }
 
     return filtered; // No client-side limit; pagination handled via PostProvider + Load More
-  }, [providerPosts, filter, sortBy, categoryFilter, userId, effSelectedStrategy, effSelectedStatus, effSelectedCountry, effSelectedSymbol]);
+  }, [providerPosts, feedPosts, filter, sortBy, categoryFilter, userId, isSelfProfile, effSelectedStrategy, effSelectedStatus, effSelectedCountry, effSelectedSymbol]);
 
   // Source posts for profile mode (provider-owned for self, local for others)
   const profileSourcePosts = isSelfProfile ? myPosts : userPosts;
@@ -363,6 +368,14 @@ export function PostsFeed({
     }
     if (selectedSymbol) {
       filtered = filtered.filter(post => matchesSymbol(post, selectedSymbol));
+    }
+    if (selectedAccessType) {
+      filtered = filtered.filter(post => {
+        const isPremium = post.is_premium_only === true || post.isPremiumOnly === true;
+        if (selectedAccessType === 'premium') return isPremium;
+        if (selectedAccessType === 'free') return !isPremium;
+        return true;
+      });
     }
 
     // Apply sorting
@@ -400,7 +413,7 @@ export function PostsFeed({
     }
 
     return filtered;
-  }, [profileSourcePosts, myPosts, userPosts, sortBy, categoryFilter, selectedStrategy, selectedStatus, selectedCountry, selectedSymbol]);
+  }, [profileSourcePosts, myPosts, userPosts, sortBy, categoryFilter, selectedStrategy, selectedStatus, selectedCountry, selectedSymbol, selectedAccessType]);
 
   // Use filtered posts - either filteredUserPosts for profile mode or filteredAndSortedPosts for home mode
   const posts = (isSelfProfile || userId) ? filteredUserPosts : filteredAndSortedPosts;

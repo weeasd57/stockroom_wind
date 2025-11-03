@@ -329,7 +329,33 @@ export default function PostDetailsPage() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Stock Analysis</h1>
+        <h1 className={styles.title}>
+          Stock Analysis
+          {(post.is_premium_only || post.isPremiumOnly) && (
+            <span 
+              className={styles.premiumBadge}
+              title="Premium Content - Only visible to Pro subscribers"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                marginLeft: '12px',
+                padding: '6px 12px',
+                background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                border: '2px solid #f59e0b',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: 600,
+                color: '#92400e',
+                boxShadow: '0 2px 8px rgba(245, 158, 11, 0.25)',
+                animation: 'pulse 2s infinite',
+              }}
+            >
+              <span style={{ fontSize: '16px' }}>⭐</span>
+              <span>Premium</span>
+            </span>
+          )}
+        </h1>
       </div>
       
       <div className={styles.card}>

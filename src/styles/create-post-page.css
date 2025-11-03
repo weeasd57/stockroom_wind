@@ -3825,3 +3825,39 @@ input.visible-input::placeholder {
     background: hsla(var(--primary)/0.15);
   }
 }
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 200px;
+  }
+}
+
+/* Premium Post Toggle Responsive Styles */
+.premium-post-toggle-container {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.premium-post-toggle-container:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.3) !important;
+}
+
+/* Responsive design for mobile */
+@media (max-width: 640px) {
+  .premium-post-toggle-container {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+  
+  .premium-post-toggle-container > div:first-child {
+    width: 100% !important;
+  }
+}

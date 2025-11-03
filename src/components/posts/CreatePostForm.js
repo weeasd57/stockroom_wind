@@ -2514,37 +2514,178 @@ export default function CreatePostForm() {
             
             {(subscription?.plan_name === 'pro' || isPro) && (
               <div className="form-group">
-                <label className="form-label">Post Access</label>
+                <label className="form-label" style={{ marginBottom: '12px', fontSize: '14px', fontWeight: 600 }}>
+                  Post Access
+                </label>
                 <div
-                  className="form-control"
+                  className="premium-post-toggle-container"
                   style={{
+                    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                    border: isPremiumOnly ? '2px solid #f59e0b' : '2px solid #fbbf24',
+                    borderRadius: '12px',
+                    padding: '16px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 12,
-                    padding: '10px 12px',
+                    justifyContent: 'space-between',
+                    gap: '16px',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    cursor: 'pointer',
+                    boxShadow: isPremiumOnly 
+                      ? '0 4px 12px rgba(245, 158, 11, 0.25)' 
+                      : '0 2px 8px rgba(251, 191, 36, 0.15)',
+                    transform: isPremiumOnly ? 'translateY(-1px)' : 'translateY(0)',
                   }}
+                  onClick={() => updateField('isPremiumOnly', !isPremiumOnly)}
                 >
-                  <input
-                    id="isPremiumOnly"
-                    type="checkbox"
-                    checked={!!isPremiumOnly}
-                    onChange={(e) => updateField('isPremiumOnly', e.target.checked)}
-                    style={{ marginRight: 8 }}
-                  />
-                  <label htmlFor="isPremiumOnly" style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    backgroundColor: '#fef3c7',
-                    color: '#f59e0b',
-                    padding: '4px 8px',
-                    borderRadius: 6,
-                    fontWeight: 600
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px',
+                    flex: 1
                   }}>
-                    <span aria-hidden>⭐</span>
-                    Premium Post
-                  </label>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      background: isPremiumOnly 
+                        ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                        : 'rgba(255, 255, 255, 0.6)',
+                      borderRadius: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '20px',
+                      transition: 'all 0.3s ease',
+                      boxShadow: isPremiumOnly ? '0 2px 8px rgba(245, 158, 11, 0.3)' : 'none',
+                    }}>
+                      <span style={{ 
+                        filter: isPremiumOnly ? 'none' : 'grayscale(1)',
+                        transition: 'filter 0.3s ease'
+                      }}>⭐</span>
+                    </div>
+                    
+                    <div style={{ flex: 1 }}>
+                      <div style={{
+                        fontSize: '15px',
+                        fontWeight: 600,
+                        color: '#92400e',
+                        marginBottom: '2px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        Premium Post
+                        {isPremiumOnly && (
+                          <span style={{
+                            fontSize: '10px',
+                            background: '#f59e0b',
+                            color: 'white',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}>
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <div style={{
+                        fontSize: '12px',
+                        color: '#78350f',
+                        opacity: 0.8
+                      }}>
+                        {isPremiumOnly ? 'Only Pro users can see this post' : 'Make this post visible to Pro members only'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Modern Toggle Switch */}
+                  <div
+                    style={{
+                      position: 'relative',
+                      width: '52px',
+                      height: '28px',
+                      background: isPremiumOnly 
+                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                        : 'rgba(255, 255, 255, 0.5)',
+                      borderRadius: '14px',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      cursor: 'pointer',
+                      boxShadow: isPremiumOnly 
+                        ? '0 2px 8px rgba(16, 185, 129, 0.4), inset 0 1px 2px rgba(0, 0, 0, 0.1)'
+                        : 'inset 0 1px 3px rgba(0, 0, 0, 0.1)',
+                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updateField('isPremiumOnly', !isPremiumOnly);
+                    }}
+                  >
+                    <input
+                      id="isPremiumOnly"
+                      type="checkbox"
+                      checked={!!isPremiumOnly}
+                      onChange={(e) => updateField('isPremiumOnly', e.target.checked)}
+                      style={{ 
+                        position: 'absolute',
+                        opacity: 0,
+                        width: 0,
+                        height: 0
+                      }}
+                      aria-label="Toggle Premium Post"
+                    />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '2px',
+                        left: isPremiumOnly ? '24px' : '2px',
+                        width: '20px',
+                        height: '20px',
+                        background: 'white',
+                        borderRadius: '50%',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      {isPremiumOnly && (
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                          <path 
+                            d="M10 3L4.5 8.5L2 6" 
+                            stroke="#10b981" 
+                            strokeWidth="2" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
                 </div>
+                
+                {/* Additional Info */}
+                {isPremiumOnly && (
+                  <div style={{
+                    marginTop: '12px',
+                    padding: '12px',
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    border: '1px solid rgba(245, 158, 11, 0.2)',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    color: '#92400e',
+                    display: 'flex',
+                    alignItems: 'start',
+                    gap: '8px',
+                    animation: 'slideDown 0.3s ease'
+                  }}>
+                    <span style={{ fontSize: '16px' }}>💡</span>
+                    <span>
+                      This post will be marked as premium content and only visible to users with an active Pro subscription.
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
