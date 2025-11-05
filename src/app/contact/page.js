@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSupabase } from "@/providers/SimpleSupabaseProvider";
+import Footer from "@/components/Footer";
 
 export default function ContactPage() {
   const { user, getProfile } = useSupabase();
@@ -243,6 +244,9 @@ export default function ContactPage() {
           </div>
         )}
       </form>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 }

@@ -40,6 +40,7 @@ export default function ViewProfile({ params }) {
   const [basicDataLoading, setBasicDataLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
   const [profileData, setProfileData] = useState(null);
+  const [premiumPostsCount, setPremiumPostsCount] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState('/default-avatar.svg');
   const [backgroundUrl, setBackgroundUrl] = useState('https://images.unsplash.com/photo-1579546929662-711aa81148cf?q=80&w=1200&auto=format&fit=crop');
   const [error, setError] = useState(null);
@@ -151,7 +152,7 @@ export default function ViewProfile({ params }) {
             () =>
               supabase
                 .from('profiles')
-                .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts, facebook_url, telegram_url, youtube_url')
+                .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts, facebook_url, telegram_url, youtube_url, is_broker, paypal_email, broker_plan_description, broker_average_posts_info, broker_price_plan_info')
                 .eq('id', userId)
                 .maybeSingle()
                 .abortSignal(controller.signal)
@@ -165,7 +166,7 @@ export default function ViewProfile({ params }) {
               () =>
                 supabase
                   .from('profiles')
-                  .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts, facebook_url, telegram_url, youtube_url')
+                  .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts, facebook_url, telegram_url, youtube_url, is_broker, paypal_email, broker_plan_description, broker_average_posts_info, broker_price_plan_info')
                   .eq('id', userId)
                   .maybeSingle()
                   .abortSignal(controller.signal),
@@ -206,15 +207,31 @@ export default function ViewProfile({ params }) {
           try {
             const { count: postsCount } = await supabase
               .from('posts')
-              .select('id', { count: 'exact', head: true })
+              .select('*', { count: 'exact', head: true })
               .eq('user_id', userId);
+            
+            // Fetch premium posts count
+            const { count: premiumCount } = await supabase
+              .from('posts')
+              .select('*', { count: 'exact', head: true })
+              .eq('user_id', userId)
+              .eq('is_premium_only', true);
             safeSetState(() => {
-              setProfileData(prev => prev ? { ...prev, posts_count: postsCount || 0 } : prev);
+              setProfileData(prev => ({
+                ...prev,
+                posts_count: postsCount || 0
+              }));
+              setPremiumPostsCount(premiumCount || 0);
               setStatsLoading(false);
             });
           } catch (e) {
             console.log('[VIEW-PROFILE] Failed to fetch posts count:', e);
             safeSetState(() => {
+              setProfileData(prev => ({
+                ...prev,
+                posts_count: 0
+              }));
+              setPremiumPostsCount(0);
               setProfileData(prev => prev ? { ...prev, posts_count: 0 } : prev);
               setStatsLoading(false);
             });
@@ -628,6 +645,165 @@ if (error) {
           <span className={styles.statLabel}>Loss Posts</span>
         </div>
       </div>
+      
+      {/* Premium Stats Section - Show if broker has premium plan setup */}
+      {profileData?.is_broker && profileData?.paypal_email && (
+        <div className={styles.premiumStatsSection} style={{
+          marginTop: '2rem',
+          padding: '1.5rem',
+          background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+          border: '2px solid #f59e0b',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(245, 158, 11, 0.15)'
+        }}>
+          <h3 style={{
+            fontSize: '20px',
+            fontWeight: '700',
+            color: '#78350f',
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            ⭐ Premium Broker
+          </h3>
+          
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '1rem',
+            marginBottom: '1rem'
+          }}>
+            <div style={{
+              padding: '1rem',
+              background: 'rgba(255, 255, 255, 0.6)',
+              borderRadius: '8px',
+              border: '1px solid rgba(245, 158, 11, 0.3)'
+            }}>
+              <div style={{
+                fontSize: '28px',
+                fontWeight: '700',
+                color: '#92400e',
+                marginBottom: '0.25rem'
+              }}>
+                {statsLoading ? '...' : premiumPostsCount}
+              </div>
+              <div style={{
+                fontSize: '14px',
+                color: '#92400e',
+                fontWeight: '500'
+              }}>
+                Premium Posts
+              </div>
+            </div>
+            
+            <div style={
+{
+              padding: '1rem',
+              background: 'rgba(255, 255, 255, 0.6)',
+              borderRadius: '8px',
+              border: '1px solid rgba(245, 158, 11, 0.3)'
+            }}>
+              <div style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#78350f',
+                marginBottom: '0.5rem'
+              }}>
+                💰 PayPal Subscription
+              </div>
+              <div style={{
+                fontSize: '12px',
+                color: '#92400e',
+                wordBreak: 'break-word'
+              }}>
+                {profileData.paypal_email}
+              </div>
+            </div>
+          </div>
+          
+          {profileData?.broker_plan_description && (
+            <div style={{
+              padding: '1rem',
+              background: 'rgba(255, 255, 255, 0.6)',
+              borderRadius: '8px',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              marginBottom: '1rem'
+            }}>
+              <div style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#78350f',
+                marginBottom: '0.5rem'
+              }}>
+                📋 Plan Description
+              </div>
+              <div style={{
+                fontSize: '14px',
+                color: '#92400e',
+                lineHeight: '1.6'
+              }}>
+                {profileData.broker_plan_description}
+              </div>
+            </div>
+          )}
+          
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '1rem'
+          }}>
+            {profileData?.broker_average_posts_info && (
+              <div style={{
+                padding: '1rem',
+                background: 'rgba(255, 255, 255, 0.6)',
+                borderRadius: '8px',
+                border: '1px solid rgba(245, 158, 11, 0.3)'
+              }}>
+                <div style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#78350f',
+                  marginBottom: '0.5rem'
+                }}>
+                  📊 Post Frequency
+                </div>
+                <div style={{
+                  fontSize: '14px',
+                  color: '#92400e'
+                }}>
+                  {profileData.broker_average_posts_info}
+                </div>
+              </div>
+            )}
+            
+            {profileData?.broker_price_plan_info && (
+              <div style={{
+                padding: '1rem',
+                background: 'rgba(255, 255, 255, 0.6)',
+                borderRadius: '8px',
+                border: '1px solid rgba(245, 158, 11, 0.3)'
+              }}>
+                <div style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#78350f',
+                  marginBottom: '0.5rem'
+                }}>
+                  💎 Pricing & Features
+                </div>
+                <div style={{
+                  fontSize: '14px',
+                  color: '#92400e',
+                  lineHeight: '1.6'
+                }}>
+                  {profileData.broker_price_plan_info}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       
       <div className={styles.profileTabs}>
         <div className={styles.tabsHeader}>

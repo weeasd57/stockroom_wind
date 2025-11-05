@@ -16,20 +16,28 @@ export function usePostActions(postId, initialBuyCount = 0, initialSellCount = 0
     if (!user || !supabase) return;
     
     try {
+      // Use maybeSingle() to avoid PGRST116 error when user has no action yet
       const { data, error } = await supabase
         .from('post_actions')
         .select('action_type')
         .eq('post_id', postId)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
+      if (error) {
+        console.error('Error fetching user action:', error);
+        setUserAction('none');
+        return;
+      }
+
+      // maybeSingle() returns null if no action exists (not an error)
       if (data) {
         setUserAction(data.action_type);
       } else {
         setUserAction('none');
       }
     } catch (error) {
-      console.error('Error fetching user action:', error);
+      console.error('Unexpected error fetching user action:', error);
       setUserAction('none');
     }
   }, [user, supabase, postId]);

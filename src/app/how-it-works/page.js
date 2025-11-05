@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Footer from '@/components/Footer';
 import styles from '@/styles/how-it-works.module.css';
 
 export default function HowItWorksPage() {
@@ -251,6 +252,9 @@ export default function HowItWorksPage() {
           Sign Up Now
         </Link>
       </section>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 }

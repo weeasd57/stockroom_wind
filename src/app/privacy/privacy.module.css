@@ -1,0 +1,138 @@
+.container {
+  min-height: 100vh;
+  padding: 2rem 1rem;
+  background: linear-gradient(135deg, 
+    hsl(var(--background)) 0%, 
+    hsl(var(--muted) / 0.1) 100%
+  );
+}
+
+.content {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  background: hsl(var(--card));
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.header {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid hsl(var(--border));
+}
+
+.header h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  margin-bottom: 0.5rem;
+}
+
+.lastUpdated {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.9rem;
+}
+
+.section {
+  margin-bottom: 2rem;
+}
+
+.section h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  margin-bottom: 1rem;
+}
+
+.section p {
+  color: hsl(var(--foreground) / 0.9);
+  line-height: 1.7;
+  margin-bottom: 1rem;
+}
+
+.section ul {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.section li {
+  color: hsl(var(--foreground) / 0.9);
+  line-height: 1.7;
+  margin-bottom: 0.5rem;
+}
+
+.section strong {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+}
+
+.section a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+}
+
+.section a:hover {
+  color: hsl(var(--primary) / 0.8);
+}
+
+.actions {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 2px solid hsl(var(--border));
+  text-align: center;
+}
+
+.backButton {
+  display: inline-block;
+  padding: 0.75rem 2rem;
+  background: hsl(var(--primary));
+  color: white;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.backButton:hover {
+  background: hsl(var(--primary) / 0.9);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Dark mode support */
+:global(.dark) .content {
+  background: hsl(var(--card));
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+:global(.dark) .header {
+  border-bottom-color: hsl(var(--border));
+}
+
+:global(.dark) .section h2 {
+  color: hsl(45, 100%, 70%);
+}
+
+:global(.dark) .backButton {
+  background: linear-gradient(135deg, hsl(45, 100%, 60%), hsl(45, 100%, 50%));
+}
+
+:global(.dark) .backButton:hover {
+  background: linear-gradient(135deg, hsl(45, 100%, 70%), hsl(45, 100%, 60%));
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .content {
+    padding: 1.5rem;
+  }
+
+  .header h1 {
+    font-size: 2rem;
+  }
+
+  .section h2 {
+    font-size: 1.3rem;
+  }
+}

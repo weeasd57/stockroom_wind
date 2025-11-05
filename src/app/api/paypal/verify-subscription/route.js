@@ -1,22 +1,17 @@
 import { NextResponse } from 'next/server';
 
-// PayPal API base URLs
-// Prefer explicit PAYPAL_MODE to avoid coupling to NODE_ENV.
-// PAYPAL_MODE should be either 'live' or 'sandbox' (defaults to 'sandbox').
-const PAYPAL_MODE = ((process.env.PAYPAL_MODE || process.env.NEXT_PUBLIC_PAYPAL_MODE || 'sandbox').toLowerCase() === 'live') ? 'live' : 'sandbox';
+// PayPal API base URLs - Use exact names from .env.local
+const PAYPAL_MODE = (process.env.PAYPAL_MODE || 'sandbox').toLowerCase();
 const PAYPAL_BASE = PAYPAL_MODE === 'live'
   ? 'https://api-m.paypal.com'
   : 'https://api-m.sandbox.paypal.com';
 
 function getCredentials() {
-  const isLive = PAYPAL_MODE === 'live';
-  const clientId = isLive
-    ? (process.env.PAYPAL_LIVE_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID_LIVE || process.env.PAYPAL_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID)
-    : (process.env.PAYPAL_SANDBOX_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID_SANDBOX || process.env.PAYPAL_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID);
-  const clientSecret = isLive
-    ? (process.env.PAYPAL_LIVE_CLIENT_SECRET || process.env.PAYPAL_CLIENT_SECRET)
-    : (process.env.PAYPAL_SANDBOX_CLIENT_SECRET || process.env.PAYPAL_CLIENT_SECRET);
-  return { clientId, clientSecret };
+  // Use exact environment variable names from .env.local
+  return {
+    clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID,
+    clientSecret: process.env.PAYPAL_CLIENT_SECRET
+  };
 }
 
 // Get PayPal access token (server credentials only)

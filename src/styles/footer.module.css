@@ -40,6 +40,32 @@
   min-width: 160px;
 }
 
+.sectionTitle {
+  color: var(--foreground);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+:global(.dark) .sectionTitle {
+  color: hsl(45, 100%, 70%);
+}
+
+.darkFooter .sectionTitle {
+  color: hsl(45, 100%, 70%);
+}
+
+.linkList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  z-index: 2;
+}
+
 .title {
   color: var(--foreground);
   font-size: 1rem;

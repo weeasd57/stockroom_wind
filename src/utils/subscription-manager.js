@@ -136,12 +136,13 @@ export async function cancelSubscription({
     });
 
     // 1. الحصول على الاشتراك الحالي من جدول user_subscriptions (الصف النشط فقط)
+    // Use maybeSingle() to avoid PGRST116 error when no active subscription exists
     const { data: currentSub, error: fetchError } = await _supabase
       .from('user_subscriptions')
       .select(`*, subscription_plans(name, display_name)`) // requires FK plan_id -> subscription_plans.id
       .eq('user_id', userId)
       .eq('status', 'active')
-      .single();
+      .maybeSingle();
 
     if (fetchError || !currentSub) {
       return {
@@ -299,12 +300,13 @@ export async function validatePayPalSubscription(subscriptionId) {
  */
 export async function syncSubscriptionWithPayPal(userId) {
   try {
+    // Use maybeSingle() to avoid PGRST116 error when no active subscription exists
     const { data: userSub } = await _supabase
       .from('user_subscriptions')
       .select('id, status, paypal_subscription_id')
       .eq('user_id', userId)
       .eq('status', 'active')
-      .single();
+      .maybeSingle();
 
     if (!userSub?.paypal_subscription_id) {
       return { synced: false, reason: 'No PayPal subscription ID' };

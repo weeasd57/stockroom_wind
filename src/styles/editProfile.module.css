@@ -557,4 +557,70 @@
   outline: none;
   border-color: hsl(var(--primary));
   box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2);
-} 
+}
+
+/* Broker Section Styles */
+.brokerSection {
+  padding: 16px;
+  background: linear-gradient(135deg, hsl(var(--muted) / 0.3), hsl(var(--muted) / 0.1));
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.brokerSection:hover {
+  background: linear-gradient(135deg, hsl(var(--muted) / 0.4), hsl(var(--muted) / 0.15));
+  box-shadow: 0 4px 12px hsl(var(--primary) / 0.08);
+}
+
+.checkboxGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.checkboxGroup:hover {
+  background: hsl(var(--muted) / 0.2);
+  border-color: hsl(var(--primary) / 0.5);
+}
+
+.checkboxGroup input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: hsl(var(--primary));
+}
+
+.checkboxGroup label {
+  cursor: pointer;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+  user-select: none;
+}
+
+/* Dark mode adjustments for broker section */
+:global(.dark) .brokerSection {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:global(.dark) .brokerSection:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+  box-shadow: 0 4px 12px rgba(245, 215, 110, 0.1);
+}
+
+:global(.dark) .checkboxGroup {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:global(.dark) .checkboxGroup:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(245, 215, 110, 0.5);
+}

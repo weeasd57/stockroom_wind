@@ -313,6 +313,143 @@ async function diagnoseWebhookConfigFromRequest(request) {
   }
 }
 
+// Create webhook notification for users
+async function createWebhookNotification(event) {
+  try {
+    const eventType = event?.event_type;
+    const eventId = event?.id;
+    
+    // Extract user information from event
+    let userId = null;
+    let payerEmail = null;
+    
+    // Try to get user from different event types
+    switch (eventType) {
+      case 'CHECKOUT.ORDER.APPROVED':
+      case 'PAYMENT.CAPTURE.COMPLETED':
+        payerEmail = event?.resource?.payer?.email_address;
+        const customId = event?.resource?.purchase_units?.[0]?.custom_id || event?.resource?.custom_id;
+        if (customId) {
+          const user = await resolveUserByCustomId(customId);
+          userId = user?.id;
+        }
+        break;
+      case 'PAYMENT.SALE.COMPLETED':
+        payerEmail = event?.resource?.payer_info?.email || event?.resource?.payer?.email_address;
+        break;
+      case 'BILLING.SUBSCRIPTION.ACTIVATED':
+      case 'BILLING.SUBSCRIPTION.CANCELLED':
+        // For subscription events, try to find user by subscription ID
+        const subscriptionId = event?.resource?.id;
+        if (subscriptionId) {
+          const { data: userSub } = await supabase
+            .from('user_subscriptions')
+            .select('user_id')
+            .eq('paypal_subscription_id', subscriptionId)
+            .single();
+          userId = userSub?.user_id;
+        }
+        break;
+    }
+    
+    // Fallback to email lookup if no userId found
+    if (!userId && payerEmail) {
+      const user = await resolveUserByEmail(payerEmail);
+      userId = user?.id;
+    }
+    
+    if (!userId) {
+      console.log(`[PayPal] No user found for notification, skipping. Event: ${eventType}`);
+      return;
+    }
+    
+    // Generate notification content based on event type
+    const { title, message, severity } = getNotificationContent(eventType, event);
+    
+    // Create notification in database
+    await supabase.rpc('create_webhook_notification', {
+      p_user_id: userId,
+      p_webhook_id: credentials.webhookId,
+      p_event_type: eventType,
+      p_event_id: eventId,
+      p_title: title,
+      p_message: message,
+      p_paypal_data: event,
+      p_severity: severity
+    });
+    
+    console.log(`[PayPal] Notification created for user ${userId}: ${title}`);
+    
+  } catch (error) {
+    console.error('[PayPal] Failed to create webhook notification:', error);
+  }
+}
+
+// Generate notification content based on event type
+function getNotificationContent(eventType, event) {
+  const amount = event?.resource?.amount?.value || event?.resource?.purchase_units?.[0]?.amount?.value;
+  const currency = event?.resource?.amount?.currency_code || event?.resource?.purchase_units?.[0]?.amount?.currency_code || 'USD';
+  
+  switch (eventType) {
+    case 'CHECKOUT.ORDER.APPROVED':
+      return {
+        title: 'Payment Order Approved',
+        message: `Your payment order${amount ? ` of ${amount} ${currency}` : ''} has been approved and is being processed.`,
+        severity: 'info'
+      };
+      
+    case 'PAYMENT.CAPTURE.COMPLETED':
+      return {
+        title: 'Payment Completed Successfully',
+        message: `Your payment${amount ? ` of ${amount} ${currency}` : ''} has been completed. Your Pro subscription is now active!`,
+        severity: 'success'
+      };
+      
+    case 'PAYMENT.SALE.COMPLETED':
+      return {
+        title: 'Payment Received',
+        message: `Payment${amount ? ` of ${amount} ${currency}` : ''} has been successfully processed. Thank you for your subscription!`,
+        severity: 'success'
+      };
+      
+    case 'BILLING.SUBSCRIPTION.ACTIVATED':
+      return {
+        title: 'Subscription Activated',
+        message: 'Your recurring subscription has been activated successfully. You now have access to Pro features!',
+        severity: 'success'
+      };
+      
+    case 'BILLING.SUBSCRIPTION.CANCELLED':
+      return {
+        title: 'Subscription Cancelled',
+        message: 'Your subscription has been cancelled. You can reactivate it anytime from your profile.',
+        severity: 'warning'
+      };
+      
+    case 'BILLING.SUBSCRIPTION.EXPIRED':
+      return {
+        title: 'Subscription Expired',
+        message: 'Your subscription has expired. Please renew to continue using Pro features.',
+        severity: 'warning'
+      };
+      
+    case 'PAYMENT.CAPTURE.DENIED':
+    case 'PAYMENT.CAPTURE.DECLINED':
+      return {
+        title: 'Payment Failed',
+        message: 'Your payment could not be processed. Please try again or use a different payment method.',
+        severity: 'error'
+      };
+      
+    default:
+      return {
+        title: 'PayPal Notification',
+        message: `PayPal event: ${eventType}`,
+        severity: 'info'
+      };
+  }
+}
+
 async function handleEvent(event) {
   try {
     const type = event?.event_type;
@@ -330,6 +467,9 @@ async function handleEvent(event) {
       console.log(`[PayPal] Event ${id} already processed, skipping`);
       return;
     }
+
+    // Create notification for all events
+    await createWebhookNotification(event);
 
     switch (type) {
       case 'CHECKOUT.ORDER.APPROVED': {

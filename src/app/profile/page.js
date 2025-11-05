@@ -19,7 +19,7 @@ import { createPortal } from 'react-dom';
 import { PostsFeed } from '@/components/home/PostsFeed';
 import CheckPostPricesButton from '@/components/profile/CheckPostPricesButton';
 import StrategyDetailsModal from '@/components/profile/StrategyDetailsModal';
-import TelegramBotManagement from '@/components/telegram/TelegramBotManagement';
+import TelegramBotTab from '@/components/telegram/TelegramBotTab';
 import { DashboardSection } from '@/components/home/DashboardSection';
 import { useTheme } from '@/providers/theme-provider';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
@@ -28,7 +28,8 @@ import logger from '@/utils/logger';
 import SocialLinks from '@/components/profile/SocialLinks';
 import { useBackgroundProfileEdit } from '@/providers/BackgroundProfileEditProvider';
 import AnalysisTab from '@/components/profile/AnalysisTab';
-import SubscribersTab from '@/components/profile/SubscribersTab';
+import PremiumPlanTab from '@/components/profile/PremiumPlanTab';
+import { PremiumPlanProvider } from '@/providers/PremiumPlanProvider';
 
 export default function Profile() {
   const { supabase, user, isAuthenticated, isLoading: authLoading } = useSupabase();
@@ -109,7 +110,7 @@ export default function Profile() {
   useEffect(() => {
     try {
       const tab = searchParams?.get('tab');
-      const allowed = ['posts', 'strategies', 'telegram', 'analysis', 'subscribers'];
+      const allowed = ['posts', 'strategies', 'telegrambot', 'analysis', 'premium'];
       if (tab && allowed.includes(tab) && tab !== activeTab) {
         setActiveTab(tab);
       }
@@ -129,7 +130,14 @@ export default function Profile() {
 
   // Guard: ensure activeTab is one of the allowed tabs
   useEffect(() => {
-    const allowed = ['posts', 'strategies', 'telegram', 'analysis', 'subscribers'];
+    const allowed = ['posts', 'strategies', 'telegrambot', 'analysis', 'premium'];
+    
+    // Redirect old tab names to new ones
+    if (activeTab === 'telegram' || activeTab === 'subscribers') {
+      setActiveTab('telegrambot');
+      return;
+    }
+    
     if (!allowed.includes(activeTab)) {
       setActiveTab('posts');
     }
@@ -144,6 +152,11 @@ export default function Profile() {
     telegram_url: '',
     youtube_url: '',
     show_facebook: false,
+    paypal_email: '',
+    is_broker: false,
+    broker_plan_description: '',
+    broker_average_posts_info: '',
+    broker_price_plan_info: '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -206,6 +219,11 @@ export default function Profile() {
     telegram_url: profile?.telegram_url || '',
     youtube_url: profile?.youtube_url || '',
     show_facebook: Boolean(profile?.show_facebook),
+    paypal_email: profile?.paypal_email || '',
+    is_broker: Boolean(profile?.is_broker),
+    broker_plan_description: profile?.broker_plan_description || '',
+    broker_average_posts_info: profile?.broker_average_posts_info || '',
+    broker_price_plan_info: profile?.broker_price_plan_info || '',
   }), []);
 
   // Initialize view mode from localStorage only after component is mounted
@@ -1401,19 +1419,18 @@ export default function Profile() {
           onClick={() => handleTabChange('strategies')}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            <path d="M12 2L2 7l10 5 10-5-10-5z" />
+            <path d="M2 17l10 5 10-5" />
+            <path d="M2 12l10 5 10-5" />
           </svg>
           Strategies
         </button>
         <button 
-          className={`${styles.tabButton} ${activeTab === 'telegram' ? styles.activeTab : ''}`}
-          onClick={() => handleTabChange('telegram')}
+          className={`${styles.tabButton} ${activeTab === 'telegrambot' ? styles.activeTab : ''}`}
+          onClick={() => handleTabChange('telegrambot')}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-            <path d="M8 10h.01"></path>
-            <path d="M12 10h.01"></path>
-            <path d="M16 10h.01"></path>
+            <path d="M21.2 8.4c.5-.4.7-1.1.5-1.6-.1-.3-.4-.5-.7-.6L4.3.4C3.8.2 3.3.4 3 .8c-.2.3-.3.7-.1 1.1l3.4 8.7L3 19.3c-.1.4-.1.8.1 1.1.3.4.8.6 1.3.4l16.7-5.8c.3-.1.6-.3.7-.6.2-.5 0-1.1-.5-1.6l-3.4-2.6 3.3-2.8z" />
           </svg>
           Telegram Bot
         </button>
@@ -1422,24 +1439,21 @@ export default function Profile() {
           onClick={() => handleTabChange('analysis')}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 3v18h18"></path>
-            <path d="M18 17V9"></path>
-            <path d="M13 17V5"></path>
-            <path d="M8 17v-3"></path>
+            <path d="M3 3v18h18" />
+            <path d="M18 17V9" />
+            <path d="M13 17V5" />
+            <path d="M8 17v-3" />
           </svg>
           Analysis
         </button>
         <button 
-          className={`${styles.tabButton} ${activeTab === 'subscribers' ? styles.activeTab : ''}`}
-          onClick={() => handleTabChange('subscribers')}
+          className={`${styles.tabButton} ${activeTab === 'premium' ? styles.activeTab : ''}`}
+          onClick={() => handleTabChange('premium')}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
           </svg>
-          Subscribers
+          Premium Plan
           {subscription?.plan_name === 'pro' && (
             <span style={{
               marginLeft: '6px',
@@ -2018,20 +2032,21 @@ export default function Profile() {
           </div>
         )}
 
-        {activeTab === 'telegram' && (
-          <TelegramBotManagement />
+        {activeTab === 'telegrambot' && (
+          <TelegramBotTab 
+            userId={user?.id}
+            isPro={subscription?.plan_name === 'pro'}
+          />
         )}
 
         {activeTab === 'analysis' && (
           <AnalysisTab userId={user?.id} posts={posts} />
         )}
 
-        {activeTab === 'subscribers' && (
-          <SubscribersTab 
-            userId={user?.id} 
-            isPro={subscription?.plan_name === 'pro'}
-            subscription={subscription}
-          />
+        {activeTab === 'premium' && (
+          <PremiumPlanProvider>
+            <PremiumPlanTab />
+          </PremiumPlanProvider>
         )}
       </div>
       
@@ -2161,23 +2176,25 @@ export default function Profile() {
       </StrategyDetailsModal>
       
       {/* Followers/Following Dialogs */}
-      <FollowersDialog
-        isOpen={followersDialogOpen}
-        onClose={() => setFollowersDialogOpen(false)}
-        followers={followers}
-        following={following}
-        type="followers"
-        loading={isLoading}
-      />
-      
-      <FollowersDialog
-        isOpen={followingDialogOpen}
-        onClose={() => setFollowingDialogOpen(false)}
-        followers={followers}
-        following={following}
-        type="following"
-        loading={isLoading}
-      />
+      <>
+        <FollowersDialog
+          isOpen={followersDialogOpen}
+          onClose={() => setFollowersDialogOpen(false)}
+          followers={followers}
+          following={following}
+          type="followers"
+          loading={isLoading}
+        />
+        
+        <FollowersDialog
+          isOpen={followingDialogOpen}
+          onClose={() => setFollowingDialogOpen(false)}
+          followers={followers}
+          following={following}
+          type="following"
+          loading={isLoading}
+        />
+      </>
       
       {/* Edit Profile Modal */}
       {showEditModal && (
@@ -2280,6 +2297,103 @@ export default function Profile() {
                       placeholder="https://youtube.com/@your-channel"
                     />
                   </div>
+                </div>
+              </div>
+              
+              {/* Broker & PayPal Section */}
+              <div className={editStyles.formGroup}>
+                <label>Broker Settings (Optional)</label>
+                <div className={editStyles.brokerSection}>
+                  <div className={editStyles.checkboxGroup} style={{ marginBottom: '16px' }}>
+                    <input
+                      type="checkbox"
+                      id="is_broker"
+                      name="is_broker"
+                      checked={formData.is_broker}
+                      onChange={(e) => setFormData({ ...formData, is_broker: e.target.checked })}
+                      disabled={isSaving}
+                    />
+                    <label htmlFor="is_broker" style={{ marginLeft: '8px' }}>
+                      I am a broker/trader offering premium services
+                    </label>
+                  </div>
+                  
+                  {formData.is_broker && (
+                    <>
+                      <div className={editStyles.socialInput} style={{ marginBottom: '12px' }}>
+                        <label htmlFor="paypal_email">
+                          PayPal Email 💰
+                          <span style={{ fontSize: '12px', color: 'var(--muted-foreground)', marginLeft: '8px' }}>
+                            (Required to receive subscription payments)
+                          </span>
+                        </label>
+                        <input
+                          type="email"
+                          id="paypal_email"
+                          name="paypal_email"
+                          value={formData.paypal_email}
+                          onChange={handleInputChange}
+                          disabled={isSaving}
+                          placeholder="your-email@paypal.com"
+                          required={formData.is_broker}
+                        />
+                      </div>
+                      
+                      <div className={editStyles.socialInput} style={{ marginBottom: '12px' }}>
+                        <label htmlFor="broker_plan_description">
+                          Plan Description
+                          <span style={{ fontSize: '12px', color: 'var(--muted-foreground)', marginLeft: '8px' }}>
+                            (What do you offer?)
+                          </span>
+                        </label>
+                        <textarea
+                          id="broker_plan_description"
+                          name="broker_plan_description"
+                          value={formData.broker_plan_description}
+                          onChange={handleInputChange}
+                          rows={3}
+                          disabled={isSaving}
+                          placeholder="e.g., Professional stock analysis and premium trading signals"
+                        />
+                      </div>
+                      
+                      <div className={editStyles.socialInput} style={{ marginBottom: '12px' }}>
+                        <label htmlFor="broker_average_posts_info">
+                          Average Posts Info
+                          <span style={{ fontSize: '12px', color: 'var(--muted-foreground)', marginLeft: '8px' }}>
+                            (How often do you post?)
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          id="broker_average_posts_info"
+                          name="broker_average_posts_info"
+                          value={formData.broker_average_posts_info}
+                          onChange={handleInputChange}
+                          disabled={isSaving}
+                          placeholder="e.g., 5-10 posts per week"
+                        />
+                      </div>
+                      
+                      <div className={editStyles.socialInput}>
+                        <label htmlFor="broker_price_plan_info">
+                          Price Plan Info
+                          <span style={{ fontSize: '12px', color: 'var(--muted-foreground)', marginLeft: '8px' }}>
+                            (What's included?)
+                          </span>
+                        </label>
+                        <textarea
+                          id="broker_price_plan_info"
+                          name="broker_price_plan_info"
+                          value={formData.broker_price_plan_info}
+                          onChange={handleInputChange}
+                          rows={3}
+                          disabled={isSaving}
+                          placeholder="e.g., Real-time price alerts, exclusive strategies, 24/7 support"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
               

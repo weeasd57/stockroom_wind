@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PayPal Connect Test</title>
+  <style>
+    body {
+      font-family: system-ui;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    button {
+      background: #0070ba;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: #005ea6;
+    }
+    .info {
+      background: #e3f2fd;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+      border-left: 4px solid #2196f3;
+    }
+    pre {
+      background: #263238;
+      color: #aed581;
+      padding: 15px;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔐 PayPal Connect Test</h1>
+    
+    <div class="info">
+      <strong>Test Steps:</strong>
+      <ol>
+        <li>Click "Test Configuration" to verify env vars</li>
+        <li>Click "Generate Auth URL" to get PayPal OAuth link</li>
+        <li>Click "Connect to PayPal" to start OAuth flow</li>
+      </ol>
+    </div>
+
+    <button onclick="testConfig()">1. Test Configuration</button>
+    <button onclick="getAuthUrl()">2. Generate Auth URL</button>
+    <button onclick="connectPayPal()">3. Connect to PayPal</button>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const userId = 'test-user-123'; // Replace with actual user ID
+
+    async function testConfig() {
+      try {
+        const res = await fetch('http://localhost:3000/api/paypal/test-connect');
+        const data = await res.json();
+        
+        document.getElementById('result').innerHTML = `
+          <h3>✅ Configuration Test Result:</h3>
+          <pre>${JSON.stringify(data, null, 2)}</pre>
+        `;
+      } catch (error) {
+        document.getElementById('result').innerHTML = `
+          <h3>❌ Error:</h3>
+          <pre>${error.message}</pre>
+        `;
+      }
+    }
+
+    async function getAuthUrl() {
+      try {
+        const res = await fetch('http://localhost:3000/api/paypal/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId })
+        });
+        
+        const data = await res.json();
+        
+        if (data.authUrl) {
+          document.getElementById('result').innerHTML = `
+            <h3>✅ Auth URL Generated:</h3>
+            <pre>${data.authUrl}</pre>
+            <p><a href="${data.authUrl}" target="_blank">
+              <button>Open in New Tab</button>
+            </a></p>
+          `;
+        } else {
+          document.getElementById('result').innerHTML = `
+            <h3>❌ Error:</h3>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          `;
+        }
+      } catch (error) {
+        document.getElementById('result').innerHTML = `
+          <h3>❌ Error:</h3>
+          <pre>${error.message}</pre>
+        `;
+      }
+    }
+
+    async function connectPayPal() {
+      try {
+        const res = await fetch('http://localhost:3000/api/paypal/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId })
+        });
+        
+        const data = await res.json();
+        
+        if (data.authUrl) {
+          window.location.href = data.authUrl;
+        } else {
+          alert('Failed to get auth URL: ' + JSON.stringify(data));
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+  </script>
+</body>
+</html>

@@ -273,10 +273,14 @@ function formatBroadcastMessage(broadcast, posts) {
     posts.forEach((postData, index) => {
       const post = postData.posts;
       
-      // Symbol and Status header
+      // Symbol and Status header with Premium Badge
       message += `${index + 1}. *${post.symbol}*`;
       if (post.company_name) {
         message += ` - ${post.company_name}`;
+      }
+      // Add premium badge if post is premium-only
+      if (post.is_premium_only) {
+        message += ` ⭐ *PREMIUM*`;
       }
       message += `\n`;
       

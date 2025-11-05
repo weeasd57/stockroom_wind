@@ -8,7 +8,8 @@ const PAYPAL_BASE = PAYPAL_MODE === 'live'
 
 // Get PayPal access token
 async function getPayPalAccessToken() {
-  const clientId = process.env.PAYPAL_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+  // Use exact names from .env.local
+  const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
   const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
 
   console.log('[CreatePlan] PayPal credentials check:', {

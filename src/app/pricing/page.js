@@ -7,6 +7,7 @@ import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { supabase } from '@/utils/supabase';
 import { useSubscription } from '@/providers/SubscriptionProvider';
 import { toast } from 'sonner';
+import Footer from '@/components/Footer';
 
 export default function PricingPage() {
   const router = useRouter();
@@ -268,6 +269,9 @@ export default function PricingPage() {
           </ul>
         </div>
       </section>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 }

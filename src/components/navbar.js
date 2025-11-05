@@ -7,6 +7,7 @@ import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import NotificationBell from '@/components/notifications/NotificationBell';
 import styles from '@/styles/navbar.module.css';
 
 // Navigation configuration
@@ -224,6 +225,7 @@ export default function Navbar() {
         {/* Desktop Actions */}
         <div className={styles.desktopActions}>
           <ModeToggle />
+          {isAuthenticated && <NotificationBell />}
           
           {isAuthenticated ? (
             <div className={styles.userSection} ref={dropdownRef}>

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from 'next/link';
 import { useTheme } from '@/providers/theme-provider';
 import styles from '@/styles/footer.module.css';
 
@@ -15,6 +16,38 @@ export default function Footer() {
             <p className={styles.description}>
               Your social platform for stock market enthusiasts
             </p>
+          </div>
+          
+          <div className={styles.section}>
+            <h4 className={styles.sectionTitle}>Legal</h4>
+            <ul className={styles.linkList}>
+              <li>
+                <Link href="/privacy" className={styles.link}>
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link href="/terms" className={styles.link}>
+                  Terms of Service
+                </Link>
+              </li>
+            </ul>
+          </div>
+          
+          <div className={styles.section}>
+            <h4 className={styles.sectionTitle}>Support</h4>
+            <ul className={styles.linkList}>
+              <li>
+                <Link href="/contact" className={styles.link}>
+                  Contact Us
+                </Link>
+              </li>
+              <li>
+                <Link href="/how-it-works" className={styles.link}>
+                  How It Works
+                </Link>
+              </li>
+            </ul>
           </div>
         </div>
         
