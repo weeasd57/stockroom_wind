@@ -41,6 +41,8 @@ export default function ViewProfile({ params }) {
   const [statsLoading, setStatsLoading] = useState(true);
   const [profileData, setProfileData] = useState(null);
   const [premiumPostsCount, setPremiumPostsCount] = useState(0);
+  const [premiumFeatures, setPremiumFeatures] = useState([]);
+  const [premiumPlanData, setPremiumPlanData] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState('/default-avatar.svg');
   const [backgroundUrl, setBackgroundUrl] = useState('https://images.unsplash.com/photo-1579546929662-711aa81148cf?q=80&w=1200&auto=format&fit=crop');
   const [error, setError] = useState(null);
@@ -52,6 +54,12 @@ export default function ViewProfile({ params }) {
   const searchParams = useSearchParams();
   // Local tabs and strategies state for view-profile
   const [activeTab, setActiveTab] = useState('posts'); // 'posts' | 'strategies'
+  // Subscription state
+  const [isSubscribedToBroker, setIsSubscribedToBroker] = useState(false);
+  const [currentSubscription, setCurrentSubscription] = useState(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [strategies, setStrategies] = useState([]);
   const [strategiesLoading, setStrategiesLoading] = useState(false);
   const [selectedStrategy, setSelectedStrategy] = useState('');
@@ -216,6 +224,24 @@ export default function ViewProfile({ params }) {
               .select('*', { count: 'exact', head: true })
               .eq('user_id', userId)
               .eq('is_premium_only', true);
+            
+            // Fetch premium plan features if broker (only active plans)
+            if (profile?.is_broker) {
+              const { data: premiumPlan, error: planError } = await supabase
+                .from('premium_plans')
+                .select('features, pricing, paypal_account, is_active')
+                .eq('user_id', userId)
+                .eq('is_active', true)
+                .maybeSingle();
+              
+              if (!planError && premiumPlan) {
+                safeSetState(() => {
+                  setPremiumFeatures(premiumPlan.features || []);
+                  setPremiumPlanData(premiumPlan);
+                });
+              }
+            }
+            
             safeSetState(() => {
               setProfileData(prev => ({
                 ...prev,
@@ -332,6 +358,45 @@ export default function ViewProfile({ params }) {
 
     checkTelegramBot();
   }, [userId, supabase]);
+
+  // Check if current user is subscribed to this broker
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id || !userId || !supabase || !profileData?.is_broker) {
+      setSubscriptionLoading(false);
+      return;
+    }
+
+    const checkSubscription = async () => {
+      try {
+        const { data: subscription, error } = await supabase
+          .from('broker_subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('broker_id', userId)
+          .eq('status', 'active')
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error checking subscription:', error);
+        } else if (subscription) {
+          // Check if subscription is still valid (not expired)
+          const now = new Date();
+          const expiresAt = subscription.expires_at ? new Date(subscription.expires_at) : null;
+          
+          if (!expiresAt || expiresAt > now) {
+            setIsSubscribedToBroker(true);
+            setCurrentSubscription(subscription);
+          }
+        }
+      } catch (error) {
+        console.error('Error in checkSubscription:', error);
+      } finally {
+        setSubscriptionLoading(false);
+      }
+    };
+
+    checkSubscription();
+  }, [isAuthenticated, user?.id, userId, supabase, profileData?.is_broker]);
 
   // Use effect to check follow status using the FollowProvider
   useEffect(() => {
@@ -647,8 +712,8 @@ if (error) {
       </div>
       
       {/* Premium Stats Section - Show if broker has premium plan setup */}
-      {profileData?.is_broker && profileData?.paypal_email && (
-        <div className={styles.premiumStatsSection} style={{
+      {profileData?.is_broker && (
+        <div id="premium-broker" className={styles.premiumStatsSection} style={{
           marginTop: '2rem',
           padding: '1.5rem',
           background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
@@ -697,8 +762,7 @@ if (error) {
               </div>
             </div>
             
-            <div style={
-{
+            <div style={{
               padding: '1rem',
               background: 'rgba(255, 255, 255, 0.6)',
               borderRadius: '8px',
@@ -710,14 +774,42 @@ if (error) {
                 color: '#78350f',
                 marginBottom: '0.5rem'
               }}>
-                💰 PayPal Subscription
+                🎯 Success Rate
               </div>
               <div style={{
-                fontSize: '12px',
-                color: '#92400e',
-                wordBreak: 'break-word'
+                fontSize: '20px',
+                fontWeight: '700',
+                color: '#92400e'
               }}>
-                {profileData.paypal_email}
+                {(() => {
+                  const s = profileData?.success_posts || 0;
+                  const l = profileData?.loss_posts || 0;
+                  const total = s + l;
+                  return total ? `${Math.round((s * 100) / total)}%` : '0%';
+                })()}
+              </div>
+            </div>
+
+            <div style={{
+              padding: '1rem',
+              background: 'rgba(255, 255, 255, 0.6)',
+              borderRadius: '8px',
+              border: '1px solid rgba(245, 158, 11, 0.3)'
+            }}>
+              <div style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#78350f',
+                marginBottom: '0.5rem'
+              }}>
+                👥 Followers
+              </div>
+              <div style={{
+                fontSize: '20px',
+                fontWeight: '700',
+                color: '#92400e'
+              }}>
+                {profileData?.followers || 0}
               </div>
             </div>
           </div>
@@ -753,29 +845,6 @@ if (error) {
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
             gap: '1rem'
           }}>
-            {profileData?.broker_average_posts_info && (
-              <div style={{
-                padding: '1rem',
-                background: 'rgba(255, 255, 255, 0.6)',
-                borderRadius: '8px',
-                border: '1px solid rgba(245, 158, 11, 0.3)'
-              }}>
-                <div style={{
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#78350f',
-                  marginBottom: '0.5rem'
-                }}>
-                  📊 Post Frequency
-                </div>
-                <div style={{
-                  fontSize: '14px',
-                  color: '#92400e'
-                }}>
-                  {profileData.broker_average_posts_info}
-                </div>
-              </div>
-            )}
             
             {profileData?.broker_price_plan_info && (
               <div style={{
@@ -798,10 +867,141 @@ if (error) {
                   lineHeight: '1.6'
                 }}>
                   {profileData.broker_price_plan_info}
+                  {premiumFeatures.length > 0 && (
+                    <ul style={{ marginTop: '0.75rem', paddingLeft: '1rem', color: '#78350f', listStyle: 'disc' }}>
+                      {premiumFeatures.map((feature, idx) => (
+                        <li key={idx}>{feature}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
             )}
           </div>
+
+          {/* Subscribe/Cancel Button - Only show if not viewing own profile */}
+          {user && user.id !== userId && (
+            <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+              {subscriptionLoading ? (
+                <div style={{
+                  padding: '1rem 2.5rem',
+                  background: 'hsl(var(--muted))',
+                  color: 'hsl(var(--muted-foreground))',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: '700'
+                }}>
+                  Checking subscription...
+                </div>
+              ) : isSubscribedToBroker ? (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem',
+                  alignItems: 'center'
+                }}>
+                  <div style={{
+                    padding: '1rem 2rem',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    borderRadius: '8px',
+                    fontSize: '1rem',
+                    fontWeight: '700',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)'
+                  }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                      <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                    Active Subscription
+                  </div>
+                  {currentSubscription && (
+                    <div style={{
+                      fontSize: '0.9rem',
+                      color: '#92400e',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ marginBottom: '0.5rem' }}>
+                        <strong>Plan:</strong> {currentSubscription.plan_type === 'monthly' ? 'Monthly' : 'Yearly'}
+                      </div>
+                      {currentSubscription.expires_at && (
+                        <div>
+                          <strong>Expires:</strong> {new Date(currentSubscription.expires_at).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setShowCancelDialog(true)}
+                    style={{
+                      padding: '0.75rem 2rem',
+                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '0.95rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)',
+                      transition: 'all 0.2s ease',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(239, 68, 68, 0.5)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.4)';
+                    }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                    Cancel Subscription
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => router.push(`/broker-subscribe/${userId}`)}
+                  style={{
+                    padding: '1rem 2.5rem',
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '1rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)',
+                    transition: 'all 0.2s ease',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(245, 158, 11, 0.5)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.4)';
+                  }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                  Subscribe to Premium Plan
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
       
@@ -1039,6 +1239,136 @@ if (error) {
         </div>
       </StrategyDetailsModal>
     )}
+
+      {/* Cancel Subscription Confirmation Dialog */}
+      {showCancelDialog && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: 'hsl(var(--card))',
+            borderRadius: '12px',
+            padding: '2rem',
+            maxWidth: '500px',
+            width: '100%',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+          }}>
+            <h3 style={{
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              color: 'hsl(var(--foreground))',
+              marginBottom: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              Cancel Subscription?
+            </h3>
+            <p style={{
+              fontSize: '1rem',
+              color: 'hsl(var(--muted-foreground))',
+              marginBottom: '1.5rem',
+              lineHeight: '1.6'
+            }}>
+              Are you sure you want to cancel your subscription to this broker's premium plan? 
+              You will lose access to premium posts immediately.
+            </p>
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => setShowCancelDialog(false)}
+                disabled={cancelling}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'hsl(var(--secondary))',
+                  color: 'hsl(var(--secondary-foreground))',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: cancelling ? 'not-allowed' : 'pointer',
+                  opacity: cancelling ? 0.5 : 1,
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Keep Subscription
+              </button>
+              <button
+                onClick={async () => {
+                  if (!currentSubscription || cancelling) return;
+                  
+                  try {
+                    setCancelling(true);
+                    
+                    const response = await fetch('/api/broker-subscription/cancel', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        subscription_id: currentSubscription.id,
+                        user_id: user.id
+                      }),
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok && data.success) {
+                      // Update local state
+                      setIsSubscribedToBroker(false);
+                      setCurrentSubscription(null);
+                      setShowCancelDialog(false);
+                      
+                      // Show success message (you can use a toast library here)
+                      alert('Subscription cancelled successfully');
+                    } else {
+                      throw new Error(data.error || 'Failed to cancel subscription');
+                    }
+                  } catch (error) {
+                    console.error('Cancel subscription error:', error);
+                    alert('Failed to cancel subscription. Please try again.');
+                  } finally {
+                    setCancelling(false);
+                  }
+                }}
+                disabled={cancelling}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: cancelling ? 'hsl(var(--muted))' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: cancelling ? 'not-allowed' : 'pointer',
+                  boxShadow: cancelling ? 'none' : '0 4px 12px rgba(239, 68, 68, 0.4)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {cancelling ? 'Cancelling...' : 'Yes, Cancel Subscription'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
   </div>
 );
 }

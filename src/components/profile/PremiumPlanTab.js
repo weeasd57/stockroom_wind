@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { usePremiumPlan } from '@/providers/PremiumPlanProvider';
+import { useSubscription } from '@/providers/SubscriptionProvider';
 import PayPalConnect from '@/components/paypal/PayPalConnect';
 
 export default function PremiumPlanTab() {
   const { planData, loading, saving, error, savePremiumPlan, addFeature, removeFeature } = usePremiumPlan();
+  const { isPro } = useSubscription();
   const [formData, setFormData] = useState({ description: '', pricing: { monthly: 0, yearly: 0, currency: 'USD' }, features: [] });
   const [newFeature, setNewFeature] = useState('');
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -33,10 +35,56 @@ export default function PremiumPlanTab() {
     </div>
   );
 
+  // Check if user is not Pro
+  if (!isPro) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%)', padding: 'clamp(1rem, 3vw, 2rem)' }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center', paddingTop: '4rem' }}>
+          <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '24px', padding: '3rem', color: 'white', boxShadow: '0 20px 60px rgba(102, 126, 234, 0.3)' }}>
+            <h1 style={{ fontSize: '2.5rem', fontWeight: '900', marginBottom: '1rem' }}>⭐ Premium Broker Plan</h1>
+            <p style={{ fontSize: '1.25rem', opacity: 0.9, marginBottom: '2rem' }}>Unlock the ability to create your own premium broker plan</p>
+            <div style={{ background: 'rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '2rem', marginBottom: '2rem' }}>
+              <p style={{ fontSize: '1.125rem', marginBottom: '1rem' }}>🚀 Upgrade to Pro Plan to:</p>
+              <ul style={{ listStyle: 'none', padding: 0, textAlign: 'left', maxWidth: '400px', margin: '0 auto' }}>
+                <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(255,255,255,0.2)' }}>✓ Create premium broker plans for free</li>
+                <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(255,255,255,0.2)' }}>✓ Monetize your trading expertise</li>
+                <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(255,255,255,0.2)' }}>✓ Set custom pricing and features</li>
+                <li style={{ padding: '0.5rem 0' }}>✓ Connect PayPal for subscriptions</li>
+              </ul>
+            </div>
+            <a 
+              href="/pricing" 
+              style={{ 
+                display: 'inline-block',
+                padding: '1rem 2rem', 
+                background: 'white', 
+                color: '#667eea', 
+                borderRadius: '12px', 
+                textDecoration: 'none',
+                fontWeight: '700',
+                fontSize: '1.125rem',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
+              }}
+            >
+              Upgrade to Pro Plan
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%)', padding: 'clamp(1rem, 3vw, 2rem)' }}>
       <div style={{ maxWidth: '1600px', margin: '0 auto', display: 'grid', gap: '2rem' }}>
         
+        {/* Pro User Badge */}
+        <div style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', borderRadius: '12px', padding: '1rem', textAlign: 'center', border: '2px solid #f59e0b' }}>
+          <p style={{ margin: 0, fontWeight: '600', color: '#78350f' }}>
+            🎉 You're a Pro user! Create your premium broker plan at no additional cost.
+          </p>
+        </div>
+
         {/* Modern Header with Stats */}
         <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '24px', padding: 'clamp(2rem, 4vw, 4rem)', color: 'white', boxShadow: '0 20px 60px rgba(102, 126, 234, 0.3)', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: '-100px', right: '-100px', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)', borderRadius: '50%' }}></div>

@@ -186,15 +186,16 @@ export async function GET(request) {
 
     console.log('[PayPal Connect] PayPal account saved successfully');
 
-    // Get or create premium plan
+    // Get or create premium plan (only active plans)
     let { data: premiumPlan, error: planError } = await supabase
       .from('premium_plans')
       .select('id, description, pricing, stats')
       .eq('user_id', userId)
-      .single();
+      .eq('is_active', true)
+      .maybeSingle();
 
-    // Create if doesn't exist
-    if (planError?.code === 'PGRST116') {
+    // Create if doesn't exist (no active plan found)
+    if (!premiumPlan && !planError) {
       const { data: newPlan } = await supabase
         .from('premium_plans')
         .insert({
@@ -210,13 +211,18 @@ export async function GET(request) {
         .single();
       premiumPlan = newPlan;
     }
+    
+    // Handle errors
+    if (planError) {
+      console.error('[PayPal Connect] Error fetching premium plan:', planError);
+    }
 
     if (premiumPlan) {
       console.log('[PayPal Connect] Updating premium plan with PayPal account');
       await supabase
         .from('premium_plans')
         .update({ paypal_account: userInfo.email })
-        .eq('user_id', userId);
+        .eq('id', premiumPlan.id);
 
       // Update profiles with all broker-related fields
       console.log('[PayPal Connect] Updating profile with broker information');

@@ -124,7 +124,6 @@ export default function DisclaimerPage() {
           </p>
           <ul>
             <li>Through our <Link href="/contact">contact page</Link></li>
-            <li>By email: support@sharkszone.com</li>
           </ul>
         </section>
 

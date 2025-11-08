@@ -56,13 +56,20 @@ export function PremiumPlanProvider({ children }) {
         throw planError;
       }
 
+      // Default features for premium brokers
+      const defaultFeatures = [
+        'Exclusive premium posts',
+        'Strategy insights and analysis',
+        'Priority support'
+      ];
+
       // If no plan exists, create default structure
       if (!planInfo) {
         console.log('[PremiumPlan] No existing plan found, creating new one');
         const defaultPlan = {
           user_id: user.id,
           description: '',
-          features: [],
+          features: defaultFeatures,
           pricing: {
             monthly: 0,
             yearly: 0,
@@ -98,9 +105,14 @@ export function PremiumPlanProvider({ children }) {
         });
       } else {
         console.log('[PremiumPlan] Loaded existing plan:', planInfo);
+        // Ensure features exist, if empty add defaults
+        const features = (planInfo.features && planInfo.features.length > 0) 
+          ? planInfo.features 
+          : defaultFeatures;
+        
         setPlanData({
           description: planInfo.description || '',
-          features: planInfo.features || [],
+          features: features,
           pricing: planInfo.pricing || { monthly: 0, yearly: 0, currency: 'USD' },
           stats: planInfo.stats || { averagePostsPerMonth: 0, successRate: 0, totalSubscribers: 0, premiumSubscribers: 0 },
           paypalAccount: planInfo.paypal_account || '',

@@ -1,0 +1,87 @@
+.adContainer {
+  position: relative;
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.adLabel {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  font-size: 0.625rem;
+  color: hsl(var(--muted-foreground));
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.adContainer ins {
+  min-height: 90px;
+  display: block;
+}
+
+/* Format variations */
+.horizontal {
+  width: 100%;
+  min-height: 100px;
+}
+
+.horizontal ins {
+  width: 100%;
+  min-height: 90px;
+}
+
+.vertical {
+  width: 100%;
+  max-width: 300px;
+  min-height: 250px;
+}
+
+.vertical ins {
+  width: 100%;
+  min-height: 250px;
+}
+
+.square {
+  width: 100%;
+  max-width: 336px;
+  min-height: 280px;
+}
+
+.square ins {
+  width: 100%;
+  min-height: 280px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .adContainer {
+    margin: 1rem 0;
+    padding: 0.75rem;
+  }
+
+  .horizontal {
+    min-height: 80px;
+  }
+
+  .vertical,
+  .square {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .adContainer {
+    padding: 0.5rem;
+  }
+
+  .adLabel {
+    font-size: 0.5625rem;
+  }
+}

@@ -68,6 +68,10 @@ export async function POST(request) {
     const captureId = body?.captureId || body?.paypalCaptureId || null;
     const amount = Number(body?.amount ?? 0) || null;
     const currency = body?.currency || null;
+    const billingPeriod = body?.billingPeriod || body?.billing_period || 'monthly';
+    
+    // Validate billing period
+    const validBillingPeriod = billingPeriod === 'yearly' ? 'yearly' : 'monthly';
 
     if (!orderId) {
       return NextResponse.json({ success: false, message: 'orderId is required' }, { status: 400 });
@@ -134,7 +138,17 @@ export async function POST(request) {
 
     // 2.5) Reliably convert the current active row to Pro plan (no status fanout)
     const nowIso = new Date().toISOString();
-    const expIso = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    
+    // Calculate expiry based on billing period
+    const expiryMs = validBillingPeriod === 'yearly' 
+      ? 365 * 24 * 60 * 60 * 1000  // 1 year
+      : 30 * 24 * 60 * 60 * 1000;   // 1 month
+    const expIso = new Date(Date.now() + expiryMs).toISOString();
+    
+    const resetMs = validBillingPeriod === 'yearly'
+      ? 365 * 24 * 60 * 60 * 1000
+      : 30 * 24 * 60 * 60 * 1000;
+    const resetIso = new Date(Date.now() + resetMs).toISOString();
 
     // Fetch Pro plan id
     const { data: proPlan, error: proErr } = await admin
@@ -147,20 +161,39 @@ export async function POST(request) {
     }
 
     // Update the currently active subscription for this user to Pro
-    const { error: convErr } = await admin
+    console.log('[subscription/upgrade] Updating subscription with:', {
+      user_id: user.id,
+      started_at: nowIso,
+      expires_at: expIso,
+      billing_period: validBillingPeriod,
+      current_time: new Date().toISOString()
+    });
+    
+    const { data: updateResult, error: convErr } = await admin
       .from('user_subscriptions')
       .update({
         plan_id: proPlan.id,
         status: 'active',
+        billing_period: validBillingPeriod,
         started_at: nowIso,
         expires_at: expIso,
+        price_checks_reset_at: resetIso,
+        posts_reset_at: resetIso,
+        price_checks_used: 0,
+        posts_created: 0,
         paypal_order_id: orderId,
+        updated_at: nowIso, // Force update timestamp
       })
       .eq('user_id', user.id)
-      .eq('status', 'active');
+      .eq('status', 'active')
+      .select(); // Return updated rows for verification
+      
     if (convErr) {
+      console.error('[subscription/upgrade] Update failed:', convErr);
       return NextResponse.json({ success: false, message: 'Failed to activate Pro subscription', error: convErr.message }, { status: 500 });
     }
+    
+    console.log('[subscription/upgrade] Update successful:', updateResult);
 
     // Refresh subscriptionId from the active row (guaranteed single by DB constraint)
     const { data: activeRow, error: actErr } = await admin

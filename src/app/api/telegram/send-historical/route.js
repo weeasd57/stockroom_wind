@@ -52,6 +52,16 @@ export async function POST(request) {
     // Never trust body.user_id; always use derived userId
     console.log(`[Telegram Historical API] Processing notification for user ${userId}, type: ${data?.type}`);
 
+    // Check if this is a premium post
+    const isPremiumPost = data.is_premium_only === true || data.isPremiumOnly === true;
+    const postOwnerId = data.post_owner_id || data.user_id; // ID of the broker who owns the post
+    
+    console.log(`[Telegram Historical API] Premium post check:`, {
+      isPremiumPost,
+      postOwnerId,
+      requestingUserId: userId
+    });
+
     // Get user's Telegram subscription info
     const { data: subscription, error: subError } = await supabase
       .from('telegram_subscriptions')
@@ -68,6 +78,36 @@ export async function POST(request) {
       }, { status: 404 });
     }
 
+    // If this is a premium post, check if user is subscribed to the broker
+    if (isPremiumPost && postOwnerId && postOwnerId !== userId) {
+      console.log(`[Telegram Historical API] Checking broker subscription for premium post...`);
+      
+      // Check if user is subscribed to this broker
+      const { data: brokerSub, error: brokerSubError } = await supabase
+        .from('broker_subscriptions')
+        .select('id, status, expires_at')
+        .eq('user_id', userId)
+        .eq('broker_id', postOwnerId)
+        .eq('status', 'active')
+        .single();
+      
+      // Check if subscription is still valid
+      const hasValidSubscription = brokerSub && 
+        (!brokerSub.expires_at || new Date(brokerSub.expires_at) > new Date());
+      
+      if (!hasValidSubscription) {
+        console.log(`[Telegram Historical API] User ${userId} is not subscribed to premium broker ${postOwnerId}`);
+        return Response.json({ 
+          error: 'Premium content requires active broker subscription', 
+          success: false,
+          isPremium: true,
+          requiresSubscription: true
+        }, { status: 403 });
+      }
+      
+      console.log(`[Telegram Historical API] ✅ User has valid broker subscription`);
+    }
+
     // Format message based on activity type
     let message = '';
     let messageType = 'historical_activity';
@@ -75,7 +115,11 @@ export async function POST(request) {
     switch (data.type) {
       case 'action':
         message = `🔔 *Trading Signal Alert*\n\n`;
-        message += `${data.action_type === 'buy' ? '💰 BUY' : '📈 SELL'} Signal for *${data.symbol}*\n`;
+        message += `${data.action_type === 'buy' ? '💰 BUY' : '📈 SELL'} Signal for *${data.symbol}*`;
+        if (isPremiumPost) {
+          message += ` ⭐ *PREMIUM*`;
+        }
+        message += `\n`;
         message += `Company: ${data.company_name}\n`;
         message += `Current Price: $${data.current_price}\n`;
         if (data.target_price) message += `Target: $${data.target_price}\n`;
@@ -86,7 +130,11 @@ export async function POST(request) {
 
       case 'comment':
         message = `💬 *New Comment Alert*\n\n`;
-        message += `Comment on *${data.symbol}* (${data.company_name})\n\n`;
+        message += `Comment on *${data.symbol}* (${data.company_name})`;
+        if (isPremiumPost) {
+          message += ` ⭐ *PREMIUM*`;
+        }
+        message += `\n\n`;
         message += `"${data.content}"\n\n`;
         message += `Time: ${new Date(data.timestamp).toLocaleString()}`;
         messageType = 'comment_alert';
@@ -94,7 +142,11 @@ export async function POST(request) {
 
       case 'closed-post':
         message = `📋 *Position Closed*\n\n`;
-        message += `*${data.symbol}* - ${data.company_name}\n`;
+        message += `*${data.symbol}* - ${data.company_name}`;
+        if (isPremiumPost) {
+          message += ` ⭐ *PREMIUM*`;
+        }
+        message += `\n`;
         if (data.target_reached) {
           message += `🎯 *TARGET HIT!*\n`;
           message += `Target Price: $${data.target_price}\n`;
@@ -111,7 +163,11 @@ export async function POST(request) {
 
       case 'price-check':
         message = `💹 *Price Update*\n\n`;
-        message += `*${data.symbol}* - ${data.company_name}\n`;
+        message += `*${data.symbol}* - ${data.company_name}`;
+        if (isPremiumPost) {
+          message += ` ⭐ *PREMIUM*`;
+        }
+        message += `\n`;
         message += `Current Price: $${data.current_price}\n`;
         if (data.target_price) message += `Target: $${data.target_price}\n`;
         if (data.stop_loss_price) message += `Stop Loss: $${data.stop_loss_price}\n`;

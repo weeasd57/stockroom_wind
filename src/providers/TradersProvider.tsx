@@ -16,6 +16,7 @@ interface Trader {
   experience_score?: number;
   success_posts?: number;
   loss_posts?: number;
+  is_broker?: boolean;
   latestPost?: {
     id: string;
     symbol: string;
@@ -169,6 +170,7 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
             experience_score: profile.experience_score ?? 0,
             success_posts: profile.success_posts ?? 0,
             loss_posts: profile.loss_posts ?? 0,
+            is_broker: profile.is_broker || false,
             latestPost: latestPost,
             countryCounts,
             isLoading: false,
@@ -189,6 +191,7 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
             experience_score: profile.experience_score ?? 0,
             success_posts: profile.success_posts ?? 0,
             loss_posts: profile.loss_posts ?? 0,
+            is_broker: profile.is_broker || false,
             latestPost: null,
             countryCounts: {},
             isLoading: false,
@@ -241,7 +244,7 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
       // Build query with filters
       let query = supabase
         .from('profiles')
-        .select('id, username, full_name, bio, avatar_url, created_at, followers, following, experience_score, success_posts, loss_posts')
+        .select('id, username, full_name, bio, avatar_url, created_at, followers, following, experience_score, success_posts, loss_posts, is_broker')
         .order('created_at', { ascending: false });
 
       // Apply search filter
@@ -368,6 +371,7 @@ export const TradersProvider = ({ children }: { children: ReactNode }) => {
 
   // Initial fetch
   useEffect(() => {
+    clearCache(); // Clear cache to ensure fresh data with is_broker field
     fetchTraders(1, false);
   }, []);
 

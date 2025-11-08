@@ -135,7 +135,6 @@ export default function PrivacyPage() {
           <p>If you have any questions about this privacy policy, please contact us:</p>
           <ul>
             <li>Through our <Link href="/contact">contact page</Link></li>
-            <li>By email: support@sharkszone.com</li>
           </ul>
         </section>
 

@@ -546,6 +546,10 @@ async function handleEvent(event) {
                 .eq('user_id', userRecord.id)
                 .eq('status', 'active');
               
+              // Determine billing period from amount
+              const billingPeriod = amountValue && parseFloat(amountValue) >= 70 ? 'yearly' : 'monthly';
+              const expiryMs = billingPeriod === 'yearly' ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+              
               // Create new pro subscription
               const { data: subscription, error: subError } = await supabase
                 .from('user_subscriptions')
@@ -553,11 +557,14 @@ async function handleEvent(event) {
                   user_id: userRecord.id,
                   plan_id: proPlan.id,
                   status: 'active',
+                  billing_period: billingPeriod,
                   paypal_order_id: orderId,
                   price_checks_used: 0,
                   posts_created: 0,
                   started_at: new Date().toISOString(),
-                  expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+                  expires_at: new Date(Date.now() + expiryMs).toISOString(),
+                  price_checks_reset_at: new Date(Date.now() + expiryMs).toISOString(),
+                  posts_reset_at: new Date(Date.now() + expiryMs).toISOString()
                 })
                 .select()
                 .single();
@@ -689,6 +696,10 @@ async function handleEvent(event) {
                   .eq('user_id', userRecord.id)
                   .eq('status', 'active');
                 
+                // Determine billing period from amount
+                const billingPeriod = amount && parseFloat(amount) >= 70 ? 'yearly' : 'monthly';
+                const expiryMs = billingPeriod === 'yearly' ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+                
                 // Create new pro subscription
                 const { data: subscription } = await supabase
                   .from('user_subscriptions')
@@ -696,11 +707,14 @@ async function handleEvent(event) {
                     user_id: userRecord.id,
                     plan_id: proPlan.id,
                     status: 'active',
+                    billing_period: billingPeriod,
                     paypal_order_id: orderId,
                     price_checks_used: 0,
                     posts_created: 0,
                     started_at: new Date().toISOString(),
-                    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+                    expires_at: new Date(Date.now() + expiryMs).toISOString(),
+                    price_checks_reset_at: new Date(Date.now() + expiryMs).toISOString(),
+                    posts_reset_at: new Date(Date.now() + expiryMs).toISOString()
                   })
                   .select()
                   .single();

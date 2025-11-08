@@ -1192,6 +1192,16 @@ export async function POST(request) {
     
     if (DEBUG) console.log(`[DEBUG] Price check completed for ${posts.length} posts. Updated: ${updatedPosts.length}, Skipped: ${closedPostsCount}, Usage: ${usageCount}, Remaining checks this month: ${remainingChecks}`);
     
+    // Send Telegram notifications for updated posts
+    if (updatedPosts.length > 0) {
+      try {
+        await sendPriceCheckNotifications(supabase, userId, updatedPosts, results);
+      } catch (notifError) {
+        console.error('[Telegram] Error sending price check notifications:', notifError);
+        // Don't fail the entire request if notifications fail
+      }
+    }
+    
     return NextResponse.json({
       success: true,
       message: 'Price check completed successfully',
@@ -1215,5 +1225,188 @@ export async function POST(request) {
       },
       { status: 500 }
     );
+  }
+}
+
+// Helper function to send Telegram notifications for price checks
+async function sendPriceCheckNotifications(supabase, brokerId, updatedPosts, results) {
+  try {
+    console.log('[Telegram] Starting price check notifications...', {
+      brokerId,
+      postsCount: updatedPosts.length
+    });
+
+    // Get broker's profile to check if they're premium
+    const { data: brokerProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('is_broker')
+      .eq('id', brokerId)
+      .single();
+
+    if (profileError) {
+      console.error('[Telegram] Error fetching broker profile:', profileError);
+    }
+
+    const isBroker = brokerProfile?.is_broker === true;
+
+    // Get posts details to check which are premium
+    const postIds = updatedPosts.map(p => p.id);
+    const { data: postsData, error: postsError } = await supabase
+      .from('posts')
+      .select('id, is_premium_only, symbol, company_name')
+      .in('id', postIds);
+
+    if (postsError) {
+      console.error('[Telegram] Error fetching posts data:', postsError);
+      return;
+    }
+
+    const postsMap = new Map(postsData?.map(p => [p.id, p]) || []);
+
+    // Get telegram subscribers for this broker
+    const { data: telegramSubscribers, error: subscribersError } = await supabase
+      .from('telegram_subscribers')
+      .select('telegram_user_id, platform_user_id, is_subscribed')
+      .eq('bot_id', brokerId) // Assuming bot_id matches broker user_id
+      .eq('is_subscribed', true);
+
+    if (subscribersError) {
+      console.error('[Telegram] Error fetching subscribers:', subscribersError);
+      return;
+    }
+
+    if (!telegramSubscribers || telegramSubscribers.length === 0) {
+      console.log('[Telegram] No active telegram subscribers found for broker', brokerId);
+      return;
+    }
+
+    console.log(`[Telegram] Found ${telegramSubscribers.length} telegram subscribers`);
+
+    // Get broker subscriptions for premium filtering
+    const subscriberUserIds = telegramSubscribers
+      .map(s => s.platform_user_id)
+      .filter(id => id); // Only users linked to platform accounts
+
+    const { data: brokerSubscriptions, error: subError } = await supabase
+      .from('broker_subscriptions')
+      .select('user_id, status, expires_at')
+      .eq('broker_id', brokerId)
+      .eq('status', 'active')
+      .in('user_id', subscriberUserIds);
+
+    if (subError) {
+      console.error('[Telegram] Error fetching broker subscriptions:', subError);
+      // Continue without filtering if query fails
+    }
+
+    // Create a set of users with valid broker subscriptions
+    const premiumSubscribers = new Set(
+      brokerSubscriptions
+        ?.filter(sub => !sub.expires_at || new Date(sub.expires_at) > new Date())
+        .map(sub => sub.user_id) || []
+    );
+
+    console.log(`[Telegram] Found ${premiumSubscribers.size} premium subscribers`);
+
+    // Get bot token from environment
+    const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.TELEGRAMBOT_TOKEN;
+    if (!botToken) {
+      console.error('[Telegram] Bot token not configured');
+      return;
+    }
+
+    // Send notifications
+    let sentCount = 0;
+    let failedCount = 0;
+    let skippedCount = 0;
+    
+    for (const subscriber of telegramSubscribers) {
+      for (const updatedPost of updatedPosts) {
+        const postData = postsMap.get(updatedPost.id);
+        const postResult = results.find(r => r.id === updatedPost.id);
+        
+        if (!postData || !postResult) {
+          skippedCount++;
+          continue;
+        }
+
+        const isPremiumPost = postData.is_premium_only === true;
+
+        // Filter: Skip premium posts for non-premium subscribers
+        if (isPremiumPost && !premiumSubscribers.has(subscriber.platform_user_id)) {
+          skippedCount++;
+          continue;
+        }
+
+        // Only send notification if something significant happened
+        const shouldNotify = updatedPost.target_reached || 
+                            updatedPost.stop_loss_triggered || 
+                            updatedPost.closed;
+
+        if (!shouldNotify) {
+          skippedCount++;
+          continue;
+        }
+
+        // Format message
+        let message = `💹 *Price Update*\n\n`;
+        message += `*${postData.symbol || 'Unknown'}* - ${postData.company_name || 'N/A'}`;
+        if (isPremiumPost) {
+          message += ` ⭐ *PREMIUM*`;
+        }
+        message += `\n`;
+        message += `Current Price: $${postResult.currentPrice}\n`;
+        message += `Target: $${postResult.targetPrice}\n`;
+        message += `Stop Loss: $${postResult.stopLossPrice}\n`;
+
+        if (updatedPost.target_reached) {
+          message += `\n🎯 *TARGET REACHED!*`;
+        } else if (updatedPost.stop_loss_triggered) {
+          message += `\n🛑 *STOP LOSS TRIGGERED!*`;
+        }
+
+        if (updatedPost.closed) {
+          message += `\n📋 *Position Closed*`;
+        }
+
+        message += `\nLast Check: ${new Date().toLocaleString()}`;
+
+        // Send to Telegram
+        try {
+          const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: subscriber.telegram_user_id,
+              text: message,
+              parse_mode: 'Markdown',
+              disable_web_page_preview: true
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const result = await response.json();
+          if (result.ok) {
+            sentCount++;
+          } else {
+            failedCount++;
+            console.error(`[Telegram] Failed to send to ${subscriber.telegram_user_id}:`, result.description);
+          }
+        } catch (error) {
+          failedCount++;
+          console.error(`[Telegram] Error sending to ${subscriber.telegram_user_id}:`, error?.message || error);
+        }
+
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    console.log(`[Telegram] Price check notifications complete. Sent: ${sentCount}, Failed: ${failedCount}, Skipped: ${skippedCount}`);
+  } catch (error) {
+    console.error('[Telegram] Fatal error in sendPriceCheckNotifications:', error?.message || error);
   }
 }

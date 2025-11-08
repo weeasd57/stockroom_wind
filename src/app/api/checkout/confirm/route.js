@@ -31,11 +31,17 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { orderId, captureId, amount } = body;
+    const { orderId, captureId, amount, billingPeriod } = body;
 
-    // Validate payment amount
-    if (parseFloat(amount) !== 7.00) {
-      return NextResponse.json({ error: 'Invalid payment amount' }, { status: 400 });
+    // Validate billing period
+    const validBillingPeriod = billingPeriod === 'yearly' ? 'yearly' : 'monthly';
+    
+    // Validate payment amount based on billing period
+    const expectedAmount = validBillingPeriod === 'yearly' ? 70.00 : 7.00;
+    if (parseFloat(amount) !== expectedAmount) {
+      return NextResponse.json({ 
+        error: `Invalid payment amount for ${validBillingPeriod} subscription. Expected: $${expectedAmount}` 
+      }, { status: 400 });
     }
 
     // Start transaction
@@ -60,6 +66,16 @@ export async function POST(request) {
       .eq('user_id', user.id)
       .eq('status', 'active');
 
+    // Calculate expiry date based on billing period
+    const now = new Date();
+    const expiryDate = validBillingPeriod === 'yearly' 
+      ? new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000) // 1 year
+      : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);  // 1 month
+    
+    const resetDate = validBillingPeriod === 'yearly'
+      ? new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
+      : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
     // Create new pro subscription
     const { data: subscription, error: subError } = await supabase
       .from('user_subscriptions')
@@ -67,9 +83,14 @@ export async function POST(request) {
         user_id: user.id,
         plan_id: proPlans.id,
         status: 'active',
+        billing_period: validBillingPeriod,
         paypal_order_id: orderId,
+        started_at: now.toISOString(),
+        expires_at: expiryDate.toISOString(),
         price_checks_used: 0,
-        price_checks_reset_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        posts_created: 0,
+        price_checks_reset_at: resetDate.toISOString(),
+        posts_reset_at: resetDate.toISOString()
       })
       .select()
       .single();
@@ -101,7 +122,9 @@ export async function POST(request) {
 
     return NextResponse.json({ 
       success: true,
-      subscription: subscription
+      subscription: subscription,
+      billingPeriod: validBillingPeriod,
+      expiresAt: expiryDate.toISOString()
     });
 
   } catch (error) {

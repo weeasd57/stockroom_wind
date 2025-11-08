@@ -10,6 +10,9 @@ import PriceUpdateIndicator from '@/components/PriceUpdateIndicator';
 import Link from 'next/link';
 import styles from '@/styles/home/PostsFeed.module.css';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
+import { useSubscription } from '@/providers/SubscriptionProvider';
+import { useSupabase } from '@/providers/SimpleSupabaseProvider';
+import { useBrokerSubscription } from '@/hooks/useBrokerSubscription';
 
 // Reusable PostCard component used across Home feed and Traders page
 export default function PostCard({ post, showFlagBackground = false, hideUserInfo = false, viewMode = 'list' }) {
@@ -46,6 +49,17 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
   const profileId = post?.profile?.id;
   const userInitial = username ? username.charAt(0).toUpperCase() : 'U';
 
+  const { isPro } = useSubscription();
+  const { user } = useSupabase();
+  const { isSubscribedToBroker } = useBrokerSubscription();
+  
+  const isPremiumPost = post?.is_premium_only === true || post?.isPremiumOnly === true;
+  const isOwner = !!user?.id && (post?.user_id === user.id || profileId === user.id);
+  
+  // Check if user has access: owner, pro, or subscribed to broker
+  const hasSubscription = isSubscribedToBroker(post?.user_id);
+  const locked = isPremiumPost && !isOwner && !isPro && !hasSubscription;
+
   // Debug: log post data to check last_price_check field
   if (post?.id && post.id === 'f2e20d85-c0b6-4e54-b723-4407bea26163') {
     console.log(`[PostCard] Post ${post.id} data:`, {
@@ -80,6 +94,73 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
     return null;
   };
   const countryCode = getCountryCode(post);
+
+  if (locked) {
+    return (
+      <div className={`${styles.postCard} ${viewMode === 'grid' ? styles.gridCard : styles.listCard}`}>
+        <div className={styles.postHeader}>
+          {!hideUserInfo && (
+            profileId ? (
+              <Link href={`/view-profile/${profileId}`} className={styles.userInfo} prefetch={false}>
+                <div className={styles.avatar}>
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={username} className={styles.avatarImage} />
+                  ) : (
+                    <div className={styles.avatarPlaceholder}>
+                      {username.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className={styles.userDetails}>
+                  <h4 className={styles.username}>{username}</h4>
+                </div>
+              </Link>
+            ) : (
+              <div className={styles.userInfo}>
+                <div className={styles.avatar}>
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={username} className={styles.avatarImage} />
+                  ) : (
+                    <div className={styles.avatarPlaceholder}>
+                      {username.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className={styles.userDetails}>
+                  <h4 className={styles.username}>{username}</h4>
+                </div>
+              </div>
+            )
+          )}
+          <div className={styles.headerBadges}>
+            <span className={styles.premiumBadge} title="Premium Post">
+              <span aria-hidden>⭐</span>
+              Premium
+            </span>
+          </div>
+        </div>
+        <div style={{
+          marginTop: '0.75rem',
+          padding: '1rem',
+          background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+          border: '2px solid #f59e0b',
+          borderRadius: 12,
+          color: '#78350f',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>Premium content</div>
+          <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 10 }}>Subscribe to unlock this post</div>
+          <Link 
+            className={styles.actionButton} 
+            href={`/broker-subscribe/${profileId}`}
+            style={{ display: 'inline-block', padding: '8px 16px', borderRadius: 6, background: '#f59e0b', color: '#fff', textDecoration: 'none', fontWeight: 600 }}
+          >
+            Subscribe to Unlock
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`${styles.postCard} ${viewMode === 'grid' ? styles.gridCard : styles.listCard}`}>

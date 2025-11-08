@@ -171,25 +171,28 @@ export async function cancelSubscription({
 
     // 3. تحديث قاعدة البيانات: استهدف الصف النشط فقط، واستخدم أعمدة صحيحة
     console.log(`[Subscription] Updating subscription for user ${userId}...`);
-    const { data: existingCancelledRows, error: existingCancelledError } = await _supabase
+    
+    // CRITICAL FIX: UPDATE old cancelled to 'expired' FIRST
+    // This prevents duplicate key violation on UNIQUE(user_id, status)
+    // We UPDATE instead of DELETE to preserve data and respect FK constraints
+    const { data: expiredRows, error: expireError } = await _supabase
       .from('user_subscriptions')
-      .select('id')
+      .update({
+        status: 'expired',
+        updated_at: new Date().toISOString(),
+      })
       .eq('user_id', userId)
       .eq('status', 'cancelled')
-      .limit(1);
+      .select('id');
 
-    if (!existingCancelledError && Array.isArray(existingCancelledRows) && existingCancelledRows.length > 0) {
-      const existingCancelledId = existingCancelledRows[0]?.id;
-      if (existingCancelledId) {
-        await _supabase
-          .from('user_subscriptions')
-          .update({
-            status: 'expired',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existingCancelledId);
-      }
+    if (expireError) {
+      console.warn('[Subscription] Could not expire old cancelled subscriptions:', expireError.message);
+      // Continue anyway - we'll try the update
+    } else if (expiredRows && expiredRows.length > 0) {
+      console.log(`[Subscription] Expired ${expiredRows.length} old cancelled subscription(s)`);
     }
+
+    // Now safe to update active subscription to cancelled
     const { data: updateData, error: updateError } = await _supabase
       .from('user_subscriptions')
       .update({

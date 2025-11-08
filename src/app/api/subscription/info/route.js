@@ -95,6 +95,8 @@ export async function GET(request) {
       subscription_status: rpcData.subscription_status,
       start_date: rpcData.start_date,
       end_date: rpcData.end_date,
+      can_create_premium_plans: rpcData.can_create_premium_plans || false,
+      show_ads: rpcData.show_ads !== false, // Default to true for safety
       fetched_at: new Date().toISOString()
     };
 

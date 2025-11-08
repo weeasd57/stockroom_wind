@@ -3,11 +3,17 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
+import { useSubscription } from '@/providers/SubscriptionProvider';
+import { useSupabase } from '@/providers/SimpleSupabaseProvider';
+import { useBrokerSubscription } from '@/hooks/useBrokerSubscription';
 
 // Simple spreadsheet-like table for posts with resizable columns and row heights
 // No external deps; designed for profile feed usage
 export default function PostsTableView({ posts = [], hidePublisher = false }) {
   const router = useRouter();
+  const { isPro } = useSubscription();
+  const { user } = useSupabase();
+  const { isSubscribedToBroker } = useBrokerSubscription();
   const containerRef = useRef(null);
   const toolbarRef = useRef(null);
   const theadRef = useRef(null);
@@ -163,15 +169,48 @@ export default function PostsTableView({ posts = [], hidePublisher = false }) {
     return columns.filter(c => map[c.id] !== false);
   }, [columns, visibleCols]);
 
+  // Check if user has access to premium post
+  const hasAccessToPremium = (post) => {
+    const isPremiumPost = post?.is_premium_only === true || post?.isPremiumOnly === true;
+    if (!isPremiumPost) return true;
+    const isOwner = !!user?.id && (post?.user_id === user.id || post?.profile?.id === user.id);
+    const hasSubscription = isSubscribedToBroker(post?.user_id);
+    return isOwner || isPro || hasSubscription;
+  };
+
+  // Show all posts (don't filter premium), but block content for non-accessible ones
+  const accessiblePosts = posts;
+
+  // Check if user viewing premium broker's posts without subscription
+  const viewingPremiumBrokerWithoutAccess = useMemo(() => {
+    // Check if any posts are premium
+    const hasPremiumPosts = posts.some(p => p?.is_premium_only === true || p?.isPremiumOnly === true);
+    if (!hasPremiumPosts) return false;
+
+    // Get the broker ID from first premium post
+    const premiumPost = posts.find(p => p?.is_premium_only === true || p?.isPremiumOnly === true);
+    if (!premiumPost) return false;
+
+    const brokerId = premiumPost.user_id || premiumPost?.profile?.id;
+    if (!brokerId) return false;
+
+    // Check if user has access
+    const isOwner = !!user?.id && user.id === brokerId;
+    const hasSubscription = isSubscribedToBroker(brokerId);
+    const hasAccess = isOwner || isPro || hasSubscription;
+
+    return !hasAccess;
+  }, [posts, user?.id, isPro, isSubscribedToBroker]);
+
   // Global filter
   const filteredPosts = useMemo(() => {
-    if (!globalFilter) return posts;
+    if (!globalFilter) return accessiblePosts;
     const needle = String(globalFilter).toLowerCase();
-    return posts.filter(p => {
+    return accessiblePosts.filter(p => {
       const rowStr = displayColumns.map(col => safeStr(col.accessor(p))).join(' | ').toLowerCase();
       return rowStr.includes(needle);
     });
-  }, [posts, globalFilter, displayColumns]);
+  }, [accessiblePosts, globalFilter, displayColumns]);
 
   // Sorting
   const sortedPosts = useMemo(() => {
@@ -217,6 +256,28 @@ export default function PostsTableView({ posts = [], hidePublisher = false }) {
     const c2 = Math.max(selection.start.c, selection.end.c);
     return ri >= r1 && ri <= r2 && ci >= c1 && ci <= c2;
   };
+
+  // If viewing premium broker without subscription, show blocked message
+  if (viewingPremiumBrokerWithoutAccess) {
+    return (
+      <div style={styles.blockedTableContainer}>
+        <div style={styles.blockedTableContent}>
+          <div style={styles.lockIcon}>🔒</div>
+          <h3 style={styles.blockedTitle}>Premium Table View</h3>
+          <p style={styles.blockedDescription}>
+            This table view contains premium content from a broker. 
+            Subscribe to this broker's premium plan to access the full table view with export features.
+          </p>
+          <div style={styles.blockedFeatures}>
+            <div style={styles.featureItem}>✓ Full table access</div>
+            <div style={styles.featureItem}>✓ Export to Excel (Copy)</div>
+            <div style={styles.featureItem}>✓ Customize columns</div>
+            <div style={styles.featureItem}>✓ Advanced filtering</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
@@ -264,8 +325,20 @@ export default function PostsTableView({ posts = [], hidePublisher = false }) {
           </tr>
         </thead>
         <tbody>
-          {sortedPosts.map((p, ri) => (
-            <tr key={p.id} style={{ ...styles.tr, height: rowHeights[p.id] ? `${rowHeights[p.id]}px` : undefined }}>
+          {sortedPosts.map((p, ri) => {
+            const isPremium = p?.is_premium_only === true || p?.isPremiumOnly === true;
+            const hasAccess = hasAccessToPremium(p);
+            const showBlocked = isPremium && !hasAccess;
+            
+            return (
+            <tr 
+              key={p.id} 
+              style={{ 
+                ...styles.tr, 
+                height: rowHeights[p.id] ? `${rowHeights[p.id]}px` : undefined,
+                ...(showBlocked ? styles.blockedRow : null)
+              }}
+            >
               {displayColumns.map((col, ci) => (
                 <td
                   key={col.id}
@@ -279,7 +352,7 @@ export default function PostsTableView({ posts = [], hidePublisher = false }) {
                   onMouseDown={() => startSelection(ri, ci)}
                   onMouseEnter={() => extendSelection(ri, ci)}
                 >
-                  {renderCell(col, p, router)}
+                  {renderCell(col, p, router, hasAccessToPremium(p))}
                   {ci === 0 && (
                     <div
                       style={styles.rowResizer}
@@ -290,7 +363,8 @@ export default function PostsTableView({ posts = [], hidePublisher = false }) {
                 </td>
               ))}
             </tr>
-          ))}
+            );
+          })}
         </tbody>
         </table>
       </div>
@@ -322,7 +396,21 @@ export default function PostsTableView({ posts = [], hidePublisher = false }) {
   );
 }
 
-function renderCell(col, post, router) {
+function renderCell(col, post, router, hasAccess = true) {
+  // If no access to premium post, show blocked content (except publisher and open columns)
+  if (!hasAccess && col.id !== 'publisher' && col.id !== 'open') {
+    return (
+      <span style={{
+        ...styles.blockedCell,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px'
+      }}>
+        🔒 Premium
+      </span>
+    );
+  }
+
   const val = col.accessor(post);
   if (col.id === 'open') {
     const id = post?.id;
@@ -340,6 +428,14 @@ function renderCell(col, post, router) {
   }
   if (col.id === 'publisher') {
     const profileId = post?.profile?.id;
+    const isPremium = post?.is_premium_only === true || post?.isPremiumOnly === true;
+    const content = (
+      <>
+        {isPremium && <span style={{ marginRight: '4px' }}>⭐</span>}
+        {String(val)}
+      </>
+    );
+    
     if (profileId) {
       return (
         <a
@@ -347,11 +443,11 @@ function renderCell(col, post, router) {
           style={styles.link}
           onClick={(e) => { e.preventDefault(); try { router.push(`/view-profile/${profileId}`); } catch {} }}
         >
-          {String(val)}
+          {content}
         </a>
       );
     }
-    return <span>{String(val)}</span>;
+    return <span>{content}</span>;
   }
   if (col.id.endsWith('_url') && typeof val === 'string' && val.startsWith('http')) {
     return (
@@ -503,6 +599,9 @@ const styles = {
   tr: {
     borderBottom: '1px solid hsl(var(--border))',
   },
+  blockedRow: {
+    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(251, 191, 36, 0.05) 100%)',
+  },
   td: {
     padding: '6px 10px',
     borderBottom: '1px solid hsl(var(--border))',
@@ -533,6 +632,14 @@ const styles = {
     textDecoration: 'underline',
   },
   muted: { color: 'hsl(var(--muted-foreground))' },
+  blockedCell: {
+    color: 'hsl(var(--muted-foreground))',
+    fontStyle: 'italic',
+    fontSize: '12px',
+    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%)',
+    padding: '2px 6px',
+    borderRadius: '4px',
+  },
   columnsPanel: {
     position: 'absolute',
     right: 0,
@@ -585,5 +692,56 @@ const styles = {
     display: 'flex',
     gap: 8,
     justifyContent: 'flex-end'
+  },
+  blockedTableContainer: {
+    width: '100%',
+    minHeight: '400px',
+    border: '2px solid hsl(var(--border))',
+    borderRadius: 12,
+    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(251, 191, 36, 0.05) 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '3rem 2rem',
+  },
+  blockedTableContent: {
+    maxWidth: 500,
+    textAlign: 'center',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '1.5rem',
+  },
+  lockIcon: {
+    fontSize: '4rem',
+    marginBottom: '0.5rem',
+  },
+  blockedTitle: {
+    fontSize: '1.75rem',
+    fontWeight: '700',
+    color: 'hsl(var(--foreground))',
+    margin: 0,
+  },
+  blockedDescription: {
+    fontSize: '1rem',
+    color: 'hsl(var(--muted-foreground))',
+    lineHeight: 1.6,
+    margin: 0,
+  },
+  blockedFeatures: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.75rem',
+    width: '100%',
+    marginTop: '1rem',
+  },
+  featureItem: {
+    padding: '0.75rem 1.25rem',
+    background: 'rgba(245, 158, 11, 0.1)',
+    border: '1px solid rgba(245, 158, 11, 0.3)',
+    borderRadius: 8,
+    fontSize: '0.95rem',
+    fontWeight: 600,
+    color: 'hsl(var(--foreground))',
   }
 };

@@ -31,6 +31,7 @@ export default function TradersPage() {
   const [followings, setFollowings] = useState({});
   const [loadingMore, setLoadingMore] = useState(false);
   const [telegramBots, setTelegramBots] = useState({}); // Track telegram bot status
+  const [brokersOnly, setBrokersOnly] = useState(false); // Filter for brokers only
   const router = useRouter();
 
   // Animation effect
@@ -205,7 +206,7 @@ export default function TradersPage() {
     return Array.from(set).sort();
   }, [traders]);
 
-  // Derived list: filter by country, telegram bot, and sort by selected key/order
+  // Derived list: filter by country, telegram bot, brokers, and sort by selected key/order
   const displayedTraders = useMemo(() => {
     let list = Array.isArray(traders) ? [...traders] : [];
 
@@ -220,6 +221,11 @@ export default function TradersPage() {
       list = list.filter(t => telegramBots[t.id]?.hasBot);
     }
 
+    // Filter by brokers only
+    if (brokersOnly) {
+      list = list.filter(t => t?.is_broker === true);
+    }
+
     const key = sortKey;
     const dir = sortOrder === 'asc' ? 1 : -1;
     list.sort((a, b) => {
@@ -229,7 +235,7 @@ export default function TradersPage() {
       return av > bv ? dir : -dir;
     });
     return list;
-  }, [traders, country, sortKey, sortOrder, filter, telegramBots]);
+  }, [traders, country, sortKey, sortOrder, filter, telegramBots, brokersOnly]);
 
   // Show error state
   if (error) {
@@ -272,6 +278,12 @@ export default function TradersPage() {
         
         {/* Row 1: Main filters centered */}
         <div className={styles.mainFiltersRow}>
+          <button 
+            className={`${styles.filterButton} ${brokersOnly ? styles.active : ''}`}
+            onClick={() => setBrokersOnly(!brokersOnly)}
+          >
+            ⭐ Premium Brokers
+          </button>
           <button 
             className={`${styles.filterButton} ${filter === 'telegram' ? styles.active : ''}`}
             onClick={() => setFilter(filter === 'telegram' ? '' : 'telegram')}

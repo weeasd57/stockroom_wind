@@ -178,7 +178,6 @@ export default function TermsPage() {
           <p>If you have any questions about these Terms, please contact us:</p>
           <ul>
             <li>Through our <Link href="/contact">contact page</Link></li>
-            <li>By email: support@sharkszone.com</li>
           </ul>
         </section>
 

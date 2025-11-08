@@ -542,6 +542,15 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
         scheduleRefreshMyStats(0);
       }
       notifyCreated(saved);
+      
+      // Send Telegram notification for new post
+      if (saved?.id && saved?.user_id) {
+        sendNewPostTelegramNotifications(supabase, saved).catch(err => {
+          console.error('[Telegram] Error sending new post notifications:', err);
+          // Don't fail post creation if notifications fail
+        });
+      }
+      
       return saved;
     } catch (e: any) {
       setPosts(prev => prev.filter(p => p.id !== tempId));
@@ -628,11 +637,169 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     updateUserPosts,
   };
 
-  return <PostsContext.Provider value={value}>{children}</PostsContext.Provider>;
+  return (
+    <PostsContext.Provider value={value}>
+      {children}
+    </PostsContext.Provider>
+  );
+}
+
+// Helper function to send Telegram notifications for new posts
+async function sendNewPostTelegramNotifications(supabase: any, post: any) {
+  try {
+    console.log('[Telegram] Sending new post notifications...', {
+      postId: post.id,
+      userId: post.user_id,
+      isPremium: post.is_premium_only
+    });
+
+    const brokerId = post.user_id;
+    const isPremiumPost = post.is_premium_only === true;
+
+    // Get telegram subscribers for this broker
+    const { data: telegramSubscribers, error: subscribersError } = await supabase
+      .from('telegram_subscribers')
+      .select('telegram_user_id, platform_user_id, is_subscribed')
+      .eq('bot_id', brokerId)
+      .eq('is_subscribed', true);
+
+    if (subscribersError) {
+      console.error('[Telegram] Error fetching subscribers:', subscribersError);
+      return;
+    }
+
+    if (!telegramSubscribers || telegramSubscribers.length === 0) {
+      console.log('[Telegram] No active telegram subscribers found');
+      return;
+    }
+
+  console.log(`[Telegram] Found ${telegramSubscribers.length} telegram subscribers`);
+
+  // If premium post, filter subscribers by broker subscription
+  let targetSubscribers = telegramSubscribers;
+  if (isPremiumPost) {
+    const subscriberUserIds = telegramSubscribers
+      .map((s: any) => s.platform_user_id)
+      .filter((id: any) => id);
+
+    const { data: brokerSubscriptions, error: subError } = await supabase
+      .from('broker_subscriptions')
+      .select('user_id, status, expires_at')
+      .eq('broker_id', brokerId)
+      .eq('status', 'active')
+      .in('user_id', subscriberUserIds);
+
+    if (subError) {
+      console.error('[Telegram] Error fetching broker subscriptions:', subError);
+      // Continue with all subscribers if query fails
+      targetSubscribers = telegramSubscribers;
+    } else {
+
+      const premiumSubscribers = new Set(
+        brokerSubscriptions
+          ?.filter((sub: any) => !sub.expires_at || new Date(sub.expires_at) > new Date())
+          .map((sub: any) => sub.user_id) || []
+      );
+
+      console.log(`[Telegram] Filtering for premium subscribers: ${premiumSubscribers.size}`);
+      
+      // Filter to only premium subscribers
+      targetSubscribers = telegramSubscribers.filter((sub: any) => 
+        premiumSubscribers.has(sub.platform_user_id)
+      );
+
+      if (targetSubscribers.length === 0) {
+        console.log('[Telegram] No premium subscribers found for premium post');
+        return;
+      }
+    }
+  }
+
+    // Get bot token
+    const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.TELEGRAMBOT_TOKEN;
+    if (!botToken) {
+      console.error('[Telegram] Bot token not configured');
+      return;
+    }
+
+    // Format message
+    let message = `🆕 *New Post Alert*\n\n`;
+    message += `*${post.symbol || 'Unknown'}*`;
+    if (post.company_name) {
+      message += ` - ${post.company_name}`;
+    }
+    if (isPremiumPost) {
+      message += ` ⭐ *PREMIUM*`;
+    }
+    message += `\n\n`;
+    
+    if (post.sentiment) {
+      const sentimentEmoji = post.sentiment === 'bullish' ? '📈' : post.sentiment === 'bearish' ? '📉' : '➡️';
+      message += `${sentimentEmoji} ${post.sentiment.toUpperCase()}\n`;
+    }
+    
+    if (post.current_price) message += `💰 Price: $${post.current_price}\n`;
+    if (post.target_price) message += `🎯 Target: $${post.target_price}\n`;
+    if (post.stop_loss_price) message += `🛑 Stop Loss: $${post.stop_loss_price}\n`;
+    if (post.strategy) message += `📊 Strategy: ${post.strategy}\n`;
+    
+    if (post.content) {
+      const contentPreview = post.content.length > 100 
+        ? post.content.substring(0, 100) + '...' 
+        : post.content;
+      message += `\n${contentPreview}\n`;
+    }
+    
+    const baseUrl = typeof window !== 'undefined' 
+      ? window.location.origin 
+      : process.env.NEXT_PUBLIC_APP_URL || 'https://stockroom-saas.vercel.app';
+    message += `\n🔗 [View Post](${baseUrl}/posts/${post.id})`;
+
+    // Send notifications
+    let sentCount = 0;
+    let failedCount = 0;
+    
+    for (const subscriber of targetSubscribers) {
+      try {
+        const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: subscriber.telegram_user_id,
+            text: message,
+            parse_mode: 'Markdown',
+            disable_web_page_preview: false
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        if (result.ok) {
+          sentCount++;
+        } else {
+          failedCount++;
+          console.error(`[Telegram] Failed to send to ${subscriber.telegram_user_id}:`, result.description);
+        }
+      } catch (error: any) {
+        failedCount++;
+        console.error(`[Telegram] Error sending to ${subscriber.telegram_user_id}:`, error?.message || error);
+      }
+
+      // Delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    console.log(`[Telegram] New post notifications complete. Sent: ${sentCount}, Failed: ${failedCount}, Total: ${targetSubscribers.length}`);
+  } catch (error: any) {
+    console.error('[Telegram] Fatal error in sendNewPostTelegramNotifications:', error?.message || error);
+  }
 }
 
 export const usePosts = () => {
-  const ctx = useContext(PostsContext);
-  if (!ctx) throw new Error('usePosts must be used within a PostProvider');
-  return ctx;
+  const context = useContext(PostsContext);
+  if (!context) throw new Error('usePosts must be used within a PostProvider');
+  return context;
 };

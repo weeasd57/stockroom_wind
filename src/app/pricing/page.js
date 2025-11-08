@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { supabase } from '@/utils/supabase';
 import { useSubscription } from '@/providers/SubscriptionProvider';
@@ -11,16 +10,14 @@ import Footer from '@/components/Footer';
 
 export default function PricingPage() {
   const router = useRouter();
-  const { user, isAuthenticated, refreshSession } = useSupabase();
+  const { user, refreshSession } = useSupabase();
   const { 
-    subscriptionInfo, 
     isPro,
-    loading: subscriptionLoading,
-    syncing,
     refreshSubscription
   } = useSubscription();
   const [loading, setLoading] = useState(false);
   const [switchingToFree, setSwitchingToFree] = useState(false);
+  const [billingPeriod, setBillingPeriod] = useState('monthly'); // 'monthly' or 'yearly'
 
   const handleUpgradeToPro = async () => {
     if (!user) {
@@ -29,9 +26,14 @@ export default function PricingPage() {
     }
 
     setLoading(true);
-    // Redirect to checkout page
-    router.push('/checkout');
+    // Redirect to checkout page with billing period
+    router.push(`/checkout?plan=${billingPeriod}`);
   };
+
+  // Calculate prices based on billing period
+  const getProPrice = () => billingPeriod === 'yearly' ? '70.00' : '7.00';
+  const getPriceLabel = () => billingPeriod === 'yearly' ? '/ year' : '/ month';
+  const getSavings = () => billingPeriod === 'yearly' ? '(Save $14/year)' : null;
 
   const handleFreePlan = async () => {
     if (!user) {
@@ -154,19 +156,35 @@ export default function PricingPage() {
           Simple, transparent pricing
         </h1>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          Choose the plan that works best for you. Start with Free or upgrade to Pro for more price checks.
+          Choose the plan that works best for you. Start with Free or upgrade to Pro for unlimited premium plans, ad-free experience, and more.
         </p>
-      {subscriptionInfo && !subscriptionLoading && (
-        <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-sm">
-          <span>Current Plan:</span>
-          <span className="font-semibold">{subscriptionInfo.plan_display_name || 'Free'}</span>
-          {!isPro && (
-            <span className="text-muted-foreground">
-              ({subscriptionInfo.remaining_checks || 0}/{subscriptionInfo.price_check_limit || 50} price checks remaining)
-            </span>
-          )}
+      </section>
+
+      {/* Billing Period Toggle */}
+      <section className="flex justify-center mb-8">
+        <div className="inline-flex items-center gap-2 p-1 bg-muted rounded-lg">
+          <button
+            onClick={() => setBillingPeriod('monthly')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              billingPeriod === 'monthly'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Monthly
+          </button>
+          <button
+            onClick={() => setBillingPeriod('yearly')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              billingPeriod === 'yearly'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Yearly
+            <span className="ml-1 text-xs text-green-600 dark:text-green-400 font-semibold">Save 17%</span>
+          </button>
         </div>
-      )}
       </section>
 
       {/* Plans */}
@@ -193,6 +211,7 @@ export default function PricingPage() {
             <li className="flex items-start gap-2"><span>✅</span> <strong>50 price checks per month</strong></li>
             <li className="flex items-start gap-2"><span>✅</span> <strong>100 posts per month</strong></li>
             <li className="flex items-start gap-2"><span>📱</span> <strong>Telegram notifications: subscribe to traders you follow</strong></li>
+            <li className="flex items-start gap-2"><span>📢</span> <span className="text-muted-foreground">Ads displayed</span></li>
             <li className="flex items-start gap-2"><span>✅</span> Basic features</li>
             <li className="flex items-start gap-2"><span>✅</span> Community support</li>
           </ul>
@@ -229,12 +248,19 @@ export default function PricingPage() {
           <h2 className="text-xl font-semibold">Pro Plan</h2>
           <p className="text-muted-foreground mt-1">For active traders</p>
           <div className="mt-5 flex items-baseline gap-1">
-            <span className="text-3xl font-bold">$7.00</span>
-            <span className="text-sm text-muted-foreground">/ month</span>
+            <span className="text-3xl font-bold">${getProPrice()}</span>
+            <span className="text-sm text-muted-foreground">{getPriceLabel()}</span>
           </div>
+          {getSavings() && (
+            <div className="mt-1 text-xs text-green-600 dark:text-green-400 font-medium">
+              {getSavings()}
+            </div>
+          )}
           <ul className="mt-6 space-y-2 text-sm">
             <li className="flex items-start gap-2"><span>🚀</span> <strong>300 price checks per month</strong></li>
             <li className="flex items-start gap-2"><span>🚀</span> <strong>500 posts per month</strong></li>
+            <li className="flex items-start gap-2"><span>💎</span> <strong>Create premium broker plans</strong></li>
+            <li className="flex items-start gap-2"><span>🚫</span> <strong>No ads - Ad-free experience</strong></li>
             <li className="flex items-start gap-2"><span>📱</span> <strong>Telegram notifications: subscribe to traders you follow</strong></li>
             <li className="flex items-start gap-2"><span>🚀</span> Priority support</li>
           </ul>
@@ -263,6 +289,8 @@ export default function PricingPage() {
           <ul className="space-y-1 ml-4">
             <li>• Price checks reset monthly on your billing date</li>
             <li>• Unused checks don't roll over to the next month</li>
+            <li>• Pro users can create multiple premium broker plans to monetize their trading insights</li>
+            <li>• Pro users enjoy an ad-free experience across the platform</li>
             <li>• You can upgrade or cancel anytime</li>
             <li>• Prices in USD. Taxes may apply</li>
             <li>• Secure payment processing via PayPal</li>

@@ -248,6 +248,8 @@ export const useSubscription = () => {
       canPerformPriceCheck,
       canCreatePost: () => (currentInfo ? getRemainingPosts() > 0 : false),
       isProPlan: () => (currentInfo?.plan_name === 'pro'),
+      canCreatePremiumPlans: () => (currentInfo?.can_create_premium_plans === true),
+      shouldShowAds: () => (currentInfo?.show_ads !== false),
       getRemainingPriceChecks: () => (currentInfo?.remaining_checks ?? 0),
       getRemainingPosts,
       getUsageInfo,
@@ -263,7 +265,9 @@ export const useSubscription = () => {
       incrementPriceCheckUsage,
       isPro: currentInfo?.plan_name === 'pro',
       usageInfo: getUsageInfo(),
-      subscriptionMessage: null
+      subscriptionMessage: null,
+      can_create_premium_plans: currentInfo?.can_create_premium_plans || false,
+      show_ads: currentInfo?.show_ads !== false
     };
   }, [subInfo, loading, syncing, error, fetchInfo, refresh, canPerformPriceCheck, getRemainingPosts, getUsageInfo, incrementPostUsage, incrementPriceCheckUsage]);
 
@@ -489,7 +493,8 @@ export function SubscriptionProvider({ children }) {
           orderId: paymentDetails.paypal_order_id || paymentDetails.orderId || 'manual',
           captureId: paymentDetails.paypal_capture_id || paymentDetails.captureId || null,
           amount: parseFloat(paymentDetails.amount) || 7.00,
-          currency: paymentDetails.currency || 'USD'
+          currency: paymentDetails.currency || 'USD',
+          billing_period: paymentDetails.billing_period || 'monthly'
         })
       });
 
@@ -562,6 +567,16 @@ export function SubscriptionProvider({ children }) {
 
   const isProPlan = useCallback(() => {
     return subscriptionInfo?.plan_name === 'pro';
+  }, [subscriptionInfo]);
+
+  const canCreatePremiumPlans = useCallback(() => {
+    if (!subscriptionInfo) return false;
+    return subscriptionInfo.can_create_premium_plans === true;
+  }, [subscriptionInfo]);
+
+  const shouldShowAds = useCallback(() => {
+    if (!subscriptionInfo) return true; // Default to showing ads for safety
+    return subscriptionInfo.show_ads !== false;
   }, [subscriptionInfo]);
 
   const getUsageInfo = useCallback(() => {
@@ -809,6 +824,8 @@ export function SubscriptionProvider({ children }) {
     canPerformPriceCheck,
     canCreatePost,
     isProPlan,
+    canCreatePremiumPlans,
+    shouldShowAds,
     
     // Getters
     getRemainingPriceChecks,
@@ -835,7 +852,11 @@ export function SubscriptionProvider({ children }) {
     // Computed values
     isPro: isProPlan(),
     usageInfo: getUsageInfo(),
-    subscriptionMessage: getSubscriptionMessage()
+    subscriptionMessage: getSubscriptionMessage(),
+    
+    // New feature flags
+    can_create_premium_plans: subscriptionInfo?.can_create_premium_plans || false,
+    show_ads: subscriptionInfo?.show_ads !== false
   };
 
   return (

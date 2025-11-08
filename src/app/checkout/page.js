@@ -36,6 +36,7 @@ export default function CheckoutPage() {
   const [orderAmount, setOrderAmount] = useState('7.00');
   const [fundingParam, setFundingParam] = useState('');
   const [intentParam, setIntentParam] = useState('authorize');
+  const [planType, setPlanType] = useState('monthly'); // 'monthly' or 'yearly'
   // Prevent rendering SDK before URL params are parsed
   const [sdkReady, setSdkReady] = useState(false);
 
@@ -57,10 +58,20 @@ export default function CheckoutPage() {
       const a = (url.searchParams.get('amount') || '').trim();
       const f = (url.searchParams.get('funding') || '').trim().toLowerCase();
       const i = (url.searchParams.get('intent') || '').trim().toLowerCase();
+      const p = (url.searchParams.get('plan') || 'monthly').trim().toLowerCase();
+      
       if (c) setOrderCurrency(c);
-      if (a) setOrderAmount(a);
       if (f) setFundingParam(f);
       if (i && (i === 'authorize' || i === 'capture')) setIntentParam(i);
+      
+      // Set plan type and corresponding amount
+      if (p === 'yearly') {
+        setPlanType('yearly');
+        setOrderAmount(a || '70.00');
+      } else {
+        setPlanType('monthly');
+        setOrderAmount(a || '7.00');
+      }
     } catch (_) {}
     // Mark SDK ready to render after parsing
     setSdkReady(true);
@@ -210,6 +221,7 @@ export default function CheckoutPage() {
             amount: amountValue,
             currency: currencyCode,
             captured_at: new Date().toISOString(),
+            billing_period: planType, // 'monthly' or 'yearly'
           });
 
           console.log('Upgrade result:', upgradeResult);
@@ -282,6 +294,7 @@ export default function CheckoutPage() {
             amount: amountValue,
             currency: currencyCode,
             captured_at: new Date().toISOString(),
+            billing_period: planType, // 'monthly' or 'yearly'
           });
 
           console.log('Upgrade result:', upgradeResult);
@@ -436,11 +449,18 @@ export default function CheckoutPage() {
           <div className="flex justify-between items-center">
             <div>
               <h3 className="font-semibold">Pro Plan</h3>
-              <p className="text-sm text-muted-foreground">Billed monthly</p>
+              <p className="text-sm text-muted-foreground">
+                Billed {planType === 'yearly' ? 'annually' : 'monthly'}
+              </p>
+              {planType === 'yearly' && (
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-medium">
+                  Save $14/year (17% off)
+                </p>
+              )}
             </div>
             <div className="text-right">
-              <p className="text-2xl font-bold">$7.00</p>
-              <p className="text-sm text-muted-foreground">/month</p>
+              <p className="text-2xl font-bold">${orderAmount}</p>
+              <p className="text-sm text-muted-foreground">/{planType === 'yearly' ? 'year' : 'month'}</p>
             </div>
           </div>
 
@@ -457,9 +477,16 @@ export default function CheckoutPage() {
               </li>
               <li className="flex items-center gap-2">
                 <span className="text-green-500">✓</span>
+                Create premium broker plans
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-green-500">✓</span>
+                No ads - Ad-free experience
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-green-500">✓</span>
                 Telegram notifications: subscribe to traders you follow
               </li>
-              
               <li className="flex items-center gap-2">
                 <span className="text-green-500">✓</span>
                 Priority support
@@ -531,7 +558,7 @@ export default function CheckoutPage() {
                           value: orderAmount || '7.00',
                           currency_code: orderCurrency || 'USD',
                         },
-                        description: 'SharksZone Pro Plan - Monthly Subscription',
+                        description: `SharksZone Pro Plan - ${planType === 'yearly' ? 'Yearly' : 'Monthly'} Subscription`,
                       },
                     ],
                     application_context: {
