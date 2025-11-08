@@ -31,6 +31,11 @@ export default function Footer() {
                   Terms of Service
                 </Link>
               </li>
+              <li>
+                <Link href="/disclaimer" className={styles.link}>
+                  Financial Disclaimer
+                </Link>
+              </li>
             </ul>
           </div>
           

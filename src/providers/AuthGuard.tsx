@@ -6,7 +6,7 @@ import { useSupabase } from './SimpleSupabaseProvider';
 import '@/styles/auth.css';
 
 // Define paths that don't require authentication
-const PUBLIC_PATHS = ['/landing', '/login', '/register', '/auth/callback', '/traders', '/pricing', '/checkout', '/contact', '/how-it-works', '/privacy', '/terms'];
+const PUBLIC_PATHS = ['/landing', '/login', '/register', '/auth/callback', '/traders', '/pricing', '/checkout', '/contact', '/how-it-works', '/privacy', '/terms', '/disclaimer'];
 
 // Define path prefixes that should be public (for dynamic routes)
 // Include '/admin' so admin routes handle their own auth inside the page

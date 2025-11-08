@@ -202,6 +202,19 @@ export function PremiumPlanProvider({ children }) {
 
       if (error) throw error;
 
+      // Update profiles table with broker information (sync with SQL schema)
+      const pricing = updates.pricing || { monthly: 0, yearly: 0, currency: 'USD' };
+      const stats = planData.stats || { averagePostsPerMonth: 0 };
+      
+      await supabase
+        .from('profiles')
+        .update({
+          broker_plan_description: updates.description || '',
+          broker_average_posts_info: `Average ${stats.averagePostsPerMonth || 0} posts per month`,
+          broker_price_plan_info: `$${pricing.monthly || 0}/month or $${pricing.yearly || 0}/year`
+        })
+        .eq('id', user.id);
+
       // Update local state
       setPlanData(prev => ({
         ...prev,
@@ -221,7 +234,7 @@ export function PremiumPlanProvider({ children }) {
     } finally {
       setSaving(false);
     }
-  }, [user?.id, supabase]);
+  }, [user?.id, supabase, planData.stats]);
 
   // Update specific field
   const updatePlanField = useCallback(async (field, value) => {

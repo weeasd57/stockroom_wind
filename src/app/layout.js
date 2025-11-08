@@ -26,6 +26,7 @@ import GlobalPriceCheckHandler from '@/components/internal/GlobalPriceCheckHandl
 import UnifiedBackgroundProcessDrawer from '@/components/background/UnifiedBackgroundProcessDrawer';
 import { Toaster } from 'sonner';
 import FloatingClock from '@/components/ui/FloatingClock';
+import CookieConsent from '@/components/ui/CookieConsent';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -88,6 +89,21 @@ export default function RootLayout({ children }) {
               console.log('Initial abort function called - no active fetch to cancel');
               return Promise.resolve();
             };
+          `}
+        </Script>
+        
+        {/* Google Analytics Consent Management */}
+        <Script id="gtag-consent-init" strategy="beforeInteractive" nonce={cspNonce || undefined}>
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            window.gtag = gtag;
+            
+            // Set default consent state (denied until user accepts)
+            gtag('consent', 'default', {
+              analytics_storage: 'denied',
+              ad_storage: 'denied',
+            });
           `}
         </Script>
         
@@ -319,6 +335,7 @@ export default function RootLayout({ children }) {
                                         <UnifiedBackgroundProcessDrawer />
                                         <FloatingClock />
                                         <Toaster richColors position="top-right" />
+                                        <CookieConsent />
                                       </FollowProvider>
                                     </PriceCheckResultsProvider>
                                   </BackgroundPriceCheckProvider>
