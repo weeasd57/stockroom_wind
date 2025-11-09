@@ -858,6 +858,17 @@ export function SubscriptionProvider({ children }) {
     can_create_premium_plans: subscriptionInfo?.can_create_premium_plans || false,
     show_ads: subscriptionInfo?.show_ads !== false
   };
+  
+  // Debug logging
+  if (process.env.NODE_ENV === 'development' && subscriptionInfo) {
+    console.log('[SubscriptionProvider] Current subscription state:', {
+      plan_name: subscriptionInfo.plan_name,
+      isPro: isProPlan(),
+      can_create_premium_plans: subscriptionInfo.can_create_premium_plans,
+      subscription_status: subscriptionInfo.subscription_status,
+      userId: user?.id
+    });
+  }
 
   return (
     <SubscriptionContext.Provider value={value}>

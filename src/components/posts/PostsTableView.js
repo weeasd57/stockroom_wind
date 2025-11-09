@@ -169,13 +169,13 @@ export default function PostsTableView({ posts = [], hidePublisher = false }) {
     return columns.filter(c => map[c.id] !== false);
   }, [columns, visibleCols]);
 
-  // Check if user has access to premium post
+  // Check if user has access to premium post (NO Pro bypass)
   const hasAccessToPremium = (post) => {
     const isPremiumPost = post?.is_premium_only === true || post?.isPremiumOnly === true;
     if (!isPremiumPost) return true;
     const isOwner = !!user?.id && (post?.user_id === user.id || post?.profile?.id === user.id);
     const hasSubscription = isSubscribedToBroker(post?.user_id);
-    return isOwner || isPro || hasSubscription;
+    return isOwner || hasSubscription;
   };
 
   // Show all posts (don't filter premium), but block content for non-accessible ones
@@ -194,10 +194,23 @@ export default function PostsTableView({ posts = [], hidePublisher = false }) {
     const brokerId = premiumPost.user_id || premiumPost?.profile?.id;
     if (!brokerId) return false;
 
-    // Check if user has access
+    // Check if user has access (NO Pro bypass)
     const isOwner = !!user?.id && user.id === brokerId;
     const hasSubscription = isSubscribedToBroker(brokerId);
-    const hasAccess = isOwner || isPro || hasSubscription;
+    const hasAccess = isOwner || hasSubscription;
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[PostsTableView] Premium table access check:', {
+        hasPremiumPosts,
+        brokerId,
+        isOwner,
+        isPro,
+        hasSubscription,
+        hasAccess,
+        shouldBlock: !hasAccess,
+        userId: user?.id
+      });
+    }
 
     return !hasAccess;
   }, [posts, user?.id, isPro, isSubscribedToBroker]);

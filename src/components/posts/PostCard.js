@@ -56,9 +56,23 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
   const isPremiumPost = post?.is_premium_only === true || post?.isPremiumOnly === true;
   const isOwner = !!user?.id && (post?.user_id === user.id || profileId === user.id);
   
-  // Check if user has access: owner, pro, or subscribed to broker
+  // Check if user has access: owner or subscribed to broker (NO Pro bypass)
   const hasSubscription = isSubscribedToBroker(post?.user_id);
-  const locked = isPremiumPost && !isOwner && !isPro && !hasSubscription;
+  const locked = isPremiumPost && !isOwner && !hasSubscription;
+  
+  // Debug premium access
+  if (isPremiumPost && process.env.NODE_ENV === 'development') {
+    console.log('[PostCard] Premium access check:', {
+      postId: post?.id,
+      brokerId: post?.user_id,
+      isPremiumPost,
+      isOwner,
+      isPro,
+      hasSubscription,
+      locked,
+      userId: user?.id
+    });
+  }
 
   // Debug: log post data to check last_price_check field
   if (post?.id && post.id === 'f2e20d85-c0b6-4e54-b723-4407bea26163') {

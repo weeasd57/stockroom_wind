@@ -66,7 +66,18 @@ export function useBrokerSubscription() {
   }, [user?.id]);
 
   const isSubscribedToBroker = (brokerId) => {
-    return subscribedBrokerIds.has(brokerId);
+    const isSubscribed = subscribedBrokerIds.has(brokerId);
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[useBrokerSubscription] Check access:', {
+        brokerId,
+        isSubscribed,
+        subscribedBrokerIds: Array.from(subscribedBrokerIds),
+        userId: user?.id
+      });
+    }
+    
+    return isSubscribed;
   };
 
   return {
