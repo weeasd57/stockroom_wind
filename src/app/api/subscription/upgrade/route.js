@@ -195,6 +195,22 @@ export async function POST(request) {
     
     console.log('[subscription/upgrade] Update successful:', updateResult);
 
+    // Update profile to mark user as broker when they subscribe to Pro
+    const { error: profileErr } = await admin
+      .from('profiles')
+      .update({ 
+        is_broker: true,
+        updated_at: nowIso
+      })
+      .eq('id', user.id);
+    
+    if (profileErr) {
+      console.warn('[subscription/upgrade] Failed to update profile.is_broker:', profileErr.message);
+      // Don't fail the entire request if profile update fails
+    } else {
+      console.log('[subscription/upgrade] Profile updated: is_broker = true');
+    }
+
     // Refresh subscriptionId from the active row (guaranteed single by DB constraint)
     const { data: activeRow, error: actErr } = await admin
       .from('user_subscriptions')
