@@ -169,46 +169,44 @@ export default function PostsTableView({ posts = [], hidePublisher = false }) {
     return columns.filter(c => map[c.id] !== false);
   }, [columns, visibleCols]);
 
-  // Check if user has access to premium post (NO Pro bypass)
+  // Check if user has access to premium post
   const hasAccessToPremium = (post) => {
     const isPremiumPost = post?.is_premium_only === true || post?.isPremiumOnly === true;
     if (!isPremiumPost) return true;
     const isOwner = !!user?.id && (post?.user_id === user.id || post?.profile?.id === user.id);
     const hasSubscription = isSubscribedToBroker(post?.user_id);
-    return isOwner || hasSubscription;
+    return isOwner || isPro || hasSubscription;
   };
 
   // Show all posts (don't filter premium), but block content for non-accessible ones
   const accessiblePosts = posts;
 
-  // Check if user viewing premium broker's posts without subscription
-  const viewingPremiumBrokerWithoutAccess = useMemo(() => {
-    // Check if any posts are premium
-    const hasPremiumPosts = posts.some(p => p?.is_premium_only === true || p?.isPremiumOnly === true);
-    if (!hasPremiumPosts) return false;
+  // Check if table view should be blocked (table is a premium feature for broker profiles)
+  const shouldBlockTableView = useMemo(() => {
+    // Derive brokerId from posts list (profile feed posts should share same owner)
+    const sample = posts && posts.find(p => p?.user_id || p?.profile?.id);
+    const brokerId = sample?.user_id || sample?.profile?.id;
 
-    // Get the broker ID from first premium post
-    const premiumPost = posts.find(p => p?.is_premium_only === true || p?.isPremiumOnly === true);
-    if (!premiumPost) return false;
+    // BLOCK if user is not logged in
+    if (!user?.id) return true;
 
-    const brokerId = premiumPost.user_id || premiumPost?.profile?.id;
+    // If brokerId is unknown (no posts yet), allow access to avoid false blocks
     if (!brokerId) return false;
 
-    // Check if user has access (NO Pro bypass)
-    const isOwner = !!user?.id && user.id === brokerId;
+    // Check if user has access (Owner, Pro, or subscribed to this broker)
+    const isOwner = user.id === brokerId;
     const hasSubscription = isSubscribedToBroker(brokerId);
-    const hasAccess = isOwner || hasSubscription;
-    
+    const hasAccess = isOwner || isPro || hasSubscription;
+
     if (process.env.NODE_ENV === 'development') {
       console.log('[PostsTableView] Premium table access check:', {
-        hasPremiumPosts,
         brokerId,
+        userId: user.id,
         isOwner,
         isPro,
         hasSubscription,
         hasAccess,
-        shouldBlock: !hasAccess,
-        userId: user?.id
+        shouldBlock: !hasAccess
       });
     }
 
@@ -270,16 +268,18 @@ export default function PostsTableView({ posts = [], hidePublisher = false }) {
     return ri >= r1 && ri <= r2 && ci >= c1 && ci <= c2;
   };
 
-  // If viewing premium broker without subscription, show blocked message
-  if (viewingPremiumBrokerWithoutAccess) {
+  // Block entire table for non-premium viewers
+  if (shouldBlockTableView) {
     return (
       <div style={styles.blockedTableContainer}>
         <div style={styles.blockedTableContent}>
           <div style={styles.lockIcon}>🔒</div>
           <h3 style={styles.blockedTitle}>Premium Table View</h3>
           <p style={styles.blockedDescription}>
-            This table view contains premium content from a broker. 
-            Subscribe to this broker's premium plan to access the full table view with export features.
+            {!user?.id
+              ? 'Please sign in to access this broker\'s table view.'
+              : 'Subscribe to this broker\'s premium plan or upgrade to Pro to view the table.'
+            }
           </p>
           <div style={styles.blockedFeatures}>
             <div style={styles.featureItem}>✓ Full table access</div>
@@ -303,19 +303,31 @@ export default function PostsTableView({ posts = [], hidePublisher = false }) {
           style={styles.filterInput}
         />
         <div style={{ flex: 1 }} />
-        <button style={styles.toolButton} onClick={() => { try { copySelection(displayColumns, sortedPosts, selection); } catch {} }} title="Copy selection or all">
-          Copy
-        </button>
-        <button style={styles.toolButton} onClick={() => setShowColsDialog(true)} title="Show/Hide columns">
-          Columns
-        </button>
+        {!shouldBlockTableView && (
+          <>
+            <button style={styles.toolButton} onClick={() => { try { copySelection(displayColumns, sortedPosts, selection); } catch {} }} title="Copy selection or all">
+              Copy
+            </button>
+            <button style={styles.toolButton} onClick={() => setShowColsDialog(true)} title="Show/Hide columns">
+              Columns
+            </button>
+          </>
+        )}
+        {shouldBlockTableView && (
+          <div style={styles.premiumNotice}>
+            {!user?.id 
+              ? '🔒 Sign in to access export features'
+              : '🔒 Subscribe to access export features'
+            }
+          </div>
+        )}
       </div>
       {/* Scrollable table container */}
       <div
         ref={containerRef}
         style={styles.wrapper}
         tabIndex={0}
-        onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') { e.preventDefault(); try { copySelection(displayColumns, sortedPosts, selection); } catch {} } }}
+        onKeyDown={(e) => { if (shouldBlockTableView) return; if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') { e.preventDefault(); try { copySelection(displayColumns, sortedPosts, selection); } catch {} } }}
       >
         <table style={styles.table}>
         <thead ref={theadRef}>
@@ -756,5 +768,17 @@ const styles = {
     fontSize: '0.95rem',
     fontWeight: 600,
     color: 'hsl(var(--foreground))',
+  },
+  premiumNotice: {
+    padding: '6px 12px',
+    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(251, 191, 36, 0.15) 100%)',
+    border: '1px solid rgba(245, 158, 11, 0.3)',
+    borderRadius: 6,
+    color: 'hsl(var(--foreground))',
+    fontSize: 13,
+    fontWeight: 600,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
   }
 };

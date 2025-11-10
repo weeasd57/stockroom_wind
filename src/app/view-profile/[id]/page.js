@@ -62,7 +62,7 @@ export default function ViewProfile({ params }) {
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [hasTelegramBot, setHasTelegramBot] = useState(false);
   const [telegramBotLoading, setTelegramBotLoading] = useState(true);
-  const [postsViewMode, setPostsViewMode] = useState('table');
+  const [postsViewMode, setPostsViewMode] = useState('grid');
   const searchParams = useSearchParams();
   // Local tabs and strategies state for view-profile
   const [activeTab, setActiveTab] = useState('posts'); // 'posts' | 'strategies'

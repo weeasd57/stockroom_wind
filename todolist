@@ -4,9 +4,6 @@
 TESTS list {
   
 
-  * check prices should if post in premium send to 
-    premium users and add premium badge in telegram messege too 
-  * and create post too 
 
 }
 

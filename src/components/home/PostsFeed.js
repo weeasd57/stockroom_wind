@@ -1075,8 +1075,8 @@ function PostsFeed({
           className={`${styles.postsContainer} ${viewMode === 'grid' ? styles.gridView : styles.listView}`}
           style={viewMode === 'grid' ? {
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-            gap: '20px',
+            gridTemplateColumns: `repeat(auto-fill, minmax(${mode === 'view-profile' ? 280 : 350}px, 1fr))`,
+            gap: mode === 'view-profile' ? '16px' : '20px',
             alignItems: 'start'
           } : {}}
         >

@@ -117,8 +117,13 @@ export default function TradersPage() {
       return;
     }
     
-    if (username) {
-      router.push(`/view-profile/${username}`);
+    // Ensure username exists and has no spaces (use userId as fallback)
+    const profileIdentifier = username && !username.includes(' ') 
+      ? username 
+      : userId;
+    
+    if (profileIdentifier) {
+      router.push(`/view-profile/${profileIdentifier}`);
     }
   };
 
@@ -399,6 +404,7 @@ export default function TradersPage() {
                           />
                         </div>
                         <div className={styles.traderInfo}>
+                          <p className={styles.username}>@{trader.username || 'username'}</p>
                           <div className={styles.traderNameRow}>
                             <h3>{trader.full_name || 'Trader'}</h3>
                             {telegramBots[trader.id]?.hasBot && (
@@ -409,7 +415,6 @@ export default function TradersPage() {
                               </div>
                             )}
                           </div>
-                          <p className={styles.username}>@{trader.username || 'username'}</p>
                         </div>
                       </div>
                       
@@ -479,7 +484,7 @@ export default function TradersPage() {
                     {/* Grid layout: Keep original structure */}
                     <div 
                       className={styles.traderHeader}
-                      onClick={() => navigateToProfile(trader.id)}
+                      onClick={() => navigateToProfile(trader.id, trader.username)}
                     >
                       <div className={styles.traderAvatar}>
                         <LazyImage
@@ -493,6 +498,7 @@ export default function TradersPage() {
                         />
                       </div>
                       <div className={styles.traderInfo}>
+                        <p className={styles.username}>@{trader.username || 'username'}</p>
                         <div className={styles.traderNameRow}>
                           <h3>{trader.full_name || 'Trader'}</h3>
                           {telegramBots[trader.id]?.hasBot && (
@@ -503,7 +509,6 @@ export default function TradersPage() {
                             </div>
                           )}
                         </div>
-                        <p className={styles.username}>@{trader.username || 'username'}</p>
                       </div>
                     </div>
                     
