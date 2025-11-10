@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { toast } from 'sonner';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
 import { useStrategies } from '@/providers/StrategiesProvider';
@@ -16,7 +17,7 @@ import CreatePostForm from '@/components/posts/CreatePostForm';
 import { uploadImage } from '@/utils/supabase';
 import { useCreatePostForm } from '@/providers/CreatePostFormProvider';
 import { createPortal } from 'react-dom';
-import { PostsFeed } from '@/components/home/PostsFeed';
+import PostsFeed from '@/components/home/PostsFeed';
 import CheckPostPricesButton from '@/components/profile/CheckPostPricesButton';
 import StrategyDetailsModal from '@/components/profile/StrategyDetailsModal';
 import TelegramBotTab from '@/components/telegram/TelegramBotTab';
@@ -198,7 +199,7 @@ export default function Profile() {
   const [strategyToDelete, setStrategyToDelete] = useState(null);
   const [strategyPostsCount, setStrategyPostsCount] = useState(0);
   const [backgroundUploadProgress, setBackgroundUploadProgress] = useState(0);
-  const [viewMode, setViewMode] = useState('table'); // 'table' | 'grid' | 'list'
+  const [viewMode, setViewMode] = useState('grid'); // 'table' | 'grid' | 'list'
   const [mounted, setMounted] = useState(false);
   const [followersDialogOpen, setFollowersDialogOpen] = useState(false);
   const [followingDialogOpen, setFollowingDialogOpen] = useState(false);
@@ -435,7 +436,7 @@ export default function Profile() {
   }, []);
 
   const handleShareProfile = useCallback(() => {
-    const profileUrl = `${window.location.origin}/view-profile/${user?.id}`;
+    const profileUrl = `${window.location.origin}/view-profile/${profile?.username || user?.id}`;
     
     // Try to use the modern Clipboard API
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -889,6 +890,25 @@ export default function Profile() {
     setBackgroundUploadError(null);
     
     try {
+      // Check if there are actual changes
+      const hasChanges = avatarFile || backgroundFile || 
+        formData.username !== profile?.username ||
+        formData.full_name !== profile?.full_name ||
+        formData.bio !== profile?.bio ||
+        formData.facebook_url !== (profile?.facebook_url || '') ||
+        formData.telegram_url !== (profile?.telegram_url || '') ||
+        formData.youtube_url !== (profile?.youtube_url || '') ||
+        formData.show_facebook !== (profile?.show_facebook || false);
+      
+      if (!hasChanges) {
+        console.log('[PROFILE EDIT] ⚠️ No changes detected, skipping update');
+        toast.info('No changes detected', {
+          description: 'You haven\'t made any changes to your profile.'
+        });
+        setShowEditModal(false);
+        return;
+      }
+      
       // Submit to background processing
       const taskId = await submitProfileEdit(formData, avatarFile, backgroundFile);
       
@@ -2289,8 +2309,12 @@ export default function Profile() {
                   value={formData.username}
                   onChange={handleInputChange}
                   required
+                  minLength={3}
+                  maxLength={30}
+                  pattern="^[a-zA-Z0-9_-]+$"
+                  title="Username must be 3-30 characters and can only contain letters, numbers, underscores, and hyphens"
                   disabled={isSaving}
-                  placeholder="Enter your username"
+                  placeholder="Enter your username (e.g., john_trader)"
                 />
               </div>
               

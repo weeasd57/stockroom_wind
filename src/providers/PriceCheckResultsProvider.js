@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import PriceCheckResultsDialog from '@/components/dialogs/PriceCheckResultsDialog';
 
 const PriceCheckResultsContext = createContext();
@@ -48,6 +48,14 @@ export function PriceCheckResultsProvider({ children }) {
   return (
     <PriceCheckResultsContext.Provider value={value}>
       {children}
+      {typeof window !== 'undefined' && (
+        (() => {
+          try {
+            window.showPriceCheckResults = (resultsData, statsData) => showResults(resultsData, statsData);
+          } catch {}
+          return null;
+        })()
+      )}
       <PriceCheckResultsDialog
         isOpen={dialogState.isOpen}
         onClose={hideResults}

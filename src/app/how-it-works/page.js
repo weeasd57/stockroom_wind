@@ -127,6 +127,20 @@ export default function HowItWorksPage() {
         'Analyze post status, strategies, and more',
         'Save and manage your custom charts'
       ]
+    },
+    {
+      id: 'premium-features',
+      title: 'Premium Features',
+      description: 'Upgrade to premium and unlock advanced features designed for serious traders. Subscribe to professional brokers, export your data, and get priority support with an ad-free experience.',
+      image: '/how work it/bandicam 2025-10-31 14-25-24-137.jpg',
+      highlights: [
+        'Subscribe to premium brokers for exclusive signals',
+        'Export trading data to Excel/CSV',
+        'Ad-free trading experience',
+        'Priority customer support',
+        'Access premium broker analysis and insights'
+      ],
+      isPremium: true
     }
   ];
 
@@ -160,7 +174,7 @@ export default function HowItWorksPage() {
         {sections.map((section, index) => (
           <section 
             key={section.id} 
-            className={`${styles.section} ${index % 2 === 1 ? styles.sectionReverse : ''}`}
+            className={`${styles.section} ${index % 2 === 1 ? styles.sectionReverse : ''} ${section.isPremium ? styles.premiumSection : ''}`}
             id={section.id}
           >
             <div className={styles.sectionContent}>

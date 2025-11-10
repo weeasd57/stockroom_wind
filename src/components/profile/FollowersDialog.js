@@ -89,7 +89,7 @@ export default function FollowersDialog({
                         // Close the dialog first
                         onClose();
                         // Navigate using Next.js router
-                        router.push(`/view-profile/${user.id}`);
+                        router.push(`/view-profile/${user.username}`);
                       }}
                     >
                       <div className={styles.avatarContainer}>

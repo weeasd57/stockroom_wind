@@ -14,7 +14,7 @@ import DashboardSection from '@/components/home/DashboardSection';
 // DashboardSection imported statically to avoid dev-time chunk load issues
 
 const PostsFeed = dynamic(
-  () => import('@/components/home/PostsFeed'),
+  () => import('@/components/home/PostsFeed').then((mod) => mod.default),
   {
     loading: () => <div className={styles.skeletonFeed}>Loading posts...</div>,
     ssr: true // Keep SSR for SEO

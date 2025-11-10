@@ -111,14 +111,14 @@ export default function TradersPage() {
   }, [supabase, traders]);
 
   // Navigation functions
-  const navigateToProfile = (userId) => {
+  const navigateToProfile = (userId, username) => {
     if (isAuthenticated && user && userId === user.id) {
       router.push('/profile');
       return;
     }
     
-    if (userId) {
-      router.push(`/view-profile/${userId}`);
+    if (username) {
+      router.push(`/view-profile/${username}`);
     }
   };
 
@@ -385,7 +385,7 @@ export default function TradersPage() {
                     <div className={styles.leftColumn}>
                       <div 
                         className={styles.traderHeader}
-                        onClick={() => navigateToProfile(trader.id)}
+                        onClick={() => navigateToProfile(trader.id, trader.username)}
                       >
                         <div className={styles.traderAvatar}>
                           <LazyImage

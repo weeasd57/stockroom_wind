@@ -12,7 +12,7 @@ import styles from '@/styles/home/PostsFeed.module.css';
 import { COUNTRY_CODE_TO_NAME } from '@/models/CountryData';
 import { useSubscription } from '@/providers/SubscriptionProvider';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
-import { useBrokerSubscription } from '@/hooks/useBrokerSubscription';
+import { useBrokerSubscription } from '@/providers/BrokerSubscriptionProvider';
 
 // Reusable PostCard component used across Home feed and Traders page
 export default function PostCard({ post, showFlagBackground = false, hideUserInfo = false, viewMode = 'list' }) {
@@ -115,7 +115,7 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
         <div className={styles.postHeader}>
           {!hideUserInfo && (
             profileId ? (
-              <Link href={`/view-profile/${profileId}`} className={styles.userInfo} prefetch={false}>
+              <Link href={`/view-profile/${username}`} className={styles.userInfo} prefetch={false}>
                 <div className={styles.avatar}>
                   {avatarUrl ? (
                     <img src={avatarUrl} alt={username} className={styles.avatarImage} />
@@ -187,7 +187,7 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
         <div className={styles.postHeader}>
           {!hideUserInfo && (
             profileId ? (
-              <Link href={`/view-profile/${profileId}`} className={styles.userInfo} prefetch={false}>
+              <Link href={`/view-profile/${username}`} className={styles.userInfo} prefetch={false}>
                 <div className={styles.avatar}>
                   {avatarUrl ? (
                     <img src={avatarUrl} alt={username} className={styles.avatarImage} />

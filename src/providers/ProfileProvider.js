@@ -57,6 +57,29 @@ export function ProfileProvider({ children }) {
   // Helper function to handle error objects consistently - defined early
   const handleError = useCallback((err) => {
     if (typeof err === 'object' && err !== null) {
+      // Check for specific error codes
+      if (err.code === '23505') {
+        // Duplicate key violation
+        if (err.message && err.message.includes('profiles_username_key')) {
+          console.error('Duplicate username error:', err);
+          return 'This username is already taken. Please choose a different username.';
+        }
+        console.error('Duplicate key error:', err);
+        return 'This value is already in use. Please choose a different one.';
+      }
+      
+      if (err.code === '23503') {
+        // Foreign key violation
+        console.error('Foreign key violation:', err);
+        return 'Invalid reference. Please check your data and try again.';
+      }
+      
+      if (err.code === '42501') {
+        // Insufficient privileges
+        console.error('Permission denied:', err);
+        return 'You do not have permission to perform this action.';
+      }
+      
       // If error has message property, use it
       if (err.message) {
         console.error('Error object:', err);
@@ -426,8 +449,35 @@ export function ProfileProvider({ children }) {
     
     setLoading(true);
     try {
+      // Create a copy of updates to modify
+      const cleanedUpdates = { ...updates };
       
-      const { data, error } = await updateUserProfile(user.id, updates);
+      // Debug: Log current values
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[ProfileProvider] Update check:', {
+          updateUsername: cleanedUpdates.username,
+          profileUsername: profile?.username,
+          areEqual: cleanedUpdates.username === profile?.username
+        });
+      }
+      
+      // Remove username if it hasn't changed (to avoid duplicate key error)
+      if (cleanedUpdates.username && profile?.username) {
+        if (cleanedUpdates.username === profile.username) {
+          console.log('[ProfileProvider] ✅ Username unchanged, removing from updates to avoid duplicate error');
+          delete cleanedUpdates.username;
+        } else {
+          console.log('[ProfileProvider] ⚠️ Username changed from', profile.username, 'to', cleanedUpdates.username);
+        }
+      } else {
+        console.log('[ProfileProvider] ⚠️ Username check skipped:', {
+          hasUpdateUsername: !!cleanedUpdates.username,
+          hasProfileUsername: !!profile?.username,
+          profile: profile
+        });
+      }
+      
+      const { data, error } = await updateUserProfile(user.id, cleanedUpdates);
       
       if (error) {
         console.error('Error updating profile:', error);

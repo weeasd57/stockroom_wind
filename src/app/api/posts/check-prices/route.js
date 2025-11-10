@@ -16,11 +16,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Create client function to be called when needed
-const createSupabaseClient = () => {
+const createSupabaseClient = (accessToken) => {
   return createClient(supabaseUrl || '', supabaseAnonKey || '', {
     auth: {
       autoRefreshToken: false,
       persistSession: false
+    },
+    global: {
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
     }
   });
 };
@@ -85,14 +88,15 @@ export async function GET(request) {
     if (!supabaseUrl || !supabaseAnonKey) {
       return NextResponse.json({ success: false, message: 'Database configuration not available', error: 'missing_database_config' }, { status: 503 });
     }
-    const supabase = createSupabaseClient();
+    const authClient = createSupabaseClient();
 
     const { searchParams } = new URL(request.url);
     let userId = searchParams.get('userId') || '';
     const cookieHeader = request.headers.get('cookie');
+    let accessToken;
 
     if (!userId) {
-      const { data: { session }, error: authError } = await supabase.auth.getSession({ cookieHeader });
+      const { data: { session }, error: authError } = await authClient.auth.getSession({ cookieHeader });
       if (authError) {
         return NextResponse.json({ success: false, message: 'Authentication error', details: authError.message }, { status: 401 });
       }
@@ -100,11 +104,14 @@ export async function GET(request) {
         return NextResponse.json({ success: false, message: 'Unauthorized', details: 'No active session' }, { status: 401 });
       }
       userId = session.user.id;
+      accessToken = session.access_token;
     }
 
     if (!userId) {
       return NextResponse.json({ success: false, message: 'User ID not available' }, { status: 401 });
     }
+
+    const supabase = createSupabaseClient(accessToken);
 
     const { data: activeSub, error: subError } = await supabase
       .from('user_subscriptions')
@@ -157,8 +164,8 @@ export async function POST(request) {
       );
     }
 
-    // Create client after validation
-    const supabase = createSupabaseClient();
+    // Create client for auth; will re-instantiate with JWT after session retrieval
+    let supabase = createSupabaseClient();
 
     const body = await request.json().catch(() => ({}));
     if (DEBUG) console.log(`[DEBUG] Request body:`, JSON.stringify(body));
@@ -200,6 +207,8 @@ export async function POST(request) {
       
       userId = session.user.id;
       if (DEBUG) console.log(`[DEBUG] Retrieved userId from session: ${userId}`);
+      const accessToken = session?.access_token;
+      supabase = createSupabaseClient(accessToken);
     }
     
     

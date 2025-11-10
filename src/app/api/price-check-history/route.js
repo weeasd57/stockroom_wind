@@ -2,11 +2,16 @@ export const dynamic = 'force-dynamic'; // Ensure this route is server-rendered 
 
 import { createClient } from '@supabase/supabase-js';
 
-// Use anon key for API routes (safer and more compatible)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+// Factory to create client (optionally with Authorization header)
+const createSupabase = (accessToken) =>
+  createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} }
+    }
+  );
 
 // Check if environment variables are available
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -27,6 +32,7 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const days = parseInt(searchParams.get('days') || '30');
+    const cookieHeader = request.headers.get('cookie');
 
     if (!userId) {
       return Response.json({ error: 'User ID is required' }, { status: 400 });
@@ -39,6 +45,15 @@ export async function GET(request) {
 
     // Fetch price check related data from multiple sources
     const priceCheckActivities = [];
+
+    // Resolve session and create an auth-bound client for RLS-protected reads
+    const authClient = createSupabase();
+    let accessToken;
+    try {
+      const { data: { session } } = await authClient.auth.getSession({ cookieHeader });
+      accessToken = session?.access_token;
+    } catch {}
+    const supabase = createSupabase(accessToken);
 
     try {
       // 1. Get posts that had price updates in the last N days
@@ -58,6 +73,12 @@ export async function GET(request) {
           stop_loss_triggered,
           last_price_check,
           price_checks,
+          closed,
+          closed_date,
+          status_message,
+          postDateAfterPriceDate,
+          postAfterMarketClose,
+          noDataAvailable,
           created_at,
           updated_at
         `)
@@ -68,22 +89,23 @@ export async function GET(request) {
       if (postsError) {
         console.error('[Price Check History API] Posts fetch error:', postsError);
       } else if (updatedPosts) {
-        // Group posts by price check date (approximately)
+        // Group posts by price check time bucket (approximately)
         const groupedByDate = {};
         
         updatedPosts.forEach(post => {
           if (!post.last_price_check) return;
           
-          // Round to nearest hour to group checks that happened around the same time
+          // Round to 1-minute bucket to group checks that belong to the same run
           const checkDate = new Date(post.last_price_check);
-          const roundedHour = new Date(checkDate);
-          const dateKey = roundedHour.toISOString();
+          const minuteBucketMs = 60 * 1000;
+          const bucketTime = Math.floor(checkDate.getTime() / minuteBucketMs) * minuteBucketMs;
+          const dateKey = new Date(bucketTime).toISOString();
           
           if (!groupedByDate[dateKey]) {
             groupedByDate[dateKey] = {
-              id: `price_check_${checkDate.getTime()}`,
+              id: `price_check_${bucketTime}`,
               type: 'price-check',
-              timestamp: checkDate.toISOString(),
+              timestamp: new Date(bucketTime).toISOString(),
               title: `Price Check - ${checkDate.toLocaleDateString()}`,
               posts: [],
               checkedPosts: 0,

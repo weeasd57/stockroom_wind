@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { useSubscription } from '@/providers/SubscriptionProvider';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
-import { useBrokerSubscription } from '@/hooks/useBrokerSubscription';
+import { useBrokerSubscription } from '@/providers/BrokerSubscriptionProvider';
 
 // Simple spreadsheet-like table for posts with resizable columns and row heights
 // No external deps; designed for profile feed usage
@@ -440,7 +440,7 @@ function renderCell(col, post, router, hasAccess = true) {
     );
   }
   if (col.id === 'publisher') {
-    const profileId = post?.profile?.id;
+    const username = post?.profile?.username;
     const isPremium = post?.is_premium_only === true || post?.isPremiumOnly === true;
     const content = (
       <>
@@ -449,12 +449,12 @@ function renderCell(col, post, router, hasAccess = true) {
       </>
     );
     
-    if (profileId) {
+    if (username) {
       return (
         <a
-          href={`/view-profile/${profileId}`}
+          href={`/view-profile/${username}`}
           style={styles.link}
-          onClick={(e) => { e.preventDefault(); try { router.push(`/view-profile/${profileId}`); } catch {} }}
+          onClick={(e) => { e.preventDefault(); try { router.push(`/view-profile/${username}`); } catch {} }}
         >
           {content}
         </a>

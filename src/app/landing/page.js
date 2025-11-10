@@ -140,6 +140,37 @@ export default function LandingPage() {
    
   ];
 
+  const premiumFeatures = [
+    {
+      id: 1,
+      title: 'Premium Broker Subscriptions',
+      description:
+        'Subscribe to professional brokers and access their exclusive premium trading signals, detailed analysis, and market insights.',
+      icon: '💎',
+    },
+    {
+      id: 2,
+      title: 'Export to Excel & CSV',
+      description:
+        'Export your trading data, post history, and analysis to Excel format for advanced data analysis and record keeping.',
+      icon: '📁',
+    },
+    {
+      id: 3,
+      title: 'Ad-Free Experience',
+      description:
+        'Enjoy a clean, distraction-free trading environment without any advertisements interrupting your workflow.',
+      icon: '🚫',
+    },
+    {
+      id: 4,
+      title: 'Priority Support',
+      description:
+        'Get faster response times and dedicated support from our team to help you maximize your trading performance.',
+      icon: '🎯',
+    },
+  ];
+
   const login = () => {
     setVisible(false);
     setTimeout(() => {
@@ -253,6 +284,36 @@ export default function LandingPage() {
                   <p>{f.description}</p>
                 </article>
               ))}
+            </section>
+
+            {/* Premium Features Section */}
+            <section className={styles.premiumSection} aria-label="Premium features">
+              <div className={styles.premiumHeader}>
+                <h2 className={styles.premiumTitle}>
+                  <span className={styles.premiumBadge}>💎 PREMIUM</span>
+                  Unlock Advanced Features
+                </h2>
+                <p className={styles.premiumSubtitle}>
+                  Take your trading to the next level with premium features designed for serious traders
+                </p>
+              </div>
+              <div className={styles.premiumGrid}>
+                {premiumFeatures.map((f) => (
+                  <article key={f.id} className={styles.premiumCard}>
+                    <div className={styles.premiumCardIcon}>{f.icon}</div>
+                    <h3 className={styles.premiumCardTitle}>{f.title}</h3>
+                    <p>{f.description}</p>
+                  </article>
+                ))}
+              </div>
+              <div className={styles.premiumCta}>
+                <button 
+                  className={styles.premiumButton}
+                  onClick={() => router.push('/pricing')}
+                >
+                  View Premium Plans
+                </button>
+              </div>
             </section>
           </div>
 

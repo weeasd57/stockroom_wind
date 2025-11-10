@@ -51,8 +51,8 @@ function CommentItem({
           <div className={styles.commentBubble}>
             <div className={styles.commentHeader}>
               <span className={styles.username}>
-                {comment.user_id ? (
-                  <Link href={`/view-profile/${comment.user_id}`} className={styles.username} prefetch={false}>
+                {comment.user_id && comment.username ? (
+                  <Link href={`/view-profile/${comment.username}`} className={styles.username} prefetch={false}>
                     {comment.username || comment.full_name || 'Unknown User'}
                   </Link>
                 ) : (

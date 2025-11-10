@@ -656,11 +656,28 @@ async function sendNewPostTelegramNotifications(supabase: any, post: any) {
     const brokerId = post.user_id;
     const isPremiumPost = post.is_premium_only === true;
 
-    // Get telegram subscribers for this broker
+    // CRITICAL: Get bot token from user's configured bot FIRST (must use bot.id for subscribers lookup)
+    const { data: userBot, error: botError } = await supabase
+      .from('telegram_bots')
+      .select('id, bot_token, bot_name')
+      .eq('user_id', brokerId)
+      .eq('is_active', true)
+      .single();
+
+    if (botError || !userBot?.bot_token) {
+      console.error('[Telegram] No active bot found for user:', brokerId, botError);
+      return;
+    }
+
+    const botToken = userBot.bot_token;
+    const botId = userBot.id; // Use this for subscribers lookup, NOT user_id
+    console.log(`[Telegram] Using bot: ${userBot.bot_name} (${botId})`);
+
+    // Get telegram subscribers for this bot (using bot.id, NOT user_id)
     const { data: telegramSubscribers, error: subscribersError } = await supabase
       .from('telegram_subscribers')
       .select('telegram_user_id, platform_user_id, is_subscribed')
-      .eq('bot_id', brokerId)
+      .eq('bot_id', botId) // ✅ Use bot.id from telegram_bots table
       .eq('is_subscribed', true);
 
     if (subscribersError) {
@@ -669,58 +686,52 @@ async function sendNewPostTelegramNotifications(supabase: any, post: any) {
     }
 
     if (!telegramSubscribers || telegramSubscribers.length === 0) {
-      console.log('[Telegram] No active telegram subscribers found');
+      console.log('[Telegram] No active telegram subscribers found for bot:', botId);
       return;
     }
 
-  console.log(`[Telegram] Found ${telegramSubscribers.length} telegram subscribers`);
+    console.log(`[Telegram] Found ${telegramSubscribers.length} telegram subscribers`);
 
-  // If premium post, filter subscribers by broker subscription
-  let targetSubscribers = telegramSubscribers;
-  if (isPremiumPost) {
-    const subscriberUserIds = telegramSubscribers
-      .map((s: any) => s.platform_user_id)
-      .filter((id: any) => id);
+    // If premium post, filter subscribers by broker subscription
+    let targetSubscribers = telegramSubscribers;
+    if (isPremiumPost) {
+      const subscriberUserIds = telegramSubscribers
+        .map((s: any) => s.platform_user_id)
+        .filter((id: any) => id);
 
-    const { data: brokerSubscriptions, error: subError } = await supabase
-      .from('broker_subscriptions')
-      .select('user_id, status, expires_at')
-      .eq('broker_id', brokerId)
-      .eq('status', 'active')
-      .in('user_id', subscriberUserIds);
+      const { data: brokerSubscriptions, error: subError } = await supabase
+        .from('broker_subscriptions')
+        .select('user_id, status, expires_at')
+        .eq('broker_id', brokerId)
+        .eq('status', 'active')
+        .in('user_id', subscriberUserIds);
 
-    if (subError) {
-      console.error('[Telegram] Error fetching broker subscriptions:', subError);
-      // Continue with all subscribers if query fails
-      targetSubscribers = telegramSubscribers;
-    } else {
+      if (subError) {
+        console.error('[Telegram] Error fetching broker subscriptions:', subError);
+        // Continue with all subscribers if query fails
+        targetSubscribers = telegramSubscribers;
+      } else {
+        const premiumSubscribers = new Set(
+          brokerSubscriptions
+            ?.filter((sub: any) => !sub.expires_at || new Date(sub.expires_at) > new Date())
+            .map((sub: any) => sub.user_id) || []
+        );
 
-      const premiumSubscribers = new Set(
-        brokerSubscriptions
-          ?.filter((sub: any) => !sub.expires_at || new Date(sub.expires_at) > new Date())
-          .map((sub: any) => sub.user_id) || []
-      );
+        console.log(`[Telegram] Filtering for premium subscribers: ${premiumSubscribers.size}`);
+        
+        // Filter to only premium subscribers
+        targetSubscribers = telegramSubscribers.filter((sub: any) => 
+          premiumSubscribers.has(sub.platform_user_id)
+        );
 
-      console.log(`[Telegram] Filtering for premium subscribers: ${premiumSubscribers.size}`);
-      
-      // Filter to only premium subscribers
-      targetSubscribers = telegramSubscribers.filter((sub: any) => 
-        premiumSubscribers.has(sub.platform_user_id)
-      );
-
-      if (targetSubscribers.length === 0) {
-        console.log('[Telegram] No premium subscribers found for premium post');
-        return;
+        if (targetSubscribers.length === 0) {
+          console.log('[Telegram] No premium subscribers found for premium post');
+          return;
+        }
       }
     }
-  }
 
-    // Get bot token
-    const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.TELEGRAMBOT_TOKEN;
-    if (!botToken) {
-      console.error('[Telegram] Bot token not configured');
-      return;
-    }
+    console.log(`[Telegram] Sending to ${targetSubscribers.length} subscribers...`);
 
     // Format message
     let message = `🆕 *New Post Alert*\n\n`;
@@ -779,6 +790,32 @@ async function sendNewPostTelegramNotifications(supabase: any, post: any) {
         const result = await response.json();
         if (result.ok) {
           sentCount++;
+          
+          // Log notification to database (find subscriber_id from telegram_subscribers)
+          try {
+            const { data: subData } = await supabase
+              .from('telegram_subscribers')
+              .select('id')
+              .eq('bot_id', botId) // ✅ Use botId, not brokerId
+              .eq('telegram_user_id', subscriber.telegram_user_id)
+              .single();
+            
+            if (subData?.id) {
+              await supabase
+                .from('telegram_notifications')
+                .insert({
+                  bot_id: botId,
+                  subscriber_id: subData.id,
+                  notification_type: 'new_post',
+                  post_id: post.id,
+                  telegram_message_id: result.result.message_id,
+                  message_text: message,
+                  status: 'sent'
+                });
+            }
+          } catch (logError) {
+            console.warn('[Telegram] Failed to log notification:', logError);
+          }
         } else {
           failedCount++;
           console.error(`[Telegram] Failed to send to ${subscriber.telegram_user_id}:`, result.description);

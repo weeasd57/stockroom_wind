@@ -89,8 +89,8 @@ export default function BrokerSubscribePage() {
           const data = await response.json();
 
           if (response.ok && data.success) {
-            // Subscription activated, redirect to broker profile
-            router.push(`/view-profile/${brokerId}?subscribed=true`);
+            // Subscription activated, redirect to broker profile using username
+            router.push(`/view-profile/${brokerData?.username || brokerId}?subscribed=true`);
           } else {
             // Log detailed error for debugging
             console.error('[Capture Error] Response:', {
@@ -124,12 +124,17 @@ export default function BrokerSubscribePage() {
     try {
       const { supabase } = await import('@/utils/supabase');
       
-      // Fetch broker profile
-      const { data: profile, error: profileError } = await supabase
+      // Check if brokerId is UUID or username
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(brokerId);
+      
+      // Fetch broker profile (by UUID or username)
+      const query = supabase
         .from('profiles')
-        .select('id, username, avatar_url, bio, is_broker')
-        .eq('id', brokerId)
-        .single();
+        .select('id, username, avatar_url, bio, is_broker');
+      
+      const { data: profile, error: profileError } = await (isUUID 
+        ? query.eq('id', brokerId).single()
+        : query.eq('username', brokerId).single());
 
       if (profileError) throw profileError;
       if (!profile?.is_broker) {
@@ -296,7 +301,7 @@ export default function BrokerSubscribePage() {
                   Please check back later or visit their profile for updates.
                 </p>
                 <button 
-                  onClick={() => router.push(`/view-profile/${brokerId}`)}
+                  onClick={() => router.push(`/view-profile/${brokerData?.username || brokerId}`)}
                   style={{
                     padding: '1rem 2rem',
                     background: '#f59e0b',
@@ -479,7 +484,7 @@ export default function BrokerSubscribePage() {
             )}
 
             <button 
-              onClick={() => router.push(`/view-profile/${brokerId}`)}
+              onClick={() => router.push(`/view-profile/${brokerData?.username || brokerId}`)}
               className={styles.backButton}
             >
               Back to Broker Profile

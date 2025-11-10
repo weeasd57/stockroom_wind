@@ -16,7 +16,15 @@ import StrategyDetailsModal from '@/components/profile/StrategyDetailsModal';
 // Local cache for profile data
 const profileCache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Helper function to check if param is UUID or username
+const isUUID = (str) => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+};
+
 export default function ViewProfile({ params }) {
+  // Fixed: All userId references changed to actualUserId
   const { supabase, isAuthenticated, user } = useSupabase();
   const router = useRouter();
   const { isFollowing, toggleFollow, checkIsFollowing, loading: followLoading, error: followError } = useFollow(); // Use useFollow hook
@@ -31,15 +39,19 @@ export default function ViewProfile({ params }) {
     console.log('[VIEW-PROFILE] ProfileProvider not available');
   }
   
-  // Make sure to extract the ID correctly from params
-  const userId = params?.id;
+  // Extract ID/Username from params and determine type
+  const userIdOrUsername = params?.id;
+  const isUserUUID = isUUID(userIdOrUsername);
+  
   console.log("[VIEW-PROFILE] Component loaded with params:", params);
-  console.log("[VIEW-PROFILE] Extracted userId:", userId);
+  console.log("[VIEW-PROFILE] Extracted param:", userIdOrUsername);
+  console.log("[VIEW-PROFILE] Is UUID:", isUserUUID, "| Is Username:", !isUserUUID);
   
   // Progressive loading states
   const [basicDataLoading, setBasicDataLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
   const [profileData, setProfileData] = useState(null);
+  const [actualUserId, setActualUserId] = useState(null); // The real UUID from profile (not username)
   const [premiumPostsCount, setPremiumPostsCount] = useState(0);
   const [premiumFeatures, setPremiumFeatures] = useState([]);
   const [premiumPlanData, setPremiumPlanData] = useState(null);
@@ -91,8 +103,8 @@ export default function ViewProfile({ params }) {
 
   // Fetch profile data
   useEffect(() => {
-    // Only redirect if there's definitely no user ID
-    if (userId === undefined || userId === null) {
+    // Only redirect if there's definitely no user ID/username
+    if (userIdOrUsername === undefined || userIdOrUsername === null) {
       router.push('/home');
       return;
     }
@@ -103,10 +115,10 @@ export default function ViewProfile({ params }) {
     }
 
     // Prevent double-fetch in React Strict Mode (dev)
-    if (hasFetchedRef.current[userId]) {
+    if (hasFetchedRef.current[userIdOrUsername]) {
       return;
     }
-    hasFetchedRef.current[userId] = true;
+    hasFetchedRef.current[userIdOrUsername] = true;
 
     let isCancelled = false;
     const controller = new AbortController();
@@ -117,10 +129,10 @@ export default function ViewProfile({ params }) {
 
     const fetchProfileData = async () => {
       try {
-        console.log('[VIEW-PROFILE] Starting to fetch profile data for userId:', userId);
+        console.log('[VIEW-PROFILE] Starting to fetch profile data for:', userIdOrUsername);
         
         // Check cache first
-        const cacheKey = `profile_${userId}`;
+        const cacheKey = `profile_${userIdOrUsername}`;
         const cached = profileCache.get(cacheKey);
         if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
           console.log('[VIEW-PROFILE] Using cached profile data');
@@ -154,16 +166,22 @@ export default function ViewProfile({ params }) {
         
         // Fetch user profile
         console.log('[VIEW-PROFILE] Fetching profile from database...');
+        console.log('[VIEW-PROFILE] Query type:', isUserUUID ? 'by ID' : 'by Username');
         let profile, profileError;
         try {
           const res = await withTimeoutAbort(
-            () =>
-              supabase
+            () => {
+              // Query by UUID or username
+              const query = supabase
                 .from('profiles')
-                .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts, facebook_url, telegram_url, youtube_url, is_broker, paypal_email, broker_plan_description, broker_average_posts_info, broker_price_plan_info')
-                .eq('id', userId)
-                .maybeSingle()
-                .abortSignal(controller.signal)
+                .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts, facebook_url, telegram_url, youtube_url, is_broker, paypal_email, broker_plan_description, broker_average_posts_info, broker_price_plan_info');
+              
+              if (isUserUUID) {
+                return query.eq('id', userIdOrUsername).maybeSingle().abortSignal(controller.signal);
+              } else {
+                return query.eq('username', userIdOrUsername).maybeSingle().abortSignal(controller.signal);
+              }
+            }
           );
           profile = res.data;
           profileError = res.error;
@@ -171,13 +189,17 @@ export default function ViewProfile({ params }) {
           if (e && e.message === 'Request timed out') {
             // Single retry with a longer timeout
             const res = await withTimeoutAbort(
-              () =>
-                supabase
+              () => {
+                const query = supabase
                   .from('profiles')
-                  .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts, facebook_url, telegram_url, youtube_url, is_broker, paypal_email, broker_plan_description, broker_average_posts_info, broker_price_plan_info')
-                  .eq('id', userId)
-                  .maybeSingle()
-                  .abortSignal(controller.signal),
+                  .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts, facebook_url, telegram_url, youtube_url, is_broker, paypal_email, broker_plan_description, broker_average_posts_info, broker_price_plan_info');
+                
+                if (isUserUUID) {
+                  return query.eq('id', userIdOrUsername).maybeSingle().abortSignal(controller.signal);
+                } else {
+                  return query.eq('username', userIdOrUsername).maybeSingle().abortSignal(controller.signal);
+                }
+              },
               30000
             );
             profile = res.data;
@@ -197,9 +219,13 @@ export default function ViewProfile({ params }) {
           throw new Error('Profile not found');
         }
         
-        // Set basic profile data immediately
+        // IMPORTANT: Use the actual user ID from profile (not the param which could be username)
+        const resolvedUserId = profile.id;
+        
+        // Set basic profile data and actualUserId immediately
         safeSetState(() => {
           setProfileData(profile);
+          setActualUserId(resolvedUserId);
           setBasicDataLoading(false);
           setShowSkeleton(false);
         });
@@ -209,20 +235,21 @@ export default function ViewProfile({ params }) {
           data: profile,
           timestamp: Date.now()
         });
-
-        // Fetch additional stats in background (non-blocking)
+        
+        // Fetch stats asynchronously (non-blocking)
         setTimeout(async () => {
           try {
+            // Fetch posts count
             const { count: postsCount } = await supabase
               .from('posts')
               .select('*', { count: 'exact', head: true })
-              .eq('user_id', userId);
+              .eq('user_id', resolvedUserId);
             
             // Fetch premium posts count
             const { count: premiumCount } = await supabase
               .from('posts')
               .select('*', { count: 'exact', head: true })
-              .eq('user_id', userId)
+              .eq('user_id', resolvedUserId)
               .eq('is_premium_only', true);
             
             // Fetch premium plan features if broker (only active plans)
@@ -230,7 +257,7 @@ export default function ViewProfile({ params }) {
               const { data: premiumPlan, error: planError } = await supabase
                 .from('premium_plans')
                 .select('features, pricing, paypal_account, is_active')
-                .eq('user_id', userId)
+                .eq('user_id', resolvedUserId)
                 .eq('is_active', true)
                 .maybeSingle();
               
@@ -258,7 +285,6 @@ export default function ViewProfile({ params }) {
                 posts_count: 0
               }));
               setPremiumPostsCount(0);
-              setProfileData(prev => prev ? { ...prev, posts_count: 0 } : prev);
               setStatsLoading(false);
             });
           }
@@ -272,7 +298,7 @@ export default function ViewProfile({ params }) {
             const { data: avatarData } = await supabase
               .storage
               .from('avatars')
-              .getPublicUrl(`${userId}/avatar.png`);
+              .getPublicUrl(`${resolvedUserId}/avatar.png`);
               
             if (avatarData?.publicUrl) {
               safeSetState(() => setAvatarUrl(`${avatarData.publicUrl}?t=${Date.now()}`));
@@ -289,7 +315,7 @@ export default function ViewProfile({ params }) {
             const { data: bgData } = await supabase
               .storage
               .from('backgrounds')
-              .getPublicUrl(`${userId}/background.png`);
+              .getPublicUrl(`${resolvedUserId}/background.png`);
               
             if (bgData?.publicUrl) {
               safeSetState(() => setBackgroundUrl(`${bgData.publicUrl}?t=${Date.now()}`));
@@ -316,7 +342,7 @@ export default function ViewProfile({ params }) {
       isCancelled = true;
       controller.abort();
     };
-  }, [userId, supabase]);
+  }, [userIdOrUsername, supabase]);
 
   // Apply view mode from query parameter (e.g. ?view=table or ?vm=grid)
   useEffect(() => {
@@ -325,176 +351,107 @@ export default function ViewProfile({ params }) {
       if (v === 'table' || v === 'grid' || v === 'list') {
         setPostsViewMode(v);
       }
-    } catch {}
+    } catch (err) {
+      console.error('[VIEW-PROFILE] Error parsing view mode:', err);
+    }
   }, [searchParams]);
 
-  // Check if user has active Telegram bot
-  useEffect(() => {
-    if (!userId || !supabase) return;
+// Check if user has telegram bot
+useEffect(() => {
+  if (!actualUserId || !supabase) return;
+  
+  const checkTelegramBot = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('telegram_bots')
+        .select('bot_token')
+        .eq('user_id', actualUserId)
+        .maybeSingle();
 
-    const checkTelegramBot = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('telegram_bots')
-          .select('id, is_active, bot_token')
-          .eq('user_id', userId)
-          .eq('is_active', true)
-          .maybeSingle();
-
-        if (error) {
-          console.error('Error checking telegram bot:', error);
-          setHasTelegramBot(false);
-        } else {
-          // User has telegram bot if data exists and has bot_token
-          setHasTelegramBot(data && data.bot_token ? true : false);
-        }
-      } catch (error) {
-        console.error('Error in checkTelegramBot:', error);
+      if (error) {
+        console.error('Error checking telegram bot:', error);
         setHasTelegramBot(false);
-      } finally {
-        setTelegramBotLoading(false);
+      } else {
+        // User has telegram bot if data exists and has bot_token
+        setHasTelegramBot(data && data.bot_token ? true : false);
       }
-    };
-
-    checkTelegramBot();
-  }, [userId, supabase]);
-
-  // Check if current user is subscribed to this broker
-  useEffect(() => {
-    if (!isAuthenticated || !user?.id || !userId || !supabase || !profileData?.is_broker) {
-      setSubscriptionLoading(false);
-      return;
+    } catch (error) {
+      console.error('Error in checkTelegramBot:', error);
+      setHasTelegramBot(false);
+    } finally {
+      setTelegramBotLoading(false);
     }
-
-    const checkSubscription = async () => {
-      try {
-        const { data: subscription, error } = await supabase
-          .from('broker_subscriptions')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('broker_id', userId)
-          .eq('status', 'active')
-          .maybeSingle();
-
-        if (error) {
-          console.error('Error checking subscription:', error);
-        } else if (subscription) {
-          // Check if subscription is still valid (not expired)
-          const now = new Date();
-          const expiresAt = subscription.expires_at ? new Date(subscription.expires_at) : null;
-          
-          if (!expiresAt || expiresAt > now) {
-            setIsSubscribedToBroker(true);
-            setCurrentSubscription(subscription);
-          }
-        }
-      } catch (error) {
-        console.error('Error in checkSubscription:', error);
-      } finally {
-        setSubscriptionLoading(false);
-      }
-    };
-
-    checkSubscription();
-  }, [isAuthenticated, user?.id, userId, supabase, profileData?.is_broker]);
-
-  // Use effect to check follow status using the FollowProvider
-  useEffect(() => {
-    if (isAuthenticated && user?.id && userId) {
-      console.log('[VIEW-PROFILE] Checking follow status for user:', userId);
-      checkIsFollowing(userId)
-        .then(result => {
-          console.log('[VIEW-PROFILE] Follow status check completed:', result);
-        })
-        .catch(error => {
-          console.error('[VIEW-PROFILE] Error checking follow status:', error);
-        });
-    } else {
-      console.log('[VIEW-PROFILE] Skipping follow check - not authenticated or no userId');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, user?.id, userId]);
-
-  // Fetch strategies for this user (from posts)
-  useEffect(() => {
-    if (!userId || !supabase) return;
-    let canceled = false;
-    setStrategiesLoading(true);
-    supabase
-      .from('posts_with_stats')
-      .select('strategy')
-      .eq('user_id', userId)
-      .not('strategy', 'is', null)
-      .limit(500)
-      .then(({ data, error }) => {
-        if (canceled) return;
-        if (error) {
-          console.error('[VIEW-PROFILE] Failed to fetch strategies:', error);
-          setStrategies([]);
-          return;
-        }
-        const counts = new Map();
-        (data || []).forEach((row) => {
-          const name = String(row?.strategy || '').trim();
-          if (!name) return;
-          counts.set(name, (counts.get(name) || 0) + 1);
-        });
-        const list = Array.from(counts.entries())
-          .map(([name, count]) => ({ name, count }))
-          .sort((a, b) => b.count - a.count);
-        setStrategies(list);
-      })
-      .finally(() => { if (!canceled) setStrategiesLoading(false); });
-    return () => { canceled = true; };
-  }, [userId, supabase]);
-
-  const handleSelectStrategy = (name) => {
-    setSelectedStrategy(name);
-    setStrategyModalName(name);
-    setStrategyModalOpen(true);
   };
 
-  // Load related posts for selected strategy in dialog (do not filter main feed)
-  useEffect(() => {
-    if (!strategyModalOpen || !strategyModalName || !supabase || !userId) return;
-    let canceled = false;
-    setStrategyPostsLoading(true);
-    supabase
-      .from('posts_with_stats')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('strategy', strategyModalName)
-      .order('created_at', { ascending: false })
-      .limit(25)
-      .then(({ data, error }) => {
-        if (canceled) return;
-        if (error) {
-          console.error('[VIEW-PROFILE] Strategy posts fetch error:', error);
-          setStrategyPosts([]);
-          return;
-        }
-        setStrategyPosts(Array.isArray(data) ? data : []);
-      })
-      .finally(() => {
-        if (!canceled) setStrategyPostsLoading(false);
-      });
-    return () => { canceled = true; };
-  }, [strategyModalOpen, strategyModalName, supabase, userId]);
+  checkTelegramBot();
+}, [actualUserId, supabase]);
 
-  const handleFollowClick = async () => {
-    // Check if user is authenticated before following
-    if (!isAuthenticated) {
-      router.push('/login');
-      return;
-    }
-    
-    console.log('[VIEW-PROFILE] Follow button clicked, isFollowing before:', isFollowing);
-    
-    const wasFollowing = isFollowing;
-    
+// Check if current user is subscribed to this broker
+useEffect(() => {
+  if (!isAuthenticated || !user?.id || !actualUserId || !profileData?.is_broker) {
+    setSubscriptionLoading(false);
+    return;
+  }
+
+  const checkSubscription = async () => {
     try {
-      await toggleFollow(userId);
-      console.log('[VIEW-PROFILE] Toggle follow completed, isFollowing after:', isFollowing);
+      const { data, error } = await supabase
+        .from('broker_subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('broker_id', actualUserId)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking subscription:', error);
+      } else if (data) {
+        // Check if subscription is still valid (not expired)
+        const now = new Date();
+        const expiresAt = data.expires_at ? new Date(data.expires_at) : null;
+        
+        if (!expiresAt || expiresAt > now) {
+          setIsSubscribedToBroker(true);
+          setCurrentSubscription(data);
+        }
+      }
+    } catch (error) {
+      console.error('Error in checkSubscription:', error);
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
+
+  checkSubscription();
+}, [isAuthenticated, user?.id, actualUserId, profileData?.is_broker, supabase]);
+
+// Use effect to check follow status using the FollowProvider
+useEffect(() => {
+  if (isAuthenticated && user?.id && actualUserId) {
+    console.log('[VIEW-PROFILE] Checking follow status for user:', actualUserId);
+    checkIsFollowing(actualUserId)
+      .then(result => {
+        console.log('[VIEW-PROFILE] Follow status check completed:', result);
+      })
+      .catch(error => {
+        console.error('[VIEW-PROFILE] Error checking follow status:', error);
+      });
+  }
+}, [isAuthenticated, user?.id, actualUserId, checkIsFollowing]);
+
+// Handle follow button click
+const handleFollowClick = async () => {
+  if (!isAuthenticated || !actualUserId) {
+    return;
+  }
+  
+  console.log('[VIEW-PROFILE] Follow button clicked, isFollowing before:', isFollowing);
+  
+  const wasFollowing = isFollowing;
+  
+  try {
+    await toggleFollow(actualUserId);
+    console.log('[VIEW-PROFILE] Toggle follow completed, isFollowing after:', isFollowing);
       
       // Update local counts immediately for better UX
       setProfileData(prev => {
@@ -517,7 +474,7 @@ export default function ViewProfile({ params }) {
           username: profileData.username || 'User',
           avatar_url: profileData.avatar_url || '/default-avatar.svg'
         };
-        profileContext.updateFollowCounts(action, userId, targetUserData);
+        profileContext.updateFollowCounts(action, actualUserId, targetUserData);
         console.log('[VIEW-PROFILE] Updated ProfileProvider follow counts');
       }
       
@@ -635,7 +592,7 @@ if (error) {
           
           <div className={styles.profileActions}>
             {isAuthenticated ? (
-              user?.id !== userId && (
+              user?.id !== actualUserId && (
                 <>
                   <button 
                     onClick={handleFollowClick} 
@@ -646,7 +603,7 @@ if (error) {
                   </button>
                   {/* Telegram button - always visible with not-available state when no bot */}
                   <TelegramSubscribeButton 
-                    userId={userId} 
+                    userId={actualUserId} 
                     username={profileData?.username || 'User'} 
                     compact={true}
                     showNotAvailable={true}
@@ -666,7 +623,7 @@ if (error) {
                 </button>
                 {/* Telegram button - always visible with not-available state when no bot */}
                 <TelegramSubscribeButton 
-                  userId={userId} 
+                  userId={actualUserId} 
                   username={profileData?.username || 'User'} 
                   compact={true}
                   showNotAvailable={true}
@@ -880,7 +837,7 @@ if (error) {
           </div>
 
           {/* Subscribe/Cancel Button - Only show if not viewing own profile */}
-          {user && user.id !== userId && (
+          {user && user.id !== actualUserId && (
             <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
               {subscriptionLoading ? (
                 <div style={{
@@ -969,7 +926,7 @@ if (error) {
                 </div>
               ) : (
                 <button
-                  onClick={() => router.push(`/broker-subscribe/${userId}`)}
+                  onClick={() => router.push(`/broker-subscribe/${profileData?.username || actualUserId}`)}
                   style={{
                     padding: '1rem 2.5rem',
                     background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
@@ -1094,7 +1051,7 @@ if (error) {
               <div className={styles.postsGrid}>
                 <PostsFeed 
                   mode="view-profile" 
-                  userId={userId} 
+                  userId={actualUserId} 
                   hideControls 
                   showFlagBackground 
                   viewMode={postsViewMode}
@@ -1162,7 +1119,7 @@ if (error) {
         isOpen={strategyModalOpen}
         onClose={() => { setStrategyModalOpen(false); setSelectedStrategy(''); }}
         strategy={strategyModalName}
-        userId={userId}
+        userId={actualUserId}
         readOnly
         fullScreen
       >

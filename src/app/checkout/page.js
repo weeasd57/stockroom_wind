@@ -481,6 +481,10 @@ export default function CheckoutPage() {
               </li>
               <li className="flex items-center gap-2">
                 <span className="text-green-500">✓</span>
+                Table View with Export to Excel/CSV
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-green-500">✓</span>
                 No ads - Ad-free experience
               </li>
               <li className="flex items-center gap-2">

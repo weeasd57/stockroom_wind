@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { usePosts } from '@/providers/PostProvider'; // Add PostProvider for real-time updates
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useSubscription } from '@/providers/SubscriptionProvider';
-import { useBrokerSubscription } from '@/hooks/useBrokerSubscription';
+import { useBrokerSubscription } from '@/providers/BrokerSubscriptionProvider';
 import PostCard from '@/components/posts/PostCard';
 import PostsTableView from '@/components/posts/PostsTableView';
 import AdBanner from '@/components/ads/AdBanner';
@@ -18,7 +18,7 @@ import profileStyles from '@/styles/profile.module.css';
 // - title: optional override title
 // - hideControls: force hide header controls
 // - showFlagBackground: pass-through to PostCard for future styling
-export function PostsFeed({
+function PostsFeed({
   mode = 'home',
   userId,
   title,
@@ -54,14 +54,14 @@ export function PostsFeed({
   } = usePosts();
   const { getPostsPage, user } = useSupabase();
   const { isPro } = useSubscription();
-  const { isSubscribedToBroker } = useBrokerSubscription();
+  const { isSubscribedToBroker, brokerSubscriptions } = useBrokerSubscription();
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('following'); // following, all, trending, premium
   const [sortBy, setSortBy] = useState('date_desc'); // date_desc, date_asc, engagement, price_change
   const [categoryFilter, setCategoryFilter] = useState('all'); // all, buy, sell, analysis
-  const [internalViewMode, setInternalViewMode] = useState('list'); // list, grid, table
+  const [internalViewMode, setInternalViewMode] = useState('grid'); // list, grid, table
   const [mounted, setMounted] = useState(false);
   // Advanced filters (Home mode)
   const [homeSelectedStrategy, setHomeSelectedStrategy] = useState('');
@@ -70,9 +70,7 @@ export function PostsFeed({
   const [homeSelectedSymbol, setHomeSelectedSymbol] = useState('');
   const [homeFilterLoading, setHomeFilterLoading] = useState(false);
   // Premium posts filter
-  const [myBrokerSubscriptions, setMyBrokerSubscriptions] = useState([]);
   const [selectedPublisher, setSelectedPublisher] = useState(''); // Filter by specific broker
-  const [brokersLoading, setBrokersLoading] = useState(false);
   // Use external viewMode if provided, otherwise use internal state
   const viewMode = externalViewMode || internalViewMode;
   // In profile page, we always render the current user's posts
@@ -122,53 +120,8 @@ export function PostsFeed({
   const [userHasMore, setUserHasMore] = useState(false);
   const userBeforeCursorRef = useRef(null);
 
-  // Fetch broker subscriptions for premium filter
-  useEffect(() => {
-    if (!user?.id || mode !== 'home') return;
-    
-    const fetchBrokerSubscriptions = async () => {
-      setBrokersLoading(true);
-      try {
-        // Use supabase client from context
-        const { supabase } = await import('@/utils/supabase');
-        
-        const { data, error } = await supabase
-          .from('broker_subscriptions')
-          .select(`
-            broker_id,
-            status,
-            expires_at,
-            broker:profiles!broker_subscriptions_broker_id_fkey(
-              id,
-              username,
-              avatar_url,
-              is_broker
-            )
-          `)
-          .eq('user_id', user.id)
-          .eq('status', 'active');
-
-        if (error) {
-          console.error('[PostsFeed] Error fetching broker subscriptions:', error);
-          return;
-        }
-
-        // Filter valid subscriptions
-        const validSubs = (data || []).filter(sub => 
-          !sub.expires_at || new Date(sub.expires_at) > new Date()
-        );
-
-        setMyBrokerSubscriptions(validSubs);
-        console.log('[PostsFeed] Loaded broker subscriptions:', validSubs.length);
-      } catch (error) {
-        console.error('[PostsFeed] Error loading broker subscriptions:', error);
-      } finally {
-        setBrokersLoading(false);
-      }
-    };
-
-    fetchBrokerSubscriptions();
-  }, [user?.id, mode]);
+  // Broker subscriptions now come from BrokerSubscriptionProvider
+  // No need for separate fetch - reduces API calls!
   
   // View mode storage key
   const VIEW_MODE_STORAGE_KEY = "sharkszone-viewmode";
@@ -360,7 +313,7 @@ export function PostsFeed({
         }
         
         // Otherwise show all premium posts from subscribed brokers
-        const subscribedBrokerIds = myBrokerSubscriptions.map(sub => sub.broker_id);
+        const subscribedBrokerIds = brokerSubscriptions.map(sub => sub.broker_id);
         return subscribedBrokerIds.includes(post.user_id);
       });
     }
@@ -415,7 +368,7 @@ export function PostsFeed({
     }
 
     return filtered; // No client-side limit; pagination handled via PostProvider + Load More
-  }, [providerPosts, feedPosts, filter, sortBy, categoryFilter, userId, isSelfProfile, effSelectedStrategy, effSelectedStatus, effSelectedCountry, effSelectedSymbol, myBrokerSubscriptions, selectedPublisher]);
+  }, [providerPosts, feedPosts, filter, sortBy, categoryFilter, userId, isSelfProfile, effSelectedStrategy, effSelectedStatus, effSelectedCountry, effSelectedSymbol, brokerSubscriptions, selectedPublisher]);
 
   // Source posts for profile mode (provider-owned for self, local for others)
   const profileSourcePosts = isSelfProfile ? myPosts : userPosts;
@@ -824,7 +777,7 @@ export function PostsFeed({
             {userId
               ? "This user hasn't posted anything yet."
               : (filter === 'premium'
-                  ? (myBrokerSubscriptions.length === 0
+                  ? (brokerSubscriptions.length === 0
                       ? "⭐ No broker subscriptions yet. Subscribe to premium brokers to see their exclusive content!"
                       : "No premium posts available yet from your subscribed brokers.")
                   : (filter === 'following' 
@@ -893,16 +846,16 @@ export function PostsFeed({
                       className={`${profileStyles.filterSelect} ${selectedPublisher ? profileStyles.activeFilter : ''}`}
                       value={selectedPublisher}
                       onChange={(e) => setSelectedPublisher(e.target.value)}
-                      disabled={brokersLoading}
+                      disabled={false}
                     >
                       <option value="">All Publishers</option>
-                      {myBrokerSubscriptions.map((sub) => (
+                      {brokerSubscriptions.map((sub) => (
                         <option key={sub.broker_id} value={sub.broker_id}>
                           {sub.broker?.username || `Broker ${sub.broker_id}`}
                         </option>
                       ))}
                     </select>
-                    {selectedPublisher && !brokersLoading && (
+                    {selectedPublisher && (
                       <button
                         className={profileStyles.clearFilterButton}
                         onClick={() => setSelectedPublisher('')}
@@ -913,7 +866,7 @@ export function PostsFeed({
                       </button>
                     )}
                   </div>
-                  {myBrokerSubscriptions.length === 0 && !brokersLoading && (
+                  {brokerSubscriptions.length === 0 && (
                     <span className={profileStyles.filterHint} style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                       No broker subscriptions
                     </span>

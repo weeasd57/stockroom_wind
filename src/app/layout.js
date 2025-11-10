@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/providers/theme-provider";
 import { SimpleSupabaseProvider } from '@/providers/SimpleSupabaseProvider';
 import { UserProvider } from '@/providers/UserProvider';
 import { SubscriptionProvider } from '@/providers/SubscriptionProvider';
+import { BrokerSubscriptionProvider } from '@/providers/BrokerSubscriptionProvider';
 import { CreatePostFormProvider } from '@/providers/CreatePostFormProvider';
 import { ProfileProvider } from '@/providers/ProfileProvider';
 import { TradersProvider } from '@/providers/TradersProvider';
@@ -314,7 +315,8 @@ export default function RootLayout({ children }) {
         <SimpleSupabaseProvider>
           <UserProvider>
             <SubscriptionProvider>
-              <ProfileProvider>
+              <BrokerSubscriptionProvider>
+                <ProfileProvider>
                 <StrategiesProvider>
                   <AnalysisStateProvider>
                     <TradersProvider>
@@ -351,6 +353,7 @@ export default function RootLayout({ children }) {
                   </AnalysisStateProvider>
                 </StrategiesProvider>
               </ProfileProvider>
+              </BrokerSubscriptionProvider>
             </SubscriptionProvider>
           </UserProvider>
         </SimpleSupabaseProvider>

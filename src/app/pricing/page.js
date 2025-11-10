@@ -260,6 +260,7 @@ export default function PricingPage() {
             <li className="flex items-start gap-2"><span>🚀</span> <strong>300 price checks per month</strong></li>
             <li className="flex items-start gap-2"><span>🚀</span> <strong>500 posts per month</strong></li>
             <li className="flex items-start gap-2"><span>💎</span> <strong>Create premium broker plans</strong></li>
+            <li className="flex items-start gap-2"><span>📊</span> <strong>Table View with Export to Excel/CSV</strong></li>
             <li className="flex items-start gap-2"><span>🚫</span> <strong>No ads - Ad-free experience</strong></li>
             <li className="flex items-start gap-2"><span>📱</span> <strong>Telegram notifications: subscribe to traders you follow</strong></li>
             <li className="flex items-start gap-2"><span>🚀</span> Priority support</li>
@@ -290,6 +291,7 @@ export default function PricingPage() {
             <li>• Price checks reset monthly on your billing date</li>
             <li>• Unused checks don't roll over to the next month</li>
             <li>• Pro users can create multiple premium broker plans to monetize their trading insights</li>
+            <li>• Pro users get access to advanced Table View with Export to Excel/CSV functionality</li>
             <li>• Pro users enjoy an ad-free experience across the platform</li>
             <li>• You can upgrade or cancel anytime</li>
             <li>• Prices in USD. Taxes may apply</li>

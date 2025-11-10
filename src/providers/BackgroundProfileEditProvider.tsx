@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 // @ts-ignore - uuid module types not available
 import { v4 as uuidv4 } from 'uuid';
+import { toast } from 'sonner';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
 import { uploadImage } from '@/utils/supabase';
@@ -50,18 +51,12 @@ interface BackgroundProfileEditProviderProps {
 export function BackgroundProfileEditProvider({ children }: BackgroundProfileEditProviderProps) {
   const { user, supabase } = useSupabase();
   
-  // Get profile context with safe fallbacks and explicit typing
-  const profileContext: any = (() => {
-    try {
-      return useProfile();
-    } catch (e) {
-      console.warn('Profile provider not available in BackgroundProfileEditProvider');
-      return null;
-    }
-  })();
-  
-  const updateProfile = profileContext?.updateProfile;
-  const refreshData = profileContext?.refreshData;
+  // Get profile functions from ProfileProvider
+  // Type cast to any to avoid TypeScript errors with JS ProfileProvider
+  const profileContext = useProfile() as any;
+  const updateProfile = profileContext?.updateProfile as ((updates: any) => Promise<{ success: boolean; error?: any }>) | undefined;
+  const refreshData = profileContext?.refreshData as (() => Promise<void>) | undefined;
+  const currentProfile = profileContext?.profile as { username?: string; [key: string]: any } | undefined;
   
   const [tasks, setTasks] = useState<ProfileEditTask[]>([]);
   const processingRef = useRef(false);
@@ -259,9 +254,23 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
           throw new Error('Profile update function not available');
         }
         
+        // CRITICAL FIX: Remove username if it hasn't changed (to avoid duplicate key error)
+        if (updateData.username && currentProfile?.username) {
+          if (updateData.username === currentProfile.username) {
+            console.log('[BackgroundProfileEdit] ✅ Username unchanged, removing from updates to avoid duplicate error');
+            delete updateData.username;
+          } else {
+            console.log('[BackgroundProfileEdit] ⚠️ Username changed from', currentProfile.username, 'to', updateData.username);
+          }
+        }
+        
         const { success, error } = await updateProfile(updateData);
         
-        if (error) throw new Error((error as any).message || 'Failed to update profile');
+        if (error) {
+          // Pass the full error message from ProfileProvider's handleError
+          const errorMsg = typeof error === 'string' ? error : (error as any).message || 'Failed to update profile';
+          throw new Error(errorMsg);
+        }
 
         // Clear any profile cache to ensure immediate updates
         if (typeof window !== 'undefined') {
@@ -301,9 +310,9 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
           });
         }
 
-        // Refresh profile data
+        // Refresh profile data (no parameters needed)
         if (refreshData) {
-          await refreshData(user.id);
+          await refreshData();
         }
         
         // Trigger a window event to notify other components about profile update
@@ -346,19 +355,22 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
         console.log('Profile updated successfully');
         
         // Show success notification
-        if (typeof window !== 'undefined' && window.showNotification) {
-          window.showNotification('Profile updated successfully! ✅', 'success');
-        }
+        toast.success('Profile updated successfully! ✅');
 
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         console.error('Profile save failed:', error);
         updateTaskStatus('failed', 0, { error: `Failed to save profile: ${errorMessage}` });
         
-        // Show error notification  
-        if (typeof window !== 'undefined' && window.showNotification) {
-          window.showNotification('Failed to update profile ❌', 'error');
-        }
+        // Show error notification with the specific error message
+        // Extract the user-friendly message (handle both formats)
+        const displayMessage = errorMessage.includes('Failed to save profile:') 
+          ? errorMessage.replace('Failed to save profile:', '').trim()
+          : errorMessage;
+        toast.error(displayMessage, {
+          duration: 5000, // Show for 5 seconds
+          description: 'Please fix the issue and try again.'
+        });
       }
 
     } catch (error: unknown) {
@@ -372,7 +384,7 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
     } finally {
       processingRef.current = false;
     }
-  }, [user, updateProfile, refreshData]);
+  }, [user, updateProfile, refreshData, currentProfile]);
 
   // Remove a task
   const removeTask = useCallback((taskId: string) => {
