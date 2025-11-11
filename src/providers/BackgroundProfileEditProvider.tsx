@@ -128,12 +128,16 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
       }
       
       if (!currentTask || !user) {
-        console.error(`[BackgroundProfileEdit] ❌ Task ${taskId} not found or no user - Task: ${!!currentTask}, User: ${!!user}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.error(`[BackgroundProfileEdit] ❌ Task ${taskId} not found or no user - Task: ${!!currentTask}, User: ${!!user}`);
+        }
         processingRef.current = false;
         return;
       }
 
-      console.log(`[BackgroundProfileEdit] ✅ Processing task ${taskId} - Avatar: ${!!currentTask.avatarFile}, Background: ${!!currentTask.backgroundFile}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[BackgroundProfileEdit] ✅ Processing task ${taskId} - Avatar: ${!!currentTask.avatarFile}, Background: ${!!currentTask.backgroundFile}`);
+      }
 
       // Update task status
       const updateTaskStatus = (status: ProfileEditTaskStatus, progress: number, updates?: Partial<ProfileEditTask>) => {

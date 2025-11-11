@@ -187,6 +187,9 @@ export default function UnifiedBackgroundProcessDrawer() {
   
   // Debug error logger
   const logDebugError = useCallback((source: string, error: any, context?: any) => {
+    // Only log in development mode
+    if (process.env.NODE_ENV !== 'development') return;
+    
     const errorInfo = {
       timestamp: new Date().toISOString(),
       source,
@@ -1017,7 +1020,9 @@ export default function UnifiedBackgroundProcessDrawer() {
               details: p.details,
               timeAlive: Math.round((now - ensureDate(p.createdAt).getTime()) / 1000) + 's'
             };
-            console.log(`🧹 Auto-cleaning stuck process:`, debugInfo);
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`🧹 Auto-cleaning stuck process:`, debugInfo);
+            }
             logDebugError('auto-cleanup', `Process stuck: ${p.title} (${p.type}) - Status: ${p.status}, Time alive: ${debugInfo.timeAlive}`, debugInfo);
           }
           

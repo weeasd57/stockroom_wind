@@ -35,8 +35,9 @@ type PostsContextType = {
 const PostsContext = createContext<PostsContextType | undefined>(undefined);
 
 export function PostProvider({ children }: { children: React.ReactNode }) {
-  console.log('[PostProvider] 🚀 PostProvider component mounted');
-  console.error('[PostProvider] ⚠️ CRITICAL: PostProvider is loading - this should be visible!');
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[PostProvider] 🚀 PostProvider component mounted');
+  }
   const { supabase, getPostsPage, createPost: supaCreatePost, user } = useSupabase();
   const [posts, setPosts] = useState<Post[]>([]);
   // Dedicated state for current user's posts (profile/dashboard)
@@ -62,16 +63,22 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
   const statsRefreshTimeoutRef = useRef<any>(null);
 
   const refreshMyStats = useCallback(async () => {
-    console.log('🔄 [POST_PROVIDER] refreshMyStats called for user:', user?.id);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔄 [POST_PROVIDER] refreshMyStats called for user:', user?.id);
+    }
     
     if (!user?.id) {
-      console.warn('🚨 [POST_PROVIDER] No user ID, setting empty stats');
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('🚨 [POST_PROVIDER] No user ID, setting empty stats');
+      }
       setMyStats({ totalPosts: 0, successfulPosts: 0, lossPosts: 0, openPosts: 0, successRate: 0 });
       return;
     }
     
     try {
-      console.log('📊 [POST_PROVIDER] Fetching stats from database for user:', user.id);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📊 [POST_PROVIDER] Fetching stats from database for user:', user.id);
+      }
       
       // Debug: Check what status values actually exist - try posts table first
       const statusDebugRes = await supabase
@@ -80,7 +87,9 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
         .eq('user_id', user.id)
         .limit(5);
       
-      console.log('🔍 [POST_PROVIDER] Status debug sample from posts table:', statusDebugRes);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 [POST_PROVIDER] Status debug sample from posts table:', statusDebugRes);
+      }
       
       // Try posts_with_stats as well
       const statusDebugRes2 = await supabase
@@ -89,7 +98,9 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
         .eq('user_id', user.id)
         .limit(5);
       
-      console.log('🔍 [POST_PROVIDER] Status debug sample from posts_with_stats:', statusDebugRes2);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 [POST_PROVIDER] Status debug sample from posts_with_stats:', statusDebugRes2);
+      }
       
       const [totalRes, successRes, lossRes] = await Promise.all([
         supabase
@@ -108,11 +119,13 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
           .or('status.eq.loss,stop_loss_triggered.eq.true'),
       ]);
 
-      console.log('📈 [POST_PROVIDER] Database query results:', {
-        totalRes: { count: totalRes.count, error: totalRes.error },
-        successRes: { count: successRes.count, error: successRes.error },
-        lossRes: { count: lossRes.count, error: lossRes.error }
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📈 [POST_PROVIDER] Database query results:', {
+          totalRes: { count: totalRes.count, error: totalRes.error },
+          successRes: { count: successRes.count, error: successRes.error },
+          lossRes: { count: lossRes.count, error: lossRes.error }
+        });
+      }
 
       const total = totalRes.count || 0;
       const successful = successRes.count || 0;
@@ -121,11 +134,15 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       const sr = calculateSuccessRate(successful, losses);
       
       const newStats = { totalPosts: total, successfulPosts: successful, lossPosts: losses, openPosts: open, successRate: sr };
-      console.log('✅ [POST_PROVIDER] Calculated new stats from DB:', newStats);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ [POST_PROVIDER] Calculated new stats from DB:', newStats);
+      }
       
       // If database stats are empty but we have posts in myPostsState, use computed stats as fallback
       if ((successful === 0 && losses === 0) && Array.isArray(myPostsState) && myPostsState.length > 0) {
-        console.log('⚠️ [POST_PROVIDER] DB stats are empty, falling back to computed stats from myPosts');
+        if (process.env.NODE_ENV === 'development') {
+          console.log('⚠️ [POST_PROVIDER] DB stats are empty, falling back to computed stats from myPosts');
+        }
         const computedStats = calculatePostStats(myPostsState);
         const fallbackStats = { 
           totalPosts: total, // Keep DB total count
@@ -134,18 +151,21 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
           openPosts: Math.max(0, total - computedStats.successfulPosts - computedStats.lossPosts),
           successRate: computedStats.successRate 
         };
-        console.log('🔄 [POST_PROVIDER] Using fallback computed stats:', fallbackStats);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔄 [POST_PROVIDER] Using fallback computed stats:', fallbackStats);
+        }
         setMyStats(fallbackStats);
       } else {
         setMyStats(newStats);
       }
       
-      console.log('💾 [POST_PROVIDER] Stats saved to state');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('💾 [POST_PROVIDER] Stats saved to state');
+      }
       
     } catch (err) {
-      console.error('❌ [POST_PROVIDER] refreshMyStats failed:', err);
       if (process.env.NODE_ENV === 'development') {
-        console.warn('[PostProvider] refreshMyStats failed', err);
+        console.error('❌ [POST_PROVIDER] refreshMyStats failed:', err);
       }
     }
   }, [supabase, user?.id]);
@@ -323,49 +343,40 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch current user's posts (profile/dashboard owner)
   const fetchMyPosts = useCallback(async () => {
-    console.log('📋 [POST_PROVIDER] fetchMyPosts called for user:', user?.id);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📋 [POST_PROVIDER] fetchMyPosts called for user:', user?.id);
+    }
     
     if (!user?.id) {
-      console.warn('🚨 [POST_PROVIDER] No user ID, clearing my posts');
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('🚨 [POST_PROVIDER] No user ID, clearing my posts');
+      }
       setMyPostsState([]);
       setMyHasMore(false);
       myBeforeCursorRef.current = null;
       return;
     }
     
-    console.log('🔄 [POST_PROVIDER] Setting myLoading to true');
     setMyLoading(true);
     
     try {
-      console.log('📊 [POST_PROVIDER] Calling getPostsPage with:', {
-        limit: MY_PAGE_SIZE,
-        before: null,
-        userIds: [user.id]
-      });
-      
       const page = await getPostsPage({ limit: MY_PAGE_SIZE, before: null, userIds: [user.id] });
       const list = Array.isArray(page) ? page : [];
-      
-      console.log('✅ [POST_PROVIDER] Fetched user posts:', {
-        pageIsArray: Array.isArray(page),
-        listLength: list.length,
-        posts: list.map(p => ({ id: p.id, symbol: p.symbol, created_at: p.created_at }))
-      });
       
       setMyPostsState(list);
       myBeforeCursorRef.current = list.length > 0 ? String(list[list.length - 1].created_at) : null;
       setMyHasMore(list.length === MY_PAGE_SIZE);
       
-      console.log('📊 [POST_PROVIDER] Now calling refreshMyStats after fetchMyPosts...');
       await refreshMyStats();
       
     } catch (e: any) {
-      console.error('❌ [POST_PROVIDER] fetchMyPosts failed:', e);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ [POST_PROVIDER] fetchMyPosts failed:', e);
+      }
       setError(e?.message || 'Failed to fetch my posts');
       setMyPostsState([]);
       setMyHasMore(false);
     } finally {
-      console.log('✅ [POST_PROVIDER] Setting myLoading to false');
       setMyLoading(false);
     }
   }, [getPostsPage, user?.id]);
@@ -394,18 +405,21 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
   // Subscribe to realtime updates for posts (price checks, status changes)
   useEffect(() => {
     if (!supabase) {
-      console.error('[PostProvider] ❌ No supabase client - realtime will not work!');
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[PostProvider] ❌ No supabase client - realtime will not work!');
+      }
       return;
     }
-    console.log('[PostProvider] Setting up realtime subscription for posts table...');
-    console.error('[PostProvider] 🔴 REALTIME SETUP STARTED - Watch for subscription status!');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[PostProvider] Setting up realtime subscription for posts table...');
+    }
     const channelName = `posts-realtime-${Date.now()}`;
-    console.log('[PostProvider] Using channel name:', channelName);
     const channel = supabase
       .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload: any) => {
-        console.log('[PostProvider] ⚡ Real-time post update:', payload);
-        console.error('[PostProvider] 🔴🔴🔴 REALTIME EVENT RECEIVED:', payload.eventType, payload.new?.id);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[PostProvider] ⚡ Real-time post update:', payload);
+        }
         const evt = payload.eventType;
         const newRow = payload.new;
         const oldRow = payload.old;
@@ -443,11 +457,13 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
             }
           }).catch(() => {});
         } else if (evt === 'UPDATE' && newRow) {
-          console.log('[PostProvider] Real-time UPDATE received:', newRow.id, {
-            last_price_check: newRow.last_price_check,
-            current_price: newRow.current_price,
-            symbol: newRow.symbol,
-          });
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[PostProvider] Real-time UPDATE received:', newRow.id, {
+              last_price_check: newRow.last_price_check,
+              current_price: newRow.current_price,
+              symbol: newRow.symbol,
+            });
+          }
           // Fetch enriched row to ensure status/profile/derived fields are present
           fetchPostWithStats(newRow.id).then((full) => {
             const row: any = full || newRow;
@@ -539,18 +555,20 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .subscribe((status: string) => {
-        console.log('[PostProvider] Realtime channel status:', status);
-        console.error('[PostProvider] 🔴 CHANNEL STATUS:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('[PostProvider] ✅ Successfully subscribed to posts realtime updates');
-          console.error('[PostProvider] 🟢 ✅ SUCCESSFULLY SUBSCRIBED TO REALTIME!');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('[PostProvider] 🔴 ❌ REALTIME SUBSCRIPTION FAILED!');
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[PostProvider] Realtime channel status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('[PostProvider] ✅ Successfully subscribed to posts realtime updates');
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('[PostProvider] 🔴 ❌ REALTIME SUBSCRIPTION FAILED!');
+          }
         }
       });
 
     return () => {
-      console.log('[PostProvider] Cleaning up realtime subscription...');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[PostProvider] Cleaning up realtime subscription...');
+      }
       try { channel.unsubscribe(); } catch {}
     };
   }, [supabase, fetchPostWithStats]);
@@ -568,13 +586,14 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     };
     setPosts(prev => [optimisticPost, ...prev]);
     try {
-      console.log('[PostProvider] CRITICAL - Creating post with data:', {
-        hasImageUrl: !!postData.image_url,
-        imageUrl: postData.image_url,
-        imageUrlLength: postData.image_url?.length,
-        allKeys: Object.keys(postData),
-        fullData: JSON.stringify(postData)
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[PostProvider] Creating post with data:', {
+          hasImageUrl: !!postData.image_url,
+          imageUrl: postData.image_url,
+          imageUrlLength: postData.image_url?.length,
+          allKeys: Object.keys(postData)
+        });
+      }
       
       // Ensure image_url is passed correctly
       const dataToSave = {
@@ -584,22 +603,17 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       
       const saved = await supaCreatePost(dataToSave);
       
-      console.log('[PostProvider] Post created:', {
-        savedId: saved?.id,
-        savedImageUrl: saved?.image_url,
-        hasImageUrl: !!saved?.image_url
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[PostProvider] Post created:', {
+          savedId: saved?.id,
+          savedImageUrl: saved?.image_url,
+          hasImageUrl: !!saved?.image_url
+        });
+      }
       
       setPosts(prev => {
         const withoutTemp = prev.filter(p => p.id !== tempId);
-        const newList = [saved, ...withoutTemp];
-        console.log('[PostProvider] Post added to posts list:', {
-          tempId,
-          savedId: saved?.id,
-          newListLength: newList.length,
-          savedUserId: saved?.user_id
-        });
-        return newList;
+        return [saved, ...withoutTemp];
       });
       // Also update myPostsState if it's my own post
       if (saved?.user_id && user?.id && saved.user_id === user.id) {
@@ -611,7 +625,9 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
       // Send Telegram notification for new post
       if (saved?.id && saved?.user_id) {
         sendNewPostTelegramNotifications(supabase, saved).catch(err => {
-          console.error('[Telegram] Error sending new post notifications:', err);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('[Telegram] Error sending new post notifications:', err);
+          }
           // Don't fail post creation if notifications fail
         });
       }
@@ -635,18 +651,13 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
   const updateUserPosts = useCallback((newUserPosts: Post[]) => {
     // Temporary compatibility: allow external components to push myPosts
     setMyPostsState(newUserPosts);
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[PostProvider] User posts updated externally:', {
-        userId: user?.id,
-        newUserPostsCount: newUserPosts.length,
-        postIds: newUserPosts.map(p => p.id).slice(0, 3)
-      });
-    }
   }, [user?.id]);
 
   // Local update for immediate UI feedback (without waiting for Realtime or re-fetch)
   const updatePostsLocally = useCallback((updates: Array<{id: string; [key: string]: any}>) => {
-    console.log('[PostProvider] 🔵 Local update for posts:', updates.map(u => u.id));
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[PostProvider] 🔵 Local update for posts:', updates.map(u => u.id));
+    }
     
     // Update main feed posts
     setPosts(prev => {
@@ -655,7 +666,6 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
         const idx = next.findIndex(p => p.id === update.id);
         if (idx !== -1) {
           next[idx] = { ...next[idx], ...update };
-          console.log(`[PostProvider] Updated post ${update.id} in main feed`);
         }
       });
       return next;
@@ -668,7 +678,6 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
         const idx = next.findIndex(p => p.id === update.id);
         if (idx !== -1) {
           next[idx] = { ...next[idx], ...update };
-          console.log(`[PostProvider] Updated post ${update.id} in myPosts`);
         }
       });
       return next;
