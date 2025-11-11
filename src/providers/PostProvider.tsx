@@ -28,11 +28,15 @@ type PostsContextType = {
   createPost: (postData: any) => Promise<Post>;
   onPostCreated: (cb: (post: Post) => void) => () => void;
   updateUserPosts: (userPosts: Post[]) => void;
+  // Local update for immediate UI feedback
+  updatePostsLocally: (updates: Array<{id: string; [key: string]: any}>) => void;
 };
 
 const PostsContext = createContext<PostsContextType | undefined>(undefined);
 
 export function PostProvider({ children }: { children: React.ReactNode }) {
+  console.log('[PostProvider] 🚀 PostProvider component mounted');
+  console.error('[PostProvider] ⚠️ CRITICAL: PostProvider is loading - this should be visible!');
   const { supabase, getPostsPage, createPost: supaCreatePost, user } = useSupabase();
   const [posts, setPosts] = useState<Post[]>([]);
   // Dedicated state for current user's posts (profile/dashboard)
@@ -389,11 +393,19 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
 
   // Subscribe to realtime updates for posts (price checks, status changes)
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) {
+      console.error('[PostProvider] ❌ No supabase client - realtime will not work!');
+      return;
+    }
+    console.log('[PostProvider] Setting up realtime subscription for posts table...');
+    console.error('[PostProvider] 🔴 REALTIME SETUP STARTED - Watch for subscription status!');
+    const channelName = `posts-realtime-${Date.now()}`;
+    console.log('[PostProvider] Using channel name:', channelName);
     const channel = supabase
-      .channel('posts-realtime')
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload: any) => {
-        console.log('Real-time post update:', payload);
+        console.log('[PostProvider] ⚡ Real-time post update:', payload);
+        console.error('[PostProvider] 🔴🔴🔴 REALTIME EVENT RECEIVED:', payload.eventType, payload.new?.id);
         const evt = payload.eventType;
         const newRow = payload.new;
         const oldRow = payload.old;
@@ -434,45 +446,88 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
           console.log('[PostProvider] Real-time UPDATE received:', newRow.id, {
             last_price_check: newRow.last_price_check,
             current_price: newRow.current_price,
-            symbol: newRow.symbol
+            symbol: newRow.symbol,
           });
-          setPosts(prev => {
-            const next = [...prev];
-            const idx = next.findIndex(p => p.id === newRow.id);
-            if (idx !== -1) {
-              const updatedPost: any = { ...next[idx], ...newRow };
-              if (newRow.price_checks) {
-                try {
-                  updatedPost.price_checks = typeof newRow.price_checks === 'string'
-                    ? JSON.parse(newRow.price_checks)
-                    : newRow.price_checks;
-                } catch (e) {
-                  console.warn('Failed to parse price_checks:', e);
+          // Fetch enriched row to ensure status/profile/derived fields are present
+          fetchPostWithStats(newRow.id).then((full) => {
+            const row: any = full || newRow;
+            setPosts(prev => {
+              const next = [...prev];
+              const idx = next.findIndex(p => p.id === row.id);
+              if (idx !== -1) {
+                const updatedPost: any = { ...next[idx], ...row };
+                if (row.price_checks) {
+                  try {
+                    updatedPost.price_checks = typeof row.price_checks === 'string'
+                      ? JSON.parse(row.price_checks)
+                      : row.price_checks;
+                  } catch (e) { console.warn('Failed to parse price_checks:', e); }
+                }
+                next[idx] = updatedPost;
+                if (modeRef.current === 'trending') {
+                  next.sort((a: any, b: any) => {
+                    const aEng = (a.comment_count || 0) + (a.buy_count || 0) + (a.sell_count || 0);
+                    const bEng = (b.comment_count || 0) + (b.buy_count || 0) + (b.sell_count || 0);
+                    return bEng - aEng;
+                  });
                 }
               }
-              next[idx] = updatedPost;
-              if (modeRef.current === 'trending') {
-                next.sort((a: any, b: any) => {
-                  const aEng = (a.comment_count || 0) + (a.buy_count || 0) + (a.sell_count || 0);
-                  const bEng = (b.comment_count || 0) + (b.buy_count || 0) + (b.sell_count || 0);
-                  return bEng - aEng;
-                });
-              }
-            }
-            return next;
-          });
-          // Update myPostsState if applicable
-          if (newRow.user_id && user?.id && newRow.user_id === user.id) {
+              return next;
+            });
+            // Update myPostsState if the updated post exists there (profile/dashboard list)
             setMyPostsState(prev => {
               const next = [...prev];
-              const idx = next.findIndex(p => p.id === newRow.id);
+              const idx = next.findIndex(p => p.id === row.id);
               if (idx !== -1) {
-                next[idx] = { ...next[idx], ...newRow } as any;
+                const updatedPost: any = { ...next[idx], ...row };
+                if (row.price_checks) {
+                  try {
+                    updatedPost.price_checks = typeof row.price_checks === 'string'
+                      ? JSON.parse(row.price_checks)
+                      : row.price_checks;
+                  } catch {}
+                }
+                next[idx] = updatedPost;
               }
               return next;
             });
             scheduleRefreshMyStats(300);
-          }
+          }).catch(() => {
+            // Fallback: merge payload directly
+            setPosts(prev => {
+              const next = [...prev];
+              const idx = next.findIndex(p => p.id === newRow.id);
+              if (idx !== -1) {
+                const updatedPost: any = { ...next[idx], ...newRow };
+                if (newRow.price_checks) {
+                  try {
+                    updatedPost.price_checks = typeof newRow.price_checks === 'string'
+                      ? JSON.parse(newRow.price_checks)
+                      : newRow.price_checks;
+                  } catch (e) { console.warn('Failed to parse price_checks:', e); }
+                }
+                next[idx] = updatedPost;
+              }
+              return next;
+            });
+            setMyPostsState(prev => {
+              const next = [...prev];
+              const idx = next.findIndex(p => p.id === newRow.id);
+              if (idx !== -1) {
+                const updatedPost: any = { ...next[idx], ...newRow };
+                if (newRow.price_checks) {
+                  try {
+                    updatedPost.price_checks = typeof newRow.price_checks === 'string'
+                      ? JSON.parse(newRow.price_checks)
+                      : newRow.price_checks;
+                  } catch {}
+                }
+                next[idx] = updatedPost;
+              }
+              return next;
+            });
+            scheduleRefreshMyStats(300);
+          });
         } else if (evt === 'DELETE' && oldRow) {
           setPosts(prev => prev.filter(p => p.id !== oldRow.id));
           if (user?.id) {
@@ -483,9 +538,19 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
           }
         }
       })
-      .subscribe();
+      .subscribe((status: string) => {
+        console.log('[PostProvider] Realtime channel status:', status);
+        console.error('[PostProvider] 🔴 CHANNEL STATUS:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('[PostProvider] ✅ Successfully subscribed to posts realtime updates');
+          console.error('[PostProvider] 🟢 ✅ SUCCESSFULLY SUBSCRIBED TO REALTIME!');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[PostProvider] 🔴 ❌ REALTIME SUBSCRIPTION FAILED!');
+        }
+      });
 
     return () => {
+      console.log('[PostProvider] Cleaning up realtime subscription...');
       try { channel.unsubscribe(); } catch {}
     };
   }, [supabase, fetchPostWithStats]);
@@ -579,6 +644,40 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user?.id]);
 
+  // Local update for immediate UI feedback (without waiting for Realtime or re-fetch)
+  const updatePostsLocally = useCallback((updates: Array<{id: string; [key: string]: any}>) => {
+    console.log('[PostProvider] 🔵 Local update for posts:', updates.map(u => u.id));
+    
+    // Update main feed posts
+    setPosts(prev => {
+      const next = [...prev];
+      updates.forEach(update => {
+        const idx = next.findIndex(p => p.id === update.id);
+        if (idx !== -1) {
+          next[idx] = { ...next[idx], ...update };
+          console.log(`[PostProvider] Updated post ${update.id} in main feed`);
+        }
+      });
+      return next;
+    });
+    
+    // Update myPosts for current user
+    setMyPostsState(prev => {
+      const next = [...prev];
+      updates.forEach(update => {
+        const idx = next.findIndex(p => p.id === update.id);
+        if (idx !== -1) {
+          next[idx] = { ...next[idx], ...update };
+          console.log(`[PostProvider] Updated post ${update.id} in myPosts`);
+        }
+      });
+      return next;
+    });
+    
+    // Refresh stats after local update
+    scheduleRefreshMyStats(500);
+  }, []);
+
   // Initial fetch for feed posts only on mount
   useEffect(() => {
     fetchPosts();
@@ -635,6 +734,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     createPost,
     onPostCreated,
     updateUserPosts,
+    updatePostsLocally,
   };
 
   return (

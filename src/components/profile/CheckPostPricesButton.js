@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import styles from '@/styles/profile.module.css';
 import { useProfile } from '@/providers/ProfileProvider';
+import { usePosts } from '@/providers/PostProvider';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useSubscription } from '@/providers/SubscriptionProvider';
 import { useBackgroundPriceCheck } from '@/providers/BackgroundPriceCheckProvider';
@@ -15,6 +16,7 @@ export default function CheckPostPricesButton({ userId }) {
   const [checkStats, setCheckStats] = useState(null);
   const [error, setError] = useState(null);
   const { refreshData } = useProfile();
+  const { fetchMyPosts, refreshMyStats, updatePostsLocally } = usePosts();
   const { supabase } = useSupabase();
   const { canPerformPriceCheck, refreshSubscription, usageInfo } = useSubscription();
   const { submitPriceCheck, isProcessing } = useBackgroundPriceCheck();
@@ -35,50 +37,9 @@ export default function CheckPostPricesButton({ userId }) {
   const [tgTitle, setTgTitle] = useState('');
   const [tgComment, setTgComment] = useState('');
   
-  // Real-time subscription for price updates
-  useEffect(() => {
-    if (!supabase || !userId) return;
-    
-    const channel = supabase
-      .channel('price-check-updates')
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'posts',
-        filter: `user_id=eq.${userId}`
-      }, (payload) => {
-        console.log('Real-time price update received:', payload);
-        
-        // Check if this is a price-related update
-        const updatedFields = Object.keys(payload.new || {});
-        const priceFields = ['current_price', 'last_price_check', 'target_reached', 'stop_loss_triggered', 'price_checks', 'status_message'];
-        
-        if (updatedFields.some(field => priceFields.includes(field))) {
-          setRealTimeUpdates(prev => {
-            const newMap = new Map(prev);
-            newMap.set(payload.new.id, {
-              ...payload.new,
-              timestamp: new Date().toISOString()
-            });
-            return newMap;
-          });
-          
-          // Refresh profile data to update the UI
-          if (refreshData) {
-            refreshData(userId);
-          }
-        }
-      })
-      .subscribe();
-    
-    return () => {
-      try { 
-        channel.unsubscribe(); 
-      } catch (e) {
-        console.log('Error unsubscribing from price updates:', e);
-      }
-    };
-  }, [supabase, userId, refreshData]);
+  // ✅ No need for separate Realtime subscription here!
+  // PostProvider already handles Realtime updates globally.
+  // We use LOCAL UPDATE from API response for instant feedback.
   
   const cancelCheck = () => {
     if (abortController) {
@@ -233,11 +194,52 @@ export default function CheckPostPricesButton({ userId }) {
       
       console.log(`[CHECK POST PRICES] Saved to history with ID: ${historyEntryId}`);
       
+      console.log('[CHECK-PRICES] 🟡 Checking data.results...', {
+        hasResults: !!data.results,
+        isArray: Array.isArray(data.results),
+        length: data.results?.length || 0,
+        firstResult: data.results?.[0]
+      });
+      
+      // 🚀 IMMEDIATE LOCAL UPDATE - No waiting for Realtime or database re-fetch!
+      if (data.results && Array.isArray(data.results) && data.results.length > 0) {
+        console.log('[CHECK-PRICES] 🔵 Performing local update for immediate UI feedback');
+        try {
+          const localUpdates = data.results.map(result => ({
+            id: result.id,
+            current_price: result.currentPrice,
+            target_reached: result.targetReached,
+            stop_loss_triggered: result.stopLossTriggered,
+            status: result.closed ? (result.targetReached ? 'success' : 'loss') : 'open',
+            closed: result.closed,
+            last_price_check: new Date().toISOString(),
+          }));
+          
+          console.log('[CHECK-PRICES] 📝 Local updates prepared:', localUpdates);
+          
+          if (typeof updatePostsLocally === 'function') {
+            console.log('[CHECK-PRICES] 📡 Calling updatePostsLocally...');
+            updatePostsLocally(localUpdates);
+            console.log('[CHECK-PRICES] ✅ Local update complete - UI should update instantly!');
+          } else {
+            console.error('[CHECK-PRICES] ❌ updatePostsLocally is not a function!', typeof updatePostsLocally);
+          }
+        } catch (err) {
+          console.error('[CHECK-PRICES] ❌ Error during local update:', err);
+        }
+      } else {
+        console.log('[CHECK-PRICES] ⚠️ No results to update locally');
+      }
+      
       // Refresh subscription info after successful check
       refreshSubscription();
       
+      // Optional: Still refresh from database for accuracy (but UI already updated!)
       if (userId && !isCancelled) {
-        refreshData(userId);
+        // Stats refresh is important for counts
+        if (typeof refreshMyStats === 'function') {
+          try { refreshMyStats(); } catch {}
+        }
       }
       
       // Show the stats dialog

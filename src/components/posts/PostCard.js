@@ -33,14 +33,14 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
   };
 
   const getStatusColor = (p) => {
-    if (p?.target_reached) return styles.success;
-    if (p?.stop_loss_triggered) return styles.loss;
+    if (p?.target_reached || p?.status === 'success') return styles.success;
+    if (p?.stop_loss_triggered || p?.status === 'loss') return styles.loss;
     return styles.active;
   };
 
   const getStatusText = (p) => {
-    if (p?.target_reached) return '🎯 Target Reached';
-    if (p?.stop_loss_triggered) return '🛑 Stop Loss Hit';
+    if (p?.target_reached || p?.status === 'success') return '🎯 Target Reached';
+    if (p?.stop_loss_triggered || p?.status === 'loss') return '🛑 Stop Loss Hit';
     return '📊 Active';
   };
 

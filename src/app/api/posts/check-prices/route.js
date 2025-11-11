@@ -664,36 +664,40 @@ export async function POST(request) {
         let highPrice = null; // Store the high price when target is reached
         let targetHitTime = null; // Store the time of day when target was hit (if available)
         
-        for (const dayData of historicalData) {
+        // Ensure chronological order to pick earliest event
+        const sortedHistorical = Array.isArray(historicalData)
+          ? [...historicalData].sort((a, b) => new Date(a.date) - new Date(b.date))
+          : [];
+        
+        for (const dayData of sortedHistorical) {
+          // Stop once one event detected (mutually exclusive)
+          if (targetReached || stopLossTriggered) break;
+          
           const date = dayData.date;
           const high = parseFloat(dayData.high);
           const low = parseFloat(dayData.low);
           const close = parseFloat(dayData.close);
           
-          // First check if target is reached - this has priority
-          if (!targetReached && high >= targetPrice) {
+          // Check target first - priority over stop-loss
+          if (!targetReached && !stopLossTriggered && high >= targetPrice) {
             targetReached = true;
             targetReachedDate = date;
-            highPrice = high; // Store the high price that reached the target
+            highPrice = high;
             
-            // Try to extract time if it's included in the date string
-            if (date.includes('T')) {
+            if (date && String(date).includes('T')) {
               try {
                 const dateObj = new Date(date);
-                targetHitTime = dateObj.toTimeString().split(' ')[0]; // Format as HH:MM:SS
-              } catch (e) {
-                // If date parsing fails, leave targetHitTime as null
-              }
+                targetHitTime = dateObj.toTimeString().split(' ')[0];
+              } catch (e) {}
             }
-            
-            // Do not check for stop loss once target is reached
-            continue;
+            break;
           }
           
-          // Only check for stop loss if target hasn't been reached
+          // Check stop loss only if target not hit
           if (!targetReached && !stopLossTriggered && low <= stopLossPrice) {
             stopLossTriggered = true;
             stopLossTriggeredDate = date;
+            break;
           }
         }
         
@@ -973,15 +977,26 @@ export async function POST(request) {
               const postId = updateData.id;
               delete updateData.id; // Remove id from update data
               
-              const { error } = await supabase
+              console.log(`🔵 [CHECK-PRICES] Updating post ${postId} with data:`, {
+                status: updateData.status,
+                target_reached: updateData.target_reached,
+                stop_loss_triggered: updateData.stop_loss_triggered,
+                closed: updateData.closed,
+                last_price_check: updateData.last_price_check
+              });
+              
+              const { error, data } = await supabase
                 .from('posts')
                 .update(updateData)
-                .eq('id', postId);
+                .eq('id', postId)
+                .select();
                 
               if (error) {
                 updateError = error;
-                console.error('Error updating post:', postId, error);
+                console.error('❌ [CHECK-PRICES] Error updating post:', postId, error);
                 break;
+              } else {
+                console.log(`✅ [CHECK-PRICES] Successfully updated post ${postId}. Response:`, data);
               }
             }
             

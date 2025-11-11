@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useCallback, useRef } from 
 import { v4 as uuidv4 } from 'uuid';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { savePriceCheckResult } from '@/utils/priceCheckHistory';
+import { usePosts } from '@/providers/PostProvider';
 
 // Extend Window interface for showNotification and showPriceCheckResults
 declare global {
@@ -59,6 +60,7 @@ interface BackgroundPriceCheckProviderProps {
 
 export function BackgroundPriceCheckProvider({ children }: BackgroundPriceCheckProviderProps) {
   const { user, supabase } = useSupabase();
+  const { updatePostsLocally } = usePosts(); // For immediate UI updates
   
   const [tasks, setTasks] = useState<PriceCheckTask[]>([]);
   const processingRef = useRef(false);
@@ -224,6 +226,34 @@ export function BackgroundPriceCheckProvider({ children }: BackgroundPriceCheckP
           const updatedCount = result.updatedPosts || 0;
           const remainingChecks = result.remainingChecks || 0;
 
+          // 🚀 IMMEDIATE LOCAL UPDATE - Update UI before showing notifications!
+          if (result.results && Array.isArray(result.results) && result.results.length > 0) {
+            console.log('[BackgroundPriceCheck] 🔵 Performing local update for immediate UI feedback');
+            try {
+              const localUpdates = result.results.map((res: any) => ({
+                id: res.id,
+                current_price: res.currentPrice,
+                target_reached: res.targetReached,
+                stop_loss_triggered: res.stopLossTriggered,
+                status: res.closed ? (res.targetReached ? 'success' : 'loss') : 'open',
+                closed: res.closed,
+                last_price_check: new Date().toISOString(),
+              }));
+              
+              console.log('[BackgroundPriceCheck] 📝 Local updates prepared:', localUpdates);
+              
+              if (typeof updatePostsLocally === 'function') {
+                console.log('[BackgroundPriceCheck] 📡 Calling updatePostsLocally...');
+                updatePostsLocally(localUpdates);
+                console.log('[BackgroundPriceCheck] ✅ Local update complete - UI should update instantly!');
+              } else {
+                console.error('[BackgroundPriceCheck] ❌ updatePostsLocally is not a function!');
+              }
+            } catch (err) {
+              console.error('[BackgroundPriceCheck] ❌ Error during local update:', err);
+            }
+          }
+
           // Save results to localStorage for history
           const historyEntryId = savePriceCheckResult({
             checkedPosts: checkedCount,
@@ -348,7 +378,7 @@ export function BackgroundPriceCheckProvider({ children }: BackgroundPriceCheckP
     } finally {
       processingRef.current = false;
     }
-  }, [tasks, user, supabase]);
+  }, [tasks, user, supabase, updatePostsLocally]);
 
   // Cancel a running task
   const cancelTask = useCallback((taskId: string) => {

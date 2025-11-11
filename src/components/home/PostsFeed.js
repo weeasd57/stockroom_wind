@@ -52,7 +52,7 @@ function PostsFeed({
     loadMore,
     loadingMore 
   } = usePosts();
-  const { getPostsPage, user } = useSupabase();
+  const { supabase, getPostsPage, user } = useSupabase();
   const { isPro } = useSubscription();
   const { isSubscribedToBroker, brokerSubscriptions } = useBrokerSubscription();
   
@@ -250,6 +250,48 @@ function PostsFeed({
     run();
     return () => { canceled = true; };
   }, [userId, isSelfProfile, getPostsPage]);
+
+  // Realtime subscription for view-profile: keep userPosts in sync with posts table updates
+  useEffect(() => {
+    if (!userId || isSelfProfile || !supabase) return;
+
+    const channel = supabase
+      .channel(`posts-realtime-view-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts', filter: `user_id=eq.${userId}` }, (payload) => {
+        const evt = payload.eventType;
+        const newRow = payload.new;
+        const oldRow = payload.old;
+
+        if (evt === 'UPDATE' && newRow) {
+          setUserPosts(prev => {
+            const idx = prev.findIndex(p => p.id === newRow.id);
+            if (idx === -1) return prev;
+            const next = [...prev];
+            const merged = { ...next[idx], ...newRow };
+            // Parse price_checks if present
+            if (newRow.price_checks) {
+              try {
+                merged.price_checks = typeof newRow.price_checks === 'string' ? JSON.parse(newRow.price_checks) : newRow.price_checks;
+              } catch {}
+            }
+            next[idx] = merged;
+            return next;
+          });
+        } else if (evt === 'INSERT' && newRow) {
+          setUserPosts(prev => {
+            if (prev.some(p => p.id === newRow.id)) return prev;
+            return [ { ...newRow }, ...prev ];
+          });
+        } else if (evt === 'DELETE' && oldRow) {
+          setUserPosts(prev => prev.filter(p => p.id !== oldRow.id));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      try { channel.unsubscribe(); } catch {}
+    };
+  }, [supabase, userId, isSelfProfile]);
 
   // Update loading and error states from PostProvider
   // Show skeleton only if we have no posts yet; otherwise keep rendering while background refreshes
@@ -1081,7 +1123,7 @@ function PostsFeed({
           } : {}}
         >
           {posts.map((post, index) => (
-            <React.Fragment key={post.id}>
+            <React.Fragment key={`${post.id}-${post.status || ''}-${post.target_reached ? 1 : 0}-${post.stop_loss_triggered ? 1 : 0}-${post.last_price_check || ''}`}>
               <PostCard post={post} showFlagBackground={showFlagBackground} hideUserInfo={hideUserInfo} viewMode={viewMode} />
               {/* Show ad after every 5 posts for Free users */}
               {(index + 1) % 5 === 0 && (
