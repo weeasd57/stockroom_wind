@@ -1,0 +1,283 @@
+.container {
+  min-height: 100vh;
+  padding: 2rem 1rem;
+  background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkoutCard {
+  max-width: 600px;
+  width: 100%;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  margin-bottom: 0.5rem;
+}
+
+.header p {
+  color: hsl(var(--muted-foreground));
+  font-size: 1.1rem;
+}
+
+.planDetails {
+  margin-bottom: 2rem;
+}
+
+.planCard {
+  background: hsl(var(--muted));
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.planCard h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  margin-bottom: 1rem;
+}
+
+.price {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.currency {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: hsl(var(--primary));
+}
+
+.amount {
+  font-size: 3rem;
+  font-weight: 700;
+  color: hsl(var(--primary));
+}
+
+.period {
+  font-size: 1.2rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.description {
+  color: hsl(var(--muted-foreground));
+  font-size: 1rem;
+}
+
+.features {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.features h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  margin-bottom: 1rem;
+}
+
+.features ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.features li {
+  padding: 0.5rem 0;
+  color: hsl(var(--foreground));
+  font-size: 1rem;
+}
+
+.error {
+  background: hsl(var(--destructive) / 0.1);
+  border: 1px solid hsl(var(--destructive));
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.error p {
+  color: hsl(var(--destructive));
+  margin: 0;
+  font-weight: 500;
+}
+
+.clearError {
+  background: none;
+  border: none;
+  color: hsl(var(--destructive));
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.clearError:hover {
+  background: hsl(var(--destructive) / 0.1);
+}
+
+.paymentSection {
+  margin-bottom: 2rem;
+}
+
+.paymentSection h3 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.paypalContainer {
+  min-height: 60px;
+  margin: 1rem 0;
+}
+
+.loadingSpinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid hsl(var(--muted));
+  border-top: 3px solid hsl(var(--primary));
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.spinner p {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.95rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.planToggle {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.planToggle p {
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 1rem;
+}
+
+.toggleButtons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.toggleBtn {
+  padding: 0.75rem 1.5rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.toggleBtn:hover {
+  background: hsl(var(--muted));
+}
+
+.toggleBtn.active {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
+}
+
+.footer {
+  text-align: center;
+  padding-top: 1.5rem;
+  border-top: 1px solid hsl(var(--border));
+}
+
+.footer p {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.9rem;
+  margin: 0.25rem 0;
+}
+
+/* Dark mode support */
+:global(.dark) .container {
+  background: linear-gradient(135deg, #000 0%, #111 100%);
+}
+
+:global(.dark) .checkoutCard {
+  background: #1a1a1a;
+  border-color: #333;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark) .planCard {
+  background: #222;
+}
+
+:global(.dark) .features {
+  background: #1a1a1a;
+  border-color: #333;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+  
+  .checkoutCard {
+    padding: 1.5rem;
+  }
+  
+  .header h1 {
+    font-size: 1.75rem;
+  }
+  
+  .amount {
+    font-size: 2.5rem;
+  }
+  
+  .toggleButtons {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .toggleBtn {
+    width: 100%;
+  }
+}
