@@ -730,7 +730,16 @@
   }
   
   .priceValue.potential {
-    color: #059669;
+    color: #4CAF50;
+    opacity: 0.8;
+  }
+  
+  .negative {
+    color: #f44336 !important;
+  }
+  
+  .positive {
+    color: #4CAF50 !important;
   }
   
   /* Post Content */

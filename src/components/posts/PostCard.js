@@ -27,9 +27,28 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
     }).format(price);
   };
 
-  const calculatePotentialReturn = (currentPrice, targetPrice) => {
-    if (!currentPrice || !targetPrice) return 0;
-    return (((targetPrice - currentPrice) / currentPrice) * 100).toFixed(2);
+  const calculatePotentialReturn = (post) => {
+    if (!post) return { value: 0, label: 'Potential', isActual: false };
+    
+    const currentPrice = parseFloat(post.current_price || post.last_price || 0);
+    const targetPrice = parseFloat(post.target_price || 0);
+    const initialPrice = parseFloat(post.initial_price || currentPrice);
+    
+    if (!currentPrice || !targetPrice) return { value: 0, label: 'Potential', isActual: false };
+    
+    // If post is closed or stop loss/target reached, show actual return
+    if (post.closed || post.stop_loss_triggered || post.target_reached) {
+      const actualReturn = (((currentPrice - initialPrice) / initialPrice) * 100).toFixed(2);
+      return { 
+        value: actualReturn, 
+        label: post.stop_loss_triggered ? 'Loss' : post.target_reached ? 'Gain' : 'Return', 
+        isActual: true 
+      };
+    }
+    
+    // For open posts, show potential return to target
+    const potentialReturn = (((targetPrice - currentPrice) / currentPrice) * 100).toFixed(2);
+    return { value: potentialReturn, label: 'Potential', isActual: false };
   };
 
   const getStatusColor = (p) => {
@@ -296,18 +315,26 @@ export default function PostCard({ post, showFlagBackground = false, hideUserInf
               <span className={styles.priceValue}>{formatPrice(post?.stop_loss_price)}</span>
             </div>
             <div className={styles.priceItem}>
-              <span className={styles.priceLabel}>Potential</span>
-              <span className={`${styles.priceValue} ${styles.potential}`}>
-                +{calculatePotentialReturn(post?.current_price, post?.target_price)}%
-              </span>
+              {(() => {
+                const result = calculatePotentialReturn(post);
+                const isNegative = parseFloat(result.value) < 0;
+                return (
+                  <>
+                    <span className={styles.priceLabel}>{result.label}</span>
+                    <span className={`${styles.priceValue} ${result.isActual ? (isNegative ? styles.negative : styles.positive) : styles.potential}`}>
+                      {isNegative ? '' : '+'}{result.value}%
+                    </span>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
 
         {/* Content */}
-        {post?.description && (
+        {(post?.description || post?.content) && (
           <div className={styles.postContent}>
-            <p>{post.description}</p>
+            <p>{post.description || post.content}</p>
           </div>
         )}
 

@@ -110,6 +110,18 @@ export async function POST(request) {
       );
     }
 
+    // Demo mode: pretend success without doing external calls
+    const DEMO_MODE = String(process.env.NEXT_PUBLIC_DEMO_MODE || 'false').toLowerCase() === 'true';
+    if (DEMO_MODE) {
+      return NextResponse.json({
+        success: true,
+        status: 'AUTHORIZED',
+        authorizationId: 'DEMO-AUTH-123',
+        amount: { value: '0.00', currency_code: 'USD' },
+        authData: { demo: true }
+      });
+    }
+
     // Get PayPal access token
     const accessToken = await getPayPalAccessToken();
 

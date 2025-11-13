@@ -31,6 +31,7 @@ import { useBackgroundProfileEdit } from '@/providers/BackgroundProfileEditProvi
 import AnalysisTab from '@/components/profile/AnalysisTab';
 import PremiumPlanTab from '@/components/profile/PremiumPlanTab';
 import { PremiumPlanProvider } from '@/providers/PremiumPlanProvider';
+import { sanitizeUsername, sanitizeText, sanitizeUrl, sanitizeFullName } from '@/utils/validation';
 
 export default function Profile() {
   const { supabase, user, isAuthenticated, isLoading: authLoading } = useSupabase();
@@ -560,9 +561,24 @@ export default function Profile() {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ 
-      ...prev, 
-      [name]: type === 'checkbox' ? checked : (value === '' ? null : value) // Allow null for empty social media URLs
+    let nextValue = value;
+    if (type === 'checkbox') {
+      nextValue = checked;
+    } else {
+      if (name === 'username') {
+        nextValue = sanitizeUsername(value);
+      } else if (name === 'full_name') {
+        nextValue = sanitizeFullName(value);
+      } else if (name === 'bio') {
+        nextValue = sanitizeText(value, { maxLength: 500 });
+      } else if (name === 'facebook_url' || name === 'telegram_url' || name === 'youtube_url') {
+        const cleaned = sanitizeUrl(value);
+        nextValue = cleaned || '';
+      }
+    }
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? nextValue : (nextValue === '' ? null : nextValue)
     }));
   };
 

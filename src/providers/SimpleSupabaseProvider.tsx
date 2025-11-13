@@ -7,7 +7,8 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { User, Session, SupabaseClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import AuthLoadingScreen from '@/components/loading/AuthLoadingScreen';
-import { supabase as globalSupabase } from '@/utils/supabase';
+import { supabase as globalSupabase, updateUserProfile as updateUserProfileUtil } from '@/utils/supabase';
+import { sanitizePostData, sanitizeComment } from '@/utils/validation';
 
 interface SupabaseContextType {
   supabase: SupabaseClient;
@@ -201,9 +202,9 @@ export function SimpleSupabaseProvider({ children }: SupabaseProviderProps) {
   }, [supabase]);
   
   const updateProfile = useCallback(async (userId: string, updates: any) => {
-    const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
+    const { error } = await updateUserProfileUtil(userId, updates);
     if (error) throw error;
-  }, [supabase]);
+  }, []);
   
   // Storage functions
   const uploadFile = useCallback(async (bucket: string, path: string, file: File): Promise<string> => {
@@ -256,10 +257,11 @@ export function SimpleSupabaseProvider({ children }: SupabaseProviderProps) {
   }, [supabase]);
   
   const createPost = useCallback(async (postData: any) => {
-    const { data, error } = await supabase.from('posts').insert(postData).select().single();
+    const safe = sanitizePostData(postData, user?.id);
+    const { data, error } = await supabase.from('posts').insert(safe).select().single();
     if (error) throw error;
     return data;
-  }, [supabase]);
+  }, [supabase, user?.id]);
   
   const updatePost = useCallback(async (id: string, updates: any) => {
     const { data, error } = await supabase.from('posts').update(updates).eq('id', id).select().single();
@@ -280,9 +282,11 @@ export function SimpleSupabaseProvider({ children }: SupabaseProviderProps) {
   }, [supabase]);
   
   const addComment = useCallback(async (postId: string, content: string) => {
+    const safeContent = sanitizeComment(content);
+    if (!safeContent) throw new Error('Comment content cannot be empty');
     const { data, error } = await supabase.from('comments').insert({
       post_id: postId,
-      content,
+      content: safeContent,
       user_id: user?.id
     }).select().single();
     if (error) throw error;

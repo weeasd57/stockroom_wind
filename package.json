@@ -11,7 +11,8 @@
     "clean": "rimraf .next && next clean",
     "telegram:setup": "node scripts/setup-telegram-domain.js",
     "telegram:test": "node scripts/setup-telegram-domain.js --test",
-    "paypal:test": "node scripts/test-paypal-credentials.js"
+    "paypal:test": "node scripts/test-paypal-credentials.js",
+    "prepare:codecanyon": "node scripts/prepare-codecanyon.js"
   },
   "dependencies": {
     "@paypal/paypal-server-sdk": "^1.0.4",
@@ -50,6 +51,9 @@
     "postcss": "^8",
     "rimraf": "^5.0.5",
     "tailwindcss": "^3.4.1"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "resolutions": {
     "react": "18.2.0",

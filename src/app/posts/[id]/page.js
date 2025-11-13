@@ -70,6 +70,7 @@ export default function PostDetailsPage() {
   const [error, setError] = useState(null);
   const [checkingPrice, setCheckingPrice] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
+  const [showCalculationInfo, setShowCalculationInfo] = useState(false);
   const { user } = useSupabase();
   const { profile } = useProfile();
   
@@ -186,8 +187,31 @@ export default function PostDetailsPage() {
       isMovingTowardTarget
     };
   };
-  
- 
+
+  // Calculate return information
+  const calculateReturnInfo = (post) => {
+    if (!post) return { value: 0, label: 'Potential', isActual: false };
+    
+    const currentPrice = parseFloat(post.current_price || post.last_price || 0);
+    const targetPrice = parseFloat(post.target_price || 0);
+    const initialPrice = parseFloat(post.initial_price || currentPrice);
+    
+    if (!currentPrice || !targetPrice) return { value: 0, label: 'Potential', isActual: false };
+    
+    // If post is closed or stop loss/target reached, show actual return
+    if (post.closed || post.stop_loss_triggered || post.target_reached) {
+      const actualReturn = (((currentPrice - initialPrice) / initialPrice) * 100).toFixed(2);
+      return { 
+        value: actualReturn, 
+        label: post.stop_loss_triggered ? 'Loss' : post.target_reached ? 'Gain' : 'Return', 
+        isActual: true 
+      };
+    }
+    
+    // For open posts, show potential return to target
+    const potentialReturn = (((targetPrice - currentPrice) / currentPrice) * 100).toFixed(2);
+    return { value: potentialReturn, label: 'Potential', isActual: false };
+  };
   
   // Function to format price check history
   const formatPriceHistory = (priceChecks) => {
@@ -321,6 +345,7 @@ export default function PostDetailsPage() {
   
   const countryCode = getCountryCode(post);
   const priceChange = calculatePriceChange(post.initial_price || post.current_price, post.last_price);
+  const returnInfo = calculateReturnInfo(post);
   const progress = calculateProgress(post);
   const priceHistory = formatPriceHistory(post.price_checks);
   
@@ -472,6 +497,25 @@ export default function PostDetailsPage() {
             </div>
           )}
           
+          {/* Return Information */}
+          {returnInfo.value !== 0 && (
+            <div className={styles.priceChangeContainer}>
+              <span className={styles.priceChangeLabel}>
+                {returnInfo.label}:
+                <button 
+                  className={styles.infoButton}
+                  onClick={() => setShowCalculationInfo(true)}
+                  title="Click for calculation details"
+                >
+                  ℹ️
+                </button>
+              </span>
+              <span className={`${styles.priceChangeValue} ${returnInfo.isActual ? (parseFloat(returnInfo.value) >= 0 ? styles.positive : styles.negative) : styles.potential}`}>
+                {parseFloat(returnInfo.value) >= 0 ? '+' : ''}{returnInfo.value}%
+              </span>
+            </div>
+          )}
+          
           {!post.closed && post.last_price && post.target_price && !post.target_reached && (
             <div className={styles.progressContainer}>
               <div className={styles.progressHeader}>
@@ -562,10 +606,10 @@ export default function PostDetailsPage() {
         <div className={styles.section}>
           <h3 className={styles.sectionTitle}>Analysis Details</h3>
           
-          {post.description && (
+          {(post.description || post.content) && (
             <div className={styles.descriptionContainer}>
               <h4 className={styles.descriptionTitle}>Description</h4>
-              <p className={styles.description}>{post.description}</p>
+              <p className={styles.description}>{post.description || post.content}</p>
             </div>
           )}
           
@@ -635,6 +679,49 @@ export default function PostDetailsPage() {
         
         <div className={styles.footer}>
         </div>
+        
+        {/* Calculation Info Dialog */}
+        {showCalculationInfo && (
+          <div className={styles.dialogOverlay} onClick={() => setShowCalculationInfo(false)}>
+            <div className={styles.dialogContent} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.dialogHeader}>
+                <h3>Return Calculation</h3>
+                <button 
+                  className={styles.closeButton}
+                  onClick={() => setShowCalculationInfo(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <div className={styles.dialogBody}>
+                <h4>{returnInfo.label}</h4>
+                <p><strong>Formula:</strong> {returnInfo.description}</p>
+                
+                {returnInfo.isActual ? (
+                  <div className={styles.calculationExplanation}>
+                    <p><strong>Explanation:</strong></p>
+                    <ul>
+                      <li>This shows the actual return from entry to exit</li>
+                      <li>Entry Price: ${post.initial_price || post.current_price}</li>
+                      <li>Exit Price: ${post.last_price || post.current_price}</li>
+                      <li>Return: {returnInfo.value}%</li>
+                    </ul>
+                  </div>
+                ) : (
+                  <div className={styles.calculationExplanation}>
+                    <p><strong>Explanation:</strong></p>
+                    <ul>
+                      <li>This shows potential return if target price is reached</li>
+                      <li>Current Price: ${post.last_price || post.current_price}</li>
+                      <li>Target Price: ${post.target_price}</li>
+                      <li>Potential Return: {returnInfo.value}%</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

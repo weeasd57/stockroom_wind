@@ -1265,6 +1265,13 @@ export default function CreatePostForm() {
       };
 
       // Log the postData before sending to background worker for debugging
+      console.log('[handleSubmit DEBUG] Raw input values:', {
+        contextDescription,
+        description,
+        content,
+        contentValue,
+        selectedStock: selectedStock?.symbol
+      });
       console.log('[handleSubmit DEBUG] Post data being queued:', postData);
 
       // Determine image source for background task

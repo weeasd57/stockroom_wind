@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { Comment } from '../models/Comment';
 import { useSupabase } from './SimpleSupabaseProvider';
 import { isValidUUID, isTempId } from '@/lib/utils';
+import { sanitizeComment } from '@/utils/validation';
 
 interface PostStats {
   commentCount: number;
@@ -191,12 +192,14 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     try {
+      const safeContent = sanitizeComment(content);
+      if (!safeContent) throw new Error('Comment content cannot be empty');
       const { data, error } = await supabase
         .from('comments')
         .insert({
           post_id: postId,
           user_id: user.id,
-          content: content.trim()
+          content: safeContent
         })
         .select(`
           *,
@@ -319,14 +322,15 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
 
   const editComment = async (id: string, newContent: string): Promise<void> => {
     if (!supabase || !user) throw new Error('Not authenticated');
-    if (!newContent.trim()) throw new Error('Comment content cannot be empty');
+    const safeContent = sanitizeComment(newContent);
+    if (!safeContent) throw new Error('Comment content cannot be empty');
 
     setLoading(true);
     try {
       const { error } = await supabase
         .from('comments')
         .update({ 
-          content: newContent.trim(),
+          content: safeContent,
           is_edited: true,
           updated_at: new Date().toISOString()
         })
@@ -338,7 +342,7 @@ export function CommentProvider({ children }: { children: React.ReactNode }) {
       // Optimistically update local state
       setComments(prev => prev.map(comment => 
         comment.id === id 
-          ? { ...comment, content: newContent.trim(), is_edited: true, updated_at: new Date().toISOString() }
+          ? { ...comment, content: safeContent, is_edited: true, updated_at: new Date().toISOString() }
           : comment
       ));
     } catch (err) {

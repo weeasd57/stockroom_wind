@@ -1063,6 +1063,12 @@ export async function POST(request) {
   try {
     // Validate env at request time (avoid build-time failures)
     ensureEnv();
+    // Demo mode: ignore webhooks safely
+    const DEMO_MODE = String(process.env.NEXT_PUBLIC_DEMO_MODE || 'false').toLowerCase() === 'true';
+    if (DEMO_MODE) {
+      console.log('[PayPal] Demo mode active; ignoring webhook');
+      return new Response('Demo mode', { status: 200 });
+    }
     
     // Read raw body first (best practice for webhook handlers)
     const raw = await request.text();

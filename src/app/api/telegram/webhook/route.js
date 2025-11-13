@@ -44,6 +44,11 @@ async function sendTelegramMessage(chatId, text, options = {}) {
 export async function POST(request) {
   console.log('[webhook] POST received at', new Date().toISOString());
   try {
+    // Demo mode: ignore webhook updates safely
+    const DEMO_MODE = String(process.env.NEXT_PUBLIC_DEMO_MODE || 'false').toLowerCase() === 'true';
+    if (DEMO_MODE) {
+      return NextResponse.json({ ok: true, demo: true });
+    }
     // Validate secret header
     const received = getHeaderInsensitive(request.headers, 'X-Telegram-Bot-Api-Secret-Token');
     const expected = process.env.TELEGRAM_WEBHOOK_SECRET;

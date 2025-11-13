@@ -831,3 +831,135 @@
   flex-wrap: wrap;
   gap: 0.5rem;
 }
+
+.footer {
+  padding: 20px 0;
+}
+
+/* Info Button */
+.infoButton {
+  background: none;
+  border: none;
+  margin-left: 8px;
+  padding: 2px 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+  opacity: 0.7;
+  transition: all 0.2s ease;
+}
+
+.infoButton:hover {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: scale(1.1);
+}
+
+/* Dialog Styles */
+.dialogOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.dialogContent {
+  background: var(--card-bg, #1a1a1a);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 12px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.dialogHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+.dialogHeader h3 {
+  margin: 0;
+  color: var(--text-primary, #fff);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #aaa);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.closeButton:hover {
+  color: var(--text-primary, #fff);
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dialogBody {
+  padding: 20px 24px;
+}
+
+.dialogBody h4 {
+  margin: 0 0 12px 0;
+  color: var(--accent-color, #4CAF50);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.dialogBody p {
+  margin: 0 0 16px 0;
+  color: var(--text-secondary, #ccc);
+  line-height: 1.5;
+}
+
+.calculationExplanation {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.calculationExplanation p {
+  margin: 0 0 12px 0;
+  color: var(--text-primary, #fff);
+  font-weight: 500;
+}
+
+.calculationExplanation ul {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--text-secondary, #ccc);
+}
+
+.calculationExplanation li {
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.calculationExplanation li:last-child {
+  margin-bottom: 0;
+}
+
+/* Potential styling */
+.potential {
+  color: #4CAF50 !important;
+  opacity: 0.8;
+}

@@ -23,6 +23,21 @@ const isUUID = (str) => {
   return uuidRegex.test(str);
 };
 
+// Helper function to validate and sanitize username for security
+const isValidUsername = (str) => {
+  if (!str || typeof str !== 'string') return false;
+  
+  // Username should only contain letters, numbers, spaces, underscores, and hyphens
+  // No special characters that could cause SQL injection
+  const validUsernameRegex = /^[a-zA-Z0-9\s_-]+$/;
+  
+  // Check length (reasonable limits)
+  if (str.length < 1 || str.length > 50) return false;
+  
+  // Check for valid characters only
+  return validUsernameRegex.test(str);
+};
+
 export default function ViewProfile({ params }) {
   // Fixed: All userId references changed to actualUserId
   const { supabase, isAuthenticated, user } = useSupabase();
@@ -40,12 +55,31 @@ export default function ViewProfile({ params }) {
   }
   
   // Extract ID/Username from params and determine type
-  const userIdOrUsername = params?.id;
+  // Decode URL-encoded username (handles spaces and special characters)
+  const userIdOrUsername = params?.id ? decodeURIComponent(params.id) : null;
   const isUserUUID = isUUID(userIdOrUsername);
+  
+  // Security check: Validate username to prevent SQL injection
+  if (userIdOrUsername && !isUserUUID && !isValidUsername(userIdOrUsername)) {
+    console.error('[VIEW-PROFILE] Invalid username detected:', userIdOrUsername);
+    // Don't proceed with potentially dangerous username
+    return (
+      <div className={styles.errorContainer}>
+        <h2>Invalid Profile URL</h2>
+        <p>The profile URL contains invalid characters. Please check the URL and try again.</p>
+        <button onClick={() => router.push('/home')} className={styles.backButton}>
+          Go Home
+        </button>
+      </div>
+    );
+  }
   
   console.log("[VIEW-PROFILE] Component loaded with params:", params);
   console.log("[VIEW-PROFILE] Extracted param:", userIdOrUsername);
   console.log("[VIEW-PROFILE] Is UUID:", isUserUUID, "| Is Username:", !isUserUUID);
+  if (userIdOrUsername && !isUserUUID) {
+    console.log("[VIEW-PROFILE] Username validation:", isValidUsername(userIdOrUsername) ? "VALID" : "INVALID");
+  }
   
   // Progressive loading states
   const [basicDataLoading, setBasicDataLoading] = useState(true);
@@ -145,17 +179,17 @@ export default function ViewProfile({ params }) {
         }
         
         setError(null);
-        const TIMEOUT_MS = 25000;
+        const TIMEOUT_MS = 20000; // Increased timeout to 20 seconds
         const withTimeoutAbort = async (fn, ms = TIMEOUT_MS) => {
-          const timeoutId = setTimeout(() => controller.abort(), ms);
+          const timeoutId = setTimeout(() => {
+            console.log('[VIEW-PROFILE] Request timeout after', ms, 'ms - will abort next request');
+          }, ms);
           try {
             return await fn();
           } catch (e) {
-            // Normalize abort/timeout errors
-            if (
-              (e && (e.name === 'AbortError' || e.message?.includes('aborted'))) ||
-              e?.message === 'Failed to fetch'
-            ) {
+            console.log('[VIEW-PROFILE] Query error:', e);
+            // Check for timeout or network errors
+            if (e.name === 'AbortError' || e.message?.includes('AbortError') || e.message?.includes('timeout')) {
               throw new Error('Request timed out');
             }
             throw e;
@@ -167,6 +201,9 @@ export default function ViewProfile({ params }) {
         // Fetch user profile
         console.log('[VIEW-PROFILE] Fetching profile from database...');
         console.log('[VIEW-PROFILE] Query type:', isUserUUID ? 'by ID' : 'by Username');
+        console.log('[VIEW-PROFILE] Searching for:', userIdOrUsername);
+        console.log('[VIEW-PROFILE] Original param:', params?.id);
+        console.log('[VIEW-PROFILE] After decoding:', userIdOrUsername);
         let profile, profileError;
         try {
           const res = await withTimeoutAbort(
@@ -177,9 +214,9 @@ export default function ViewProfile({ params }) {
                 .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts, facebook_url, telegram_url, youtube_url, is_broker, paypal_email, broker_plan_description, broker_average_posts_info, broker_price_plan_info');
               
               if (isUserUUID) {
-                return query.eq('id', userIdOrUsername).maybeSingle().abortSignal(controller.signal);
+                return query.eq('id', userIdOrUsername).maybeSingle();
               } else {
-                return query.eq('username', userIdOrUsername).maybeSingle().abortSignal(controller.signal);
+                return query.eq('username', userIdOrUsername).maybeSingle();
               }
             }
           );
@@ -195,9 +232,9 @@ export default function ViewProfile({ params }) {
                   .select('id, username, avatar_url, background_url, bio, followers, following, created_at, experience_score, success_posts, loss_posts, facebook_url, telegram_url, youtube_url, is_broker, paypal_email, broker_plan_description, broker_average_posts_info, broker_price_plan_info');
                 
                 if (isUserUUID) {
-                  return query.eq('id', userIdOrUsername).maybeSingle().abortSignal(controller.signal);
+                  return query.eq('id', userIdOrUsername).maybeSingle();
                 } else {
-                  return query.eq('username', userIdOrUsername).maybeSingle().abortSignal(controller.signal);
+                  return query.eq('username', userIdOrUsername).maybeSingle();
                 }
               },
               30000
@@ -209,13 +246,29 @@ export default function ViewProfile({ params }) {
           }
         }
           
-        console.log('[VIEW-PROFILE] Profile query result:', { profile: !!profile, error: profileError });
+        console.log('[VIEW-PROFILE] Profile query result:', { 
+          profile: !!profile, 
+          error: profileError,
+          profileData: profile ? { id: profile.id, username: profile.username } : null,
+          searchedFor: userIdOrUsername,
+          queryType: isUserUUID ? 'UUID' : 'username'
+        });
           
         if (profileError) {
           throw profileError;
         }
         
         if (!profile) {
+          // Debug: Let's see what usernames actually exist in the database
+          try {
+            const { data: allProfiles } = await supabase
+              .from('profiles')
+              .select('username')
+              .limit(10);
+            console.log('[VIEW-PROFILE] Available usernames in database:', allProfiles?.map(p => p.username));
+          } catch (e) {
+            console.log('[VIEW-PROFILE] Could not fetch available usernames:', e);
+          }
           throw new Error('Profile not found');
         }
         

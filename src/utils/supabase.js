@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 // import logger from '@/utils/logger';
 import imageCompression from 'browser-image-compression';
+import { sanitizeUsername, sanitizeText, sanitizeUrl, sanitizePostData, sanitizeFullName } from '@/utils/validation';
 
 // Lazy initialize Supabase client to avoid build-time env access
 let _supabaseClient = null;
@@ -378,9 +379,13 @@ export const updateUserProfile = async (userId, updates) => {
     const dbUpdates = {};
     
     // Map form fields to database columns
-    if (updates.username) dbUpdates.username = updates.username;
-    if (updates.full_name) dbUpdates.full_name = updates.full_name;
-    if (updates.bio) dbUpdates.bio = updates.bio;
+    if (updates.username) {
+      const u = sanitizeUsername(updates.username);
+      if (!u) return { data: null, error: new Error('Invalid username') };
+      dbUpdates.username = u;
+    }
+    if (updates.full_name) dbUpdates.full_name = sanitizeFullName(updates.full_name);
+    if (updates.bio !== undefined) dbUpdates.bio = sanitizeText(updates.bio, { maxLength: 500 });
     
     // Handle social media URLs
     // All social media URLs need proper format validation or null
@@ -389,31 +394,25 @@ export const updateUserProfile = async (userId, updates) => {
       if (facebookUrl === '' || !facebookUrl.trim()) {
         dbUpdates.facebook_url = null;
       } else if (facebookUrl.includes('facebook.com') || facebookUrl.includes('fb.com')) {
-        dbUpdates.facebook_url = facebookUrl;
+        dbUpdates.facebook_url = sanitizeUrl(facebookUrl) || null;
       } else if (!facebookUrl.includes('://')) {
-        // If it's just a username, construct proper Facebook URL
-        dbUpdates.facebook_url = 'https://facebook.com/' + facebookUrl;
+        dbUpdates.facebook_url = sanitizeUrl('https://facebook.com/' + facebookUrl) || null;
       } else {
-        dbUpdates.facebook_url = facebookUrl;
+        dbUpdates.facebook_url = sanitizeUrl(facebookUrl) || null;
       }
     }
     if (updates.hasOwnProperty('telegram_url')) {
-      // For telegram, send null if empty or invalid format
       const telegramUrl = updates.telegram_url || '';
-      // Only allow valid telegram URLs or null (convert empty string to null)
       if (telegramUrl === '' || !telegramUrl.trim()) {
         dbUpdates.telegram_url = null;
       } else if (telegramUrl.startsWith('https://t.me/') || telegramUrl.startsWith('http://t.me/')) {
-        dbUpdates.telegram_url = telegramUrl;
+        dbUpdates.telegram_url = sanitizeUrl(telegramUrl) || null;
       } else if (telegramUrl.startsWith('t.me/')) {
-        // Add https:// prefix if missing
-        dbUpdates.telegram_url = 'https://' + telegramUrl;
+        dbUpdates.telegram_url = sanitizeUrl('https://' + telegramUrl) || null;
       } else if (!telegramUrl.includes('://') && !telegramUrl.startsWith('t.me/')) {
-        // If it's just a username without proper format, construct a proper URL
-        dbUpdates.telegram_url = 'https://t.me/' + telegramUrl.replace('@', '');
+        dbUpdates.telegram_url = sanitizeUrl('https://t.me/' + telegramUrl.replace('@', '')) || null;
       } else {
-        // Use as is (might fail constraint but that's user input)
-        dbUpdates.telegram_url = telegramUrl;
+        dbUpdates.telegram_url = sanitizeUrl(telegramUrl) || null;
       }
     }
     if (updates.hasOwnProperty('youtube_url')) {
@@ -421,31 +420,26 @@ export const updateUserProfile = async (userId, updates) => {
       if (youtubeUrl === '' || !youtubeUrl.trim()) {
         dbUpdates.youtube_url = null;
       } else if (youtubeUrl.includes('youtube.com') || youtubeUrl.includes('youtu.be')) {
-        dbUpdates.youtube_url = youtubeUrl;
+        dbUpdates.youtube_url = sanitizeUrl(youtubeUrl) || null;
       } else if (!youtubeUrl.includes('://')) {
-        // If it's just a channel name, construct proper YouTube URL
-        dbUpdates.youtube_url = 'https://youtube.com/@' + youtubeUrl;
+        dbUpdates.youtube_url = sanitizeUrl('https://youtube.com/@' + youtubeUrl) || null;
       } else {
-        dbUpdates.youtube_url = youtubeUrl;
+        dbUpdates.youtube_url = sanitizeUrl(youtubeUrl) || null;
       }
     }
     
     // Handle avatarUrl (from form) or avatar_url (directly provided)
     if (updates.avatarUrl) {
-      dbUpdates.avatar_url = updates.avatarUrl.split('?')[0]; // Remove cache params
-      // console.log('Setting avatar_url in database to:', dbUpdates.avatar_url);
+      dbUpdates.avatar_url = (updates.avatarUrl.split('?')[0]);
     } else if (updates.avatar_url) {
-      dbUpdates.avatar_url = updates.avatar_url.split('?')[0]; // Remove cache params
-      // console.log('Setting avatar_url in database to:', dbUpdates.avatar_url);
+      dbUpdates.avatar_url = (updates.avatar_url.split('?')[0]);
     }
     
     // Handle backgroundUrl (from form) or background_url (directly provided)
     if (updates.backgroundUrl) {
-      dbUpdates.background_url = updates.backgroundUrl.split('?')[0]; // Remove cache params
-      // console.log('Setting background_url in database to:', dbUpdates.background_url);
+      dbUpdates.background_url = (updates.backgroundUrl.split('?')[0]);
     } else if (updates.background_url) {
-      dbUpdates.background_url = updates.background_url.split('?')[0]; // Remove cache params
-      // console.log('Setting background_url in database to:', dbUpdates.background_url);
+      dbUpdates.background_url = (updates.background_url.split('?')[0]);
     }
     
     // console.log('Final database updates:', dbUpdates);
@@ -903,15 +897,15 @@ async function createPost(post, userId) {
     console.warn('Subscription check failed, continuing with post creation:', error);
   }
 
-  // Create a sanitized post object without the images field
-  const { images, ...sanitizedPost } = post;
+  // Create a sanitized post payload
+  const sanitizedPost = sanitizePostData(post, userId);
   
   // Prepare a simplified version for retries (with just essential data)
   const essentialPostData = {
-    title: post.title,
-    content: post.content,
-    user_id: userId,
-    strategy: post.strategy || null,
+    title: sanitizedPost.title,
+    content: sanitizedPost.content,
+    user_id: sanitizedPost.user_id || userId,
+    strategy: sanitizedPost.strategy || null,
     created_at: new Date().toISOString(),
   };
   
@@ -928,7 +922,7 @@ async function createPost(post, userId) {
     }
     const { data, error } = await supabase
       .from('posts')
-      .insert([sanitizedPost]) // Use sanitized post without images
+      .insert([sanitizedPost])
       .select();
     
     const insertDuration = performance.now() - startTime;
