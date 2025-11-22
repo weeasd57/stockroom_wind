@@ -8,10 +8,10 @@ import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
 import { uploadImage } from '@/utils/supabase';
 
-export type ProfileEditTaskStatus = 
+export type ProfileEditTaskStatus =
   | 'pending'
   | 'uploading_avatar'
-  | 'uploading_background' 
+  | 'uploading_background'
   | 'saving_profile'
   | 'completed'
   | 'failed'
@@ -50,30 +50,30 @@ interface BackgroundProfileEditProviderProps {
 
 export function BackgroundProfileEditProvider({ children }: BackgroundProfileEditProviderProps) {
   const { user, supabase } = useSupabase();
-  
+
   // Get profile functions from ProfileProvider
   // Type cast to any to avoid TypeScript errors with JS ProfileProvider
   const profileContext = useProfile() as any;
   const updateProfile = profileContext?.updateProfile as ((updates: any) => Promise<{ success: boolean; error?: any }>) | undefined;
   const refreshData = profileContext?.refreshData as (() => Promise<void>) | undefined;
-  const currentProfile = profileContext?.profile as { username?: string; [key: string]: any } | undefined;
-  
+  const currentProfile = profileContext?.profile as { username?: string;[key: string]: any } | undefined;
+
   const [tasks, setTasks] = useState<ProfileEditTask[]>([]);
   const processingRef = useRef(false);
 
   // Check if we're currently processing any tasks
-  const isProcessing = tasks.some(task => 
+  const isProcessing = tasks.some(task =>
     ['pending', 'uploading_avatar', 'uploading_background', 'saving_profile'].includes(task.status)
   );
 
   // Submit a new profile edit task
   const submitProfileEdit = useCallback(async (
-    formData: any, 
-    avatarFile?: File, 
+    formData: any,
+    avatarFile?: File,
     backgroundFile?: File
   ): Promise<string> => {
     const taskId = uuidv4();
-    
+
     const newTask: ProfileEditTask = {
       id: taskId,
       status: 'pending',
@@ -86,17 +86,17 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
     };
 
     setTasks(prev => [...prev, newTask]);
-    
+
     console.log(`[BackgroundProfileEdit] ✅ New task created: ${taskId}`);
     console.log('[BackgroundProfileEdit] 📋 Form data:', formData);
     console.log('[BackgroundProfileEdit] 🖼️ Avatar file:', avatarFile ? `${avatarFile.name} (${avatarFile.size} bytes)` : 'None');
     console.log('[BackgroundProfileEdit] 🎨 Background file:', backgroundFile ? `${backgroundFile.name} (${backgroundFile.size} bytes)` : 'None');
-    
+
     // Start processing after state flush to ensure the task exists when read
     setTimeout(() => {
       processTask(taskId);
     }, 0);
-    
+
     return taskId;
   }, []);
 
@@ -117,7 +117,7 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
         currentTask = prev.find(t => t.id === taskId);
         return prev;
       });
-      
+
       // Fallback: allow one microtask for state commit then retry fetching the task
       if (!currentTask || !user) {
         await new Promise(res => setTimeout(res, 0));
@@ -126,7 +126,7 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
           return prev;
         });
       }
-      
+
       if (!currentTask || !user) {
         if (process.env.NODE_ENV === 'development') {
           console.error(`[BackgroundProfileEdit] ❌ Task ${taskId} not found or no user - Task: ${!!currentTask}, User: ${!!user}`);
@@ -141,7 +141,7 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
 
       // Update task status
       const updateTaskStatus = (status: ProfileEditTaskStatus, progress: number, updates?: Partial<ProfileEditTask>) => {
-        setTasks(prev => prev.map(t => 
+        setTasks(prev => prev.map(t =>
           t.id === taskId
             ? { ...t, status, progress, updatedAt: new Date(), ...updates }
             : t
@@ -154,10 +154,10 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
       // Upload avatar if provided
       if (currentTask.avatarFile) {
         updateTaskStatus('uploading_avatar', 10);
-        
+
         try {
           console.log('Uploading avatar file...');
-          
+
           const { data, error, publicUrl } = await uploadImage(
             currentTask.avatarFile,
             'avatars',
@@ -170,10 +170,10 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
           );
 
           if (error) throw error;
-          
+
           newAvatarUrl = publicUrl;
           updateTaskStatus('uploading_avatar', 40, { avatarUrl: newAvatarUrl });
-          
+
           console.log('Avatar uploaded successfully:', newAvatarUrl);
         } catch (error: unknown) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -186,10 +186,10 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
       // Upload background if provided
       if (currentTask.backgroundFile) {
         updateTaskStatus('uploading_background', 50);
-        
+
         try {
           console.log('Uploading background file...');
-          
+
           const { data, error, publicUrl } = await uploadImage(
             currentTask.backgroundFile,
             'backgrounds',
@@ -202,10 +202,10 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
           );
 
           if (error) throw error;
-          
+
           newBackgroundUrl = publicUrl;
           updateTaskStatus('uploading_background', 70, { backgroundUrl: newBackgroundUrl });
-          
+
           console.log('Background uploaded successfully:', newBackgroundUrl);
         } catch (error: unknown) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -218,7 +218,7 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
       // Save profile data
       console.log(`[BackgroundProfileEdit] 💾 Starting to save profile data for task ${taskId}`);
       updateTaskStatus('saving_profile', 80);
-      
+
       try {
         const updateData = {
           ...currentTask.formData
@@ -228,36 +228,44 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
         if (newAvatarUrl) {
           updateData.avatar_url = newAvatarUrl.split('?')[0]; // Remove cache busting
           // Clear avatar from local storage to force refresh
-          if (typeof window !== 'undefined') {
-            const oldAvatarKeys = Object.keys(localStorage).filter(key => 
-              key.startsWith(`avatar_${user.id}`) || 
-              key.startsWith(`cached_avatar_${user.id}`) ||
-              key.includes('avatar_url')
-            );
-            oldAvatarKeys.forEach(key => localStorage.removeItem(key));
-            console.log('🗑️ Cleared avatar cache from localStorage');
+          try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+              const oldAvatarKeys = Object.keys(window.localStorage).filter(key =>
+                key.startsWith(`avatar_${user.id}`) ||
+                key.startsWith(`cached_avatar_${user.id}`) ||
+                key.includes('avatar_url')
+              );
+              oldAvatarKeys.forEach(key => safeStorage.removeItem(key));
+              console.log('🗑️ Cleared avatar cache from localStorage');
+            }
+          } catch (e) {
+            console.warn('Failed to clear avatar cache:', e);
           }
         }
         if (newBackgroundUrl) {
           updateData.background_url = newBackgroundUrl.split('?')[0]; // Remove cache busting
           // Clear background from local storage to force refresh
-          if (typeof window !== 'undefined') {
-            const oldBackgroundKeys = Object.keys(localStorage).filter(key => 
-              key.startsWith(`background_${user.id}`) || 
-              key.startsWith(`cached_background_${user.id}`) ||
-              key.includes('background_url')
-            );
-            oldBackgroundKeys.forEach(key => localStorage.removeItem(key));
-            console.log('🗑️ Cleared background cache from localStorage');
+          try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+              const oldBackgroundKeys = Object.keys(window.localStorage).filter(key =>
+                key.startsWith(`background_${user.id}`) ||
+                key.startsWith(`cached_background_${user.id}`) ||
+                key.includes('background_url')
+              );
+              oldBackgroundKeys.forEach(key => safeStorage.removeItem(key));
+              console.log('🗑️ Cleared background cache from localStorage');
+            }
+          } catch (e) {
+            console.warn('Failed to clear background cache:', e);
           }
         }
 
         console.log('Saving profile data:', updateData);
-        
+
         if (!updateProfile) {
           throw new Error('Profile update function not available');
         }
-        
+
         // CRITICAL FIX: Remove username if it hasn't changed (to avoid duplicate key error)
         if (updateData.username && currentProfile?.username) {
           if (updateData.username === currentProfile.username) {
@@ -267,9 +275,9 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
             console.log('[BackgroundProfileEdit] ⚠️ Username changed from', currentProfile.username, 'to', updateData.username);
           }
         }
-        
+
         const { success, error } = await updateProfile(updateData);
-        
+
         if (error) {
           // Pass the full error message from ProfileProvider's handleError
           const errorMsg = typeof error === 'string' ? error : (error as any).message || 'Failed to update profile';
@@ -277,189 +285,193 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
         }
 
         // Clear any profile cache to ensure immediate updates
-        if (typeof window !== 'undefined') {
-          const profileCacheKeys = Object.keys(localStorage).filter(key => 
-            key.includes(`profile_${user.id}`) || 
-            key.includes('cached_profile') ||
-            key.includes('user_profile')
-          );
-          profileCacheKeys.forEach(key => localStorage.removeItem(key));
-          console.log('🗑️ Cleared profile cache from localStorage for real-time update');
-          
-          // Force refresh all images with the user's avatar URL to bust browser cache
-          const timestamp = Date.now();
-          const avatarImages = document.querySelectorAll(`img[src*="${user.id}/avatar"]`);
-          avatarImages.forEach((img) => {
-            const htmlImg = img as HTMLImageElement;
-            const currentSrc = htmlImg.src;
-            const baseSrc = currentSrc.split('?')[0]; // Remove existing query params
-            htmlImg.src = `${baseSrc}?t=${timestamp}`;
-            console.log('🔄 Force refreshed avatar image:', htmlImg.src);
-          });
-          
-          // Also force refresh background images
-          const backgroundElements = document.querySelectorAll(`[style*="${user.id}/background"]`);
-          backgroundElements.forEach((el) => {
-            const htmlEl = el as HTMLElement;
-            const style = htmlEl.style.backgroundImage;
-            if (style.includes(user.id)) {
-              const urlMatch = style.match(/url\(['"]?(.*?)['"]?\)/);
-              if (urlMatch) {
-                const currentUrl = urlMatch[1];
-                const baseUrl = currentUrl.split('?')[0];
-                htmlEl.style.backgroundImage = `url("${baseUrl}?t=${timestamp}")`;
-                console.log('🔄 Force refreshed background image:', htmlEl.style.backgroundImage);
-              }
-            }
-          });
+        try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            const profileCacheKeys = Object.keys(window.localStorage).filter(key =>
+              key.includes(`profile_${user.id}`) ||
+              key.includes('cached_profile') ||
+              key.includes('user_profile')
+            );
+            profileCacheKeys.forEach(key => safeStorage.removeItem(key));
+            console.log('🗑️ Cleared profile cache from localStorage for real-time update');
+          }
+        } catch (e) {
+          console.warn('Failed to clear profile cache:', e);
         }
+        // Force refresh all images with the user's avatar URL to bust browser cache
+        const timestamp = Date.now();
+        const avatarImages = document.querySelectorAll(`img[src*="${user.id}/avatar"]`);
+        avatarImages.forEach((img) => {
+          const htmlImg = img as HTMLImageElement;
+          const currentSrc = htmlImg.src;
+          const baseSrc = currentSrc.split('?')[0]; // Remove existing query params
+          htmlImg.src = `${baseSrc}?t=${timestamp}`;
+          console.log('🔄 Force refreshed avatar image:', htmlImg.src);
+        });
 
-        // Refresh profile data (no parameters needed)
-        if (refreshData) {
-          await refreshData();
-        }
-        
-        // Trigger a window event to notify other components about profile update
-        if (typeof window !== 'undefined') {
-          const profileUpdateEvent = new CustomEvent('avatarUpdated', {
-            detail: { 
-              userId: user.id, 
-              newAvatarUrl: newAvatarUrl,
-              newBackgroundUrl: newBackgroundUrl,
-              profileData: updateData, // Include all updated profile data
-              timestamp: Date.now()
+        // Also force refresh background images
+        const backgroundElements = document.querySelectorAll(`[style*="${user.id}/background"]`);
+        backgroundElements.forEach((el) => {
+          const htmlEl = el as HTMLElement;
+          const style = htmlEl.style.backgroundImage;
+          if (style.includes(user.id)) {
+            const urlMatch = style.match(/url\(['"]?(.*?)['"]?\)/);
+            if (urlMatch) {
+              const currentUrl = urlMatch[1];
+              const baseUrl = currentUrl.split('?')[0];
+              htmlEl.style.backgroundImage = `url("${baseUrl}?t=${timestamp}")`;
+              console.log('🔄 Force refreshed background image:', htmlEl.style.backgroundImage);
             }
-          });
-          window.dispatchEvent(profileUpdateEvent);
-          console.log('📡 Dispatched avatarUpdated event with complete profile data for real-time UI updates');
-          
-          // Dispatch specific event for social links update
-          // Always dispatch social links event whether values are present or not
-          // This ensures empty strings are properly handled and not converted to null
-          const socialLinksUpdateEvent = new CustomEvent('socialLinksUpdated', {
-            detail: {
-              userId: user.id,
-              // Use empty string as fallback to prevent null values
-              facebook_url: updateData.facebook_url || '',
-              telegram_url: updateData.telegram_url || '',
-              youtube_url: updateData.youtube_url || '',
-              timestamp: Date.now()
-            }
-          });
-          window.dispatchEvent(socialLinksUpdateEvent);
-          console.log('📡 Dispatched socialLinksUpdated event for social media icons refresh', {
-            facebook: updateData.facebook_url || '',
-            telegram: updateData.telegram_url || '',
-            youtube: updateData.youtube_url || ''
-          });
-        }
-        
-        updateTaskStatus('completed', 100);
-        
-        console.log('Profile updated successfully');
-        
-        // Show success notification
-        toast.success('Profile updated successfully! ✅');
-
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        console.error('Profile save failed:', error);
-        updateTaskStatus('failed', 0, { error: `Failed to save profile: ${errorMessage}` });
-        
-        // Show error notification with the specific error message
-        // Extract the user-friendly message (handle both formats)
-        const displayMessage = errorMessage.includes('Failed to save profile:') 
-          ? errorMessage.replace('Failed to save profile:', '').trim()
-          : errorMessage;
-        toast.error(displayMessage, {
-          duration: 5000, // Show for 5 seconds
-          description: 'Please fix the issue and try again.'
+          }
         });
       }
 
+        // Refresh profile data (no parameters needed)
+        if (refreshData) {
+        await refreshData();
+      }
+
+      // Trigger a window event to notify other components about profile update
+      if (typeof window !== 'undefined') {
+        const profileUpdateEvent = new CustomEvent('avatarUpdated', {
+          detail: {
+            userId: user.id,
+            newAvatarUrl: newAvatarUrl,
+            newBackgroundUrl: newBackgroundUrl,
+            profileData: updateData, // Include all updated profile data
+            timestamp: Date.now()
+          }
+        });
+        window.dispatchEvent(profileUpdateEvent);
+        console.log('📡 Dispatched avatarUpdated event with complete profile data for real-time UI updates');
+
+        // Dispatch specific event for social links update
+        // Always dispatch social links event whether values are present or not
+        // This ensures empty strings are properly handled and not converted to null
+        const socialLinksUpdateEvent = new CustomEvent('socialLinksUpdated', {
+          detail: {
+            userId: user.id,
+            // Use empty string as fallback to prevent null values
+            facebook_url: updateData.facebook_url || '',
+            telegram_url: updateData.telegram_url || '',
+            youtube_url: updateData.youtube_url || '',
+            timestamp: Date.now()
+          }
+        });
+        window.dispatchEvent(socialLinksUpdateEvent);
+        console.log('📡 Dispatched socialLinksUpdated event for social media icons refresh', {
+          facebook: updateData.facebook_url || '',
+          telegram: updateData.telegram_url || '',
+          youtube: updateData.youtube_url || ''
+        });
+      }
+
+      updateTaskStatus('completed', 100);
+
+      console.log('Profile updated successfully');
+
+      // Show success notification
+      toast.success('Profile updated successfully! ✅');
+
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      console.error('Task processing failed:', error);
-      setTasks(prev => prev.map(t => 
-        t.id === taskId 
-          ? { ...t, status: 'failed', error: errorMessage, updatedAt: new Date() }
-          : t
-      ));
-    } finally {
-      processingRef.current = false;
-    }
-  }, [user, updateProfile, refreshData, currentProfile]);
+      console.error('Profile save failed:', error);
+      updateTaskStatus('failed', 0, { error: `Failed to save profile: ${errorMessage}` });
 
-  // Remove a task
-  const removeTask = useCallback((taskId: string) => {
-    setTasks(prev => prev.filter(t => t.id !== taskId));
-  }, [tasks]);
-  // Retry a failed task
-  const retryTask = useCallback(async (taskId: string) => {
-    // Check if task exists using state setter callback
-    let taskExists = false;
-    setTasks(prev => {
-      taskExists = prev.some(t => t.id === taskId);
-      return prev;
-    });
-    
-    if (!taskExists) {
-      console.warn(`[BackgroundProfileEdit] Task ${taskId} not found for retry`);
-      return;
+      // Show error notification with the specific error message
+      // Extract the user-friendly message (handle both formats)
+      const displayMessage = errorMessage.includes('Failed to save profile:')
+        ? errorMessage.replace('Failed to save profile:', '').trim()
+        : errorMessage;
+      toast.error(displayMessage, {
+        duration: 5000, // Show for 5 seconds
+        description: 'Please fix the issue and try again.'
+      });
     }
 
-    // Reset task status
-    setTasks(prev => prev.map(t => 
-      t.id === taskId 
-        ? { ...t, status: 'pending', progress: 0, error: undefined, updatedAt: new Date() }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error('Task processing failed:', error);
+    setTasks(prev => prev.map(t =>
+      t.id === taskId
+        ? { ...t, status: 'failed', error: errorMessage, updatedAt: new Date() }
         : t
     ));
+  } finally {
+    processingRef.current = false;
+  }
+}, [user, updateProfile, refreshData, currentProfile]);
 
-    // Process the task again
-    await processTask(taskId);
-  }, [processTask]);
+// Remove a task
+const removeTask = useCallback((taskId: string) => {
+  setTasks(prev => prev.filter(t => t.id !== taskId));
+}, [tasks]);
+// Retry a failed task
+const retryTask = useCallback(async (taskId: string) => {
+  // Check if task exists using state setter callback
+  let taskExists = false;
+  setTasks(prev => {
+    taskExists = prev.some(t => t.id === taskId);
+    return prev;
+  });
 
-  // Clear all completed tasks
-  // Cancel a task
-  const cancelTask = useCallback((taskId: string) => {
-    setTasks(prev => prev.map(t => {
-      if (t.id === taskId) {
-        // Abort any ongoing operations
-        if (t.abortController) {
-          t.abortController.abort();
-        }
-        return { 
-          ...t, 
-          status: 'canceled', 
-          error: 'Task canceled by user',
-          progress: 0,
-          updatedAt: new Date() 
-        };
+  if (!taskExists) {
+    console.warn(`[BackgroundProfileEdit] Task ${taskId} not found for retry`);
+    return;
+  }
+
+  // Reset task status
+  setTasks(prev => prev.map(t =>
+    t.id === taskId
+      ? { ...t, status: 'pending', progress: 0, error: undefined, updatedAt: new Date() }
+      : t
+  ));
+
+  // Process the task again
+  await processTask(taskId);
+}, [processTask]);
+
+// Clear all completed tasks
+// Cancel a task
+const cancelTask = useCallback((taskId: string) => {
+  setTasks(prev => prev.map(t => {
+    if (t.id === taskId) {
+      // Abort any ongoing operations
+      if (t.abortController) {
+        t.abortController.abort();
       }
-      return t;
-    }));
-  }, []);
+      return {
+        ...t,
+        status: 'canceled',
+        error: 'Task canceled by user',
+        progress: 0,
+        updatedAt: new Date()
+      };
+    }
+    return t;
+  }));
+}, []);
 
-  // Clear all completed tasks
-  const clearCompletedTasks = useCallback(() => {
-    setTasks(prev => prev.filter(t => t.status !== 'completed' && t.status !== 'canceled'));
-  }, []);
+// Clear all completed tasks
+const clearCompletedTasks = useCallback(() => {
+  setTasks(prev => prev.filter(t => t.status !== 'completed' && t.status !== 'canceled'));
+}, []);
 
-  const value: BackgroundProfileEditContextType = {
-    tasks,
-    isProcessing,
-    submitProfileEdit,
-    removeTask,
-    retryTask,
-    cancelTask,
-    clearCompletedTasks,
-  };
+const value: BackgroundProfileEditContextType = {
+  tasks,
+  isProcessing,
+  submitProfileEdit,
+  removeTask,
+  retryTask,
+  cancelTask,
+  clearCompletedTasks,
+};
 
-  return (
-    <BackgroundProfileEditContext.Provider value={value}>
-      {children}
-    </BackgroundProfileEditContext.Provider>
-  );
+return (
+  <BackgroundProfileEditContext.Provider value={value}>
+    {children}
+  </BackgroundProfileEditContext.Provider>
+);
 }
 
 export const useBackgroundProfileEdit = () => {

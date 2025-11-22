@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSupabase } from './SimpleSupabaseProvider';
+import safeStorage from '@/utils/safeStorage';
 
 const SubscriptionContext = createContext({});
 
@@ -47,12 +48,12 @@ export const useSubscription = () => {
     if (fetchingRef.current) return;
     const now = Date.now();
     if (!forceRefresh && (now - lastFetchTime.current) < 10000) return;
-    
+
     try {
       fetchingRef.current = true;
       if (options.silent) setSyncing(true); else setLoading(true);
       setError(null);
-      
+
       // Get access token from session or localStorage
       let accessToken = null;
       try {
@@ -61,14 +62,14 @@ export const useSubscription = () => {
       } catch (e) {
         console.warn('[useSubscription] getSession failed, trying localStorage:', e);
       }
-      
+
       // Fallback: read from localStorage if session is not available
-      if (!accessToken && typeof window !== 'undefined') {
+      if (!accessToken) {
         try {
           const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
           const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\./)?.[1] || '';
           const storageKey = `sb-${projectRef}-auth-token`;
-          const stored = localStorage.getItem(storageKey);
+          const stored = safeStorage.getItem(storageKey);
           if (stored) {
             const parsed = JSON.parse(stored);
             accessToken = parsed?.access_token || parsed?.currentSession?.access_token;
@@ -77,12 +78,12 @@ export const useSubscription = () => {
           console.warn('[useSubscription] localStorage read failed:', e);
         }
       }
-      
+
       const headers = { 'Content-Type': 'application/json' };
       if (accessToken) {
         headers.Authorization = `Bearer ${accessToken}`;
       }
-      
+
       const res = await fetch('/api/subscription/info', {
         method: 'GET',
         headers: {
@@ -93,10 +94,10 @@ export const useSubscription = () => {
         credentials: 'include',
         cache: 'no-store' // مهم جداً - يعطل cache المتصفح
       });
-      
+
       if (!res.ok) throw new Error(`API Error: ${res.status}`);
       const json = await res.json();
-      
+
       if (json.success && json.data) {
         setSubInfo((prev) => {
           const prevUsed = prev?.posts_created ?? 0;
@@ -232,7 +233,7 @@ export const useSubscription = () => {
 
   const fallbackValue = useMemo(() => {
     const currentInfo = subInfo;
-    
+
     return {
       subscriptionInfo: currentInfo,
       subscription: currentInfo,
@@ -278,13 +279,13 @@ export const useSubscription = () => {
 
 export function SubscriptionProvider({ children }) {
   const { supabase, user, isAuthenticated } = useSupabase();
-  
+
   // State for subscription info - will be populated from API
   const [subscriptionInfo, setSubscriptionInfo] = useState(null);
   const [loading, setLoading] = useState(false); // Start as false since we have default data
   const [syncing, setSyncing] = useState(false); // Background sync
   const [error, setError] = useState(null);
-  
+
   // State for user analytics
   const [analytics, setAnalytics] = useState({
     postsCount: 0,
@@ -300,8 +301,8 @@ export function SubscriptionProvider({ children }) {
   // Optimized fetch subscription info from API with caching
   const fetchSubscriptionInfo = useCallback(async (forceRefresh = false, options = { silent: false }) => {
     if (process.env.NODE_ENV === 'development') {
-      console.log('[SUBSCRIPTION PROVIDER] fetchSubscriptionInfo called', { 
-        userId: user?.id, 
+      console.log('[SUBSCRIPTION PROVIDER] fetchSubscriptionInfo called', {
+        userId: user?.id,
         hasSupabase: !!supabase,
         forceRefresh,
         silent: options.silent
@@ -337,19 +338,19 @@ export function SubscriptionProvider({ children }) {
 
     try {
       fetchingRef.current = true;
-      
+
       // Show appropriate loading state
       if (options.silent || (subscriptionInfo && forceRefresh)) {
         setSyncing(true);
       } else {
         setLoading(true);
       }
-      
+
       setError(null);
 
       // Get session first to ensure we have valid token
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
+
       if (sessionError || !session?.access_token) {
         if (process.env.NODE_ENV === 'development') {
           console.error('[SUBSCRIPTION PROVIDER] No valid session found:', sessionError?.message || 'No access token');
@@ -391,11 +392,11 @@ export function SubscriptionProvider({ children }) {
       }
 
       const result = await response.json();
-      
+
       if (process.env.NODE_ENV === 'development') {
         console.log('[SUBSCRIPTION PROVIDER] API response data:', result);
       }
-      
+
       if (result.success && result.data) {
         setSubscriptionInfo((prev) => {
           const prevUsed = prev?.posts_created ?? 0;
@@ -467,7 +468,7 @@ export function SubscriptionProvider({ children }) {
   // Upgrade to Pro subscription with enhanced error handling
   const upgradeToProSubscription = useCallback(async (paymentDetails) => {
     console.log('[SUBSCRIPTION] Starting upgradeToProSubscription with details:', paymentDetails);
-    
+
     if (!user?.id) {
       console.error('[SUBSCRIPTION] No user logged in');
       return { success: false, error: 'المستخدم غير مسجل دخول' };
@@ -506,7 +507,7 @@ export function SubscriptionProvider({ children }) {
 
       // Force refresh subscription state
       await fetchSubscriptionInfo(true);
-      
+
       return {
         success: true,
         subscriptionId: json?.data?.subscriptionId,
@@ -581,7 +582,7 @@ export function SubscriptionProvider({ children }) {
 
   const getUsageInfo = useCallback(() => {
     if (!subscriptionInfo) return null;
-    
+
     return {
       priceChecks: {
         used: subscriptionInfo.price_checks_used || 0,
@@ -604,7 +605,7 @@ export function SubscriptionProvider({ children }) {
   // Increment post usage and refresh state with optimistic update
   const incrementPostUsage = useCallback(async () => {
     if (!user?.id) return { success: false, error: 'No user logged in' };
-    
+
     try {
       // Optimistic update: immediately update local state
       if (subscriptionInfo) {
@@ -616,7 +617,7 @@ export function SubscriptionProvider({ children }) {
         setSubscriptionInfo(optimisticUpdate);
         console.log('[SUBSCRIPTION PROVIDER] Optimistic post increment:', optimisticUpdate.posts_created);
       }
-      
+
       // Atomically log post creation usage via RPC to avoid race conditions
       const { data: rpcData, error: rpcError } = await supabase
         .rpc('log_post_creation', { p_user_id: user.id });
@@ -639,12 +640,12 @@ export function SubscriptionProvider({ children }) {
           };
         });
       }
-      
+
       // Silent refresh to sync with server
       console.log('[SUBSCRIPTION PROVIDER] Refreshing subscription info from API...');
       await fetchSubscriptionInfo(true, { silent: true });
       console.log('[SUBSCRIPTION PROVIDER] ✅ Subscription info refreshed');
-      
+
       return { success: true };
     } catch (error) {
       console.error('Error incrementing post usage:', error);
@@ -657,20 +658,20 @@ export function SubscriptionProvider({ children }) {
   // Increment price check usage and refresh state with optimistic update
   const incrementPriceCheckUsage = useCallback(async () => {
     if (!user?.id) return { success: false, error: 'No user logged in' };
-    
+
     try {
       // Check if we can perform price check first
       const { data: canCheck, error: checkError } = await supabase
         .rpc('check_price_limit', { p_user_id: user.id });
-      
+
       if (checkError) {
         throw checkError;
       }
-      
+
       if (canCheck === false) {
         return { success: false, error: 'Price check limit exceeded' };
       }
-      
+
       // Optimistic update: immediately update local state
       if (subscriptionInfo) {
         const optimisticUpdate = {
@@ -681,23 +682,23 @@ export function SubscriptionProvider({ children }) {
         setSubscriptionInfo(optimisticUpdate);
         console.log('[SUBSCRIPTION PROVIDER] Optimistic price check increment:', optimisticUpdate.price_checks_used);
       }
-      
+
       // Log the price check using the existing RPC function
       const { error: logError } = await supabase
-        .rpc('log_price_check', { 
+        .rpc('log_price_check', {
           p_user_id: user.id,
           p_symbol: 'API_CALL',
           p_exchange: null,
           p_country: null
         });
-      
+
       if (logError) {
         throw logError;
       }
-      
+
       // Silent refresh to sync with server
       await fetchSubscriptionInfo(true, { silent: true });
-      
+
       return { success: true };
     } catch (error) {
       console.error('Error incrementing price check usage:', error);
@@ -710,11 +711,11 @@ export function SubscriptionProvider({ children }) {
   // Get subscription status message
   const getSubscriptionMessage = useCallback(() => {
     if (!subscriptionInfo) return null;
-    
+
     const { plan_name, remaining_checks, remaining_posts } = subscriptionInfo;
     const remainingChecks = remaining_checks || 0;
     const remainingPostsCount = getRemainingPosts();
-    
+
     if (plan_name === 'free') {
       if (remainingChecks === 0) {
         return {
@@ -725,7 +726,7 @@ export function SubscriptionProvider({ children }) {
       }
       if (remainingPostsCount === 0) {
         return {
-          type: 'warning', 
+          type: 'warning',
           message: 'لقد استنفدت عدد المنشورات المتاحة. قم بالترقية إلى Pro للحصول على المزيد.',
           message_en: 'You have used all your posts. Upgrade to Pro for more.'
         };
@@ -736,7 +737,7 @@ export function SubscriptionProvider({ children }) {
         message_en: `Free plan: ${remainingChecks} price checks and ${remainingPostsCount} posts remaining`
       };
     }
-    
+
     return {
       type: 'success',
       message: `خطة Pro: ${remainingChecks} فحص أسعار و ${remainingPostsCount} منشور متبقي`,
@@ -746,10 +747,10 @@ export function SubscriptionProvider({ children }) {
 
   // Auto-fetch subscription info when user changes
   useEffect(() => {
-    console.log('[SUBSCRIPTION PROVIDER] useEffect triggered - user change detected', { 
-      userId: user?.id, 
+    console.log('[SUBSCRIPTION PROVIDER] useEffect triggered - user change detected', {
+      userId: user?.id,
       hasUser: !!user,
-      isAuthenticated 
+      isAuthenticated
     });
 
     if (user?.id) {
@@ -760,7 +761,7 @@ export function SubscriptionProvider({ children }) {
         user_id: user.id
       };
       setSubscriptionInfo(userDefaultPlan);
-      
+
       // Fetch real data in background without blocking UI
       fetchSubscriptionInfo(false, { silent: true });
       fetchAnalytics();
@@ -813,26 +814,26 @@ export function SubscriptionProvider({ children }) {
     syncing,
     error,
     analytics,
-    
+
     // Methods
     fetchSubscriptionInfo,
     refreshSubscription,
     upgradeToProSubscription,
     cancelSubscription,
-    
+
     // Checkers
     canPerformPriceCheck,
     canCreatePost,
     isProPlan,
     canCreatePremiumPlans,
     shouldShowAds,
-    
+
     // Getters
     getRemainingPriceChecks,
     getRemainingPosts,
     getUsageInfo,
     getSubscriptionMessage,
-    
+
     // Backward-compat proxy fields (for existing consumers expecting flat fields)
     // Price checks
     remaining_checks: subscriptionInfo?.remaining_checks,
@@ -844,21 +845,21 @@ export function SubscriptionProvider({ children }) {
     post_creation_limit: subscriptionInfo?.post_creation_limit,
     // Loading state
     subscriptionLoading: loading,
-    
+
     // Usage incrementers
     incrementPostUsage,
     incrementPriceCheckUsage,
-    
+
     // Computed values
     isPro: isProPlan(),
     usageInfo: getUsageInfo(),
     subscriptionMessage: getSubscriptionMessage(),
-    
+
     // New feature flags
     can_create_premium_plans: subscriptionInfo?.can_create_premium_plans || false,
     show_ads: subscriptionInfo?.show_ads !== false
   };
-  
+
   // Debug logging
   if (process.env.NODE_ENV === 'development' && subscriptionInfo) {
     console.log('[SubscriptionProvider] Current subscription state:', {

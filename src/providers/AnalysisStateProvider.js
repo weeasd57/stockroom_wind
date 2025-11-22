@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect } from 'react';
+import safeStorage from '@/utils/safeStorage';
 
 const AnalysisStateContext = createContext(undefined);
 
@@ -50,53 +51,53 @@ export function AnalysisStateProvider({ children }) {
   // Load state from localStorage on mount
   useEffect(() => {
     setMounted(true);
-    
+
     try {
       // Load view mode
-      const savedViewMode = localStorage.getItem(STORAGE_KEYS.VIEW_MODE);
+      const savedViewMode = safeStorage.getItem(STORAGE_KEYS.VIEW_MODE);
       if (savedViewMode && ['table', 'grid', 'timeline', 'kanban', 'calendar'].includes(savedViewMode)) {
         setViewMode(savedViewMode);
       }
 
       // Load date range
-      const savedDateRange = localStorage.getItem(STORAGE_KEYS.DATE_RANGE);
+      const savedDateRange = safeStorage.getItem(STORAGE_KEYS.DATE_RANGE);
       if (savedDateRange) {
         setDateRange(savedDateRange);
       }
 
       // Load sort settings
-      const savedSortColumn = localStorage.getItem(STORAGE_KEYS.SORT_COLUMN);
+      const savedSortColumn = safeStorage.getItem(STORAGE_KEYS.SORT_COLUMN);
       if (savedSortColumn) {
         setSortColumn(savedSortColumn);
       }
 
-      const savedSortDirection = localStorage.getItem(STORAGE_KEYS.SORT_DIRECTION);
+      const savedSortDirection = safeStorage.getItem(STORAGE_KEYS.SORT_DIRECTION);
       if (savedSortDirection && ['asc', 'desc'].includes(savedSortDirection)) {
         setSortDirection(savedSortDirection);
       }
 
       // Load show charts
-      const savedShowCharts = localStorage.getItem(STORAGE_KEYS.SHOW_CHARTS);
+      const savedShowCharts = safeStorage.getItem(STORAGE_KEYS.SHOW_CHARTS);
       if (savedShowCharts !== null) {
         setShowCharts(savedShowCharts === 'true');
       }
 
       // Load visible charts
-      const savedVisibleCharts = localStorage.getItem(STORAGE_KEYS.VISIBLE_CHARTS);
+      const savedVisibleCharts = safeStorage.getItem(STORAGE_KEYS.VISIBLE_CHARTS);
       if (savedVisibleCharts) {
         setVisibleCharts(JSON.parse(savedVisibleCharts));
       }
 
       // Load custom charts
-      const savedCustomCharts = localStorage.getItem(STORAGE_KEYS.CUSTOM_CHARTS);
+      const savedCustomCharts = safeStorage.getItem(STORAGE_KEYS.CUSTOM_CHARTS);
       if (savedCustomCharts) {
         const charts = JSON.parse(savedCustomCharts);
         setCustomCharts(charts);
 
         // Load custom charts visibility
-        const savedVisibility = localStorage.getItem(STORAGE_KEYS.CUSTOM_CHARTS_VISIBILITY);
+        const savedVisibility = safeStorage.getItem(STORAGE_KEYS.CUSTOM_CHARTS_VISIBILITY);
         const visibility = savedVisibility ? JSON.parse(savedVisibility) : {};
-        
+
         // Ensure all charts have visibility state
         const updatedVisibility = {};
         charts.forEach(chart => {
@@ -112,72 +113,44 @@ export function AnalysisStateProvider({ children }) {
   // Save view mode
   useEffect(() => {
     if (!mounted) return;
-    try {
-      localStorage.setItem(STORAGE_KEYS.VIEW_MODE, viewMode);
-    } catch (error) {
-      console.error('[AnalysisStateProvider] Error saving view mode:', error);
-    }
+    safeStorage.setItem(STORAGE_KEYS.VIEW_MODE, viewMode);
   }, [viewMode, mounted]);
 
   // Save date range
   useEffect(() => {
     if (!mounted) return;
-    try {
-      localStorage.setItem(STORAGE_KEYS.DATE_RANGE, dateRange);
-    } catch (error) {
-      console.error('[AnalysisStateProvider] Error saving date range:', error);
-    }
+    safeStorage.setItem(STORAGE_KEYS.DATE_RANGE, dateRange);
   }, [dateRange, mounted]);
 
   // Save sort settings
   useEffect(() => {
     if (!mounted) return;
-    try {
-      localStorage.setItem(STORAGE_KEYS.SORT_COLUMN, sortColumn);
-      localStorage.setItem(STORAGE_KEYS.SORT_DIRECTION, sortDirection);
-    } catch (error) {
-      console.error('[AnalysisStateProvider] Error saving sort settings:', error);
-    }
+    safeStorage.setItem(STORAGE_KEYS.SORT_COLUMN, sortColumn);
+    safeStorage.setItem(STORAGE_KEYS.SORT_DIRECTION, sortDirection);
   }, [sortColumn, sortDirection, mounted]);
 
   // Save show charts
   useEffect(() => {
     if (!mounted) return;
-    try {
-      localStorage.setItem(STORAGE_KEYS.SHOW_CHARTS, showCharts.toString());
-    } catch (error) {
-      console.error('[AnalysisStateProvider] Error saving show charts:', error);
-    }
+    safeStorage.setItem(STORAGE_KEYS.SHOW_CHARTS, showCharts.toString());
   }, [showCharts, mounted]);
 
   // Save visible charts
   useEffect(() => {
     if (!mounted) return;
-    try {
-      localStorage.setItem(STORAGE_KEYS.VISIBLE_CHARTS, JSON.stringify(visibleCharts));
-    } catch (error) {
-      console.error('[AnalysisStateProvider] Error saving visible charts:', error);
-    }
+    safeStorage.setItem(STORAGE_KEYS.VISIBLE_CHARTS, JSON.stringify(visibleCharts));
   }, [visibleCharts, mounted]);
 
   // Save custom charts
   useEffect(() => {
     if (!mounted) return;
-    try {
-      localStorage.setItem(STORAGE_KEYS.CUSTOM_CHARTS, JSON.stringify(customCharts));
-    } catch (error) {
-      console.error('[AnalysisStateProvider] Error saving custom charts:', error);
-    }
+    safeStorage.setItem(STORAGE_KEYS.CUSTOM_CHARTS, JSON.stringify(customCharts));
   }, [customCharts, mounted]);
 
   // Save custom charts visibility
   useEffect(() => {
     if (!mounted) return;
-    try {
-      localStorage.setItem(STORAGE_KEYS.CUSTOM_CHARTS_VISIBILITY, JSON.stringify(customChartsVisibility));
-    } catch (error) {
-      console.error('[AnalysisStateProvider] Error saving custom charts visibility:', error);
-    }
+    safeStorage.setItem(STORAGE_KEYS.CUSTOM_CHARTS_VISIBILITY, JSON.stringify(customChartsVisibility));
   }, [customChartsVisibility, mounted]);
 
   // Toggle chart visibility
@@ -242,7 +215,7 @@ export function AnalysisStateProvider({ children }) {
     visibleCharts,
     customCharts,
     customChartsVisibility,
-    
+
     // Setters
     setViewMode,
     setDateRange,
@@ -252,7 +225,7 @@ export function AnalysisStateProvider({ children }) {
     setVisibleCharts,
     setCustomCharts,
     setCustomChartsVisibility,
-    
+
     // Actions
     toggleChart,
     toggleCustomChart,

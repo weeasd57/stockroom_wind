@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { createContext, useContext, useEffect, useState } from "react";
+import safeStorage from "@/utils/safeStorage";
 
 type Theme = "light" | "dark";
 
@@ -36,13 +37,13 @@ export function ThemeProvider({
     try {
       // Migrate old key if exists to preserve user preference
       const legacyKey = "firestocks-theme";
-      const legacy = localStorage.getItem(legacyKey) as Theme | null;
-      if (legacy && !localStorage.getItem(THEME_STORAGE_KEY)) {
-        localStorage.setItem(THEME_STORAGE_KEY, legacy);
-        try { localStorage.removeItem(legacyKey); } catch {}
+      const legacy = safeStorage.getItem(legacyKey) as Theme | null;
+      if (legacy && !safeStorage.getItem(THEME_STORAGE_KEY)) {
+        safeStorage.setItem(THEME_STORAGE_KEY, legacy);
+        safeStorage.removeItem(legacyKey);
       }
 
-      const storedTheme = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
+      const storedTheme = safeStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
       if (storedTheme) {
         setTheme(storedTheme);
       }
@@ -54,20 +55,16 @@ export function ThemeProvider({
   // Save theme to localStorage whenever it changes, but only after mounted
   useEffect(() => {
     if (!mounted) return;
-    
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, theme);
-    } catch (error) {
-      console.error("Error saving theme to localStorage:", error);
-    }
+
+    safeStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme, mounted]);
 
   // Resolve and apply theme
   useEffect(() => {
     if (!mounted) return;
-    
+
     const root = window.document.documentElement;
-    
+
     // Update resolved theme state
     setResolvedTheme(theme);
 

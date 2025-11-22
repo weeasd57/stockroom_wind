@@ -1,4 +1,5 @@
 // Enhanced utility to manage price check history in localStorage + Supabase integration
+import safeStorage from '@/utils/safeStorage';
 
 const PRICE_CHECK_HISTORY_KEY = 'priceCheckHistory';
 const SUPABASE_HISTORY_CACHE_KEY = 'supabasePriceCheckHistory';
@@ -26,18 +27,18 @@ export const savePriceCheckResult = (result) => {
 
     // Get existing history
     const existingHistory = getPriceCheckHistory();
-    
+
     // Add new entry at the beginning
     const updatedHistory = [historyEntry, ...existingHistory];
-    
+
     // Limit to MAX_HISTORY_ENTRIES
     const limitedHistory = updatedHistory.slice(0, MAX_HISTORY_ENTRIES);
-    
+
     // Save to localStorage
-    localStorage.setItem(PRICE_CHECK_HISTORY_KEY, JSON.stringify(limitedHistory));
-    
+    safeStorage.setItem(PRICE_CHECK_HISTORY_KEY, JSON.stringify(limitedHistory));
+
     console.log(`[PriceCheckHistory] ✅ Saved to localStorage. Total entries: ${limitedHistory.length}`);
-    
+
     return historyEntry.id;
   } catch (error) {
     console.error('[PriceCheckHistory] ❌ Failed to save price check result:', error);
@@ -47,15 +48,15 @@ export const savePriceCheckResult = (result) => {
 
 export const getPriceCheckHistory = () => {
   try {
-    const stored = localStorage.getItem(PRICE_CHECK_HISTORY_KEY);
+    const stored = safeStorage.getItem(PRICE_CHECK_HISTORY_KEY);
     if (!stored) {
       console.log('[PriceCheckHistory] 📭 No history found in localStorage');
       return [];
     }
-    
+
     const parsed = JSON.parse(stored);
     console.log(`[PriceCheckHistory] 📚 Loaded ${parsed.length} entries from localStorage`);
-    
+
     return parsed.filter(entry => entry && entry.id); // Filter out invalid entries
   } catch (error) {
     console.error('[PriceCheckHistory] ❌ Failed to load price check history:', error);
@@ -67,10 +68,10 @@ export const deletePriceCheckEntry = (entryId) => {
   try {
     const history = getPriceCheckHistory();
     const updatedHistory = history.filter(entry => entry.id !== entryId);
-    
-    localStorage.setItem(PRICE_CHECK_HISTORY_KEY, JSON.stringify(updatedHistory));
+
+    safeStorage.setItem(PRICE_CHECK_HISTORY_KEY, JSON.stringify(updatedHistory));
     console.log(`[PriceCheckHistory] 🗑️ Deleted entry ${entryId}`);
-    
+
     return true;
   } catch (error) {
     console.error('[PriceCheckHistory] ❌ Failed to delete entry:', error);
@@ -80,7 +81,7 @@ export const deletePriceCheckEntry = (entryId) => {
 
 export const clearPriceCheckHistory = () => {
   try {
-    localStorage.removeItem(PRICE_CHECK_HISTORY_KEY);
+    safeStorage.removeItem(PRICE_CHECK_HISTORY_KEY);
     console.log('[PriceCheckHistory] 🧹 Cleared all price check history');
     return true;
   } catch (error) {
@@ -92,7 +93,7 @@ export const clearPriceCheckHistory = () => {
 export const getPriceCheckStatistics = () => {
   try {
     const history = getPriceCheckHistory();
-    
+
     if (history.length === 0) {
       return {
         totalChecks: 0,
@@ -119,7 +120,7 @@ export const getPriceCheckStatistics = () => {
       checksThisMonth: history.filter(entry => new Date(entry.timestamp) > oneMonthAgo).length
     };
 
-    stats.averageUpdatesPerCheck = stats.totalChecks > 0 
+    stats.averageUpdatesPerCheck = stats.totalChecks > 0
       ? (stats.totalPostsUpdated / stats.totalChecks).toFixed(2)
       : 0;
 
@@ -134,7 +135,7 @@ export const getPriceCheckStatistics = () => {
 export const fetchSupabasePriceCheckHistory = async (userId, days = 30) => {
   try {
     console.log(`[PriceCheckHistory] 🔄 Fetching Supabase history for user ${userId}`);
-    
+
     // Check cache first
     const cacheKey = `${SUPABASE_HISTORY_CACHE_KEY}_${userId}`;
     const cached = getCachedData(cacheKey);
@@ -144,19 +145,19 @@ export const fetchSupabasePriceCheckHistory = async (userId, days = 30) => {
     }
 
     const response = await fetch(`/api/price-check-history?userId=${userId}&days=${days}`);
-    
+
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     const data = await response.json();
-    
+
     if (!data.success) {
       throw new Error(data.error || 'Failed to fetch history');
     }
 
     const activities = data.activities || [];
-    
+
     if (data.fallback) {
       console.log(`[PriceCheckHistory] ⚠️ ${data.message}, returning empty Supabase data`);
     } else {
@@ -164,16 +165,16 @@ export const fetchSupabasePriceCheckHistory = async (userId, days = 30) => {
       // Only cache successful non-fallback results
       setCachedData(cacheKey, activities);
     }
-    
+
     return activities;
   } catch (error) {
     console.error('[PriceCheckHistory] ❌ Failed to fetch Supabase history:', error);
-    
+
     // If it's a 404 error, the API route might not be available
     if (error.message.includes('404')) {
       console.warn('[PriceCheckHistory] ⚠️ API route not found, server might need restart');
     }
-    
+
     return [];
   }
 };
@@ -183,14 +184,14 @@ export const getCombinedPriceCheckHistory = async (userId) => {
   try {
     // Get localStorage history
     const localHistory = getPriceCheckHistory();
-    
+
     // Get Supabase history
     const supabaseHistory = userId ? await fetchSupabasePriceCheckHistory(userId) : [];
-    
+
     // Combine and deduplicate by ID
     const combined = [...localHistory];
     const localIds = new Set(localHistory.map(h => h.id));
-    
+
     supabaseHistory.forEach(item => {
       if (!localIds.has(item.id)) {
         combined.push({
@@ -199,12 +200,12 @@ export const getCombinedPriceCheckHistory = async (userId) => {
         });
       }
     });
-    
+
     // Sort by timestamp (newest first)
     combined.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    
+
     console.log(`[PriceCheckHistory] 📚 Combined history: ${localHistory.length} local + ${supabaseHistory.length} remote = ${combined.length} total`);
-    
+
     return combined;
   } catch (error) {
     console.error('[PriceCheckHistory] ❌ Failed to get combined history:', error);
@@ -215,18 +216,18 @@ export const getCombinedPriceCheckHistory = async (userId) => {
 // Cache management utilities
 const getCachedData = (key) => {
   try {
-    const cached = localStorage.getItem(key);
+    const cached = safeStorage.getItem(key);
     if (!cached) return null;
-    
+
     const parsed = JSON.parse(cached);
     const now = Date.now();
-    
+
     if (parsed.timestamp && (now - parsed.timestamp) < CACHE_DURATION) {
       return parsed.data;
     }
-    
+
     // Cache expired, remove it
-    localStorage.removeItem(key);
+    safeStorage.removeItem(key);
     return null;
   } catch (error) {
     console.error('[PriceCheckHistory] ❌ Cache read error:', error);
@@ -240,7 +241,7 @@ const setCachedData = (key, data) => {
       timestamp: Date.now(),
       data: data
     };
-    localStorage.setItem(key, JSON.stringify(cacheEntry));
+    safeStorage.setItem(key, JSON.stringify(cacheEntry));
     console.log(`[PriceCheckHistory] 💾 Cached ${data.length} entries for ${key}`);
   } catch (error) {
     console.error('[PriceCheckHistory] ❌ Cache write error:', error);
@@ -250,14 +251,22 @@ const setCachedData = (key, data) => {
 // Clear all caches
 export const clearPriceCheckCaches = () => {
   try {
-    const keys = Object.keys(localStorage).filter(key => 
-      key.startsWith(SUPABASE_HISTORY_CACHE_KEY)
-    );
-    
-    keys.forEach(key => localStorage.removeItem(key));
-    console.log(`[PriceCheckHistory] 🧹 Cleared ${keys.length} cache entries`);
-    
-    return true;
+    // safeStorage doesn't support iteration over keys or clearing all, 
+    // so we can't easily implement this without direct localStorage access.
+    // However, safeStorage is designed to prevent crashes.
+    // We can try to access window.localStorage directly inside a try-catch block here
+    // because this function explicitly asks to clear caches.
+
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const keys = Object.keys(window.localStorage).filter(key =>
+        key.startsWith(SUPABASE_HISTORY_CACHE_KEY)
+      );
+
+      keys.forEach(key => safeStorage.removeItem(key));
+      console.log(`[PriceCheckHistory] 🧹 Cleared ${keys.length} cache entries`);
+      return true;
+    }
+    return false;
   } catch (error) {
     console.error('[PriceCheckHistory] ❌ Failed to clear caches:', error);
     return false;
@@ -273,38 +282,44 @@ export const triggerHistoricalTelegramNotifications = async (userId, historyEntr
     }
 
     console.log(`[PriceCheckHistory] 📢 Processing ${historyEntries.length} entries for Telegram notifications`);
-    
+
     let sentCount = 0;
-    
+
     for (const entry of historyEntries) {
       if (!entry.posts || !entry.posts.length) continue;
-      
+
       // Only send notifications for entries with significant updates
-      const significantPosts = entry.posts.filter(post => 
+      const significantPosts = entry.posts.filter(post =>
         post.target_reached || post.stop_loss_triggered
       );
-      
+
       if (significantPosts.length === 0) continue;
-      
+
       try {
         // Get access token from localStorage
         const headers = {
           'Content-Type': 'application/json'
         };
-        
+
         if (typeof window !== 'undefined') {
-          const keys = Object.keys(localStorage);
-          const authKey = keys.find(k => k.includes('sb-') && k.includes('auth-token'));
-          if (authKey) {
-            try {
-              const authData = JSON.parse(localStorage.getItem(authKey));
-              const token = authData?.access_token || authData?.accessToken;
-              if (token) {
-                headers.Authorization = `Bearer ${token}`;
+          // We need to find the auth token key. 
+          // Since safeStorage doesn't support listing keys, we try a best effort approach
+          // or just rely on the fact that if we are in a sandbox, we might not have the token anyway.
+          try {
+            // Try to find the key if we can access localStorage directly
+            if (window.localStorage) {
+              const keys = Object.keys(window.localStorage);
+              const authKey = keys.find(k => k.includes('sb-') && k.includes('auth-token'));
+              if (authKey) {
+                const authData = JSON.parse(safeStorage.getItem(authKey));
+                const token = authData?.access_token || authData?.accessToken;
+                if (token) {
+                  headers.Authorization = `Bearer ${token}`;
+                }
               }
-            } catch (e) {
-              console.warn('[PriceCheckHistory] Could not parse auth token:', e);
             }
+          } catch (e) {
+            console.warn('[PriceCheckHistory] Could not access localStorage keys for auth token:', e);
           }
         }
 
@@ -348,19 +363,19 @@ export const triggerHistoricalTelegramNotifications = async (userId, historyEntr
         } else {
           console.warn(`[PriceCheckHistory] ⚠️ Failed to send Telegram for entry ${entry.id}`);
         }
-        
+
         // Add delay between requests to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
       } catch (telegramError) {
         console.error(`[PriceCheckHistory] ❌ Telegram error for entry ${entry.id}:`, telegramError);
       }
     }
-    
+
     console.log(`[PriceCheckHistory] 📊 Telegram notifications complete: ${sentCount}/${historyEntries.length} sent`);
-    
+
     return { success: true, sent: sentCount, total: historyEntries.length };
-    
+
   } catch (error) {
     console.error('[PriceCheckHistory] ❌ Failed to trigger historical Telegram notifications:', error);
     return { success: false, error: error.message };
@@ -372,7 +387,7 @@ export const exportPriceCheckHistory = () => {
     const history = getPriceCheckHistory();
     const dataStr = JSON.stringify(history, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    
+
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
     link.href = url;
@@ -381,7 +396,7 @@ export const exportPriceCheckHistory = () => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    
+
     console.log('[PriceCheckHistory] 📤 Exported price check history');
     return true;
   } catch (error) {

@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { User } from '../models/User';
 import { fetchWithTimeout } from '../services/api';
+import safeStorage from '@/utils/safeStorage';
 
 interface UserContextType {
   user: User | null;
@@ -33,7 +34,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       });
       const data = await response.json();
       setUser(data.user);
-      localStorage.setItem('isLoggedIn', 'true');
+      safeStorage.setItem('isLoggedIn', 'true');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to login');
       throw err;
@@ -46,7 +47,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       await fetch('/api/auth/logout');
       setUser(null);
-      localStorage.removeItem('isLoggedIn');
+      safeStorage.removeItem('isLoggedIn');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to logout');
       throw err;
@@ -72,13 +73,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const checkAuth = useCallback(async () => {
-    if (!localStorage.getItem('isLoggedIn')) return;
+    if (!safeStorage.getItem('isLoggedIn')) return;
 
     try {
       const data = await fetchWithTimeout('/api/auth/check');
       setUser(data.user);
     } catch {
-      localStorage.removeItem('isLoggedIn');
+      safeStorage.removeItem('isLoggedIn');
       setUser(null);
     }
   }, []);
@@ -108,8 +109,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [checkAuth]);
 
   return (
-    <UserContext.Provider value={{ 
-      user, loading, error, 
+    <UserContext.Provider value={{
+      user, loading, error,
       login, logout, updateProfile,
       checkAuth, register
     }}>

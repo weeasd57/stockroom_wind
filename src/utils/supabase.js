@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 // import logger from '@/utils/logger';
 import imageCompression from 'browser-image-compression';
 import { sanitizeUsername, sanitizeText, sanitizeUrl, sanitizePostData, sanitizeFullName } from '@/utils/validation';
+import safeStorage from '@/utils/safeStorage';
 
 // Lazy initialize Supabase client to avoid build-time env access
 let _supabaseClient = null;
@@ -14,31 +15,6 @@ function initSupabaseClient() {
     // Throw at runtime if actually used without proper config
     throw new Error('Supabase client missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
   }
-
-  // Custom storage adapter that fails gracefully
-  const safeStorage = {
-    getItem: (key) => {
-      try {
-        return localStorage.getItem(key);
-      } catch (e) {
-        return null;
-      }
-    },
-    setItem: (key, value) => {
-      try {
-        localStorage.setItem(key, value);
-      } catch (e) {
-        // Ignore write errors in sandbox
-      }
-    },
-    removeItem: (key) => {
-      try {
-        localStorage.removeItem(key);
-      } catch (e) {
-        // Ignore errors
-      }
-    }
-  };
 
   return createClient(url, anonKey, {
     auth: {
