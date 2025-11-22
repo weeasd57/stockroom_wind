@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sandbox Storage Test</title>
+    <style>
+        body { font-family: system-ui, sans-serif; padding: 20px; }
+        .success { color: green; font-weight: bold; }
+        .failure { color: red; font-weight: bold; }
+        iframe { width: 100%; height: 200px; border: 1px solid #ccc; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Sandbox Storage Verification</h1>
+    <p>This test simulates a restricted iframe environment (like CodeCanyon) where <code>localStorage</code> access might be blocked.</p>
+    
+    <div id="status">Waiting for test results...</div>
+    <div id="details"></div>
+
+    <!-- 
+        sandbox="allow-scripts" WITHOUT "allow-same-origin" causes localStorage access to throw SecurityError 
+        in most modern browsers because the origin is treated as unique (null).
+    -->
+    <iframe id="test-frame" sandbox="allow-scripts" srcdoc="
+        <html>
+        <body>
+            <h2>Inside Sandboxed Iframe</h2>
+            <script>
+                // Inline definition of safeStorage for testing
+                const safeStorage = {
+                    getItem: (key) => {
+                        try {
+                            if (typeof window !== 'undefined' && window.localStorage) {
+                                return window.localStorage.getItem(key);
+                            }
+                        } catch (e) {
+                            console.warn('[safeStorage] Failed to get item:', e);
+                            return null; // Expected behavior: return null on error
+                        }
+                        return null;
+                    },
+                    setItem: (key, value) => {
+                        try {
+                            if (typeof window !== 'undefined' && window.localStorage) {
+                                window.localStorage.setItem(key, value);
+                            }
+                        } catch (e) {
+                            console.warn('[safeStorage] Failed to set item:', e);
+                            // Expected behavior: catch error and do nothing
+                        }
+                    },
+                    removeItem: (key) => {
+                        try {
+                            if (typeof window !== 'undefined' && window.localStorage) {
+                                window.localStorage.removeItem(key);
+                            }
+                        } catch (e) {
+                            console.warn('[safeStorage] Failed to remove item:', e);
+                        }
+                    }
+                };
+
+                try {
+                    console.log('Attempting to set item...');
+                    safeStorage.setItem('test_key', 'test_value');
+                    
+                    console.log('Attempting to get item...');
+                    const val = safeStorage.getItem('test_key');
+                    
+                    // If we reached here without crashing, the test is successful.
+                    // In a sandbox, val will likely be null because setItem failed silently or getItem failed silently.
+                    window.parent.postMessage({ 
+                        status: 'success', 
+                        message: 'Operations completed without crashing',
+                        valueRead: val
+                    }, '*');
+                } catch (e) {
+                    window.parent.postMessage({ 
+                        status: 'failure', 
+                        error: e.toString() 
+                    }, '*');
+                }
+            </script>
+        </body>
+        </html>
+    "></iframe>
+
+    <script>
+        window.addEventListener('message', (event) => {
+            const statusDiv = document.getElementById('status');
+            const detailsDiv = document.getElementById('details');
+            
+            if (event.data.status === 'success') {
+                statusDiv.innerHTML = '<span class=\'success\'>✅ TEST PASSED</span>';
+                detailsDiv.innerText = event.data.message + '. Value read: ' + event.data.valueRead;
+            } else if (event.data.status === 'failure') {
+                statusDiv.innerHTML = '<span class=\'failure\'>❌ TEST FAILED</span>';
+                detailsDiv.innerText = 'Error caught: ' + event.data.error;
+            }
+        });
+    </script>
+</body>
+</html>

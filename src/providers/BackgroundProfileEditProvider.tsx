@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useProfile } from '@/providers/ProfileProvider';
 import { uploadImage } from '@/utils/supabase';
+import safeStorage from '@/utils/safeStorage';
 
 export type ProfileEditTaskStatus =
   | 'pending'
@@ -324,10 +325,9 @@ export function BackgroundProfileEditProvider({ children }: BackgroundProfileEdi
             }
           }
         });
-      }
 
-        // Refresh profile data (no parameters needed)
-        if (refreshData) {
+      // Refresh profile data (no parameters needed)
+      if (refreshData) {
         await refreshData();
       }
 
