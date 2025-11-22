@@ -1,0 +1,447 @@
+[
+  {
+    "table_schema": "auth",
+    "table_name": "audit_log_entries",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "flow_state",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "identities",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "instances",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "mfa_amr_claims",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "mfa_challenges",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "mfa_factors",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "oauth_authorizations",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "oauth_clients",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "oauth_consents",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "one_time_tokens",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "refresh_tokens",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "saml_providers",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "saml_relay_states",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "schema_migrations",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "sessions",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "sso_domains",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "sso_providers",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "auth",
+    "table_name": "users",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "extensions",
+    "table_name": "pg_stat_statements",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "extensions",
+    "table_name": "pg_stat_statements_info",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "pgsodium",
+    "table_name": "decrypted_key",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "pgsodium",
+    "table_name": "key",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "pgsodium",
+    "table_name": "mask_columns",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "pgsodium",
+    "table_name": "masking_rule",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "pgsodium",
+    "table_name": "valid_key",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "admin_activity_log",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "admin_credentials",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "admin_logs",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "broker_subscriptions",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "comments",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "comments_with_user_info",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "contact_conversations",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "contact_messages",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "free_telegram_subscribers",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payment_transactions",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "paypal_accounts",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "post_actions",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "posts",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "posts_with_action_counts",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "posts_with_stats",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "premium_plans",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "premium_plans_with_stats",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "premium_post_access_log",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "premium_telegram_subscribers",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "price_check_logs",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "profile_details",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "profiles",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "profiles_public",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "subscription_events",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "subscription_plans",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "subscription_stats",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "system_settings",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "telegram_bot_commands",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "telegram_bots",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "telegram_broadcast_posts",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "telegram_broadcast_recipients",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "telegram_broadcasts",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "telegram_broadcasts_with_stats",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "telegram_notification_settings",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "telegram_notifications",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "telegram_subscribers",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "telegram_subscribers_with_subscription",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "user_followings",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "user_strategies",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "user_subscriptions",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "webhook_notifications",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "realtime",
+    "table_name": "messages",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "realtime",
+    "table_name": "messages_2025_11_16",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "realtime",
+    "table_name": "messages_2025_11_17",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "realtime",
+    "table_name": "messages_2025_11_18",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "realtime",
+    "table_name": "messages_2025_11_19",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "realtime",
+    "table_name": "messages_2025_11_20",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "realtime",
+    "table_name": "messages_2025_11_21",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "realtime",
+    "table_name": "messages_2025_11_22",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "realtime",
+    "table_name": "schema_migrations",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "realtime",
+    "table_name": "subscription",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "storage",
+    "table_name": "buckets",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "storage",
+    "table_name": "buckets_analytics",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "storage",
+    "table_name": "buckets_vectors",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "storage",
+    "table_name": "migrations",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "storage",
+    "table_name": "objects",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "storage",
+    "table_name": "prefixes",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "storage",
+    "table_name": "s3_multipart_uploads",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "storage",
+    "table_name": "s3_multipart_uploads_parts",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "storage",
+    "table_name": "vector_indexes",
+    "table_type": "BASE TABLE"
+  },
+  {
+    "table_schema": "vault",
+    "table_name": "decrypted_secrets",
+    "table_type": "VIEW"
+  },
+  {
+    "table_schema": "vault",
+    "table_name": "secrets",
+    "table_type": "BASE TABLE"
+  }
+]

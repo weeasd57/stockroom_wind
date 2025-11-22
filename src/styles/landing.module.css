@@ -452,29 +452,45 @@
   flex-wrap: wrap;
 }
 
-/* Simplified button styles */
+/* Primary CTA button styles */
 .primaryButton {
-  background: var(--primary);
-  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: #ffffff;
   border: none;
-  padding: 0.75rem 1.5rem;
+  padding: 0.85rem 2.25rem;
   font-size: 1rem;
   font-weight: 600;
-  border-radius: 50px;
+  border-radius: 999px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.35);
+  transform: translateY(0) scale(1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .primaryButton:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
-  opacity: 0.9;
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.5);
+  background: linear-gradient(135deg, var(--secondary), var(--primary));
+}
+
+.primaryButton:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.45);
+}
+
+.buttonIcon {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex-shrink: 0;
 }
 
 /* Dark theme styles */
 :global(.dark) .primaryButton {
-  background: #ca8a04;
+  background: linear-gradient(135deg, #ca8a04, #fbbf24);
 }
 
 .secondaryButton {
@@ -1370,5 +1386,155 @@
     width: 100%;
     padding: 0.75rem 1.5rem;
     font-size: 0.95rem;
+  }
+}
+
+/* Earn cycle section (SharksZone flow) */
+.earnCycleSection {
+  margin-top: 3rem;
+  width: 100%;
+  max-width: 960px;
+  padding: 2.5rem 2rem;
+  border-radius: 24px;
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.95);
+  margin-left: auto;
+  margin-right: auto;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+  text-align: center;
+}
+
+:global(.dark) .earnCycleSection {
+  background: rgba(0, 0, 0, 0.95);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.earnCycleTitle {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+}
+
+.earnCycleSubtitle {
+  font-size: 1rem;
+  color: var(--text-light);
+  max-width: 520px;
+  margin: 0 auto 2rem;
+}
+
+.earnCycleGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+  align-items: stretch;
+}
+
+.earnStepCard {
+  position: relative;
+  grid-column: auto;
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.03), rgba(15, 23, 42, 0.07));
+  border-radius: 20px;
+  padding: 1.75rem 1.5rem;
+  border: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  text-align: left;
+  min-height: 160px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+}
+
+:global(.dark) .earnStepCard {
+  background: rgba(15, 23, 42, 0.9);
+  border-color: rgba(148, 163, 184, 0.4);
+}
+
+.earnStepHeading {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.earnStepBody {
+  font-size: 0.95rem;
+  color: var(--text-light);
+  margin: 0;
+}
+
+.earnStepCard:not(:last-child)::after {
+  content: '➝';
+  position: absolute;
+  top: 50%;
+  right: -1.75rem;
+  transform: translateY(-50%);
+  font-size: 1.4rem;
+  color: var(--text-light);
+}
+
+.earnArrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  color: transparent; /* actual glyph rendered via ::before */
+}
+
+.earnArrow::before {
+  content: '→';
+  font-size: 1.6rem;
+  color: var(--text-light);
+}
+
+.earnCycleFooter {
+  margin-top: 1.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.earnFooterLabel {
+  font-weight: 600;
+}
+
+.earnFooterIcons {
+  font-size: 1.3rem;
+}
+
+@media (max-width: 900px) {
+  .earnCycleGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .earnStepCard {
+    grid-column: auto;
+  }
+
+  .earnStepCard:not(:last-child)::after {
+    content: '↓';
+    top: auto;
+    bottom: -1.4rem;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
+}
+
+@media (max-width: 480px) {
+  .earnCycleSection {
+    padding: 1.75rem 1.25rem;
+    border-radius: 16px;
+  }
+
+  .earnCycleTitle {
+    font-size: 1.6rem;
   }
 }

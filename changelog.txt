@@ -4,5 +4,4 @@ v1.0.0
 - Initial CodeCanyon-ready release
 - Features: Social posts, profiles, follow, stock search, EODHD prices, PayPal Pro upgrade, webhooks, Telegram bot & contact bridge
 - Docs: ENVIRONMENT, INSTALLATION, DEPLOYMENT, TESTING, BRANDING
-- Scripts: prepare-codecanyon
 - Demo Mode: disable payments/webhooks when NEXT_PUBLIC_DEMO_MODE=true

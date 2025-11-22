@@ -13,7 +13,7 @@ import styles from '@/styles/navbar.module.css';
 // Navigation configuration
 const navigationConfig = {
   authenticated: [
-    { href: '/home', label: 'Home'},
+    { href: '/home', label: 'Home' },
     { href: '/traders', label: 'Traders' },
     { href: '/pricing', label: 'Pricing' },
   ],
@@ -39,7 +39,7 @@ export default function Navbar() {
   const [avatarLoading, setAvatarLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  
+
   // Refs
   const lastAvatarRefresh = useRef(Date.now());
   const unsubscribeRef = useRef(null);
@@ -52,7 +52,7 @@ export default function Navbar() {
   // Initialize component and set up scroll listener
   useEffect(() => {
     setMounted(true);
-    
+
     // No scroll listener needed as per new requirement
     const handleClickOutside = (event) => {
       if (navRef.current && !navRef.current.contains(event.target)) {
@@ -71,7 +71,7 @@ export default function Navbar() {
 
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
-    
+
     // Subscribe to avatar changes from imageCacheManager
     if (typeof window !== 'undefined' && window.imageCacheManager && user) {
       const handleImageChange = (userId, imageType, newUrl) => {
@@ -81,16 +81,16 @@ export default function Navbar() {
           setAvatarLoading(false);
         }
       };
-      
+
       unsubscribeRef.current = window.imageCacheManager.subscribe(handleImageChange);
-      
+
       const cachedAvatar = window.imageCacheManager.getAvatarUrl(user.id);
       if (cachedAvatar) {
         setAvatarUrl(cachedAvatar);
         setAvatarLoading(false);
       }
     }
-    
+
     return () => {
       // No scroll listener to remove
       document.removeEventListener('mousedown', handleClickOutside);
@@ -105,10 +105,10 @@ export default function Navbar() {
   useEffect(() => {
     if (profile && getEffectiveAvatarUrl) {
       const now = Date.now();
-      const shouldRefresh = !avatarUrl || 
-                          avatarUrl === '/default-avatar.svg' || 
-                          now - lastAvatarRefresh.current > 30000;
-      
+      const shouldRefresh = !avatarUrl ||
+        avatarUrl === '/default-avatar.svg' ||
+        now - lastAvatarRefresh.current > 30000;
+
       if (shouldRefresh) {
         const loadAvatar = async () => {
           setAvatarLoading(true);
@@ -117,7 +117,7 @@ export default function Navbar() {
             if (url && url !== avatarUrl) {
               setAvatarUrl(url);
               lastAvatarRefresh.current = now;
-            } 
+            }
           } catch (error) {
             console.error('Error loading avatar:', error);
             setAvatarUrl('/default-avatar.svg');
@@ -126,7 +126,7 @@ export default function Navbar() {
           }
         };
         loadAvatar();
-      } 
+      }
     }
   }, [profile, getEffectiveAvatarUrl, avatarUrl]);
 
@@ -155,7 +155,7 @@ export default function Navbar() {
   // Logout handler
   const handleLogoutClick = async () => {
     if (isLoggingOut) return;
-    
+
     try {
       setIsLoggingOut(true);
       closeMenu();
@@ -173,29 +173,27 @@ export default function Navbar() {
   }
 
   return (
-    <header 
+    <header
       ref={navRef}
-      className={styles.navbar} 
+      className={styles.navbar}
       suppressHydrationWarning
     >
       <div className={styles.container}>
         {/* Logo */}
-        <Link 
-          href={isAuthenticated ? '/home' : '/landing'} 
+        <Link
+          href={isAuthenticated ? '/home' : '/landing'}
           className={styles.logo}
           onClick={closeMenu}
         >
           <div className={styles.logoWrapper}>
-            <img 
-              src="/favicon_io/android-chrome-192x192.png" 
-              alt="SharksZone Logo" 
+            <img
+              src="/favicon_io/android-chrome-192x192.png"
+              alt="SharksZone Logo"
               width={40}
               height={40}
               className={styles.logoImage}
             />
-            <span className={styles.logoText}>
-              <span className="gradient-text" style={{ fontSize: '1.75rem' }}>Sharks</span>Zone
-            </span>
+            <span className={styles.logoText}>SharksZone</span>
           </div>
         </Link>
 
@@ -204,7 +202,7 @@ export default function Navbar() {
           <ul className={styles.navList}>
             {navLinks.map((link, index) => (
               <li key={link.href} className={styles.navItem}>
-                <Link 
+                <Link
                   href={link.href}
                   className={`${styles.navLink} ${pathname === link.href ? styles.active : ''}`}
                 >
@@ -222,10 +220,10 @@ export default function Navbar() {
         <div className={styles.desktopActions}>
           <ModeToggle />
           {isAuthenticated && <NotificationBell />}
-          
+
           {isAuthenticated ? (
             <div className={styles.userSection} ref={dropdownRef}>
-              <button 
+              <button
                 className={styles.profileDropdownTrigger}
                 onMouseEnter={() => setIsDropdownOpen(true)}
                 onMouseLeave={() => setIsDropdownOpen(false)}
@@ -240,8 +238,8 @@ export default function Navbar() {
                     </div>
                   ) : (
                     <Avatar className={styles.avatar}>
-                      <AvatarImage 
-                        src={avatarUrl} 
+                      <AvatarImage
+                        src={avatarUrl}
                         alt={`${profile?.username || 'User'}'s Avatar`}
                         onError={(e) => {
                           console.error('Error loading navbar avatar image');
@@ -261,7 +259,7 @@ export default function Navbar() {
               </button>
 
               {/* Dropdown Menu */}
-              <div 
+              <div
                 className={`${styles.dropdownMenu} ${isDropdownOpen ? styles.open : ''}`}
                 onMouseEnter={() => setIsDropdownOpen(true)}
                 onMouseLeave={() => setIsDropdownOpen(false)}
@@ -271,7 +269,7 @@ export default function Navbar() {
                   <span>View Profile</span>
                 </Link>
                 <div className={styles.dropdownDivider}></div>
-                <button 
+                <button
                   className={styles.dropdownItem}
                   onClick={handleLogoutClick}
                   disabled={isLoggingOut}
@@ -299,7 +297,7 @@ export default function Navbar() {
         </div>
 
         {/* Mobile Menu Toggle */}
-        <button 
+        <button
           className={styles.mobileMenuToggle}
           onClick={toggleMenu}
           aria-label="Toggle mobile menu"
@@ -315,7 +313,7 @@ export default function Navbar() {
       </div>
 
       {/* Mobile Menu */}
-      <div 
+      <div
         id="mobile-menu"
         className={`${styles.mobileMenu} ${isMenuOpen ? styles.open : ''}`}
         aria-hidden={!isMenuOpen}
@@ -325,7 +323,7 @@ export default function Navbar() {
             <ul className={styles.mobileNavList}>
               {navLinks.map((link, index) => (
                 <li key={link.href} className={styles.mobileNavItem} style={{ animationDelay: `${index * 100}ms` }}>
-                  <button 
+                  <button
                     onClick={() => handleNavigation(link.href)}
                     className={`${styles.mobileNavLink} ${pathname === link.href ? styles.active : ''}`}
                   >
@@ -345,7 +343,7 @@ export default function Navbar() {
 
               {isAuthenticated ? (
                 <div className={styles.mobileUserSection}>
-                  <button 
+                  <button
                     onClick={() => handleNavigation('/profile')}
                     className={styles.mobileProfileButton}
                   >
@@ -358,9 +356,9 @@ export default function Navbar() {
                         </div>
                       ) : (
                         <Avatar className={styles.avatar}>
-                          <AvatarImage 
-                            src={avatarUrl} 
-                            alt={`${profile?.username || 'User'}'s Avatar`} 
+                          <AvatarImage
+                            src={avatarUrl}
+                            alt={`${profile?.username || 'User'}'s Avatar`}
                             onError={(e) => {
                               console.error('Error loading mobile navbar avatar image');
                               e.target.src = '/default-avatar.svg';
@@ -374,9 +372,9 @@ export default function Navbar() {
                     </div>
                     <span>View Profile</span>
                   </button>
-                  
-                  <button 
-                    className={styles.mobileLogoutButton} 
+
+                  <button
+                    className={styles.mobileLogoutButton}
                     onClick={handleLogoutClick}
                     disabled={isLoggingOut}
                   >
@@ -394,7 +392,7 @@ export default function Navbar() {
                   </button>
                 </div>
               ) : (
-                <button 
+                <button
                   onClick={() => handleNavigation('/login')}
                   className={styles.mobileSignInButton}
                 >

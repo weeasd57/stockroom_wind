@@ -91,20 +91,6 @@ SharksZone is a social trading platform where traders can share stock ideas, con
 ## Project Structure
 ```
 stockroom/
-├── src/
-│   ├── app/                # Next.js 14 app directory
-│   ├── components/         # Reusable React components
-│   ├── contexts/           # React Context providers
-│   ├── hooks/              # Custom React hooks
-│   ├── styles/             # CSS modules and global styles
-│   └── utils/              # Helper functions and API utilities
-├── public/                 # Static assets
-├── .env.local              # Environment variables (create this)
-└── package.json            # Project dependencies
-```
-
-## Features In Detail
-
 ### Post Creation
 Users can create posts with:
 - Rich text descriptions

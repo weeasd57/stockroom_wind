@@ -175,3 +175,125 @@ export async function DELETE(request) {
     );
   }
 }
+
+/**
+ * PATCH /api/admin/users
+ * Update user status (activate, deactivate, ban, unban)
+ * Body: { action, user_ids: [uuid, uuid, ...] }
+ */
+export async function PATCH(request) {
+  try {
+    const { action, user_ids } = await request.json();
+
+    // Validate input
+    if (!action || !user_ids || !Array.isArray(user_ids) || user_ids.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Action and user IDs array required' },
+        { status: 400 }
+      );
+    }
+
+    const validActions = ['activate', 'deactivate', 'ban', 'unban', 'view', 'edit'];
+    if (!validActions.includes(action)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid action' },
+        { status: 400 }
+      );
+    }
+
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      { auth: { persistSession: false } }
+    );
+
+    let updateData = {};
+    let successMessage = '';
+
+    switch (action) {
+      case 'activate':
+        updateData = { is_active: true, is_banned: false };
+        successMessage = 'Users activated successfully';
+        break;
+      case 'deactivate':
+        updateData = { is_active: false };
+        successMessage = 'Users deactivated successfully';
+        break;
+      case 'ban':
+        updateData = { is_active: false, is_banned: true };
+        successMessage = 'Users banned successfully';
+        break;
+      case 'unban':
+        updateData = { is_banned: false, is_active: true };
+        successMessage = 'Users unbanned successfully';
+        break;
+      case 'view':
+        // Handle view action - redirect to profile
+        return NextResponse.json({
+          success: true,
+          action: 'redirect',
+          url: `/view-profile/${user_ids[0]}`
+        });
+      case 'edit':
+        // Handle edit action - return user data for editing
+        const { data: userData, error: userError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user_ids[0])
+          .single();
+
+        if (userError) {
+          return NextResponse.json(
+            { success: false, error: 'Failed to fetch user data' },
+            { status: 500 }
+          );
+        }
+
+        return NextResponse.json({
+          success: true,
+          action: 'edit',
+          user: userData
+        });
+    }
+
+    // Update users in database
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updateData)
+      .in('id', user_ids)
+      .select();
+
+    if (error) {
+      console.error('[Admin Users] Update error:', error);
+      return NextResponse.json(
+        { success: false, error: `Failed to ${action} users` },
+        { status: 500 }
+      );
+    }
+
+    // Log the action
+    await supabase.rpc('log_admin_activity', {
+      p_admin_email: 'admin@system', // You might want to pass actual admin email
+      p_action_type: `user_${action}`,
+      p_details: {
+        user_ids,
+        action,
+        affected_count: data?.length || 0
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: successMessage,
+      affected_count: data?.length || 0,
+      users: data
+    });
+
+  } catch (error) {
+    console.error('[Admin Users] PATCH error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to update users' },
+      { status: 500 }
+    );
+  }
+}

@@ -1,0 +1,1568 @@
+[
+  {
+    "schemaname": "auth",
+    "tablename": "audit_log_entries",
+    "indexname": "audit_log_entries_pkey",
+    "indexdef": "CREATE UNIQUE INDEX audit_log_entries_pkey ON auth.audit_log_entries USING btree (id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "audit_log_entries",
+    "indexname": "audit_logs_instance_id_idx",
+    "indexdef": "CREATE INDEX audit_logs_instance_id_idx ON auth.audit_log_entries USING btree (instance_id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "flow_state",
+    "indexname": "flow_state_created_at_idx",
+    "indexdef": "CREATE INDEX flow_state_created_at_idx ON auth.flow_state USING btree (created_at DESC)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "flow_state",
+    "indexname": "flow_state_pkey",
+    "indexdef": "CREATE UNIQUE INDEX flow_state_pkey ON auth.flow_state USING btree (id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "flow_state",
+    "indexname": "idx_auth_code",
+    "indexdef": "CREATE INDEX idx_auth_code ON auth.flow_state USING btree (auth_code)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "flow_state",
+    "indexname": "idx_user_id_auth_method",
+    "indexdef": "CREATE INDEX idx_user_id_auth_method ON auth.flow_state USING btree (user_id, authentication_method)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "identities",
+    "indexname": "identities_email_idx",
+    "indexdef": "CREATE INDEX identities_email_idx ON auth.identities USING btree (email text_pattern_ops)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "identities",
+    "indexname": "identities_pkey",
+    "indexdef": "CREATE UNIQUE INDEX identities_pkey ON auth.identities USING btree (id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "identities",
+    "indexname": "identities_provider_id_provider_unique",
+    "indexdef": "CREATE UNIQUE INDEX identities_provider_id_provider_unique ON auth.identities USING btree (provider_id, provider)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "identities",
+    "indexname": "identities_user_id_idx",
+    "indexdef": "CREATE INDEX identities_user_id_idx ON auth.identities USING btree (user_id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "instances",
+    "indexname": "instances_pkey",
+    "indexdef": "CREATE UNIQUE INDEX instances_pkey ON auth.instances USING btree (id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "mfa_amr_claims",
+    "indexname": "amr_id_pk",
+    "indexdef": "CREATE UNIQUE INDEX amr_id_pk ON auth.mfa_amr_claims USING btree (id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "mfa_amr_claims",
+    "indexname": "mfa_amr_claims_session_id_authentication_method_pkey",
+    "indexdef": "CREATE UNIQUE INDEX mfa_amr_claims_session_id_authentication_method_pkey ON auth.mfa_amr_claims USING btree (session_id, authentication_method)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "mfa_challenges",
+    "indexname": "mfa_challenge_created_at_idx",
+    "indexdef": "CREATE INDEX mfa_challenge_created_at_idx ON auth.mfa_challenges USING btree (created_at DESC)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "mfa_challenges",
+    "indexname": "mfa_challenges_pkey",
+    "indexdef": "CREATE UNIQUE INDEX mfa_challenges_pkey ON auth.mfa_challenges USING btree (id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "mfa_factors",
+    "indexname": "factor_id_created_at_idx",
+    "indexdef": "CREATE INDEX factor_id_created_at_idx ON auth.mfa_factors USING btree (user_id, created_at)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "mfa_factors",
+    "indexname": "mfa_factors_last_challenged_at_key",
+    "indexdef": "CREATE UNIQUE INDEX mfa_factors_last_challenged_at_key ON auth.mfa_factors USING btree (last_challenged_at)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "mfa_factors",
+    "indexname": "mfa_factors_pkey",
+    "indexdef": "CREATE UNIQUE INDEX mfa_factors_pkey ON auth.mfa_factors USING btree (id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "mfa_factors",
+    "indexname": "mfa_factors_user_friendly_name_unique",
+    "indexdef": "CREATE UNIQUE INDEX mfa_factors_user_friendly_name_unique ON auth.mfa_factors USING btree (friendly_name, user_id) WHERE (TRIM(BOTH FROM friendly_name) <> ''::text)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "mfa_factors",
+    "indexname": "mfa_factors_user_id_idx",
+    "indexdef": "CREATE INDEX mfa_factors_user_id_idx ON auth.mfa_factors USING btree (user_id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "mfa_factors",
+    "indexname": "unique_phone_factor_per_user",
+    "indexdef": "CREATE UNIQUE INDEX unique_phone_factor_per_user ON auth.mfa_factors USING btree (user_id, phone)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "oauth_authorizations",
+    "indexname": "oauth_auth_pending_exp_idx",
+    "indexdef": "CREATE INDEX oauth_auth_pending_exp_idx ON auth.oauth_authorizations USING btree (expires_at) WHERE (status = 'pending'::auth.oauth_authorization_status)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "oauth_authorizations",
+    "indexname": "oauth_authorizations_authorization_code_key",
+    "indexdef": "CREATE UNIQUE INDEX oauth_authorizations_authorization_code_key ON auth.oauth_authorizations USING btree (authorization_code)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "oauth_authorizations",
+    "indexname": "oauth_authorizations_authorization_id_key",
+    "indexdef": "CREATE UNIQUE INDEX oauth_authorizations_authorization_id_key ON auth.oauth_authorizations USING btree (authorization_id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "oauth_authorizations",
+    "indexname": "oauth_authorizations_pkey",
+    "indexdef": "CREATE UNIQUE INDEX oauth_authorizations_pkey ON auth.oauth_authorizations USING btree (id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "oauth_clients",
+    "indexname": "oauth_clients_deleted_at_idx",
+    "indexdef": "CREATE INDEX oauth_clients_deleted_at_idx ON auth.oauth_clients USING btree (deleted_at)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "oauth_clients",
+    "indexname": "oauth_clients_pkey",
+    "indexdef": "CREATE UNIQUE INDEX oauth_clients_pkey ON auth.oauth_clients USING btree (id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "oauth_consents",
+    "indexname": "oauth_consents_active_client_idx",
+    "indexdef": "CREATE INDEX oauth_consents_active_client_idx ON auth.oauth_consents USING btree (client_id) WHERE (revoked_at IS NULL)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "oauth_consents",
+    "indexname": "oauth_consents_active_user_client_idx",
+    "indexdef": "CREATE INDEX oauth_consents_active_user_client_idx ON auth.oauth_consents USING btree (user_id, client_id) WHERE (revoked_at IS NULL)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "oauth_consents",
+    "indexname": "oauth_consents_pkey",
+    "indexdef": "CREATE UNIQUE INDEX oauth_consents_pkey ON auth.oauth_consents USING btree (id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "oauth_consents",
+    "indexname": "oauth_consents_user_client_unique",
+    "indexdef": "CREATE UNIQUE INDEX oauth_consents_user_client_unique ON auth.oauth_consents USING btree (user_id, client_id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "oauth_consents",
+    "indexname": "oauth_consents_user_order_idx",
+    "indexdef": "CREATE INDEX oauth_consents_user_order_idx ON auth.oauth_consents USING btree (user_id, granted_at DESC)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "one_time_tokens",
+    "indexname": "one_time_tokens_pkey",
+    "indexdef": "CREATE UNIQUE INDEX one_time_tokens_pkey ON auth.one_time_tokens USING btree (id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "one_time_tokens",
+    "indexname": "one_time_tokens_relates_to_hash_idx",
+    "indexdef": "CREATE INDEX one_time_tokens_relates_to_hash_idx ON auth.one_time_tokens USING hash (relates_to)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "one_time_tokens",
+    "indexname": "one_time_tokens_token_hash_hash_idx",
+    "indexdef": "CREATE INDEX one_time_tokens_token_hash_hash_idx ON auth.one_time_tokens USING hash (token_hash)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "one_time_tokens",
+    "indexname": "one_time_tokens_user_id_token_type_key",
+    "indexdef": "CREATE UNIQUE INDEX one_time_tokens_user_id_token_type_key ON auth.one_time_tokens USING btree (user_id, token_type)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "refresh_tokens",
+    "indexname": "refresh_tokens_instance_id_idx",
+    "indexdef": "CREATE INDEX refresh_tokens_instance_id_idx ON auth.refresh_tokens USING btree (instance_id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "refresh_tokens",
+    "indexname": "refresh_tokens_instance_id_user_id_idx",
+    "indexdef": "CREATE INDEX refresh_tokens_instance_id_user_id_idx ON auth.refresh_tokens USING btree (instance_id, user_id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "refresh_tokens",
+    "indexname": "refresh_tokens_parent_idx",
+    "indexdef": "CREATE INDEX refresh_tokens_parent_idx ON auth.refresh_tokens USING btree (parent)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "refresh_tokens",
+    "indexname": "refresh_tokens_pkey",
+    "indexdef": "CREATE UNIQUE INDEX refresh_tokens_pkey ON auth.refresh_tokens USING btree (id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "refresh_tokens",
+    "indexname": "refresh_tokens_session_id_revoked_idx",
+    "indexdef": "CREATE INDEX refresh_tokens_session_id_revoked_idx ON auth.refresh_tokens USING btree (session_id, revoked)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "refresh_tokens",
+    "indexname": "refresh_tokens_token_unique",
+    "indexdef": "CREATE UNIQUE INDEX refresh_tokens_token_unique ON auth.refresh_tokens USING btree (token)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "refresh_tokens",
+    "indexname": "refresh_tokens_updated_at_idx",
+    "indexdef": "CREATE INDEX refresh_tokens_updated_at_idx ON auth.refresh_tokens USING btree (updated_at DESC)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "saml_providers",
+    "indexname": "saml_providers_entity_id_key",
+    "indexdef": "CREATE UNIQUE INDEX saml_providers_entity_id_key ON auth.saml_providers USING btree (entity_id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "saml_providers",
+    "indexname": "saml_providers_pkey",
+    "indexdef": "CREATE UNIQUE INDEX saml_providers_pkey ON auth.saml_providers USING btree (id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "saml_providers",
+    "indexname": "saml_providers_sso_provider_id_idx",
+    "indexdef": "CREATE INDEX saml_providers_sso_provider_id_idx ON auth.saml_providers USING btree (sso_provider_id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "saml_relay_states",
+    "indexname": "saml_relay_states_created_at_idx",
+    "indexdef": "CREATE INDEX saml_relay_states_created_at_idx ON auth.saml_relay_states USING btree (created_at DESC)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "saml_relay_states",
+    "indexname": "saml_relay_states_for_email_idx",
+    "indexdef": "CREATE INDEX saml_relay_states_for_email_idx ON auth.saml_relay_states USING btree (for_email)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "saml_relay_states",
+    "indexname": "saml_relay_states_pkey",
+    "indexdef": "CREATE UNIQUE INDEX saml_relay_states_pkey ON auth.saml_relay_states USING btree (id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "saml_relay_states",
+    "indexname": "saml_relay_states_sso_provider_id_idx",
+    "indexdef": "CREATE INDEX saml_relay_states_sso_provider_id_idx ON auth.saml_relay_states USING btree (sso_provider_id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "schema_migrations",
+    "indexname": "schema_migrations_pkey",
+    "indexdef": "CREATE UNIQUE INDEX schema_migrations_pkey ON auth.schema_migrations USING btree (version)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "sessions",
+    "indexname": "sessions_not_after_idx",
+    "indexdef": "CREATE INDEX sessions_not_after_idx ON auth.sessions USING btree (not_after DESC)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "sessions",
+    "indexname": "sessions_oauth_client_id_idx",
+    "indexdef": "CREATE INDEX sessions_oauth_client_id_idx ON auth.sessions USING btree (oauth_client_id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "sessions",
+    "indexname": "sessions_pkey",
+    "indexdef": "CREATE UNIQUE INDEX sessions_pkey ON auth.sessions USING btree (id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "sessions",
+    "indexname": "sessions_user_id_idx",
+    "indexdef": "CREATE INDEX sessions_user_id_idx ON auth.sessions USING btree (user_id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "sessions",
+    "indexname": "user_id_created_at_idx",
+    "indexdef": "CREATE INDEX user_id_created_at_idx ON auth.sessions USING btree (user_id, created_at)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "sso_domains",
+    "indexname": "sso_domains_domain_idx",
+    "indexdef": "CREATE UNIQUE INDEX sso_domains_domain_idx ON auth.sso_domains USING btree (lower(domain))"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "sso_domains",
+    "indexname": "sso_domains_pkey",
+    "indexdef": "CREATE UNIQUE INDEX sso_domains_pkey ON auth.sso_domains USING btree (id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "sso_domains",
+    "indexname": "sso_domains_sso_provider_id_idx",
+    "indexdef": "CREATE INDEX sso_domains_sso_provider_id_idx ON auth.sso_domains USING btree (sso_provider_id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "sso_providers",
+    "indexname": "sso_providers_pkey",
+    "indexdef": "CREATE UNIQUE INDEX sso_providers_pkey ON auth.sso_providers USING btree (id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "sso_providers",
+    "indexname": "sso_providers_resource_id_idx",
+    "indexdef": "CREATE UNIQUE INDEX sso_providers_resource_id_idx ON auth.sso_providers USING btree (lower(resource_id))"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "sso_providers",
+    "indexname": "sso_providers_resource_id_pattern_idx",
+    "indexdef": "CREATE INDEX sso_providers_resource_id_pattern_idx ON auth.sso_providers USING btree (resource_id text_pattern_ops)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "users",
+    "indexname": "confirmation_token_idx",
+    "indexdef": "CREATE UNIQUE INDEX confirmation_token_idx ON auth.users USING btree (confirmation_token) WHERE ((confirmation_token)::text !~ '^[0-9 ]*$'::text)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "users",
+    "indexname": "email_change_token_current_idx",
+    "indexdef": "CREATE UNIQUE INDEX email_change_token_current_idx ON auth.users USING btree (email_change_token_current) WHERE ((email_change_token_current)::text !~ '^[0-9 ]*$'::text)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "users",
+    "indexname": "email_change_token_new_idx",
+    "indexdef": "CREATE UNIQUE INDEX email_change_token_new_idx ON auth.users USING btree (email_change_token_new) WHERE ((email_change_token_new)::text !~ '^[0-9 ]*$'::text)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "users",
+    "indexname": "reauthentication_token_idx",
+    "indexdef": "CREATE UNIQUE INDEX reauthentication_token_idx ON auth.users USING btree (reauthentication_token) WHERE ((reauthentication_token)::text !~ '^[0-9 ]*$'::text)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "users",
+    "indexname": "recovery_token_idx",
+    "indexdef": "CREATE UNIQUE INDEX recovery_token_idx ON auth.users USING btree (recovery_token) WHERE ((recovery_token)::text !~ '^[0-9 ]*$'::text)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "users",
+    "indexname": "users_email_partial_key",
+    "indexdef": "CREATE UNIQUE INDEX users_email_partial_key ON auth.users USING btree (email) WHERE (is_sso_user = false)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "users",
+    "indexname": "users_instance_id_email_idx",
+    "indexdef": "CREATE INDEX users_instance_id_email_idx ON auth.users USING btree (instance_id, lower((email)::text))"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "users",
+    "indexname": "users_instance_id_idx",
+    "indexdef": "CREATE INDEX users_instance_id_idx ON auth.users USING btree (instance_id)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "users",
+    "indexname": "users_is_anonymous_idx",
+    "indexdef": "CREATE INDEX users_is_anonymous_idx ON auth.users USING btree (is_anonymous)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "users",
+    "indexname": "users_phone_key",
+    "indexdef": "CREATE UNIQUE INDEX users_phone_key ON auth.users USING btree (phone)"
+  },
+  {
+    "schemaname": "auth",
+    "tablename": "users",
+    "indexname": "users_pkey",
+    "indexdef": "CREATE UNIQUE INDEX users_pkey ON auth.users USING btree (id)"
+  },
+  {
+    "schemaname": "pgsodium",
+    "tablename": "key",
+    "indexname": "key_key_id_key_context_key_type_idx",
+    "indexdef": "CREATE UNIQUE INDEX key_key_id_key_context_key_type_idx ON pgsodium.key USING btree (key_id, key_context, key_type)"
+  },
+  {
+    "schemaname": "pgsodium",
+    "tablename": "key",
+    "indexname": "key_pkey",
+    "indexdef": "CREATE UNIQUE INDEX key_pkey ON pgsodium.key USING btree (id)"
+  },
+  {
+    "schemaname": "pgsodium",
+    "tablename": "key",
+    "indexname": "key_status_idx",
+    "indexdef": "CREATE INDEX key_status_idx ON pgsodium.key USING btree (status) WHERE (status = ANY (ARRAY['valid'::pgsodium.key_status, 'default'::pgsodium.key_status]))"
+  },
+  {
+    "schemaname": "pgsodium",
+    "tablename": "key",
+    "indexname": "key_status_idx1",
+    "indexdef": "CREATE UNIQUE INDEX key_status_idx1 ON pgsodium.key USING btree (status) WHERE (status = 'default'::pgsodium.key_status)"
+  },
+  {
+    "schemaname": "pgsodium",
+    "tablename": "key",
+    "indexname": "pgsodium_key_unique_name",
+    "indexdef": "CREATE UNIQUE INDEX pgsodium_key_unique_name ON pgsodium.key USING btree (name)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "admin_activity_log",
+    "indexname": "admin_activity_log_pkey",
+    "indexdef": "CREATE UNIQUE INDEX admin_activity_log_pkey ON public.admin_activity_log USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "admin_activity_log",
+    "indexname": "idx_admin_log_created",
+    "indexdef": "CREATE INDEX idx_admin_log_created ON public.admin_activity_log USING btree (created_at DESC)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "admin_activity_log",
+    "indexname": "idx_admin_log_email",
+    "indexdef": "CREATE INDEX idx_admin_log_email ON public.admin_activity_log USING btree (admin_email)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "admin_activity_log",
+    "indexname": "idx_admin_log_target",
+    "indexdef": "CREATE INDEX idx_admin_log_target ON public.admin_activity_log USING btree (target_user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "admin_activity_log",
+    "indexname": "idx_admin_log_type",
+    "indexdef": "CREATE INDEX idx_admin_log_type ON public.admin_activity_log USING btree (action_type)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "admin_credentials",
+    "indexname": "admin_credentials_admin_email_key",
+    "indexdef": "CREATE UNIQUE INDEX admin_credentials_admin_email_key ON public.admin_credentials USING btree (admin_email)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "admin_credentials",
+    "indexname": "admin_credentials_pkey",
+    "indexdef": "CREATE UNIQUE INDEX admin_credentials_pkey ON public.admin_credentials USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "admin_credentials",
+    "indexname": "idx_admin_credentials_active",
+    "indexdef": "CREATE INDEX idx_admin_credentials_active ON public.admin_credentials USING btree (is_active) WHERE (is_active = true)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "admin_credentials",
+    "indexname": "idx_admin_credentials_email",
+    "indexdef": "CREATE INDEX idx_admin_credentials_email ON public.admin_credentials USING btree (admin_email)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "admin_logs",
+    "indexname": "admin_logs_pkey",
+    "indexdef": "CREATE UNIQUE INDEX admin_logs_pkey ON public.admin_logs USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "broker_subscriptions",
+    "indexname": "broker_subscriptions_pkey",
+    "indexdef": "CREATE UNIQUE INDEX broker_subscriptions_pkey ON public.broker_subscriptions USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "broker_subscriptions",
+    "indexname": "broker_subscriptions_user_id_broker_id_status_key",
+    "indexdef": "CREATE UNIQUE INDEX broker_subscriptions_user_id_broker_id_status_key ON public.broker_subscriptions USING btree (user_id, broker_id, status)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "broker_subscriptions",
+    "indexname": "idx_broker_subscriptions_broker_id",
+    "indexdef": "CREATE INDEX idx_broker_subscriptions_broker_id ON public.broker_subscriptions USING btree (broker_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "broker_subscriptions",
+    "indexname": "idx_broker_subscriptions_expires_at",
+    "indexdef": "CREATE INDEX idx_broker_subscriptions_expires_at ON public.broker_subscriptions USING btree (expires_at)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "broker_subscriptions",
+    "indexname": "idx_broker_subscriptions_status",
+    "indexdef": "CREATE INDEX idx_broker_subscriptions_status ON public.broker_subscriptions USING btree (status)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "broker_subscriptions",
+    "indexname": "idx_broker_subscriptions_user_id",
+    "indexdef": "CREATE INDEX idx_broker_subscriptions_user_id ON public.broker_subscriptions USING btree (user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "comments",
+    "indexname": "comments_pkey",
+    "indexdef": "CREATE UNIQUE INDEX comments_pkey ON public.comments USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "comments",
+    "indexname": "idx_comments_created_at",
+    "indexdef": "CREATE INDEX idx_comments_created_at ON public.comments USING btree (created_at DESC)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "comments",
+    "indexname": "idx_comments_created_at_brin",
+    "indexdef": "CREATE INDEX idx_comments_created_at_brin ON public.comments USING brin (created_at)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "comments",
+    "indexname": "idx_comments_parent_comment_id",
+    "indexdef": "CREATE INDEX idx_comments_parent_comment_id ON public.comments USING btree (parent_comment_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "comments",
+    "indexname": "idx_comments_post",
+    "indexdef": "CREATE INDEX idx_comments_post ON public.comments USING btree (post_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "comments",
+    "indexname": "idx_comments_post_id",
+    "indexdef": "CREATE INDEX idx_comments_post_id ON public.comments USING btree (post_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "comments",
+    "indexname": "idx_comments_post_parent_created",
+    "indexdef": "CREATE INDEX idx_comments_post_parent_created ON public.comments USING btree (post_id, parent_comment_id, created_at)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "comments",
+    "indexname": "idx_comments_user_id",
+    "indexdef": "CREATE INDEX idx_comments_user_id ON public.comments USING btree (user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "contact_conversations",
+    "indexname": "contact_conversations_pkey",
+    "indexdef": "CREATE UNIQUE INDEX contact_conversations_pkey ON public.contact_conversations USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "contact_conversations",
+    "indexname": "idx_contact_conversations_last",
+    "indexdef": "CREATE INDEX idx_contact_conversations_last ON public.contact_conversations USING btree (last_message_at DESC)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "contact_conversations",
+    "indexname": "idx_contact_conversations_user",
+    "indexdef": "CREATE INDEX idx_contact_conversations_user ON public.contact_conversations USING btree (user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "contact_messages",
+    "indexname": "contact_messages_pkey",
+    "indexdef": "CREATE UNIQUE INDEX contact_messages_pkey ON public.contact_messages USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "contact_messages",
+    "indexname": "idx_contact_messages_conv",
+    "indexdef": "CREATE INDEX idx_contact_messages_conv ON public.contact_messages USING btree (conversation_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "contact_messages",
+    "indexname": "idx_contact_messages_created",
+    "indexdef": "CREATE INDEX idx_contact_messages_created ON public.contact_messages USING btree (created_at)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "notifications",
+    "indexname": "idx_notifications_created_at",
+    "indexdef": "CREATE INDEX idx_notifications_created_at ON public.notifications USING btree (created_at DESC)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "notifications",
+    "indexname": "idx_notifications_user_id",
+    "indexdef": "CREATE INDEX idx_notifications_user_id ON public.notifications USING btree (user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "notifications",
+    "indexname": "notifications_pkey",
+    "indexdef": "CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "payment_transactions",
+    "indexname": "idx_payment_transactions_paypal_order_id",
+    "indexdef": "CREATE INDEX idx_payment_transactions_paypal_order_id ON public.payment_transactions USING btree (paypal_order_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "payment_transactions",
+    "indexname": "idx_payment_transactions_user_id",
+    "indexdef": "CREATE INDEX idx_payment_transactions_user_id ON public.payment_transactions USING btree (user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "payment_transactions",
+    "indexname": "payment_transactions_pkey",
+    "indexdef": "CREATE UNIQUE INDEX payment_transactions_pkey ON public.payment_transactions USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "payment_transactions",
+    "indexname": "payment_tx_capture_unique",
+    "indexdef": "CREATE UNIQUE INDEX payment_tx_capture_unique ON public.payment_transactions USING btree (paypal_capture_id) WHERE (paypal_capture_id IS NOT NULL)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "payment_transactions",
+    "indexname": "payment_tx_order_unique",
+    "indexdef": "CREATE UNIQUE INDEX payment_tx_order_unique ON public.payment_transactions USING btree (paypal_order_id) WHERE (paypal_order_id IS NOT NULL)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "paypal_accounts",
+    "indexname": "idx_paypal_accounts_email",
+    "indexdef": "CREATE INDEX idx_paypal_accounts_email ON public.paypal_accounts USING btree (email)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "paypal_accounts",
+    "indexname": "idx_paypal_accounts_merchant_id",
+    "indexdef": "CREATE INDEX idx_paypal_accounts_merchant_id ON public.paypal_accounts USING btree (merchant_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "paypal_accounts",
+    "indexname": "idx_paypal_accounts_user_id",
+    "indexdef": "CREATE INDEX idx_paypal_accounts_user_id ON public.paypal_accounts USING btree (user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "paypal_accounts",
+    "indexname": "idx_paypal_accounts_verification_status",
+    "indexdef": "CREATE INDEX idx_paypal_accounts_verification_status ON public.paypal_accounts USING btree (verification_status)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "paypal_accounts",
+    "indexname": "paypal_accounts_pkey",
+    "indexdef": "CREATE UNIQUE INDEX paypal_accounts_pkey ON public.paypal_accounts USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "paypal_accounts",
+    "indexname": "paypal_accounts_user_id_email_key",
+    "indexdef": "CREATE UNIQUE INDEX paypal_accounts_user_id_email_key ON public.paypal_accounts USING btree (user_id, email)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "post_actions",
+    "indexname": "idx_post_actions_action_type",
+    "indexdef": "CREATE INDEX idx_post_actions_action_type ON public.post_actions USING btree (action_type)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "post_actions",
+    "indexname": "idx_post_actions_created_at",
+    "indexdef": "CREATE INDEX idx_post_actions_created_at ON public.post_actions USING btree (created_at DESC)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "post_actions",
+    "indexname": "idx_post_actions_post_id",
+    "indexdef": "CREATE INDEX idx_post_actions_post_id ON public.post_actions USING btree (post_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "post_actions",
+    "indexname": "idx_post_actions_post_user_type",
+    "indexdef": "CREATE INDEX idx_post_actions_post_user_type ON public.post_actions USING btree (post_id, user_id, action_type)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "post_actions",
+    "indexname": "idx_post_actions_user_id",
+    "indexdef": "CREATE INDEX idx_post_actions_user_id ON public.post_actions USING btree (user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "post_actions",
+    "indexname": "idx_post_actions_user_post",
+    "indexdef": "CREATE UNIQUE INDEX idx_post_actions_user_post ON public.post_actions USING btree (post_id, user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "post_actions",
+    "indexname": "post_actions_pkey",
+    "indexdef": "CREATE UNIQUE INDEX post_actions_pkey ON public.post_actions USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "post_actions",
+    "indexname": "post_actions_post_id_user_id_action_type_key",
+    "indexdef": "CREATE UNIQUE INDEX post_actions_post_id_user_id_action_type_key ON public.post_actions USING btree (post_id, user_id, action_type)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "posts",
+    "indexname": "idx_posts_active",
+    "indexdef": "CREATE INDEX idx_posts_active ON public.posts USING btree (created_at) WHERE (NOT closed)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "posts",
+    "indexname": "idx_posts_created_at",
+    "indexdef": "CREATE INDEX idx_posts_created_at ON public.posts USING btree (created_at DESC)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "posts",
+    "indexname": "idx_posts_is_premium_only",
+    "indexdef": "CREATE INDEX idx_posts_is_premium_only ON public.posts USING btree (is_premium_only) WHERE (is_premium_only = true)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "posts",
+    "indexname": "idx_posts_user_created_at",
+    "indexdef": "CREATE INDEX idx_posts_user_created_at ON public.posts USING btree (user_id, created_at DESC)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "posts",
+    "indexname": "idx_posts_user_id",
+    "indexdef": "CREATE INDEX idx_posts_user_id ON public.posts USING btree (user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "posts",
+    "indexname": "posts_pkey",
+    "indexdef": "CREATE UNIQUE INDEX posts_pkey ON public.posts USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "premium_plans",
+    "indexname": "idx_premium_plans_created_at",
+    "indexdef": "CREATE INDEX idx_premium_plans_created_at ON public.premium_plans USING btree (created_at)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "premium_plans",
+    "indexname": "idx_premium_plans_is_active",
+    "indexdef": "CREATE INDEX idx_premium_plans_is_active ON public.premium_plans USING btree (is_active)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "premium_plans",
+    "indexname": "idx_premium_plans_user_id",
+    "indexdef": "CREATE INDEX idx_premium_plans_user_id ON public.premium_plans USING btree (user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "premium_plans",
+    "indexname": "premium_plans_pkey",
+    "indexdef": "CREATE UNIQUE INDEX premium_plans_pkey ON public.premium_plans USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "premium_plans",
+    "indexname": "premium_plans_user_id_key",
+    "indexdef": "CREATE UNIQUE INDEX premium_plans_user_id_key ON public.premium_plans USING btree (user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "premium_post_access_log",
+    "indexname": "idx_premium_access_log_post_id",
+    "indexdef": "CREATE INDEX idx_premium_access_log_post_id ON public.premium_post_access_log USING btree (post_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "premium_post_access_log",
+    "indexname": "idx_premium_access_log_viewed_at",
+    "indexdef": "CREATE INDEX idx_premium_access_log_viewed_at ON public.premium_post_access_log USING btree (viewed_at DESC)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "premium_post_access_log",
+    "indexname": "idx_premium_access_log_viewer_id",
+    "indexdef": "CREATE INDEX idx_premium_access_log_viewer_id ON public.premium_post_access_log USING btree (viewer_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "premium_post_access_log",
+    "indexname": "premium_post_access_log_pkey",
+    "indexdef": "CREATE UNIQUE INDEX premium_post_access_log_pkey ON public.premium_post_access_log USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "price_check_logs",
+    "indexname": "idx_price_check_logs_checked_at",
+    "indexdef": "CREATE INDEX idx_price_check_logs_checked_at ON public.price_check_logs USING btree (checked_at)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "price_check_logs",
+    "indexname": "idx_price_check_logs_user_id",
+    "indexdef": "CREATE INDEX idx_price_check_logs_user_id ON public.price_check_logs USING btree (user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "price_check_logs",
+    "indexname": "price_check_logs_pkey",
+    "indexdef": "CREATE UNIQUE INDEX price_check_logs_pkey ON public.price_check_logs USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "indexname": "idx_profiles_created_at",
+    "indexdef": "CREATE INDEX idx_profiles_created_at ON public.profiles USING btree (created_at DESC)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "indexname": "idx_profiles_email",
+    "indexdef": "CREATE INDEX idx_profiles_email ON public.profiles USING btree (email)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "indexname": "idx_profiles_is_broker",
+    "indexdef": "CREATE INDEX idx_profiles_is_broker ON public.profiles USING btree (is_broker) WHERE (is_broker = true)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "indexname": "idx_profiles_paypal_email",
+    "indexdef": "CREATE INDEX idx_profiles_paypal_email ON public.profiles USING btree (paypal_email) WHERE (paypal_email IS NOT NULL)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "indexname": "idx_profiles_username",
+    "indexdef": "CREATE INDEX idx_profiles_username ON public.profiles USING btree (username)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "indexname": "profiles_email_key",
+    "indexdef": "CREATE UNIQUE INDEX profiles_email_key ON public.profiles USING btree (email)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "indexname": "profiles_pkey",
+    "indexdef": "CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "indexname": "profiles_username_key",
+    "indexdef": "CREATE UNIQUE INDEX profiles_username_key ON public.profiles USING btree (username)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "subscription_events",
+    "indexname": "idx_subscription_events_user_id_created_at",
+    "indexdef": "CREATE INDEX idx_subscription_events_user_id_created_at ON public.subscription_events USING btree (user_id, created_at DESC)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "subscription_events",
+    "indexname": "subscription_events_pkey",
+    "indexdef": "CREATE UNIQUE INDEX subscription_events_pkey ON public.subscription_events USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "subscription_plans",
+    "indexname": "subscription_plans_name_key",
+    "indexdef": "CREATE UNIQUE INDEX subscription_plans_name_key ON public.subscription_plans USING btree (name)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "subscription_plans",
+    "indexname": "subscription_plans_pkey",
+    "indexdef": "CREATE UNIQUE INDEX subscription_plans_pkey ON public.subscription_plans USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "system_settings",
+    "indexname": "system_settings_pkey",
+    "indexdef": "CREATE UNIQUE INDEX system_settings_pkey ON public.system_settings USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_bot_commands",
+    "indexname": "telegram_bot_commands_bot_id_command_key",
+    "indexdef": "CREATE UNIQUE INDEX telegram_bot_commands_bot_id_command_key ON public.telegram_bot_commands USING btree (bot_id, command)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_bot_commands",
+    "indexname": "telegram_bot_commands_pkey",
+    "indexdef": "CREATE UNIQUE INDEX telegram_bot_commands_pkey ON public.telegram_bot_commands USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_bots",
+    "indexname": "idx_telegram_bots_active",
+    "indexdef": "CREATE INDEX idx_telegram_bots_active ON public.telegram_bots USING btree (is_active) WHERE (is_active = true)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_bots",
+    "indexname": "idx_telegram_bots_user_id",
+    "indexdef": "CREATE INDEX idx_telegram_bots_user_id ON public.telegram_bots USING btree (user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_bots",
+    "indexname": "telegram_bots_pkey",
+    "indexdef": "CREATE UNIQUE INDEX telegram_bots_pkey ON public.telegram_bots USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_bots",
+    "indexname": "telegram_bots_user_id_key",
+    "indexdef": "CREATE UNIQUE INDEX telegram_bots_user_id_key ON public.telegram_bots USING btree (user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_broadcast_posts",
+    "indexname": "telegram_broadcast_posts_broadcast_id_post_id_key",
+    "indexdef": "CREATE UNIQUE INDEX telegram_broadcast_posts_broadcast_id_post_id_key ON public.telegram_broadcast_posts USING btree (broadcast_id, post_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_broadcast_posts",
+    "indexname": "telegram_broadcast_posts_pkey",
+    "indexdef": "CREATE UNIQUE INDEX telegram_broadcast_posts_pkey ON public.telegram_broadcast_posts USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_broadcast_recipients",
+    "indexname": "telegram_broadcast_recipients_broadcast_id_subscriber_id_key",
+    "indexdef": "CREATE UNIQUE INDEX telegram_broadcast_recipients_broadcast_id_subscriber_id_key ON public.telegram_broadcast_recipients USING btree (broadcast_id, subscriber_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_broadcast_recipients",
+    "indexname": "telegram_broadcast_recipients_pkey",
+    "indexdef": "CREATE UNIQUE INDEX telegram_broadcast_recipients_pkey ON public.telegram_broadcast_recipients USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_broadcasts",
+    "indexname": "idx_telegram_broadcasts_audience",
+    "indexdef": "CREATE INDEX idx_telegram_broadcasts_audience ON public.telegram_broadcasts USING btree (target_audience)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_broadcasts",
+    "indexname": "idx_telegram_broadcasts_bot_id",
+    "indexdef": "CREATE INDEX idx_telegram_broadcasts_bot_id ON public.telegram_broadcasts USING btree (bot_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_broadcasts",
+    "indexname": "idx_telegram_broadcasts_created_at",
+    "indexdef": "CREATE INDEX idx_telegram_broadcasts_created_at ON public.telegram_broadcasts USING btree (created_at DESC)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_broadcasts",
+    "indexname": "idx_telegram_broadcasts_sender_id",
+    "indexdef": "CREATE INDEX idx_telegram_broadcasts_sender_id ON public.telegram_broadcasts USING btree (sender_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_broadcasts",
+    "indexname": "idx_telegram_broadcasts_status",
+    "indexdef": "CREATE INDEX idx_telegram_broadcasts_status ON public.telegram_broadcasts USING btree (status)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_broadcasts",
+    "indexname": "telegram_broadcasts_pkey",
+    "indexdef": "CREATE UNIQUE INDEX telegram_broadcasts_pkey ON public.telegram_broadcasts USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_notification_settings",
+    "indexname": "telegram_notification_setting_subscriber_id_notification_ty_key",
+    "indexdef": "CREATE UNIQUE INDEX telegram_notification_setting_subscriber_id_notification_ty_key ON public.telegram_notification_settings USING btree (subscriber_id, notification_type)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_notification_settings",
+    "indexname": "telegram_notification_settings_pkey",
+    "indexdef": "CREATE UNIQUE INDEX telegram_notification_settings_pkey ON public.telegram_notification_settings USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_notifications",
+    "indexname": "idx_telegram_notifications_bot_id",
+    "indexdef": "CREATE INDEX idx_telegram_notifications_bot_id ON public.telegram_notifications USING btree (bot_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_notifications",
+    "indexname": "idx_telegram_notifications_post_id",
+    "indexdef": "CREATE INDEX idx_telegram_notifications_post_id ON public.telegram_notifications USING btree (post_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_notifications",
+    "indexname": "idx_telegram_notifications_recipient_tier",
+    "indexdef": "CREATE INDEX idx_telegram_notifications_recipient_tier ON public.telegram_notifications USING btree (recipient_tier)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_notifications",
+    "indexname": "idx_telegram_notifications_sent_at",
+    "indexdef": "CREATE INDEX idx_telegram_notifications_sent_at ON public.telegram_notifications USING btree (sent_at DESC)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_notifications",
+    "indexname": "idx_telegram_notifications_subscriber_id",
+    "indexdef": "CREATE INDEX idx_telegram_notifications_subscriber_id ON public.telegram_notifications USING btree (subscriber_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_notifications",
+    "indexname": "telegram_notifications_pkey",
+    "indexdef": "CREATE UNIQUE INDEX telegram_notifications_pkey ON public.telegram_notifications USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_subscribers",
+    "indexname": "idx_telegram_subscribers_bot_id",
+    "indexdef": "CREATE INDEX idx_telegram_subscribers_bot_id ON public.telegram_subscribers USING btree (bot_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_subscribers",
+    "indexname": "idx_telegram_subscribers_platform_user_id",
+    "indexdef": "CREATE INDEX idx_telegram_subscribers_platform_user_id ON public.telegram_subscribers USING btree (platform_user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_subscribers",
+    "indexname": "idx_telegram_subscribers_premium",
+    "indexdef": "CREATE INDEX idx_telegram_subscribers_premium ON public.telegram_subscribers USING btree (bot_id, subscription_tier) WHERE ((subscription_tier = 'premium'::subscription_tier_enum) AND (is_subscribed = true))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_subscribers",
+    "indexname": "idx_telegram_subscribers_subscribed",
+    "indexdef": "CREATE INDEX idx_telegram_subscribers_subscribed ON public.telegram_subscribers USING btree (is_subscribed) WHERE (is_subscribed = true)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_subscribers",
+    "indexname": "idx_telegram_subscribers_telegram_user_id",
+    "indexdef": "CREATE INDEX idx_telegram_subscribers_telegram_user_id ON public.telegram_subscribers USING btree (telegram_user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_subscribers",
+    "indexname": "idx_telegram_subscribers_tier",
+    "indexdef": "CREATE INDEX idx_telegram_subscribers_tier ON public.telegram_subscribers USING btree (subscription_tier)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_subscribers",
+    "indexname": "telegram_subscribers_bot_id_telegram_user_id_key",
+    "indexdef": "CREATE UNIQUE INDEX telegram_subscribers_bot_id_telegram_user_id_key ON public.telegram_subscribers USING btree (bot_id, telegram_user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_subscribers",
+    "indexname": "telegram_subscribers_pkey",
+    "indexdef": "CREATE UNIQUE INDEX telegram_subscribers_pkey ON public.telegram_subscribers USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_followings",
+    "indexname": "idx_user_followings_follower",
+    "indexdef": "CREATE INDEX idx_user_followings_follower ON public.user_followings USING btree (follower_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_followings",
+    "indexname": "idx_user_followings_follower_id",
+    "indexdef": "CREATE INDEX idx_user_followings_follower_id ON public.user_followings USING btree (follower_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_followings",
+    "indexname": "idx_user_followings_following_id",
+    "indexdef": "CREATE INDEX idx_user_followings_following_id ON public.user_followings USING btree (following_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_followings",
+    "indexname": "idx_user_followings_unique",
+    "indexdef": "CREATE UNIQUE INDEX idx_user_followings_unique ON public.user_followings USING btree (follower_id, following_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_followings",
+    "indexname": "user_followings_follower_id_following_id_key",
+    "indexdef": "CREATE UNIQUE INDEX user_followings_follower_id_following_id_key ON public.user_followings USING btree (follower_id, following_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_followings",
+    "indexname": "user_followings_pkey",
+    "indexdef": "CREATE UNIQUE INDEX user_followings_pkey ON public.user_followings USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_strategies",
+    "indexname": "idx_user_strategies_created_at",
+    "indexdef": "CREATE INDEX idx_user_strategies_created_at ON public.user_strategies USING btree (created_at DESC)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_strategies",
+    "indexname": "idx_user_strategies_user_id",
+    "indexdef": "CREATE INDEX idx_user_strategies_user_id ON public.user_strategies USING btree (user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_strategies",
+    "indexname": "idx_user_strategies_user_strategy",
+    "indexdef": "CREATE INDEX idx_user_strategies_user_strategy ON public.user_strategies USING btree (user_id, strategy_name)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_strategies",
+    "indexname": "user_strategies_pkey",
+    "indexdef": "CREATE UNIQUE INDEX user_strategies_pkey ON public.user_strategies USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_strategies",
+    "indexname": "user_strategies_user_id_strategy_name_key",
+    "indexdef": "CREATE UNIQUE INDEX user_strategies_user_id_strategy_name_key ON public.user_strategies USING btree (user_id, strategy_name)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_subscriptions",
+    "indexname": "idx_user_subscriptions_billing_period",
+    "indexdef": "CREATE INDEX idx_user_subscriptions_billing_period ON public.user_subscriptions USING btree (billing_period)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_subscriptions",
+    "indexname": "idx_user_subscriptions_status",
+    "indexdef": "CREATE INDEX idx_user_subscriptions_status ON public.user_subscriptions USING btree (status)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_subscriptions",
+    "indexname": "idx_user_subscriptions_user_id",
+    "indexdef": "CREATE INDEX idx_user_subscriptions_user_id ON public.user_subscriptions USING btree (user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_subscriptions",
+    "indexname": "uniq_active_subscription_per_user",
+    "indexdef": "CREATE UNIQUE INDEX uniq_active_subscription_per_user ON public.user_subscriptions USING btree (user_id) WHERE ((status)::text = 'active'::text)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_subscriptions",
+    "indexname": "user_subscriptions_active_unique",
+    "indexdef": "CREATE UNIQUE INDEX user_subscriptions_active_unique ON public.user_subscriptions USING btree (user_id) WHERE ((status)::text = 'active'::text)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_subscriptions",
+    "indexname": "user_subscriptions_paypal_order_unique",
+    "indexdef": "CREATE UNIQUE INDEX user_subscriptions_paypal_order_unique ON public.user_subscriptions USING btree (paypal_order_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_subscriptions",
+    "indexname": "user_subscriptions_pkey",
+    "indexdef": "CREATE UNIQUE INDEX user_subscriptions_pkey ON public.user_subscriptions USING btree (id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "webhook_notifications",
+    "indexname": "idx_webhook_notifications_created_at",
+    "indexdef": "CREATE INDEX idx_webhook_notifications_created_at ON public.webhook_notifications USING btree (created_at)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "webhook_notifications",
+    "indexname": "idx_webhook_notifications_event_type",
+    "indexdef": "CREATE INDEX idx_webhook_notifications_event_type ON public.webhook_notifications USING btree (event_type)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "webhook_notifications",
+    "indexname": "idx_webhook_notifications_is_read",
+    "indexdef": "CREATE INDEX idx_webhook_notifications_is_read ON public.webhook_notifications USING btree (is_read)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "webhook_notifications",
+    "indexname": "idx_webhook_notifications_user_id",
+    "indexdef": "CREATE INDEX idx_webhook_notifications_user_id ON public.webhook_notifications USING btree (user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "webhook_notifications",
+    "indexname": "unique_event_per_user",
+    "indexdef": "CREATE UNIQUE INDEX unique_event_per_user ON public.webhook_notifications USING btree (user_id, event_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "webhook_notifications",
+    "indexname": "webhook_notifications_event_id_key",
+    "indexdef": "CREATE UNIQUE INDEX webhook_notifications_event_id_key ON public.webhook_notifications USING btree (event_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "webhook_notifications",
+    "indexname": "webhook_notifications_pkey",
+    "indexdef": "CREATE UNIQUE INDEX webhook_notifications_pkey ON public.webhook_notifications USING btree (id)"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "messages",
+    "indexname": "messages_inserted_at_topic_index",
+    "indexdef": "CREATE INDEX messages_inserted_at_topic_index ON ONLY realtime.messages USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE))"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "messages",
+    "indexname": "messages_pkey",
+    "indexdef": "CREATE UNIQUE INDEX messages_pkey ON ONLY realtime.messages USING btree (id, inserted_at)"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "messages_2025_11_16",
+    "indexname": "messages_2025_11_16_inserted_at_topic_idx",
+    "indexdef": "CREATE INDEX messages_2025_11_16_inserted_at_topic_idx ON realtime.messages_2025_11_16 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE))"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "messages_2025_11_16",
+    "indexname": "messages_2025_11_16_pkey",
+    "indexdef": "CREATE UNIQUE INDEX messages_2025_11_16_pkey ON realtime.messages_2025_11_16 USING btree (id, inserted_at)"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "messages_2025_11_17",
+    "indexname": "messages_2025_11_17_inserted_at_topic_idx",
+    "indexdef": "CREATE INDEX messages_2025_11_17_inserted_at_topic_idx ON realtime.messages_2025_11_17 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE))"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "messages_2025_11_17",
+    "indexname": "messages_2025_11_17_pkey",
+    "indexdef": "CREATE UNIQUE INDEX messages_2025_11_17_pkey ON realtime.messages_2025_11_17 USING btree (id, inserted_at)"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "messages_2025_11_18",
+    "indexname": "messages_2025_11_18_inserted_at_topic_idx",
+    "indexdef": "CREATE INDEX messages_2025_11_18_inserted_at_topic_idx ON realtime.messages_2025_11_18 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE))"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "messages_2025_11_18",
+    "indexname": "messages_2025_11_18_pkey",
+    "indexdef": "CREATE UNIQUE INDEX messages_2025_11_18_pkey ON realtime.messages_2025_11_18 USING btree (id, inserted_at)"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "messages_2025_11_19",
+    "indexname": "messages_2025_11_19_inserted_at_topic_idx",
+    "indexdef": "CREATE INDEX messages_2025_11_19_inserted_at_topic_idx ON realtime.messages_2025_11_19 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE))"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "messages_2025_11_19",
+    "indexname": "messages_2025_11_19_pkey",
+    "indexdef": "CREATE UNIQUE INDEX messages_2025_11_19_pkey ON realtime.messages_2025_11_19 USING btree (id, inserted_at)"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "messages_2025_11_20",
+    "indexname": "messages_2025_11_20_inserted_at_topic_idx",
+    "indexdef": "CREATE INDEX messages_2025_11_20_inserted_at_topic_idx ON realtime.messages_2025_11_20 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE))"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "messages_2025_11_20",
+    "indexname": "messages_2025_11_20_pkey",
+    "indexdef": "CREATE UNIQUE INDEX messages_2025_11_20_pkey ON realtime.messages_2025_11_20 USING btree (id, inserted_at)"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "messages_2025_11_21",
+    "indexname": "messages_2025_11_21_inserted_at_topic_idx",
+    "indexdef": "CREATE INDEX messages_2025_11_21_inserted_at_topic_idx ON realtime.messages_2025_11_21 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE))"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "messages_2025_11_21",
+    "indexname": "messages_2025_11_21_pkey",
+    "indexdef": "CREATE UNIQUE INDEX messages_2025_11_21_pkey ON realtime.messages_2025_11_21 USING btree (id, inserted_at)"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "messages_2025_11_22",
+    "indexname": "messages_2025_11_22_inserted_at_topic_idx",
+    "indexdef": "CREATE INDEX messages_2025_11_22_inserted_at_topic_idx ON realtime.messages_2025_11_22 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE))"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "messages_2025_11_22",
+    "indexname": "messages_2025_11_22_pkey",
+    "indexdef": "CREATE UNIQUE INDEX messages_2025_11_22_pkey ON realtime.messages_2025_11_22 USING btree (id, inserted_at)"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "schema_migrations",
+    "indexname": "schema_migrations_pkey",
+    "indexdef": "CREATE UNIQUE INDEX schema_migrations_pkey ON realtime.schema_migrations USING btree (version)"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "subscription",
+    "indexname": "ix_realtime_subscription_entity",
+    "indexdef": "CREATE INDEX ix_realtime_subscription_entity ON realtime.subscription USING btree (entity)"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "subscription",
+    "indexname": "pk_subscription",
+    "indexdef": "CREATE UNIQUE INDEX pk_subscription ON realtime.subscription USING btree (id)"
+  },
+  {
+    "schemaname": "realtime",
+    "tablename": "subscription",
+    "indexname": "subscription_subscription_id_entity_filters_key",
+    "indexdef": "CREATE UNIQUE INDEX subscription_subscription_id_entity_filters_key ON realtime.subscription USING btree (subscription_id, entity, filters)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "buckets",
+    "indexname": "bname",
+    "indexdef": "CREATE UNIQUE INDEX bname ON storage.buckets USING btree (name)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "buckets",
+    "indexname": "buckets_pkey",
+    "indexdef": "CREATE UNIQUE INDEX buckets_pkey ON storage.buckets USING btree (id)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "buckets_analytics",
+    "indexname": "buckets_analytics_pkey",
+    "indexdef": "CREATE UNIQUE INDEX buckets_analytics_pkey ON storage.buckets_analytics USING btree (id)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "buckets_analytics",
+    "indexname": "buckets_analytics_unique_name_idx",
+    "indexdef": "CREATE UNIQUE INDEX buckets_analytics_unique_name_idx ON storage.buckets_analytics USING btree (name) WHERE (deleted_at IS NULL)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "buckets_vectors",
+    "indexname": "buckets_vectors_pkey",
+    "indexdef": "CREATE UNIQUE INDEX buckets_vectors_pkey ON storage.buckets_vectors USING btree (id)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "migrations",
+    "indexname": "migrations_name_key",
+    "indexdef": "CREATE UNIQUE INDEX migrations_name_key ON storage.migrations USING btree (name)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "migrations",
+    "indexname": "migrations_pkey",
+    "indexdef": "CREATE UNIQUE INDEX migrations_pkey ON storage.migrations USING btree (id)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "indexname": "bucketid_objname",
+    "indexdef": "CREATE UNIQUE INDEX bucketid_objname ON storage.objects USING btree (bucket_id, name)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "indexname": "idx_name_bucket_level_unique",
+    "indexdef": "CREATE UNIQUE INDEX idx_name_bucket_level_unique ON storage.objects USING btree (name COLLATE \"C\", bucket_id, level)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "indexname": "idx_objects_bucket_id_name",
+    "indexdef": "CREATE INDEX idx_objects_bucket_id_name ON storage.objects USING btree (bucket_id, name COLLATE \"C\")"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "indexname": "idx_objects_lower_name",
+    "indexdef": "CREATE INDEX idx_objects_lower_name ON storage.objects USING btree ((path_tokens[level]), lower(name) text_pattern_ops, bucket_id, level)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "indexname": "name_prefix_search",
+    "indexdef": "CREATE INDEX name_prefix_search ON storage.objects USING btree (name text_pattern_ops)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "indexname": "objects_bucket_id_level_idx",
+    "indexdef": "CREATE UNIQUE INDEX objects_bucket_id_level_idx ON storage.objects USING btree (bucket_id, level, name COLLATE \"C\")"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "indexname": "objects_pkey",
+    "indexdef": "CREATE UNIQUE INDEX objects_pkey ON storage.objects USING btree (id)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "prefixes",
+    "indexname": "idx_prefixes_lower_name",
+    "indexdef": "CREATE INDEX idx_prefixes_lower_name ON storage.prefixes USING btree (bucket_id, level, ((string_to_array(name, '/'::text))[level]), lower(name) text_pattern_ops)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "prefixes",
+    "indexname": "prefixes_pkey",
+    "indexdef": "CREATE UNIQUE INDEX prefixes_pkey ON storage.prefixes USING btree (bucket_id, level, name)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "s3_multipart_uploads",
+    "indexname": "idx_multipart_uploads_list",
+    "indexdef": "CREATE INDEX idx_multipart_uploads_list ON storage.s3_multipart_uploads USING btree (bucket_id, key, created_at)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "s3_multipart_uploads",
+    "indexname": "s3_multipart_uploads_pkey",
+    "indexdef": "CREATE UNIQUE INDEX s3_multipart_uploads_pkey ON storage.s3_multipart_uploads USING btree (id)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "s3_multipart_uploads_parts",
+    "indexname": "s3_multipart_uploads_parts_pkey",
+    "indexdef": "CREATE UNIQUE INDEX s3_multipart_uploads_parts_pkey ON storage.s3_multipart_uploads_parts USING btree (id)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "vector_indexes",
+    "indexname": "vector_indexes_name_bucket_id_idx",
+    "indexdef": "CREATE UNIQUE INDEX vector_indexes_name_bucket_id_idx ON storage.vector_indexes USING btree (name, bucket_id)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "vector_indexes",
+    "indexname": "vector_indexes_pkey",
+    "indexdef": "CREATE UNIQUE INDEX vector_indexes_pkey ON storage.vector_indexes USING btree (id)"
+  },
+  {
+    "schemaname": "vault",
+    "tablename": "secrets",
+    "indexname": "secrets_name_idx",
+    "indexdef": "CREATE UNIQUE INDEX secrets_name_idx ON vault.secrets USING btree (name) WHERE (name IS NOT NULL)"
+  },
+  {
+    "schemaname": "vault",
+    "tablename": "secrets",
+    "indexname": "secrets_pkey",
+    "indexdef": "CREATE UNIQUE INDEX secrets_pkey ON vault.secrets USING btree (id)"
+  }
+]

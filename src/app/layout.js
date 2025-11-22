@@ -3,6 +3,7 @@ import '@/styles/globals.css';
 import 'flag-icons/css/flag-icons.min.css';
 import { ThemeProvider } from "@/providers/theme-provider";
 import { SimpleSupabaseProvider } from '@/providers/SimpleSupabaseProvider';
+import { DemoModeProvider } from '@/providers/DemoModeProvider';
 import { UserProvider } from '@/providers/UserProvider';
 import { SubscriptionProvider } from '@/providers/SubscriptionProvider';
 import { BrokerSubscriptionProvider } from '@/providers/BrokerSubscriptionProvider';
@@ -40,7 +41,7 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata = {
-  title: 'SharkZone — Social Trading Platform',
+  title: 'SharksZone — Social Trading Platform',
   description: 'Share stock ideas, connect with traders, and build a community around trading insights. Discuss market opportunities and follow successful traders.',
 };
 
@@ -92,7 +93,7 @@ export default function RootLayout({ children }) {
             };
           `}
         </Script>
-        
+
         {/* Google Analytics Consent Management */}
         <Script id="gtag-consent-init" strategy="beforeInteractive" nonce={cspNonce || undefined}>
           {`
@@ -107,7 +108,7 @@ export default function RootLayout({ children }) {
             });
           `}
         </Script>
-        
+
         <Script id="console-suppressor" strategy="beforeInteractive" nonce={cspNonce || undefined}>
           {`
             if (${isProd}) {
@@ -124,6 +125,20 @@ export default function RootLayout({ children }) {
                 console.info = originalInfo;
                 console.debug = originalDebug;
               };
+            }
+          `}
+        </Script>
+        <Script id="iframe-detector" strategy="beforeInteractive" nonce={cspNonce || undefined}>
+          {`
+            try {
+              var inIframe = window.self !== window.top;
+              if (inIframe) {
+                document.documentElement.classList.add('in-iframe');
+                window.__IN_IFRAME__ = true;
+              }
+            } catch (e) {
+              document.documentElement.classList.add('in-iframe');
+              window.__IN_IFRAME__ = true;
             }
           `}
         </Script>
@@ -313,49 +328,51 @@ export default function RootLayout({ children }) {
           `}
         </Script>
         <SimpleSupabaseProvider>
-          <UserProvider>
-            <SubscriptionProvider>
-              <BrokerSubscriptionProvider>
-                <ProfileProvider>
-                <StrategiesProvider>
-                  <AnalysisStateProvider>
-                    <TradersProvider>
-                      <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={false}>
-                    <CreatePostFormProvider>
-                      <ClientSideLayout>
-                        <AuthGuard>
-                          <ClientImagePreloader />
-                          <PostProvider>
-                            <CommentProvider>
-                              <BackgroundPostCreationProvider>
-                                <BackgroundProfileEditProvider>
-                                  <BackgroundPriceCheckProvider>
-                                    <PriceCheckResultsProvider>
-                                      <GlobalPriceCheckHandler />
-                                      <FollowProvider> {/* Wrap children with FollowProvider */}
-                                        {children}
-                                        <UnifiedBackgroundProcessDrawer />
-                                        <FloatingClock />
-                                        <Toaster richColors position="top-right" />
-                                        <CookieConsent />
-                                      </FollowProvider>
-                                    </PriceCheckResultsProvider>
-                                  </BackgroundPriceCheckProvider>
-                                </BackgroundProfileEditProvider>
-                              </BackgroundPostCreationProvider>
-                            </CommentProvider>
-                          </PostProvider>
-                        </AuthGuard>
-                      </ClientSideLayout>
-                      </CreatePostFormProvider>
-                    </ThemeProvider>
-                    </TradersProvider>
-                  </AnalysisStateProvider>
-                </StrategiesProvider>
-              </ProfileProvider>
-              </BrokerSubscriptionProvider>
-            </SubscriptionProvider>
-          </UserProvider>
+          <DemoModeProvider>
+            <UserProvider>
+              <SubscriptionProvider>
+                <BrokerSubscriptionProvider>
+                  <ProfileProvider>
+                    <StrategiesProvider>
+                      <AnalysisStateProvider>
+                        <TradersProvider>
+                          <ThemeProvider defaultTheme="dark" attribute="class" enableSystem={false}>
+                            <CreatePostFormProvider>
+                              <ClientSideLayout>
+                                <AuthGuard>
+                                  <ClientImagePreloader />
+                                  <PostProvider>
+                                    <CommentProvider>
+                                      <BackgroundPostCreationProvider>
+                                        <BackgroundProfileEditProvider>
+                                          <BackgroundPriceCheckProvider>
+                                            <PriceCheckResultsProvider>
+                                              <GlobalPriceCheckHandler />
+                                              <FollowProvider> {/* Wrap children with FollowProvider */}
+                                                {children}
+                                                <UnifiedBackgroundProcessDrawer />
+                                                <FloatingClock />
+                                                <Toaster richColors position="top-right" />
+                                                <CookieConsent />
+                                              </FollowProvider>
+                                            </PriceCheckResultsProvider>
+                                          </BackgroundPriceCheckProvider>
+                                        </BackgroundProfileEditProvider>
+                                      </BackgroundPostCreationProvider>
+                                    </CommentProvider>
+                                  </PostProvider>
+                                </AuthGuard>
+                              </ClientSideLayout>
+                            </CreatePostFormProvider>
+                          </ThemeProvider>
+                        </TradersProvider>
+                      </AnalysisStateProvider>
+                    </StrategiesProvider>
+                  </ProfileProvider>
+                </BrokerSubscriptionProvider>
+              </SubscriptionProvider>
+            </UserProvider>
+          </DemoModeProvider>
         </SimpleSupabaseProvider>
       </body>
     </html>

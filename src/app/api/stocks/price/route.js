@@ -26,11 +26,19 @@ function buildError(status, message, extra = {}) {
 // Resolve a provided country parameter (full name or ISO like 'eg') to the country name
 async function resolveCountryName(countryParam) {
   if (!countryParam) return null;
+  const raw = String(countryParam).toLowerCase();
+
+  try {
+    const mod = await import('@/models/CountryData');
+    const map = (mod && mod.COUNTRY_CODE_TO_NAME) ? mod.COUNTRY_CODE_TO_NAME : {};
+    if (map[raw]) {
+      return map[raw];
+    }
+  } catch (_) {}
+
   const ISO = await getCountryIsoCodes();
-  // Already a known country name
   if (ISO[countryParam]) return countryParam;
-  // Try reverse-lookup by iso code
-  const isoLower = String(countryParam).toLowerCase();
+  const isoLower = raw;
   for (const [countryName, iso] of Object.entries(ISO)) {
     if (String(iso).toLowerCase() === isoLower) {
       return countryName;

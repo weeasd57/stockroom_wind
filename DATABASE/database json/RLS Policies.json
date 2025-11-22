@@ -1,0 +1,938 @@
+[
+  {
+    "schemaname": "public",
+    "tablename": "admin_activity_log",
+    "policyname": "Admin logs insertable by service role",
+    "cmd": "INSERT",
+    "roles": "service_role",
+    "qual": null,
+    "with_check": "true"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "admin_activity_log",
+    "policyname": "Admin logs readable by authenticated users",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "admin_credentials",
+    "policyname": "Admin credentials readable by authenticated users",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "admin_logs",
+    "policyname": "admin_logs_insert_authenticated",
+    "cmd": "INSERT",
+    "roles": "authenticated",
+    "qual": null,
+    "with_check": "true"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "admin_logs",
+    "policyname": "admin_logs_select_authenticated",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "broker_subscriptions",
+    "policyname": "Users can view their own subscriptions",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "broker_subscriptions",
+    "policyname": "Brokers can view their subscribers",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(auth.uid() = broker_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "broker_subscriptions",
+    "policyname": "Users can insert their own subscriptions",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(auth.uid() = user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "broker_subscriptions",
+    "policyname": "Users can update their own subscriptions",
+    "cmd": "UPDATE",
+    "roles": "public",
+    "qual": "((auth.uid() = user_id) OR (auth.uid() = broker_id))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "comments",
+    "policyname": "Comments are viewable by everyone",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "comments",
+    "policyname": "Users can delete their own comments",
+    "cmd": "DELETE",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "comments",
+    "policyname": "Users can update their own comments",
+    "cmd": "UPDATE",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "comments",
+    "policyname": "Users can insert their own comments",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(auth.uid() = user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "contact_conversations",
+    "policyname": "contact_conversations_select_own",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "((user_id = auth.uid()) OR ((user_id IS NULL) AND (email = (( SELECT users.email\n   FROM auth.users\n  WHERE (users.id = auth.uid())))::text)))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "contact_conversations",
+    "policyname": "contact_conversations_update_own",
+    "cmd": "UPDATE",
+    "roles": "public",
+    "qual": "((user_id = auth.uid()) OR ((user_id IS NULL) AND (email = (( SELECT users.email\n   FROM auth.users\n  WHERE (users.id = auth.uid())))::text)))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "contact_conversations",
+    "policyname": "contact_conversations_insert_own",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "((user_id = auth.uid()) OR (user_id IS NULL))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "contact_messages",
+    "policyname": "contact_messages_select_own",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(EXISTS ( SELECT 1\n   FROM contact_conversations c\n  WHERE ((c.id = contact_messages.conversation_id) AND ((c.user_id = auth.uid()) OR ((c.user_id IS NULL) AND (c.email = (( SELECT users.email\n           FROM auth.users\n          WHERE (users.id = auth.uid())))::text))))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "contact_messages",
+    "policyname": "contact_messages_insert_own",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(((sender)::text = 'user'::text) AND (EXISTS ( SELECT 1\n   FROM contact_conversations c\n  WHERE ((c.id = contact_messages.conversation_id) AND ((c.user_id = auth.uid()) OR ((c.user_id IS NULL) AND (c.email = (( SELECT users.email\n           FROM auth.users\n          WHERE (users.id = auth.uid())))::text)))))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "contact_messages",
+    "policyname": "contact_messages_service_role_all",
+    "cmd": "ALL",
+    "roles": "service_role",
+    "qual": "true",
+    "with_check": "true"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "notifications",
+    "policyname": "Notifications readable by owner",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(user_id = auth.uid())",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "notifications",
+    "policyname": "Owner can mark notifications read",
+    "cmd": "UPDATE",
+    "roles": "public",
+    "qual": "(user_id = auth.uid())",
+    "with_check": "(user_id = auth.uid())"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "payment_transactions",
+    "policyname": "Service role can manage transactions",
+    "cmd": "ALL",
+    "roles": "public",
+    "qual": "(auth.role() = 'service_role'::text)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "payment_transactions",
+    "policyname": "Users can insert own transactions",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(auth.uid() = user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "payment_transactions",
+    "policyname": "Users can view own transactions",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "paypal_accounts",
+    "policyname": "Users can view their own paypal accounts",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "paypal_accounts",
+    "policyname": "Users can insert their own paypal accounts",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(auth.uid() = user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "paypal_accounts",
+    "policyname": "Users can update their own paypal accounts",
+    "cmd": "UPDATE",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "paypal_accounts",
+    "policyname": "Users can view their own PayPal accounts",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "paypal_accounts",
+    "policyname": "Users can delete their own paypal accounts",
+    "cmd": "DELETE",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "paypal_accounts",
+    "policyname": "Users can insert their own PayPal accounts",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(auth.uid() = user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "paypal_accounts",
+    "policyname": "Users can update their own PayPal accounts",
+    "cmd": "UPDATE",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "paypal_accounts",
+    "policyname": "Service can manage PayPal accounts",
+    "cmd": "ALL",
+    "roles": "public",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "post_actions",
+    "policyname": "Users can insert their own post actions",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(auth.uid() = user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "post_actions",
+    "policyname": "Users can delete their own post actions",
+    "cmd": "DELETE",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "post_actions",
+    "policyname": "Post actions are viewable by everyone",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "posts",
+    "policyname": "Users can update their own posts",
+    "cmd": "UPDATE",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "posts",
+    "policyname": "allow_insert_own_posts",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(auth.uid() = user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "posts",
+    "policyname": "Enable realtime for own posts",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "posts",
+    "policyname": "premium_posts_visibility",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "((is_premium_only = false) OR (user_id = auth.uid()) OR ((is_premium_only = true) AND (EXISTS ( SELECT 1\n   FROM (user_subscriptions us\n     JOIN subscription_plans sp ON ((us.plan_id = sp.id)))\n  WHERE ((us.user_id = auth.uid()) AND ((us.status)::text = 'active'::text) AND ((sp.name)::text = 'pro'::text))))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "posts",
+    "policyname": "Users can insert their own posts",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(auth.uid() = user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "posts",
+    "policyname": "Posts are viewable by everyone",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "premium_plans",
+    "policyname": "Users can delete their own premium plans",
+    "cmd": "DELETE",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "premium_plans",
+    "policyname": "Anyone can view active premium plans",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(is_active = true)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "premium_plans",
+    "policyname": "Users can view their own premium plans",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "premium_plans",
+    "policyname": "Users can insert their own premium plans",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(auth.uid() = user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "premium_plans",
+    "policyname": "Users can update their own premium plans",
+    "cmd": "UPDATE",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "premium_post_access_log",
+    "policyname": "users_insert_access_logs",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(viewer_id = auth.uid())"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "premium_post_access_log",
+    "policyname": "users_view_own_access_logs",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(viewer_id = auth.uid())",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "premium_post_access_log",
+    "policyname": "post_owners_view_access_logs",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(EXISTS ( SELECT 1\n   FROM posts p\n  WHERE ((p.id = premium_post_access_log.post_id) AND (p.user_id = auth.uid()))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "price_check_logs",
+    "policyname": "Users can view own price checks",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "price_check_logs",
+    "policyname": "Users can insert own price checks",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(auth.uid() = user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "policyname": "Public profiles are viewable by everyone",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "policyname": "Users can update own profile",
+    "cmd": "UPDATE",
+    "roles": "public",
+    "qual": "(auth.uid() = id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "policyname": "Users can insert own profile",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(auth.uid() = id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "policyname": "Users can update own profile broker fields",
+    "cmd": "UPDATE",
+    "roles": "public",
+    "qual": "(auth.uid() = id)",
+    "with_check": "(auth.uid() = id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "policyname": "profiles_select_auth",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "policyname": "Users can insert their own profile",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(auth.uid() = id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "subscription_events",
+    "policyname": "subscription_events_select_own",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "qual": "(user_id = auth.uid())",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "subscription_events",
+    "policyname": "subscription_events_insert_own",
+    "cmd": "INSERT",
+    "roles": "authenticated",
+    "qual": null,
+    "with_check": "(user_id = auth.uid())"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "subscription_plans",
+    "policyname": "Plans are viewable by all",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_bots",
+    "policyname": "Users can manage their own bots",
+    "cmd": "ALL",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_broadcast_posts",
+    "policyname": "Bot owners can view their broadcast posts",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(EXISTS ( SELECT 1\n   FROM (telegram_broadcasts b\n     JOIN telegram_bots tb ON ((tb.id = b.bot_id)))\n  WHERE ((b.id = telegram_broadcast_posts.broadcast_id) AND (tb.user_id = auth.uid()))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_broadcast_recipients",
+    "policyname": "Bot owners can view their broadcast recipients",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(EXISTS ( SELECT 1\n   FROM (telegram_broadcasts b\n     JOIN telegram_bots tb ON ((tb.id = b.bot_id)))\n  WHERE ((b.id = telegram_broadcast_recipients.broadcast_id) AND (tb.user_id = auth.uid()))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_broadcast_recipients",
+    "policyname": "Bot owners can update their broadcast recipients",
+    "cmd": "UPDATE",
+    "roles": "public",
+    "qual": "(EXISTS ( SELECT 1\n   FROM (telegram_broadcasts b\n     JOIN telegram_bots tb ON ((tb.id = b.bot_id)))\n  WHERE ((b.id = telegram_broadcast_recipients.broadcast_id) AND (tb.user_id = auth.uid()))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_broadcasts",
+    "policyname": "Users can manage their own broadcasts",
+    "cmd": "ALL",
+    "roles": "public",
+    "qual": "(EXISTS ( SELECT 1\n   FROM telegram_bots\n  WHERE ((telegram_bots.id = telegram_broadcasts.bot_id) AND (telegram_bots.user_id = auth.uid()))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_notifications",
+    "policyname": "Bot owners can view their notifications",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(EXISTS ( SELECT 1\n   FROM telegram_bots tb\n  WHERE ((tb.id = telegram_notifications.bot_id) AND (tb.user_id = auth.uid()))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_notifications",
+    "policyname": "Bot owners can insert notifications",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(EXISTS ( SELECT 1\n   FROM telegram_bots tb\n  WHERE ((tb.id = telegram_notifications.bot_id) AND (tb.user_id = auth.uid()))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_subscribers",
+    "policyname": "Bot owners can view their subscribers",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(EXISTS ( SELECT 1\n   FROM telegram_bots\n  WHERE ((telegram_bots.id = telegram_subscribers.bot_id) AND (telegram_bots.user_id = auth.uid()))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "telegram_subscribers",
+    "policyname": "Bot owners can manage subscribers",
+    "cmd": "ALL",
+    "roles": "public",
+    "qual": "(EXISTS ( SELECT 1\n   FROM telegram_bots\n  WHERE ((telegram_bots.id = telegram_subscribers.bot_id) AND (telegram_bots.user_id = auth.uid()))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_followings",
+    "policyname": "Followings are viewable by everyone",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_followings",
+    "policyname": "Users can follow others",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(auth.uid() = follower_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_followings",
+    "policyname": "Users can unfollow others",
+    "cmd": "DELETE",
+    "roles": "public",
+    "qual": "(auth.uid() = follower_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_strategies",
+    "policyname": "Users can update own strategies",
+    "cmd": "UPDATE",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_strategies",
+    "policyname": "Users can insert their own strategies",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(auth.uid() = user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_strategies",
+    "policyname": "Users can view their own strategies",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_strategies",
+    "policyname": "Users can insert own strategies",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(auth.uid() = user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_strategies",
+    "policyname": "Users can delete own strategies",
+    "cmd": "DELETE",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_strategies",
+    "policyname": "Users can view own strategies",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_subscriptions",
+    "policyname": "Service role can manage subscriptions",
+    "cmd": "ALL",
+    "roles": "public",
+    "qual": "(auth.role() = 'service_role'::text)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_subscriptions",
+    "policyname": "Users can update own subscriptions",
+    "cmd": "UPDATE",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_subscriptions",
+    "policyname": "Users can view own subscriptions",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_subscriptions",
+    "policyname": "Users can insert own subscriptions",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(auth.uid() = user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "webhook_notifications",
+    "policyname": "Users can view their own notifications",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "webhook_notifications",
+    "policyname": "Service can insert notifications",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "true"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "webhook_notifications",
+    "policyname": "Users can update their own notifications",
+    "cmd": "UPDATE",
+    "roles": "public",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Users can upload their own backgrounds",
+    "cmd": "INSERT",
+    "roles": "authenticated",
+    "qual": null,
+    "with_check": "((bucket_id = 'backgrounds'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text))"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Users can upload their own avatars",
+    "cmd": "INSERT",
+    "roles": "authenticated",
+    "qual": null,
+    "with_check": "((bucket_id = 'avatars'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text))"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Users can update their own backgrounds",
+    "cmd": "UPDATE",
+    "roles": "authenticated",
+    "qual": "((bucket_id = 'backgrounds'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text))",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Users can update their own avatars",
+    "cmd": "UPDATE",
+    "roles": "authenticated",
+    "qual": "((bucket_id = 'avatars'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text))",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Users can update own strategy images",
+    "cmd": "UPDATE",
+    "roles": "public",
+    "qual": "((bucket_id = 'strategy-images'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Users can delete own strategy images",
+    "cmd": "DELETE",
+    "roles": "public",
+    "qual": "((bucket_id = 'strategy-images'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Users can update their own avatar",
+    "cmd": "UPDATE",
+    "roles": "public",
+    "qual": "((bucket_id = 'avatars'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Users can delete their own backgrounds",
+    "cmd": "DELETE",
+    "roles": "authenticated",
+    "qual": "((bucket_id = 'backgrounds'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text))",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Users can delete their own avatars",
+    "cmd": "DELETE",
+    "roles": "authenticated",
+    "qual": "((bucket_id = 'avatars'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text))",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Public can view all backgrounds",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(bucket_id = 'backgrounds'::text)",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Public can view all avatars",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(bucket_id = 'avatars'::text)",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Post images are publicly accessible",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(bucket_id = 'post_images'::text)",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Avatar images are publicly accessible",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(bucket_id = 'avatars'::text)",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Authenticated users can upload post images",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "((bucket_id = 'post_images'::text) AND (auth.role() = 'authenticated'::text))"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Anyone can upload an avatar",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "(bucket_id = 'avatars'::text)"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Users can upload strategy images",
+    "cmd": "INSERT",
+    "roles": "public",
+    "qual": null,
+    "with_check": "((bucket_id = 'strategy-images'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))"
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Anyone can view strategy images",
+    "cmd": "SELECT",
+    "roles": "public",
+    "qual": "(bucket_id = 'strategy-images'::text)",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Users can view their own backgrounds",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "qual": "((bucket_id = 'backgrounds'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text))",
+    "with_check": null
+  },
+  {
+    "schemaname": "storage",
+    "tablename": "objects",
+    "policyname": "Users can view their own avatars",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "qual": "((bucket_id = 'avatars'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text))",
+    "with_check": null
+  }
+]

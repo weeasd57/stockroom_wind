@@ -6,7 +6,7 @@ import styles from '@/styles/footer.module.css';
 
 export default function Footer() {
   const { theme } = useTheme();
-  
+
   return (
     <footer className={`${styles.footer} ${theme === 'dark' ? styles.darkFooter : ''}`}>
       <div className={styles.container}>
@@ -17,7 +17,7 @@ export default function Footer() {
               Your social platform for stock market enthusiasts
             </p>
           </div>
-          
+
           <div className={styles.section}>
             <h4 className={styles.sectionTitle}>Legal</h4>
             <ul className={styles.linkList}>
@@ -38,7 +38,7 @@ export default function Footer() {
               </li>
             </ul>
           </div>
-          
+
           <div className={styles.section}>
             <h4 className={styles.sectionTitle}>Support</h4>
             <ul className={styles.linkList}>
@@ -55,7 +55,7 @@ export default function Footer() {
             </ul>
           </div>
         </div>
-        
+
         <div className={styles.bottom}>
           <p className={styles.copyright}>
             &copy; {new Date().getFullYear()} <span className={styles.appNameInCopyright}>SharksZone</span>. All rights reserved.

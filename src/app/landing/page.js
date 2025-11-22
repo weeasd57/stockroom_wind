@@ -34,7 +34,7 @@ export default function LandingPage() {
       router.replace('/home');
     }
   }, [user, loading, router]);
-  
+
   const handleScroll = useCallback(() => {
     // Use requestAnimationFrame to limit scroll updates
     window.requestAnimationFrame(() => {
@@ -77,7 +77,7 @@ export default function LandingPage() {
   }, [allCountryItems, displayedCount]);
 
   const totalSymbols = counts?.total || counts?.all || 0;
-  
+
   useEffect(() => {
     // Add passive flag to improve scroll performance
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -87,13 +87,13 @@ export default function LandingPage() {
   useEffect(() => {
     // Force immediate visibility to prevent empty page after logout
     setVisible(true);
-    
+
     const timer = setTimeout(() => {
       setVisible(true);
     }, 100);
     return () => clearTimeout(timer);
   }, []);
-  
+
   const features = [
     {
       id: 1,
@@ -137,7 +137,7 @@ export default function LandingPage() {
         'Supports multiple brokers with health checks and automatic failover when a provider is degraded.',
       icon: '🔗',
     },
-   
+
   ];
 
   const premiumFeatures = [
@@ -185,7 +185,7 @@ export default function LandingPage() {
       setTimeout(() => setHoverButton(null), 500);
     }
   };
-  
+
   const toggleTheme = () => {
     setTheme(theme === 'light' ? 'dark' : 'light');
   };
@@ -193,7 +193,7 @@ export default function LandingPage() {
   const handleLoadMore = () => {
     setDisplayedCount(prev => prev + 12); // Load 12 more countries
   };
-  
+
   // Show loading while checking authentication
   if (loading) {
     return (
@@ -225,7 +225,7 @@ export default function LandingPage() {
         <div className={`${styles.bubble} ${styles.bubble1} ${styles.desktopOnly}`}></div>
         <div className={`${styles.bubble} ${styles.bubble2}`}></div>
         <div className={`${styles.bubble} ${styles.bubble3} ${styles.desktopOnly}`}></div>
-        
+
         {/* Floating theme toggle */}
         <div className={styles.floatToggle}>
           <button
@@ -240,41 +240,74 @@ export default function LandingPage() {
 
         {/* Main Card */}
         <div className={styles.cardContainer}>
-          
+
           {/* Hero Section */}
           <div className={styles.heroContent}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
               <div className={styles.logobackground}>
                 <img
-                src="/favicon_io/android-chrome-512x512.png"
-                alt="SharksZone Logo"
-                className={styles.heroLogo}
-                style={{ borderRadius: 16 }}
-              />
+                  src="/favicon_io/android-chrome-512x512.png"
+                  alt="SharksZone Logo"
+                  className={styles.heroLogo}
+                  style={{ borderRadius: 16 }}
+                />
               </div>
               <h1 className={styles.title} style={{ margin: '0.75rem 0 0' }}>
-                <span className={styles.brandSharks}>Sharks</span>Zone — Stock Analysis & Social Trading
+                <span className={styles.brandSharks}>Trading</span>Hub Pro — Stock Analysis & Social Trading
               </h1>
             </div>
             <p className={styles.subtitle}>
               A social trading platform where traders can share stock ideas, connect with other investors, and build a community around trading insights. Share your analysis, follow successful traders, and discuss market opportunities in real-time.
             </p>
-            
+
             <div className={styles.heroButtons}>
-              <button 
+              <button
                 className={styles.primaryButton}
                 onClick={login}
               >
                 Get Started
-              </button>
-              <button 
-                className={styles.secondaryButton}
-                onClick={() => router.push('/how-it-works')}
-              >
-                How it Works
+                <svg className={styles.buttonIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
               </button>
             </div>
-            
+
+            {/* Earn cycle section */}
+            <section className={styles.earnCycleSection} aria-label="How SharksZone works">
+              <h2 className={styles.earnCycleTitle}>How SharksZone helps you earn</h2>
+              <p className={styles.earnCycleSubtitle}>
+                Turn your daily trading analysis into a recurring subscription business.
+              </p>
+              <div className={styles.earnCycleGrid}>
+                <article className={styles.earnStepCard}>
+                  <h3 className={styles.earnStepHeading}>Broker&apos;s desk</h3>
+                  <p className={styles.earnStepBody}>
+                    Share structured stock analysis and trading signals with your community.
+                  </p>
+                </article>
+                <article className={styles.earnStepCard}>
+                  <h3 className={styles.earnStepHeading}>Premium channel</h3>
+                  <p className={styles.earnStepBody}>
+                    Deliver instant alerts through SharksZone and Telegram.
+                  </p>
+                </article>
+                <article className={styles.earnStepCard}>
+                  <h3 className={styles.earnStepHeading}>Earn from users</h3>
+                  <p className={styles.earnStepBody}>
+                    Charge recurring subscriptions while we handle user management and access.
+                  </p>
+                </article>
+              </div>
+              <div className={styles.earnCycleFooter}>
+                <span className={styles.earnFooterLabel}>
+                  User management &amp; payments powered by SharksZone
+                </span>
+                <span className={styles.earnFooterIcons} aria-hidden="true">
+                  👤 💳
+                </span>
+              </div>
+            </section>
+
             {/* Core Features Grid */}
             <section className={styles.features} aria-label="Core features">
               {features.map((f) => (
@@ -307,7 +340,7 @@ export default function LandingPage() {
                 ))}
               </div>
               <div className={styles.premiumCta}>
-                <button 
+                <button
                   className={styles.premiumButton}
                   onClick={() => router.push('/pricing')}
                 >
@@ -335,8 +368,8 @@ export default function LandingPage() {
                 )}
                 <div className={styles.countryGrid}>
                   {countryItems.map((c, index) => (
-                    <div 
-                      className={styles.countryCard} 
+                    <div
+                      className={styles.countryCard}
                       key={c.code}
                       style={{
                         '--flag-bg': `url('https://flagcdn.com/w320/${c.code}.png')`,
@@ -353,11 +386,11 @@ export default function LandingPage() {
                     </div>
                   ))}
                 </div>
-                
+
                 {/* Load More Button */}
                 {displayedCount < allCountryItems.length && (
                   <div className={styles.loadMoreContainer}>
-                    <button 
+                    <button
                       className={styles.loadMoreButton}
                       onClick={handleLoadMore}
                       aria-label={`Load ${Math.min(12, allCountryItems.length - displayedCount)} more countries`}

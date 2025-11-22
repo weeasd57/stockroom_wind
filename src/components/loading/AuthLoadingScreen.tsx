@@ -31,7 +31,7 @@ export default function AuthLoadingScreen() {
     // Add small delay to prevent immediate execution
     const initTimer = setTimeout(() => {
       if (!isMounted) return;
-      
+
       stepInterval = setInterval(() => {
         if (!isMounted) return;
         setCurrentStep(prev => (prev + 1) % loadingSteps.length);
@@ -63,7 +63,7 @@ export default function AuthLoadingScreen() {
   const isDark = resolvedTheme === 'dark';
 
   return (
-    <div 
+    <div
       className={`${styles.authLoadingContainer} ${isDark ? styles.dark : styles.light}`}
       data-theme={resolvedTheme}
     >
@@ -81,11 +81,11 @@ export default function AuthLoadingScreen() {
         <div className={styles.heroSection}>
           <div className={styles.logoContainer}>
             <div className={styles.logoGlow}>
-              <Image 
-                src="/logo.svg" 
-                alt="SharkZone Logo" 
-                width={64} 
-                height={64} 
+              <Image
+                src="/logo.svg"
+                alt="SharksZone Logo"
+                width={64}
+                height={64}
                 className={styles.logoIcon}
               />
             </div>
@@ -127,7 +127,7 @@ export default function AuthLoadingScreen() {
         {/* Enhanced Progress Bar */}
         <div className={styles.progressSection}>
           <div className={styles.progressBarModern}>
-            <div 
+            <div
               className={styles.progressFillModern}
               style={{ width: `${Math.min(progress, 100)}%` }}
             >
@@ -172,7 +172,7 @@ export default function AuthLoadingScreen() {
           <div className={styles.particle}></div>
           <div className={styles.particle}></div>
         </div>
-        
+
         <div className={styles.waveAnimation}>
           <div className={styles.wave}></div>
           <div className={styles.wave}></div>

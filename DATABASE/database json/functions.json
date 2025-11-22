@@ -1,0 +1,380 @@
+[
+  {
+    "function_name": "add_column_if_not_exists",
+    "schema_name": "public",
+    "arguments": "p_table_name text, p_column_name text, p_data_type text, p_default_value text DEFAULT NULL::text",
+    "definition": "CREATE OR REPLACE FUNCTION public.add_column_if_not_exists(p_table_name text, p_column_name text, p_data_type text, p_default_value text DEFAULT NULL::text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE\n  column_exists BOOLEAN;\n  alter_statement TEXT;\nBEGIN\n  -- التحقق مما إذا كان العمود موجودًا بالفعل\n  SELECT EXISTS (\n    SELECT 1\n    FROM information_schema.columns\n    WHERE table_name = p_table_name\n    AND column_name = p_column_name\n    AND table_schema = 'public'\n  ) INTO column_exists;\n  \n  -- إذا لم يكن العمود موجودًا، قم بإضافته\n  IF NOT column_exists THEN\n    alter_statement := 'ALTER TABLE ' || p_table_name || ' ADD COLUMN ' || p_column_name || ' ' || p_data_type;\n    \n    -- إضافة القيمة الافتراضية إذا تم تحديدها\n    IF p_default_value IS NOT NULL THEN\n      alter_statement := alter_statement || ' DEFAULT ' || p_default_value;\n    END IF;\n    \n    EXECUTE alter_statement;\n  END IF;\nEND;\n$function$\n"
+  },
+  {
+    "function_name": "add_column_if_not_exists",
+    "schema_name": "public",
+    "arguments": "p_table_name text, p_column_name text, p_data_type text, p_default_value anyelement DEFAULT NULL::unknown",
+    "definition": "CREATE OR REPLACE FUNCTION public.add_column_if_not_exists(p_table_name text, p_column_name text, p_data_type text, p_default_value anyelement DEFAULT NULL::unknown)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  IF NOT EXISTS (\n    SELECT 1\n    FROM information_schema.columns\n    WHERE table_name = p_table_name\n    AND column_name = p_column_name\n  ) THEN\n    EXECUTE format('ALTER TABLE %I ADD COLUMN %I %s DEFAULT %L',\n      p_table_name, p_column_name, p_data_type,\n      p_default_value);\n  END IF;\nEND;\n$function$\n"
+  },
+  {
+    "function_name": "admin_confirm_emails",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.admin_confirm_emails()\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  updated_count integer;\n  result json;\nBEGIN\n  -- Update unconfirmed emails\n  WITH updated AS (\n    UPDATE auth.users\n    SET email_confirmed_at = NOW()\n    WHERE email_confirmed_at IS NULL\n    RETURNING id\n  )\n  SELECT COUNT(*) INTO updated_count FROM updated;\n  \n  -- Return the result\n  SELECT json_build_object(\n    'confirmed_users', updated_count\n  ) INTO result;\n  \n  RETURN result;\nEXCEPTION WHEN OTHERS THEN\n  RETURN json_build_object(\n    'error', SQLERRM,\n    'detail', SQLSTATE\n  );\nEND;\n$function$\n"
+  },
+  {
+    "function_name": "alter_profiles_updated_at_default",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.alter_profiles_updated_at_default()\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nBEGIN\n  -- 1. Set default value for updated_at column to NOW()\n  ALTER TABLE public.profiles \n  ALTER COLUMN updated_at SET DEFAULT NOW();\n  \n  -- 2. Update any existing NULL values to match created_at\n  UPDATE public.profiles \n  SET updated_at = created_at \n  WHERE updated_at IS NULL;\n  \n  -- 3. Make updated_at column NOT NULL after fixing existing data\n  ALTER TABLE public.profiles \n  ALTER COLUMN updated_at SET NOT NULL;\nEND;\n$function$\n"
+  },
+  {
+    "function_name": "bump_last_message_at",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.bump_last_message_at()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n  UPDATE contact_conversations\r\n    SET last_message_at = NOW(), updated_at = NOW()\r\n    WHERE id = NEW.conversation_id;\r\n  RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "calculate_subscription_expiry",
+    "schema_name": "public",
+    "arguments": "p_started_at timestamp with time zone, p_billing_period character varying",
+    "definition": "CREATE OR REPLACE FUNCTION public.calculate_subscription_expiry(p_started_at timestamp with time zone, p_billing_period character varying)\n RETURNS timestamp with time zone\n LANGUAGE plpgsql\n IMMUTABLE\nAS $function$\r\nBEGIN\r\n    CASE p_billing_period\r\n        WHEN 'monthly' THEN\r\n            RETURN p_started_at + INTERVAL '1 month';\r\n        WHEN 'yearly' THEN\r\n            RETURN p_started_at + INTERVAL '1 year';\r\n        ELSE\r\n            RETURN p_started_at + INTERVAL '1 month';\r\n    END CASE;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "can_user_view_premium_post",
+    "schema_name": "public",
+    "arguments": "p_post_id uuid, p_user_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.can_user_view_premium_post(p_post_id uuid, p_user_id uuid)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nDECLARE\r\n  v_is_premium_only BOOLEAN;\r\n  v_is_owner BOOLEAN;\r\n  v_is_premium_subscriber BOOLEAN;\r\nBEGIN\r\n  -- Get post premium status and ownership\r\n  SELECT \r\n    is_premium_only,\r\n    (user_id = p_user_id)\r\n  INTO v_is_premium_only, v_is_owner\r\n  FROM posts\r\n  WHERE id = p_post_id;\r\n  \r\n  -- If post not found\r\n  IF NOT FOUND THEN\r\n    RETURN FALSE;\r\n  END IF;\r\n  \r\n  -- If not premium post, everyone can view\r\n  IF v_is_premium_only = FALSE THEN\r\n    RETURN TRUE;\r\n  END IF;\r\n  \r\n  -- If user is owner\r\n  IF v_is_owner THEN\r\n    RETURN TRUE;\r\n  END IF;\r\n  \r\n  -- Check if user is premium subscriber\r\n  SELECT EXISTS(\r\n    SELECT 1 FROM user_subscriptions us\r\n    JOIN subscription_plans sp ON us.plan_id = sp.id\r\n    WHERE us.user_id = p_user_id\r\n      AND us.status = 'active'\r\n      AND sp.name = 'pro'\r\n  ) INTO v_is_premium_subscriber;\r\n  \r\n  RETURN v_is_premium_subscriber;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "check_post_limit",
+    "schema_name": "public",
+    "arguments": "p_user_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.check_post_limit(p_user_id uuid)\n RETURNS boolean\n LANGUAGE plpgsql\nAS $function$\r\nDECLARE\r\n  v_limit INTEGER;\r\n  v_used  INTEGER;\r\nBEGIN\r\n  -- Read only from user_subscriptions + subscription_plans\r\n  SELECT \r\n    COALESCE(p.post_creation_limit, 100),\r\n    COALESCE(s.posts_created, 0)\r\n  INTO v_limit, v_used\r\n  FROM user_subscriptions s\r\n  LEFT JOIN subscription_plans p ON p.id = s.plan_id\r\n  WHERE s.user_id = p_user_id\r\n    AND s.status = 'active';\r\n\r\n  -- If no active sub, fallback to free plan defaults\r\n  IF v_limit IS NULL THEN\r\n    SELECT COALESCE(post_creation_limit, 100)\r\n    INTO v_limit\r\n    FROM subscription_plans\r\n    WHERE name = 'free'\r\n    LIMIT 1;\r\n\r\n    v_used := 0;\r\n  END IF;\r\n\r\n  RETURN v_used < v_limit;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "check_price_limit",
+    "schema_name": "public",
+    "arguments": "p_user_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.check_price_limit(p_user_id uuid)\n RETURNS boolean\n LANGUAGE plpgsql\nAS $function$\r\nDECLARE\r\n    v_limit INTEGER;\r\n    v_used INTEGER;\r\nBEGIN\r\n    -- Get user's current plan limits and usage\r\n    SELECT \r\n        COALESCE(p.price_check_limit, 50),\r\n        COALESCE(s.price_checks_used, 0)\r\n    INTO v_limit, v_used\r\n    FROM user_subscriptions s\r\n    LEFT JOIN subscription_plans p ON s.plan_id = p.id\r\n    WHERE s.user_id = p_user_id AND s.status = 'active';\r\n    \r\n    -- If no active subscription found, use free plan defaults\r\n    IF v_limit IS NULL THEN\r\n        v_limit := 50;  -- Free plan default\r\n        v_used := 0;\r\n    END IF;\r\n    \r\n    -- Return true if user can make more checks\r\n    RETURN v_used < v_limit;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "close_completed_posts",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.close_completed_posts()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nBEGIN\n  -- إذا تم الوصول إلى الهدف أو كسر وقف الخسارة، قم بإغلاق المنشور\n  IF NEW.target_reached = TRUE OR NEW.stop_loss_triggered = TRUE THEN\n    NEW.closed = TRUE;\n    \n    -- تسجيل تاريخ الوصول إلى الهدف إذا لم يكن مسجلاً بالفعل\n    IF NEW.target_reached = TRUE AND NEW.target_reached_date IS NULL THEN\n      NEW.target_reached_date = NOW();\n    END IF;\n    \n    -- تسجيل تاريخ كسر وقف الخسارة إذا لم يكن مسجلاً بالفعل\n    IF NEW.stop_loss_triggered = TRUE AND NEW.stop_loss_triggered_date IS NULL THEN\n      NEW.stop_loss_triggered_date = NOW();\n    END IF;\n  END IF;\n  \n  RETURN NEW;\nEND;\n$function$\n"
+  },
+  {
+    "function_name": "create_pro_subscription",
+    "schema_name": "public",
+    "arguments": "p_user_id uuid, p_paypal_order_id text",
+    "definition": "CREATE OR REPLACE FUNCTION public.create_pro_subscription(p_user_id uuid, p_paypal_order_id text)\n RETURNS uuid\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\nDECLARE\r\n    v_pro_plan_id UUID;\r\n    v_subscription_id UUID;\r\nBEGIN\r\n    -- Get Pro plan ID\r\n    SELECT id INTO v_pro_plan_id\r\n    FROM subscription_plans\r\n    WHERE name = 'pro';\r\n    \r\n    IF v_pro_plan_id IS NULL THEN\r\n        RAISE EXCEPTION 'Pro plan not found';\r\n    END IF;\r\n    \r\n    -- Cancel existing active subscriptions\r\n    UPDATE user_subscriptions\r\n    SET status = 'cancelled', cancelled_at = NOW()\r\n    WHERE user_id = p_user_id AND status = 'active';\r\n    \r\n    -- Insert new pro subscription with explicit started_at = NOW()\r\n    INSERT INTO user_subscriptions (\r\n        user_id, \r\n        plan_id, \r\n        status, \r\n        paypal_order_id,\r\n        price_checks_used, \r\n        posts_created, \r\n        started_at,           -- ✅ Explicit started_at\r\n        expires_at\r\n    ) VALUES (\r\n        p_user_id, \r\n        v_pro_plan_id, \r\n        'active', \r\n        p_paypal_order_id,\r\n        0, \r\n        0, \r\n        NOW(),                -- ✅ Current timestamp\r\n        NOW() + INTERVAL '1 month'  -- Default monthly, will be updated by API\r\n    )\r\n    RETURNING id INTO v_subscription_id;\r\n    \r\n    RETURN v_subscription_id;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "create_telegram_broadcast",
+    "schema_name": "public",
+    "arguments": "p_bot_id uuid, p_sender_id uuid, p_title character varying, p_message text, p_post_ids uuid[], p_recipient_ids uuid[], p_broadcast_type character varying DEFAULT 'post_selection'::character varying, p_target_audience broadcast_audience_enum DEFAULT 'all'::broadcast_audience_enum",
+    "definition": "CREATE OR REPLACE FUNCTION public.create_telegram_broadcast(p_bot_id uuid, p_sender_id uuid, p_title character varying, p_message text, p_post_ids uuid[], p_recipient_ids uuid[], p_broadcast_type character varying DEFAULT 'post_selection'::character varying, p_target_audience broadcast_audience_enum DEFAULT 'all'::broadcast_audience_enum)\n RETURNS uuid\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nDECLARE\r\n    v_broadcast_id UUID;\r\n    v_post_id UUID;\r\n    v_recipient_id UUID;\r\nBEGIN\r\n    -- Create broadcast with target_audience\r\n    INSERT INTO telegram_broadcasts (\r\n        bot_id, sender_id, title, message, broadcast_type,\r\n        total_recipients, status, target_audience\r\n    ) VALUES (\r\n        p_bot_id, p_sender_id, p_title, p_message, p_broadcast_type,\r\n        array_length(p_recipient_ids, 1), 'draft', p_target_audience\r\n    ) RETURNING id INTO v_broadcast_id;\r\n    \r\n    -- Add posts to broadcast\r\n    FOREACH v_post_id IN ARRAY p_post_ids\r\n    LOOP\r\n        INSERT INTO telegram_broadcast_posts (broadcast_id, post_id)\r\n        VALUES (v_broadcast_id, v_post_id);\r\n    END LOOP;\r\n    \r\n    -- Add recipients to broadcast (already filtered by caller)\r\n    FOREACH v_recipient_id IN ARRAY p_recipient_ids\r\n    LOOP\r\n        INSERT INTO telegram_broadcast_recipients (broadcast_id, subscriber_id)\r\n        VALUES (v_broadcast_id, v_recipient_id);\r\n    END LOOP;\r\n    \r\n    RETURN v_broadcast_id;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "create_webhook_notification",
+    "schema_name": "public",
+    "arguments": "p_user_id uuid, p_webhook_id text, p_event_type text, p_event_id text, p_title text, p_message text, p_paypal_data jsonb DEFAULT '{}'::jsonb, p_severity text DEFAULT 'info'::text",
+    "definition": "CREATE OR REPLACE FUNCTION public.create_webhook_notification(p_user_id uuid, p_webhook_id text, p_event_type text, p_event_id text, p_title text, p_message text, p_paypal_data jsonb DEFAULT '{}'::jsonb, p_severity text DEFAULT 'info'::text)\n RETURNS uuid\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nDECLARE\r\n  notification_id UUID;\r\nBEGIN\r\n  INSERT INTO webhook_notifications (\r\n    user_id,\r\n    webhook_id,\r\n    event_type,\r\n    event_id,\r\n    title,\r\n    message,\r\n    paypal_data,\r\n    severity\r\n  ) VALUES (\r\n    p_user_id,\r\n    p_webhook_id,\r\n    p_event_type,\r\n    p_event_id,\r\n    p_title,\r\n    p_message,\r\n    p_paypal_data,\r\n    p_severity\r\n  )\r\n  ON CONFLICT (user_id, event_id) DO UPDATE SET\r\n    title = EXCLUDED.title,\r\n    message = EXCLUDED.message,\r\n    paypal_data = EXCLUDED.paypal_data,\r\n    severity = EXCLUDED.severity\r\n  RETURNING id INTO notification_id;\r\n  \r\n  RETURN notification_id;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "decrement_followers_count",
+    "schema_name": "public",
+    "arguments": "profile_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.decrement_followers_count(profile_id uuid)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n  UPDATE profiles\r\n  SET followers = GREATEST(0, followers - 1)\r\n  WHERE id = profile_id;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "decrement_following_count",
+    "schema_name": "public",
+    "arguments": "profile_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.decrement_following_count(profile_id uuid)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n  UPDATE profiles\r\n  SET following = GREATEST(0, following - 1)\r\n  WHERE id = profile_id;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "delete_user_completely",
+    "schema_name": "public",
+    "arguments": "p_user_id uuid, p_admin_email text DEFAULT NULL::text",
+    "definition": "CREATE OR REPLACE FUNCTION public.delete_user_completely(p_user_id uuid, p_admin_email text DEFAULT NULL::text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nDECLARE\r\n  v_deleted_data JSONB;\r\n  v_profile_username TEXT;\r\n  v_posts_count INT;\r\n  v_comments_count INT;\r\n  v_followings_count INT;\r\n  v_followers_count INT;\r\n  v_subscriptions_count INT;\r\n  v_post_actions_count INT;\r\n  v_telegram_subs_count INT;\r\n  v_contact_convs_count INT;\r\nBEGIN\r\n  -- Validate user exists\r\n  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_user_id) THEN\r\n    RETURN jsonb_build_object(\r\n      'success', false,\r\n      'error', 'User not found',\r\n      'user_id', p_user_id\r\n    );\r\n  END IF;\r\n  \r\n  -- Get user info before deletion\r\n  SELECT username INTO v_profile_username FROM profiles WHERE id = p_user_id;\r\n  \r\n  -- Count data to be deleted (for logging)\r\n  SELECT COUNT(*) INTO v_posts_count FROM posts WHERE posts.user_id = p_user_id;\r\n  SELECT COUNT(*) INTO v_comments_count FROM comments WHERE comments.user_id = p_user_id;\r\n  SELECT COUNT(*) INTO v_followings_count FROM user_followings WHERE user_followings.follower_id = p_user_id;\r\n  SELECT COUNT(*) INTO v_followers_count FROM user_followings WHERE user_followings.following_id = p_user_id;\r\n  SELECT COUNT(*) INTO v_post_actions_count FROM post_actions WHERE post_actions.user_id = p_user_id;\r\n  \r\n  -- Check if telegram_subscribers exists (ignore if column doesn't match)\r\n  BEGIN\r\n    SELECT COUNT(*) INTO v_telegram_subs_count FROM telegram_subscribers WHERE telegram_subscribers.user_id = p_user_id;\r\n  EXCEPTION\r\n    WHEN undefined_table THEN\r\n      v_telegram_subs_count := 0;\r\n    WHEN undefined_column THEN\r\n      v_telegram_subs_count := 0;\r\n  END;\r\n  \r\n  -- Check if contact_conversations exists (ignore if column doesn't match)\r\n  BEGIN\r\n    SELECT COUNT(*) INTO v_contact_convs_count FROM contact_conversations WHERE contact_conversations.user_id = p_user_id;\r\n  EXCEPTION\r\n    WHEN undefined_table THEN\r\n      v_contact_convs_count := 0;\r\n    WHEN undefined_column THEN\r\n      v_contact_convs_count := 0;\r\n  END;\r\n  \r\n  v_subscriptions_count := 0;\r\n  \r\n  -- Start deletion cascade - Delete ALL user data\r\n  \r\n  -- 1. Delete all comments by this user\r\n  DELETE FROM comments WHERE comments.user_id = p_user_id;\r\n  \r\n  -- 2. Delete all post actions (buy/sell votes) by this user\r\n  DELETE FROM post_actions WHERE post_actions.user_id = p_user_id;\r\n  \r\n  -- 3. Delete all posts by this user (cascade will handle related tables)\r\n  DELETE FROM posts WHERE posts.user_id = p_user_id;\r\n  \r\n  -- 4. Delete ALL followings relationships (both directions)\r\n  -- Remove where this user follows others\r\n  DELETE FROM user_followings WHERE user_followings.follower_id = p_user_id;\r\n  -- Remove where others follow this user\r\n  DELETE FROM user_followings WHERE user_followings.following_id = p_user_id;\r\n  \r\n  -- 5. Delete Telegram related data (if tables exist and columns match)\r\n  BEGIN\r\n    DELETE FROM telegram_subscribers WHERE telegram_subscribers.user_id = p_user_id;\r\n  EXCEPTION\r\n    WHEN undefined_table THEN NULL;\r\n    WHEN undefined_column THEN NULL;\r\n  END;\r\n  \r\n  BEGIN\r\n    DELETE FROM telegram_bots WHERE telegram_bots.user_id = p_user_id;\r\n  EXCEPTION\r\n    WHEN undefined_table THEN NULL;\r\n    WHEN undefined_column THEN NULL;\r\n  END;\r\n  \r\n  BEGIN\r\n    DELETE FROM telegram_broadcasts WHERE telegram_broadcasts.user_id = p_user_id;\r\n  EXCEPTION\r\n    WHEN undefined_table THEN NULL;\r\n    WHEN undefined_column THEN NULL;\r\n  END;\r\n  \r\n  -- 6. Delete contact conversations (if table exists and columns match)\r\n  BEGIN\r\n    DELETE FROM contact_conversations WHERE contact_conversations.user_id = p_user_id;\r\n  EXCEPTION\r\n    WHEN undefined_table THEN NULL;\r\n    WHEN undefined_column THEN NULL;\r\n  END;\r\n  \r\n  -- 7. Delete profile (this should be last before auth)\r\n  DELETE FROM profiles WHERE id = p_user_id;\r\n  \r\n  -- 8. Delete from auth.users (Supabase auth table)\r\n  DELETE FROM auth.users WHERE id = p_user_id;\r\n  \r\n  -- Build response JSON\r\n  v_deleted_data := jsonb_build_object(\r\n    'success', true,\r\n    'user_id', p_user_id,\r\n    'username', v_profile_username,\r\n    'deleted_counts', jsonb_build_object(\r\n      'posts', v_posts_count,\r\n      'comments', v_comments_count,\r\n      'followings', v_followings_count,\r\n      'followers', v_followers_count,\r\n      'subscriptions', v_subscriptions_count,\r\n      'post_actions', v_post_actions_count,\r\n      'telegram_subscriptions', v_telegram_subs_count,\r\n      'contact_conversations', v_contact_convs_count\r\n    ),\r\n    'deleted_at', NOW()\r\n  );\r\n  \r\n  -- Log admin activity if admin email provided\r\n  IF p_admin_email IS NOT NULL THEN\r\n    PERFORM log_admin_activity(\r\n      p_admin_email,\r\n      'delete_user',\r\n      p_user_id,\r\n      v_deleted_data,\r\n      NULL,\r\n      NULL\r\n    );\r\n  END IF;\r\n  \r\n  RETURN v_deleted_data;\r\n  \r\nEXCEPTION\r\n  WHEN OTHERS THEN\r\n    RETURN jsonb_build_object(\r\n      'success', false,\r\n      'error', SQLERRM,\r\n      'user_id', p_user_id\r\n    );\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "delete_users_bulk",
+    "schema_name": "public",
+    "arguments": "p_user_ids uuid[], p_admin_email text DEFAULT NULL::text",
+    "definition": "CREATE OR REPLACE FUNCTION public.delete_users_bulk(p_user_ids uuid[], p_admin_email text DEFAULT NULL::text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nDECLARE\r\n  v_user_id UUID;\r\n  v_result JSONB;\r\n  v_results JSONB[] := '{}';\r\n  v_success_count INT := 0;\r\n  v_failure_count INT := 0;\r\nBEGIN\r\n  -- Loop through each user\r\n  FOREACH v_user_id IN ARRAY p_user_ids\r\n  LOOP\r\n    -- Delete user\r\n    v_result := delete_user_completely(v_user_id, p_admin_email);\r\n    \r\n    -- Count successes/failures\r\n    IF (v_result->>'success')::boolean THEN\r\n      v_success_count := v_success_count + 1;\r\n    ELSE\r\n      v_failure_count := v_failure_count + 1;\r\n    END IF;\r\n    \r\n    -- Add to results array\r\n    v_results := array_append(v_results, v_result);\r\n  END LOOP;\r\n  \r\n  RETURN jsonb_build_object(\r\n    'success', true,\r\n    'total_requested', array_length(p_user_ids, 1),\r\n    'successful_deletions', v_success_count,\r\n    'failed_deletions', v_failure_count,\r\n    'results', to_jsonb(v_results)\r\n  );\r\n  \r\nEXCEPTION\r\n  WHEN OTHERS THEN\r\n    RETURN jsonb_build_object(\r\n      'success', false,\r\n      'error', SQLERRM\r\n    );\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "expire_yearly_subscriptions",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.expire_yearly_subscriptions()\n RETURNS TABLE(expired_count integer)\n LANGUAGE plpgsql\nAS $function$\r\nDECLARE\r\n    v_expired_count INTEGER := 0;\r\nBEGIN\r\n    -- Update yearly subscriptions that have passed their expiry date\r\n    UPDATE user_subscriptions\r\n    SET status = 'expired',\r\n        updated_at = NOW()\r\n    WHERE status = 'active'\r\n    AND billing_period = 'yearly'\r\n    AND expires_at <= NOW();\r\n    \r\n    GET DIAGNOSTICS v_expired_count = ROW_COUNT;\r\n    \r\n    RETURN QUERY SELECT v_expired_count;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "get_all_users_admin",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.get_all_users_admin()\n RETURNS TABLE(user_id uuid, username text, email text, avatar_url text, created_at timestamp with time zone, posts_count bigint, comments_count bigint, followers_count bigint, following_count bigint, subscription_plan text, is_active boolean)\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nBEGIN\r\n  RETURN QUERY\r\n  SELECT \r\n    p.id AS user_id,\r\n    COALESCE(p.username, 'user_' || SUBSTRING(p.id::TEXT, 1, 8))::TEXT AS username,\r\n    COALESCE(au.email, 'No email')::TEXT AS email,\r\n    COALESCE(p.avatar_url, '')::TEXT AS avatar_url,\r\n    p.created_at,\r\n    COALESCE(posts_stats.count, 0) AS posts_count,\r\n    COALESCE(comments_stats.count, 0) AS comments_count,\r\n    COALESCE(followers_stats.count, 0) AS followers_count,\r\n    COALESCE(following_stats.count, 0) AS following_count,\r\n    'free'::TEXT AS subscription_plan,\r\n    COALESCE(au.confirmed_at IS NOT NULL, false) AS is_active\r\n  FROM profiles p\r\n  LEFT JOIN auth.users au ON au.id = p.id\r\n  LEFT JOIN (\r\n    SELECT posts.user_id, COUNT(*) AS count \r\n    FROM posts \r\n    GROUP BY posts.user_id\r\n  ) posts_stats ON posts_stats.user_id = p.id\r\n  LEFT JOIN (\r\n    SELECT comments.user_id, COUNT(*) AS count \r\n    FROM comments \r\n    GROUP BY comments.user_id\r\n  ) comments_stats ON comments_stats.user_id = p.id\r\n  LEFT JOIN (\r\n    SELECT user_followings.following_id, COUNT(*) AS count \r\n    FROM user_followings \r\n    GROUP BY user_followings.following_id\r\n  ) followers_stats ON followers_stats.following_id = p.id\r\n  LEFT JOIN (\r\n    SELECT user_followings.follower_id, COUNT(*) AS count \r\n    FROM user_followings \r\n    GROUP BY user_followings.follower_id\r\n  ) following_stats ON following_stats.follower_id = p.id\r\n  ORDER BY p.created_at DESC;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "get_broker_subscriber_count",
+    "schema_name": "public",
+    "arguments": "p_broker_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.get_broker_subscriber_count(p_broker_id uuid)\n RETURNS integer\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nBEGIN\r\n  RETURN (\r\n    SELECT COUNT(*)::INTEGER\r\n    FROM broker_subscriptions\r\n    WHERE broker_id = p_broker_id\r\n      AND status = 'active'\r\n      AND (expires_at IS NULL OR expires_at > NOW())\r\n  );\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "get_conversation_messages",
+    "schema_name": "public",
+    "arguments": "conv_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.get_conversation_messages(conv_id uuid)\n RETURNS TABLE(id uuid, conversation_id uuid, sender character varying, body text, reply_to uuid, admin_id uuid, created_at timestamp with time zone)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\nBEGIN\r\n  RETURN QUERY\r\n  SELECT \r\n    cm.id,\r\n    cm.conversation_id,\r\n    cm.sender,\r\n    cm.body,\r\n    cm.reply_to,\r\n    cm.admin_id,\r\n    cm.created_at\r\n  FROM contact_messages cm\r\n  WHERE cm.conversation_id = conv_id\r\n  ORDER BY cm.created_at ASC;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "get_follower_telegram_subscribers",
+    "schema_name": "public",
+    "arguments": "p_user_id uuid, p_bot_id uuid, p_premium_only boolean DEFAULT false",
+    "definition": "CREATE OR REPLACE FUNCTION public.get_follower_telegram_subscribers(p_user_id uuid, p_bot_id uuid, p_premium_only boolean DEFAULT false)\n RETURNS TABLE(subscriber_id uuid, telegram_user_id bigint, telegram_username character varying, telegram_first_name character varying, platform_user_id uuid, username character varying, full_name character varying, avatar_url text, subscription_tier subscription_tier_enum)\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nBEGIN\r\n  RETURN QUERY\r\n  SELECT \r\n    ts.id as subscriber_id,\r\n    ts.telegram_user_id,\r\n    ts.telegram_username,\r\n    ts.telegram_first_name,\r\n    ts.platform_user_id,\r\n    p.username,\r\n    p.full_name,\r\n    p.avatar_url,\r\n    ts.subscription_tier\r\n  FROM telegram_subscribers ts\r\n  JOIN profiles p ON ts.platform_user_id = p.id\r\n  WHERE ts.bot_id = p_bot_id\r\n    AND ts.is_subscribed = TRUE\r\n    AND (\r\n      -- If premium_only is TRUE, only return premium subscribers\r\n      (p_premium_only = FALSE) OR \r\n      (p_premium_only = TRUE AND ts.subscription_tier = 'premium')\r\n    )\r\n    AND EXISTS (\r\n      SELECT 1 FROM user_followings uf\r\n      WHERE uf.follower_id = ts.platform_user_id\r\n      AND uf.following_id = p_user_id\r\n    );\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "get_monthly_price_check_count",
+    "schema_name": "public",
+    "arguments": "check_user_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.get_monthly_price_check_count(check_user_id uuid)\n RETURNS integer\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nBEGIN\r\n    RETURN (\r\n        SELECT COUNT(*)::INTEGER \r\n        FROM public.price_checks \r\n        WHERE user_id = check_user_id \r\n        AND created_at >= DATE_TRUNC('month', NOW())\r\n    );\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "get_nested_comments",
+    "schema_name": "public",
+    "arguments": "p_post_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.get_nested_comments(p_post_id uuid)\n RETURNS TABLE(comment_id uuid, user_id uuid, username character varying, full_name character varying, avatar_url text, content text, created_at timestamp with time zone, parent_comment_id uuid, level integer)\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nBEGIN\r\n  RETURN QUERY\r\n  WITH RECURSIVE comment_tree AS (\r\n    -- Base case: top-level comments\r\n    SELECT \r\n      c.id,\r\n      c.user_id,\r\n      p.username,\r\n      p.full_name,\r\n      p.avatar_url,\r\n      c.content,\r\n      c.created_at,\r\n      c.parent_comment_id,\r\n      0 as level\r\n    FROM comments c\r\n    JOIN profiles p ON c.user_id = p.id\r\n    WHERE c.post_id = p_post_id AND c.parent_comment_id IS NULL\r\n    \r\n    UNION ALL\r\n    \r\n    -- Recursive case: child comments\r\n    SELECT \r\n      c.id,\r\n      c.user_id,\r\n      p.username,\r\n      p.full_name,\r\n      p.avatar_url,\r\n      c.content,\r\n      c.created_at,\r\n      c.parent_comment_id,\r\n      ct.level + 1\r\n    FROM comments c\r\n    JOIN profiles p ON c.user_id = p.id\r\n    JOIN comment_tree ct ON c.parent_comment_id = ct.comment_id\r\n  )\r\n  SELECT * FROM comment_tree\r\n  ORDER BY level, created_at;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "get_post_action_counts",
+    "schema_name": "public",
+    "arguments": "post_uuid uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.get_post_action_counts(post_uuid uuid)\n RETURNS TABLE(buy_count bigint, sell_count bigint)\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nBEGIN\r\n  RETURN QUERY\r\n  SELECT \r\n    COUNT(CASE WHEN pa.action_type = 'buy' THEN 1 END) as buy_count,\r\n    COUNT(CASE WHEN pa.action_type = 'sell' THEN 1 END) as sell_count\r\n  FROM post_actions pa\r\n  WHERE pa.post_id = post_uuid;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "get_post_comment_count",
+    "schema_name": "public",
+    "arguments": "post_uuid uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.get_post_comment_count(post_uuid uuid)\n RETURNS bigint\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nBEGIN\r\n  RETURN (\r\n    SELECT COUNT(*) \r\n    FROM comments \r\n    WHERE post_id = post_uuid\r\n  );\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "get_subscription_info",
+    "schema_name": "public",
+    "arguments": "p_user_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.get_subscription_info(p_user_id uuid)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nDECLARE\r\n  v_result JSON;\r\n  v_free_plan_id UUID;\r\n  v_has_active BOOLEAN;\r\nBEGIN\r\n  -- Ensure free plan exists\r\n  SELECT sp.id INTO v_free_plan_id\r\n  FROM subscription_plans sp\r\n  WHERE sp.name = 'free'\r\n  LIMIT 1;\r\n\r\n  IF v_free_plan_id IS NULL THEN\r\n    RAISE EXCEPTION 'Free plan not found in subscription_plans table';\r\n  END IF;\r\n\r\n  -- Check if user already has an active subscription\r\n  SELECT EXISTS (\r\n    SELECT 1 FROM user_subscriptions s\r\n    WHERE s.user_id = p_user_id AND s.status = 'active'\r\n  ) INTO v_has_active;\r\n\r\n  -- Create free subscription if missing (no ON CONFLICT used)\r\n  IF NOT v_has_active THEN\r\n    INSERT INTO user_subscriptions (user_id, plan_id, status)\r\n    SELECT p_user_id, v_free_plan_id, 'active'\r\n    WHERE NOT EXISTS (\r\n      SELECT 1 FROM user_subscriptions s\r\n      WHERE s.user_id = p_user_id AND s.status = 'active'\r\n    );\r\n  END IF;\r\n\r\n  -- Build JSON result from latest active subscription\r\n  SELECT json_build_object(\r\n    'user_id', s.user_id,\r\n    'plan_id', sp.id,\r\n    'plan_name', sp.name,\r\n    'plan_display_name', sp.display_name,\r\n    'billing_period', s.billing_period,\r\n    'price_check_limit', sp.price_check_limit,\r\n    'price_checks_used', COALESCE(s.price_checks_used, 0),\r\n    'post_creation_limit', sp.post_creation_limit,\r\n    'posts_created', COALESCE(s.posts_created, 0),\r\n    'subscription_status', s.status,\r\n    'start_date', s.started_at,\r\n    'end_date', s.expires_at,\r\n    'can_create_premium_plans', (sp.name = 'pro'),\r\n    'show_ads', (sp.name = 'free')\r\n  ) INTO v_result\r\n  FROM user_subscriptions s\r\n  JOIN subscription_plans sp ON sp.id = s.plan_id\r\n  WHERE s.user_id = p_user_id AND s.status = 'active'\r\n  ORDER BY s.updated_at DESC NULLS LAST, s.created_at DESC\r\n  LIMIT 1;\r\n\r\n  RETURN v_result;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "get_table_columns",
+    "schema_name": "public",
+    "arguments": "table_name text",
+    "definition": "CREATE OR REPLACE FUNCTION public.get_table_columns(table_name text)\n RETURNS TABLE(column_name text, data_type text, column_default text)\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nBEGIN\n  RETURN QUERY\n  SELECT \n    c.column_name::TEXT,\n    c.data_type::TEXT,\n    c.column_default::TEXT\n  FROM \n    information_schema.columns c\n  WHERE \n    c.table_name = table_name\n    AND c.table_schema = 'public';\nEND;\n$function$\n"
+  },
+  {
+    "function_name": "get_user_post_action",
+    "schema_name": "public",
+    "arguments": "p_post_id uuid, p_user_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.get_user_post_action(p_post_id uuid, p_user_id uuid)\n RETURNS character varying\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nDECLARE\r\n    user_action VARCHAR(10);\r\nBEGIN\r\n    SELECT action_type INTO user_action\r\n    FROM post_actions\r\n    WHERE post_id = p_post_id AND user_id = p_user_id\r\n    LIMIT 1;\r\n    \r\n    RETURN COALESCE(user_action, 'none');\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "get_user_telegram_bot",
+    "schema_name": "public",
+    "arguments": "p_user_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.get_user_telegram_bot(p_user_id uuid)\n RETURNS TABLE(bot_id uuid, bot_token text, bot_username character varying, bot_name character varying, is_active boolean, subscriber_count bigint)\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nBEGIN\r\n  RETURN QUERY\r\n  SELECT \r\n    tb.id as bot_id,\r\n    tb.bot_token,\r\n    tb.bot_username,\r\n    tb.bot_name,\r\n    tb.is_active,\r\n    COUNT(ts.id) as subscriber_count\r\n  FROM telegram_bots tb\r\n  LEFT JOIN telegram_subscribers ts ON tb.id = ts.bot_id AND ts.is_subscribed = TRUE\r\n  WHERE tb.user_id = p_user_id\r\n  GROUP BY tb.id, tb.bot_token, tb.bot_username, tb.bot_name, tb.is_active;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "handle_auth_sign_in",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.handle_auth_sign_in()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nBEGIN\r\n  UPDATE public.profiles\r\n  SET last_sign_in = NOW()\r\n  WHERE id = NEW.id;\r\n  \r\n  RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "handle_new_comment",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.handle_new_comment()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nDECLARE\r\n  post_owner_id UUID;\r\nBEGIN\r\n  -- Get the post owner\r\n  SELECT user_id INTO post_owner_id FROM public.posts WHERE id = NEW.post_id;\r\n  \r\n  -- Only create notification if the comment is not from the post owner\r\n  IF post_owner_id != NEW.user_id THEN\r\n    INSERT INTO public.notifications (user_id, actor_id, type, post_id, comment_id)\r\n    VALUES (post_owner_id, NEW.user_id, 'comment', NEW.post_id, NEW.id);\r\n  END IF;\r\n  \r\n  RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "handle_new_follower",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.handle_new_follower()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nBEGIN\r\n  -- Create notification for the user being followed\r\n  INSERT INTO public.notifications (user_id, actor_id, type)\r\n  VALUES (NEW.following_id, NEW.follower_id, 'follow');\r\n  \r\n  RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "handle_new_user",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.handle_new_user()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nBEGIN\r\n  INSERT INTO public.profiles (\r\n    id,\r\n    username,\r\n    full_name,\r\n    email,\r\n    avatar_url,\r\n    bio,\r\n    background_url,\r\n    favorite_markets,\r\n    success_posts,\r\n    loss_posts,\r\n    experience_score,\r\n    followers,\r\n    following,\r\n    created_at,\r\n    updated_at\r\n  )\r\n  VALUES (\r\n    new.id,\r\n    COALESCE(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)),\r\n    COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)),\r\n    new.email,\r\n    '',\r\n    '',\r\n    '',\r\n    ARRAY[]::text[],\r\n    0,\r\n    0,\r\n    0,\r\n    0,\r\n    0,\r\n    now(),\r\n    now()\r\n  );\r\n  RETURN new;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "handle_user_sign_in",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.handle_user_sign_in()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nBEGIN\r\n  UPDATE public.profiles\r\n  SET last_sign_in = now()\r\n  WHERE id = NEW.id;\r\n  RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "handle_user_update",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.handle_user_update()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nBEGIN\r\n  UPDATE public.profiles\r\n  SET \r\n    full_name = COALESCE(NEW.raw_user_meta_data->>'full_name', profiles.full_name),\r\n    email = COALESCE(NEW.email, profiles.email),\r\n    avatar_url = COALESCE(NEW.raw_user_meta_data->>'avatar_url', profiles.avatar_url),\r\n    updated_at = now(),\r\n    last_sign_in = NEW.last_sign_in_at\r\n  WHERE id = NEW.id;\r\n  RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "increment_followers_count",
+    "schema_name": "public",
+    "arguments": "profile_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.increment_followers_count(profile_id uuid)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n  UPDATE profiles\r\n  SET followers = followers + 1\r\n  WHERE id = profile_id;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "increment_following_count",
+    "schema_name": "public",
+    "arguments": "profile_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.increment_following_count(profile_id uuid)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n  UPDATE profiles\r\n  SET following = following + 1\r\n  WHERE id = profile_id;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "is_subscribed_to_broker",
+    "schema_name": "public",
+    "arguments": "p_user_id uuid, p_broker_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.is_subscribed_to_broker(p_user_id uuid, p_broker_id uuid)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nBEGIN\r\n  RETURN EXISTS(\r\n    SELECT 1 FROM broker_subscriptions\r\n    WHERE user_id = p_user_id\r\n      AND broker_id = p_broker_id\r\n      AND status = 'active'\r\n      AND (expires_at IS NULL OR expires_at > NOW())\r\n  );\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "is_user_pro",
+    "schema_name": "public",
+    "arguments": "check_user_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.is_user_pro(check_user_id uuid)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nBEGIN\r\n    RETURN EXISTS (\r\n        SELECT 1 FROM public.subscriptions \r\n        WHERE user_id = check_user_id \r\n        AND status = 'active' \r\n        AND tier = 'pro'\r\n        AND (expires_at IS NULL OR expires_at > NOW())\r\n    );\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "log_admin_activity",
+    "schema_name": "public",
+    "arguments": "p_admin_email text, p_action_type text, p_target_user_id uuid DEFAULT NULL::uuid, p_details jsonb DEFAULT NULL::jsonb, p_ip_address text DEFAULT NULL::text, p_user_agent text DEFAULT NULL::text",
+    "definition": "CREATE OR REPLACE FUNCTION public.log_admin_activity(p_admin_email text, p_action_type text, p_target_user_id uuid DEFAULT NULL::uuid, p_details jsonb DEFAULT NULL::jsonb, p_ip_address text DEFAULT NULL::text, p_user_agent text DEFAULT NULL::text)\n RETURNS uuid\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nDECLARE\r\n  v_log_id UUID;\r\nBEGIN\r\n  INSERT INTO admin_activity_log (\r\n    admin_email,\r\n    action_type,\r\n    target_user_id,\r\n    details,\r\n    ip_address,\r\n    user_agent\r\n  ) VALUES (\r\n    p_admin_email,\r\n    p_action_type,\r\n    p_target_user_id,\r\n    p_details,\r\n    p_ip_address,\r\n    p_user_agent\r\n  )\r\n  RETURNING id INTO v_log_id;\r\n  \r\n  RETURN v_log_id;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "log_post_creation",
+    "schema_name": "public",
+    "arguments": "p_user_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.log_post_creation(p_user_id uuid)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\r\nDECLARE\r\n    v_can_create BOOLEAN;\r\n    v_subscription_exists BOOLEAN;\r\n    v_result JSON;\r\nBEGIN\r\n    -- Check if user can create the post\r\n    SELECT check_post_limit(p_user_id) INTO v_can_create;\r\n    \r\n    IF NOT v_can_create THEN\r\n        -- Return current subscription info even if check fails\r\n        SELECT json_build_object(\r\n            'success', FALSE,\r\n            'posts_created', us.posts_created,\r\n            'post_creation_limit', sp.post_creation_limit,\r\n            'plan_name', sp.name\r\n        ) INTO v_result\r\n        FROM user_subscriptions us\r\n        JOIN subscription_plans sp ON us.plan_id = sp.id\r\n        WHERE us.user_id = p_user_id AND us.status = 'active';\r\n        \r\n        RETURN COALESCE(v_result, '{\"success\": false, \"posts_created\": 0}'::JSON);\r\n    END IF;\r\n    \r\n    -- Check if user has an active subscription\r\n    SELECT EXISTS(\r\n        SELECT 1 FROM user_subscriptions \r\n        WHERE user_id = p_user_id AND status = 'active'\r\n    ) INTO v_subscription_exists;\r\n    \r\n    -- Increment the usage counter and return updated info with row lock\r\n    IF v_subscription_exists THEN\r\n        UPDATE user_subscriptions \r\n        SET \r\n            posts_created = COALESCE(posts_created, 0) + 1,\r\n            updated_at = NOW()\r\n        WHERE user_id = p_user_id AND status = 'active'\r\n        RETURNING (\r\n            SELECT json_build_object(\r\n                'success', TRUE,\r\n                'posts_created', user_subscriptions.posts_created,\r\n                'post_creation_limit', (SELECT post_creation_limit FROM subscription_plans WHERE id = user_subscriptions.plan_id),\r\n                'plan_name', (SELECT name FROM subscription_plans WHERE id = user_subscriptions.plan_id)\r\n            )\r\n        ) INTO v_result;\r\n    ELSE\r\n        -- Create free subscription if none exists and return new data\r\n        INSERT INTO user_subscriptions (user_id, plan_id, status, price_checks_used, posts_created)\r\n        SELECT p_user_id, sp.id, 'active', 0, 1\r\n        FROM subscription_plans sp\r\n        WHERE sp.name = 'free'\r\n        ON CONFLICT (user_id, status)\r\n        DO UPDATE SET \r\n            posts_created = COALESCE(user_subscriptions.posts_created, 0) + 1,\r\n            updated_at = NOW()\r\n        RETURNING (\r\n            SELECT json_build_object(\r\n                'success', TRUE,\r\n                'posts_created', user_subscriptions.posts_created,\r\n                'post_creation_limit', (SELECT post_creation_limit FROM subscription_plans sp WHERE sp.name = 'free'),\r\n                'plan_name', 'free'\r\n            )\r\n        ) INTO v_result;\r\n    END IF;\r\n    \r\n    RETURN v_result;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "log_price_check",
+    "schema_name": "public",
+    "arguments": "p_user_id uuid, p_symbol character varying, p_exchange character varying DEFAULT NULL::character varying, p_country character varying DEFAULT NULL::character varying, p_ip_address inet DEFAULT NULL::inet, p_user_agent text DEFAULT NULL::text",
+    "definition": "CREATE OR REPLACE FUNCTION public.log_price_check(p_user_id uuid, p_symbol character varying, p_exchange character varying DEFAULT NULL::character varying, p_country character varying DEFAULT NULL::character varying, p_ip_address inet DEFAULT NULL::inet, p_user_agent text DEFAULT NULL::text)\n RETURNS json\n LANGUAGE plpgsql\nAS $function$\r\nDECLARE\r\n    v_can_check BOOLEAN;\r\n    v_subscription_exists BOOLEAN;\r\n    v_result JSON;\r\nBEGIN\r\n    -- Check if user can make the price check\r\n    SELECT check_price_limit(p_user_id) INTO v_can_check;\r\n    \r\n    IF NOT v_can_check THEN\r\n        -- Return current subscription info even if check fails\r\n        SELECT json_build_object(\r\n            'success', FALSE,\r\n            'price_checks_used', us.price_checks_used,\r\n            'price_check_limit', sp.price_check_limit,\r\n            'plan_name', sp.name\r\n        ) INTO v_result\r\n        FROM user_subscriptions us\r\n        JOIN subscription_plans sp ON us.plan_id = sp.id\r\n        WHERE us.user_id = p_user_id AND us.status = 'active';\r\n        \r\n        RETURN COALESCE(v_result, '{\"success\": false, \"price_checks_used\": 0}'::JSON);\r\n    END IF;\r\n    \r\n    -- Check if user has an active subscription\r\n    SELECT EXISTS(\r\n        SELECT 1 FROM user_subscriptions \r\n        WHERE user_id = p_user_id AND status = 'active'\r\n    ) INTO v_subscription_exists;\r\n    \r\n    -- If user has active subscription, increment the counter and return updated data\r\n    IF v_subscription_exists THEN\r\n        UPDATE user_subscriptions \r\n        SET \r\n            price_checks_used = COALESCE(price_checks_used, 0) + 1,\r\n            updated_at = NOW()\r\n        WHERE user_id = p_user_id AND status = 'active'\r\n        RETURNING (\r\n            SELECT json_build_object(\r\n                'success', TRUE,\r\n                'price_checks_used', price_checks_used,\r\n                'price_check_limit', (SELECT price_check_limit FROM subscription_plans WHERE id = plan_id),\r\n                'plan_name', (SELECT name FROM subscription_plans WHERE id = plan_id)\r\n            )\r\n        ) INTO v_result;\r\n    ELSE\r\n        -- Create free subscription if none exists and return new data\r\n        INSERT INTO user_subscriptions (user_id, plan_id, status, price_checks_used, posts_created)\r\n        SELECT p_user_id, sp.id, 'active', 1, 0\r\n        FROM subscription_plans sp\r\n        WHERE sp.name = 'free'\r\n        ON CONFLICT (user_id, status)\r\n        DO UPDATE SET \r\n            price_checks_used = COALESCE(user_subscriptions.price_checks_used, 0) + 1,\r\n            updated_at = NOW()\r\n        RETURNING (\r\n            SELECT json_build_object(\r\n                'success', TRUE,\r\n                'price_checks_used', user_subscriptions.price_checks_used,\r\n                'price_check_limit', (SELECT price_check_limit FROM subscription_plans sp WHERE sp.name = 'free'),\r\n                'plan_name', 'free'\r\n            )\r\n        ) INTO v_result;\r\n    END IF;\r\n    \r\n    RETURN v_result;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "prevent_circular_comments",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.prevent_circular_comments()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nDECLARE\r\n    parent_comment UUID;\r\n    current_comment UUID;\r\nBEGIN\r\n    -- Check for circular references\r\n    current_comment := NEW.id;\r\n    parent_comment := NEW.parent_comment_id;\r\n    \r\n    WHILE parent_comment IS NOT NULL LOOP\r\n        IF parent_comment = current_comment THEN\r\n            RAISE EXCEPTION 'Circular reference detected in comments';\r\n        END IF;\r\n        \r\n        SELECT c.parent_comment_id INTO parent_comment\r\n        FROM comments c\r\n        WHERE c.id = parent_comment;\r\n    END LOOP;\r\n    \r\n    RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "public_get_users_with_active_bots",
+    "schema_name": "public",
+    "arguments": "p_user_ids uuid[]",
+    "definition": "CREATE OR REPLACE FUNCTION public.public_get_users_with_active_bots(p_user_ids uuid[])\n RETURNS TABLE(user_id uuid, bot_username text, is_active boolean)\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nbegin\r\n  return query\r\n  select tb.user_id, tb.bot_username::text as bot_username, tb.is_active\r\n  from telegram_bots tb\r\n  where tb.is_active = true\r\n    and (p_user_ids is null or tb.user_id = any (p_user_ids));\r\nend;\r\n$function$\n"
+  },
+  {
+    "function_name": "refresh_profile_stats",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.refresh_profile_stats()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n  REFRESH MATERIALIZED VIEW public.profile_stats;\r\n  RETURN NULL;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "renew_monthly_subscriptions",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.renew_monthly_subscriptions()\n RETURNS TABLE(renewed_count integer)\n LANGUAGE plpgsql\nAS $function$\r\nDECLARE\r\n    v_renewed_count INTEGER := 0;\r\n    v_subscription RECORD;\r\nBEGIN\r\n    -- Loop through active monthly subscriptions that are about to expire (within 1 day)\r\n    FOR v_subscription IN\r\n        SELECT id, user_id, plan_id, started_at, expires_at\r\n        FROM user_subscriptions\r\n        WHERE status = 'active'\r\n        AND billing_period = 'monthly'\r\n        AND expires_at <= NOW() + INTERVAL '1 day'\r\n        AND expires_at > NOW()\r\n    LOOP\r\n        -- Extend the subscription by 1 month\r\n        UPDATE user_subscriptions\r\n        SET expires_at = expires_at + INTERVAL '1 month',\r\n            price_checks_reset_at = NOW() + INTERVAL '1 month',\r\n            posts_reset_at = NOW() + INTERVAL '1 month',\r\n            price_checks_used = 0,\r\n            posts_created = 0,\r\n            updated_at = NOW()\r\n        WHERE id = v_subscription.id;\r\n        \r\n        v_renewed_count := v_renewed_count + 1;\r\n        \r\n        RAISE NOTICE 'Renewed monthly subscription % for user %', v_subscription.id, v_subscription.user_id;\r\n    END LOOP;\r\n    \r\n    RETURN QUERY SELECT v_renewed_count;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "reset_monthly_usage",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.reset_monthly_usage()\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n  -- Reset price_checks_used and posts_created to 0 for all active subscriptions\r\n  UPDATE user_subscriptions\r\n  SET price_checks_used = 0,\r\n      posts_created = 0,\r\n      price_checks_reset_at = NOW() + INTERVAL '1 month',\r\n      posts_reset_at = NOW() + INTERVAL '1 month'\r\n  WHERE status = 'active';\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "setup_schema",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.setup_schema()\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nBEGIN\r\n  -- Enable UUID extension if not already enabled\r\n  CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";\r\n\r\n  -- Posts table for storing trading posts\r\n  CREATE TABLE IF NOT EXISTS posts (\r\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\r\n    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,\r\n    description TEXT NOT NULL,\r\n    image_url TEXT,\r\n    symbol TEXT,\r\n    company_name TEXT,\r\n    country TEXT,\r\n    exchange TEXT,\r\n    current_price DECIMAL(10, 2),\r\n    target_price DECIMAL(10, 2),\r\n    stop_loss_price DECIMAL(10, 2),\r\n    strategy TEXT,\r\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),\r\n    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()\r\n  );\r\n\r\n  -- Create index on user_id for faster queries\r\n  CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);\r\n\r\n  -- Create index on created_at for faster sorting\r\n  CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at);\r\n\r\n  -- Drop the existing view if it exists\r\n  DROP VIEW IF EXISTS post_details;\r\n\r\n  -- Create a view that joins posts with user profiles for easier querying\r\n  CREATE VIEW post_details AS\r\n  SELECT \r\n    p.*,\r\n    pr.username,\r\n    pr.avatar_url AS user_avatar,\r\n    pr.background_url AS user_background\r\n  FROM \r\n    posts p\r\n  JOIN \r\n    profiles pr ON p.user_id = pr.id;\r\n\r\n  -- RLS Policies for posts table\r\n  ALTER TABLE posts ENABLE ROW LEVEL SECURITY;\r\n\r\n  -- Drop existing policies if they exist\r\n  DROP POLICY IF EXISTS \"Anyone can read posts\" ON posts;\r\n  DROP POLICY IF EXISTS \"Authenticated users can insert posts\" ON posts;\r\n  DROP POLICY IF EXISTS \"Users can update their own posts\" ON posts;\r\n  DROP POLICY IF EXISTS \"Users can delete their own posts\" ON posts;\r\n\r\n  -- Anyone can read posts\r\n  CREATE POLICY \"Anyone can read posts\"\r\n    ON posts FOR SELECT\r\n    USING (true);\r\n\r\n  -- Only authenticated users can insert posts\r\n  CREATE POLICY \"Authenticated users can insert posts\"\r\n    ON posts FOR INSERT\r\n    TO authenticated\r\n    WITH CHECK (auth.uid() = user_id);\r\n\r\n  -- Only post owners can update their posts\r\n  CREATE POLICY \"Users can update their own posts\"\r\n    ON posts FOR UPDATE\r\n    TO authenticated\r\n    USING (auth.uid() = user_id)\r\n    WITH CHECK (auth.uid() = user_id);\r\n\r\n  -- Only post owners can delete their posts\r\n  CREATE POLICY \"Users can delete their own posts\"\r\n    ON posts FOR DELETE\r\n    TO authenticated\r\n    USING (auth.uid() = user_id);\r\n\r\n  -- User strategies table to store trading strategies for each user\r\n  CREATE TABLE IF NOT EXISTS user_strategies (\r\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\r\n    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,\r\n    strategy_name TEXT NOT NULL,\r\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),\r\n    UNIQUE(user_id, strategy_name)\r\n  );\r\n\r\n  -- Create index on user_id for faster queries\r\n  CREATE INDEX IF NOT EXISTS idx_user_strategies_user_id ON user_strategies(user_id);\r\n\r\n  -- RLS Policies for user_strategies table\r\n  ALTER TABLE user_strategies ENABLE ROW LEVEL SECURITY;\r\n\r\n  -- Drop existing policies if they exist\r\n  DROP POLICY IF EXISTS \"Users can read their own strategies\" ON user_strategies;\r\n  DROP POLICY IF EXISTS \"Authenticated users can insert strategies\" ON user_strategies;\r\n  DROP POLICY IF EXISTS \"Users can update their own strategies\" ON user_strategies;\r\n  DROP POLICY IF EXISTS \"Users can delete their own strategies\" ON user_strategies;\r\n\r\n  -- Users can read their own strategies\r\n  CREATE POLICY \"Users can read their own strategies\"\r\n    ON user_strategies FOR SELECT\r\n    TO authenticated\r\n    USING (auth.uid() = user_id);\r\n\r\n  -- Authenticated users can insert strategies\r\n  CREATE POLICY \"Authenticated users can insert strategies\"\r\n    ON user_strategies FOR INSERT\r\n    TO authenticated\r\n    WITH CHECK (auth.uid() = user_id);\r\n\r\n  -- Users can update their own strategies\r\n  CREATE POLICY \"Users can update their own strategies\"\r\n    ON user_strategies FOR UPDATE\r\n    TO authenticated\r\n    USING (auth.uid() = user_id)\r\n    WITH CHECK (auth.uid() = user_id);\r\n\r\n  -- Users can delete their own strategies\r\n  CREATE POLICY \"Users can delete their own strategies\"\r\n    ON user_strategies FOR DELETE\r\n    TO authenticated\r\n    USING (auth.uid() = user_id);\r\n\r\n  -- Add default strategies for all users\r\n  INSERT INTO user_strategies (user_id, strategy_name)\r\n  SELECT \r\n    id, 'Swing Trading'\r\n  FROM \r\n    auth.users\r\n  WHERE \r\n    NOT EXISTS (\r\n      SELECT 1 FROM user_strategies \r\n      WHERE user_id = auth.users.id AND strategy_name = 'Swing Trading'\r\n    );\r\n\r\n  INSERT INTO user_strategies (user_id, strategy_name)\r\n  SELECT \r\n    id, 'Day Trading'\r\n  FROM \r\n    auth.users\r\n  WHERE \r\n    NOT EXISTS (\r\n      SELECT 1 FROM user_strategies \r\n      WHERE user_id = auth.users.id AND strategy_name = 'Day Trading'\r\n    );\r\n\r\n  INSERT INTO user_strategies (user_id, strategy_name)\r\n  SELECT \r\n    id, 'Position Trading'\r\n  FROM \r\n    auth.users\r\n  WHERE \r\n    NOT EXISTS (\r\n      SELECT 1 FROM user_strategies \r\n      WHERE user_id = auth.users.id AND strategy_name = 'Position Trading'\r\n    );\r\n\r\n  INSERT INTO user_strategies (user_id, strategy_name)\r\n  SELECT \r\n    id, 'Scalping'\r\n  FROM \r\n    auth.users\r\n  WHERE \r\n    NOT EXISTS (\r\n      SELECT 1 FROM user_strategies \r\n      WHERE user_id = auth.users.id AND strategy_name = 'Scalping'\r\n    );\r\n\r\n  INSERT INTO user_strategies (user_id, strategy_name)\r\n  SELECT \r\n    id, 'Trend Following'\r\n  FROM \r\n    auth.users\r\n  WHERE \r\n    NOT EXISTS (\r\n      SELECT 1 FROM user_strategies \r\n      WHERE user_id = auth.users.id AND strategy_name = 'Trend Following'\r\n    );\r\n\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "sync_subscriber_tier_from_subscription",
+    "schema_name": "public",
+    "arguments": "p_user_id uuid",
+    "definition": "CREATE OR REPLACE FUNCTION public.sync_subscriber_tier_from_subscription(p_user_id uuid)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nDECLARE\r\n  v_is_premium BOOLEAN;\r\nBEGIN\r\n  -- Check if user has active pro subscription\r\n  SELECT EXISTS(\r\n    SELECT 1 FROM user_subscriptions us\r\n    JOIN subscription_plans sp ON us.plan_id = sp.id\r\n    WHERE us.user_id = p_user_id\r\n      AND us.status = 'active'\r\n      AND sp.name = 'pro'\r\n  ) INTO v_is_premium;\r\n  \r\n  -- Update all telegram subscribers for this user\r\n  UPDATE telegram_subscribers\r\n  SET subscription_tier = CASE \r\n    WHEN v_is_premium THEN 'premium'::subscription_tier_enum\r\n    ELSE 'free'::subscription_tier_enum\r\n  END\r\n  WHERE platform_user_id = p_user_id;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "toggle_post_action",
+    "schema_name": "public",
+    "arguments": "p_post_id uuid, p_user_id uuid, p_action_type character varying",
+    "definition": "CREATE OR REPLACE FUNCTION public.toggle_post_action(p_post_id uuid, p_user_id uuid, p_action_type character varying)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nDECLARE\r\n    existing_action UUID;\r\nBEGIN\r\n    -- Check if action already exists\r\n    SELECT id INTO existing_action\r\n    FROM post_actions\r\n    WHERE post_id = p_post_id AND user_id = p_user_id AND action_type = p_action_type;\r\n    \r\n    IF existing_action IS NOT NULL THEN\r\n        -- Remove existing action\r\n        DELETE FROM post_actions WHERE id = existing_action;\r\n        RETURN FALSE; -- Action removed\r\n    ELSE\r\n        -- Remove opposite action if exists\r\n        DELETE FROM post_actions \r\n        WHERE post_id = p_post_id AND user_id = p_user_id \r\n        AND action_type != p_action_type;\r\n        \r\n        -- Add new action\r\n        INSERT INTO post_actions (post_id, user_id, action_type)\r\n        VALUES (p_post_id, p_user_id, p_action_type);\r\n        RETURN TRUE; -- Action added\r\n    END IF;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "trigger_sync_telegram_subscriber_tier",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.trigger_sync_telegram_subscriber_tier()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n  -- Sync for the affected user\r\n  PERFORM sync_subscriber_tier_from_subscription(NEW.user_id);\r\n  RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "update_broker_subscriptions_updated_at",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.update_broker_subscriptions_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n  NEW.updated_at = NOW();\r\n  RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "update_comment_edited_at",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.update_comment_edited_at()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n    IF OLD.content IS DISTINCT FROM NEW.content THEN\r\n        NEW.edited_at = NOW();\r\n        NEW.is_edited = TRUE;\r\n    END IF;\r\n    RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "update_contact_conversation_timestamps",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.update_contact_conversation_timestamps()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n  NEW.updated_at = NOW();\r\n  IF TG_OP = 'INSERT' THEN\r\n    NEW.last_message_at = NOW();\r\n  END IF;\r\n  RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "update_notification_read_at",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.update_notification_read_at()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n  IF NEW.is_read = true AND OLD.is_read = false THEN\r\n    NEW.read_at = NOW();\r\n  ELSIF NEW.is_read = false THEN\r\n    NEW.read_at = NULL;\r\n  END IF;\r\n  RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "update_paypal_accounts_updated_at",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.update_paypal_accounts_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n  NEW.updated_at = NOW();\r\n  RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "update_premium_plans_updated_at",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.update_premium_plans_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n  NEW.updated_at = NOW();\r\n  RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "update_profile_followers",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.update_profile_followers()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  IF TG_OP = 'INSERT' THEN\n    -- Update following count for the follower\n    UPDATE public.profiles\n    SET following = COALESCE(following, 0) + 1\n    WHERE id = NEW.follower_id;\n    \n    -- Update followers count for the followed user\n    UPDATE public.profiles\n    SET followers = COALESCE(followers, 0) + 1\n    WHERE id = NEW.following_id;\n  ELSIF TG_OP = 'DELETE' THEN\n    -- Update following count for the follower\n    UPDATE public.profiles\n    SET following = GREATEST(COALESCE(following, 0) - 1, 0)\n    WHERE id = OLD.follower_id;\n    \n    -- Update followers count for the followed user\n    UPDATE public.profiles\n    SET followers = GREATEST(COALESCE(followers, 0) - 1, 0)\n    WHERE id = OLD.following_id;\n  END IF;\n  RETURN NULL;\nEND;\n$function$\n"
+  },
+  {
+    "function_name": "update_profiles_updated_at",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.update_profiles_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n  NEW.updated_at = NOW();\r\n  RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "update_subscriber_last_interaction",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.update_subscriber_last_interaction()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n    NEW.last_interaction = NOW();\r\n    RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "update_updated_at_column",
+    "schema_name": "public",
+    "arguments": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.update_updated_at_column()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n    NEW.updated_at = NOW();\r\n    RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "function_name": "upgrade_to_pro",
+    "schema_name": "public",
+    "arguments": "p_user_id uuid, p_paypal_order_id character varying",
+    "definition": "CREATE OR REPLACE FUNCTION public.upgrade_to_pro(p_user_id uuid, p_paypal_order_id character varying)\n RETURNS uuid\n LANGUAGE plpgsql\nAS $function$\r\nDECLARE\r\n    v_subscription_id UUID;\r\n    v_pro_plan_id UUID;\r\nBEGIN\r\n    -- Get pro plan id\r\n    SELECT id INTO v_pro_plan_id FROM subscription_plans WHERE name = 'pro';\r\n    \r\n    -- Cancel existing subscription\r\n    UPDATE user_subscriptions\r\n    SET status = 'cancelled',\r\n        cancelled_at = NOW(),\r\n        updated_at = NOW()\r\n    WHERE user_id = p_user_id AND status = 'active';\r\n    \r\n    -- Create new pro subscription\r\n    INSERT INTO user_subscriptions (\r\n        user_id, \r\n        plan_id, \r\n        status, \r\n        paypal_order_id,\r\n        price_checks_used,\r\n        price_checks_reset_at\r\n    )\r\n    VALUES (\r\n        p_user_id, \r\n        v_pro_plan_id, \r\n        'active',\r\n        p_paypal_order_id,\r\n        0,\r\n        NOW() + INTERVAL '1 month'\r\n    )\r\n    RETURNING id INTO v_subscription_id;\r\n    \r\n    RETURN v_subscription_id;\r\nEND;\r\n$function$\n"
+  }
+]

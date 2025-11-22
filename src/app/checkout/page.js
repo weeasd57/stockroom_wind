@@ -4,12 +4,14 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Script from 'next/script';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
+import { useSubscription } from '@/providers/SubscriptionProvider';
 import styles from './checkout.module.css';
 
 const CheckoutPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useSupabase();
+  const { user, supabase } = useSupabase();
+  const { upgradeToProSubscription, isPro } = useSubscription();
   
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -31,6 +33,13 @@ const CheckoutPage = () => {
       return;
     }
   }, [user, router]);
+
+  // If user is already Pro, redirect them away from checkout
+  useEffect(() => {
+    if (user && isPro) {
+      router.push('/profile');
+    }
+  }, [user, isPro, router]);
 
   const planDetails = {
     monthly: {
@@ -84,28 +93,40 @@ const CheckoutPage = () => {
         onApprove: async (data, actions) => {
           try {
             setIsLoading(true);
+            setError('');
+
             const details = await actions.order.capture();
-            
-            // Call your existing checkout/confirm API
-            const response = await fetch('/api/checkout/confirm', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                orderId: data.orderID,
-                captureId: details.id,
-                amount: currentPlan.price,
-                billingPeriod: planType
-              })
+
+            const unit = details?.purchase_units?.[0];
+            const cap = unit?.payments?.captures?.[0] || details;
+            const captureId = cap?.id;
+            const amountValue = cap?.amount?.value || currentPlan.price.toFixed(2);
+            const currencyCode = cap?.amount?.currency_code || 'USD';
+
+            if (!captureId) {
+              console.error('Missing captureId from PayPal response:', details);
+              setError('Payment completed but missing transaction ID. Please contact support.');
+              setIsLoading(false);
+              return;
+            }
+
+            // Upgrade subscription using captured PayPal payment
+            const upgradeResult = await upgradeToProSubscription({
+              transaction_type: 'payment',
+              paypal_order_id: data?.orderID,
+              paypal_capture_id: captureId,
+              payer_id: data?.payerID,
+              amount: amountValue,
+              currency: currencyCode,
+              captured_at: new Date().toISOString(),
+              billing_period: planType,
             });
 
-            const result = await response.json();
-
-            if (response.ok && result.success) {
+            if (upgradeResult?.success) {
               router.push('/checkout/success?plan=' + planType);
             } else {
-              setError(result.error || 'Payment processing failed');
+              console.error('Failed to upgrade subscription:', upgradeResult?.error);
+              setError(upgradeResult?.error || 'Payment processed but subscription upgrade failed.');
               setIsLoading(false);
             }
           } catch (error) {
@@ -158,28 +179,37 @@ const CheckoutPage = () => {
       <div className={styles.checkoutCard}>
         <div className={styles.header}>
           <h1>Upgrade to Pro</h1>
-          <p>Unlock premium features and unlimited access</p>
+          <p>Complete your purchase to unlock Pro features</p>
         </div>
 
         <div className={styles.planDetails}>
           <div className={styles.planCard}>
-            <h2>{currentPlan.title}</h2>
+            <h2>Pro Plan</h2>
+            <p className={styles.planBilling}>
+              Billed {planType === 'yearly' ? 'annually' : 'monthly'}
+            </p>
+            {planType === 'yearly' && (
+              <p className={styles.planSavings}>
+                Save $14/year (17% off)
+              </p>
+            )}
             <div className={styles.price}>
               <span className={styles.currency}>$</span>
               <span className={styles.amount}>{currentPlan.price}</span>
               <span className={styles.period}>/{currentPlan.period}</span>
             </div>
-            <p className={styles.description}>{currentPlan.description}</p>
           </div>
 
           <div className={styles.features}>
             <h3>What's included:</h3>
             <ul>
-              <li>✓ Unlimited post creation</li>
-              <li>✓ Advanced price checking</li>
-              <li>✓ Premium analytics</li>
+              <li>✓ 300 price checks per month</li>
+              <li>✓ 500 posts per month</li>
+              <li>✓ Create premium broker plans</li>
+              <li>✓ Table View with Export to Excel/CSV</li>
+              <li>✓ No ads - Ad-free experience</li>
+              <li>✓ Telegram notifications: subscribe to traders you follow</li>
               <li>✓ Priority support</li>
-              <li>✓ Export capabilities</li>
             </ul>
           </div>
         </div>
@@ -197,39 +227,30 @@ const CheckoutPage = () => {
         )}
 
         <div className={styles.paymentSection}>
-          <h3>Complete your purchase</h3>
-          
-          {isLoading ? (
+          <h3>Payment Method</h3>
+
+          {/* Always render the PayPal container so the SDK can attach buttons */}
+          <div id="paypal-button-container" className={styles.paypalContainer}></div>
+
+          {/* Show loading state until PayPal buttons are rendered */}
+          {isLoading && (
             <div className={styles.loadingSpinner}>
               <div className={styles.spinner}></div>
-              <p>Loading payment options...</p>
+              <p>Processing payment...</p>
             </div>
-          ) : (
-            <div id="paypal-button-container" className={styles.paypalContainer}></div>
           )}
-        </div>
-
-        <div className={styles.planToggle}>
-          <p>Want to switch plans?</p>
-          <div className={styles.toggleButtons}>
-            <button
-              className={`${styles.toggleBtn} ${planType === 'monthly' ? styles.active : ''}`}
-              onClick={() => setPlanType('monthly')}
-            >
-              Monthly
-            </button>
-            <button
-              className={`${styles.toggleBtn} ${planType === 'yearly' ? styles.active : ''}`}
-              onClick={() => setPlanType('yearly')}
-            >
-              Yearly (Save 33%)
-            </button>
-          </div>
         </div>
 
         <div className={styles.footer}>
           <p>Secure payment powered by PayPal</p>
           <p>Cancel anytime from your profile settings</p>
+          <button
+            type="button"
+            onClick={() => router.push('/pricing')}
+            className={styles.backLink}
+          >
+            ← Back to pricing
+          </button>
         </div>
       </div>
     </div>

@@ -5,20 +5,18 @@ export function normalizeWhitespace(str) {
   return String(str ?? '').replace(/\s+/g, ' ').trim();
 }
 
-/** Username: letters, numbers, spaces, underscores, hyphens only; length 1-50 */
+/** Username: letters, numbers, underscores only; length 1-50; no spaces or symbols */
 export function sanitizeUsername(input) {
-  let s = normalizeWhitespace(input);
-  // remove any disallowed characters
-  s = s.replace(/[^a-zA-Z0-9 _-]/g, '');
-  // collapse multiple spaces again after removals
-  s = normalizeWhitespace(s);
-  if (s.length === 0 || s.length > 50) return '';
-  return s;
+	let s = String(input ?? '');
+	// remove any disallowed characters (allow only a-z, A-Z, 0-9 and underscore)
+	s = s.replace(/[^a-zA-Z0-9_]/g, '');
+	if (s.length === 0 || s.length > 50) return '';
+	return s;
 }
 
 export function isValidUsername(input) {
-  const s = String(input ?? '');
-  return s.length >= 1 && s.length <= 50 && /^[a-zA-Z0-9 _-]+$/.test(s);
+	const s = String(input ?? '');
+	return s.length >= 1 && s.length <= 50 && /^[a-zA-Z0-9_]+$/.test(s);
 }
 
 /** Human full name: keep letters (all scripts), digits, spaces, hyphen, apostrophes; max 100 */

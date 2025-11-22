@@ -53,6 +53,20 @@
   margin-bottom: 1rem;
 }
 
+.planBilling {
+  margin-top: -0.5rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.planSavings {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #16a34a; /* green-600 style */
+  margin-bottom: 0.75rem;
+}
+
 .price {
   display: flex;
   align-items: baseline;
@@ -232,6 +246,21 @@
   color: hsl(var(--muted-foreground));
   font-size: 0.9rem;
   margin: 0.25rem 0;
+}
+
+.backLink {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: hsl(var(--muted-foreground));
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+
+.backLink:hover {
+  color: hsl(var(--foreground));
 }
 
 /* Dark mode support */

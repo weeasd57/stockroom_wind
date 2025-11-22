@@ -53,9 +53,9 @@ export default function Login() {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: window.location.origin + '/auth/reset-password',
         });
-        
+
         if (error) throw error;
-        
+
         setSuccess('Password reset instructions have been sent to your email');
         setLoading(false);
       } catch (err) {
@@ -90,7 +90,7 @@ export default function Login() {
     try {
       if (isSignUp) {
         console.log('Login page: Attempting to sign up with:', email, 'Username:', username);
-        
+
         // Remember to redirect to profile after auth completes
         try { localStorage.setItem('postAuthRedirect', '/profile'); } catch (e) { /* ignore */ }
 
@@ -106,15 +106,15 @@ export default function Login() {
             username
           }),
         });
-        
+
         const data = await response.json();
-        
+
         if (!response.ok) {
           throw new Error(data.error || 'Failed to sign up');
         }
-        
+
         console.log('Login page: Sign up successful, user created');
-        
+
         // Show success message
         setSuccess('Account created successfully!');
 
@@ -143,9 +143,9 @@ export default function Login() {
       } else {
         // Use utility function for sign in
         const { data, error: signInError } = await signIn(email, password);
-        
+
         if (signInError) throw signInError;
-        
+
         // Fade out before navigation
         setVisible(false);
         setTimeout(() => router.push('/profile'), 300);
@@ -183,15 +183,15 @@ export default function Login() {
     setLoading(true);
     try {
       // Detect if we're on localhost or production
-      const isLocalhost = window.location.hostname === 'localhost' || 
-                         window.location.hostname === '127.0.0.1';
+      const isLocalhost = window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1';
 
       // NOTE: Production redirect domain should match your deployed domain
       // Update when SharksZone is deployed under its final hostname
-      const redirectTo = isLocalhost 
-        ? 'http://localhost:3000/auth/callback' 
+      const redirectTo = isLocalhost
+        ? 'http://localhost:3000/auth/callback'
         : 'https://firestocks.vercel.app/auth/callback';
-      
+
       try { localStorage.setItem('postAuthRedirect', '/profile'); } catch (e) { /* ignore */ }
 
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -200,7 +200,7 @@ export default function Login() {
           redirectTo: redirectTo,
         },
       });
-      
+
       if (error) throw error;
       // No need to do anything else here as the user will be redirected to Google
     } catch (err) {
@@ -227,10 +227,10 @@ export default function Login() {
       <div className={styles.formWrapper}>
         <div className={styles.logoContainer}>
           <div className={styles.logo}>
-            <Image 
-              src="/favicon_io/android-chrome-192x192.png" 
-              alt="SharksZone Logo" 
-              width={50} 
+            <Image
+              src="/favicon_io/android-chrome-192x192.png"
+              alt="SharksZone Logo"
+              width={50}
               height={50}
               className={styles.logoImage}
             />
@@ -244,7 +244,7 @@ export default function Login() {
         <form onSubmit={handleSubmit} className={styles.form}>
           {error && <div className={styles.error}>{error}</div>}
           {success && <div className={styles.success}>{success}</div>}
-          
+
           <div className={styles.inputGroup}>
             <label htmlFor="email" className={styles.label}>Email</label>
             <input
@@ -257,7 +257,7 @@ export default function Login() {
               placeholder="your@email.com"
             />
           </div>
-          
+
           {isSignUp && (
             <div className={styles.inputGroup}>
               <label htmlFor="username" className={styles.label}>Username</label>
@@ -274,7 +274,7 @@ export default function Login() {
               <small className={styles.passwordHint}>Username must be at least 3 characters</small>
             </div>
           )}
-          
+
           {!isResetPassword && (
             <div className={styles.inputGroup}>
               <label htmlFor="password" className={styles.label}>Password</label>
@@ -297,14 +297,14 @@ export default function Login() {
                 >
                   {showPassword ? (
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-eye-off">
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-10-7-10-7a1.8 1.8 0 0 1 0-2.02M15.07 4.93A10.07 10.07 0 0 1 12 4c7 0 10 7 10 7a1.8 1.8 0 0 1 0 2.02"/>
-                      <path d="M9.9 9.9a2 2 0 1 0 4.2 4.2"/>
-                      <path d="m2 2 20 20"/>
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-10-7-10-7a1.8 1.8 0 0 1 0-2.02M15.07 4.93A10.07 10.07 0 0 1 12 4c7 0 10 7 10 7a1.8 1.8 0 0 1 0 2.02" />
+                      <path d="M9.9 9.9a2 2 0 1 0 4.2 4.2" />
+                      <path d="m2 2 20 20" />
                     </svg>
                   ) : (
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-eye">
-                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
-                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
                     </svg>
                   )}
                 </button>
@@ -314,45 +314,45 @@ export default function Login() {
               )}
             </div>
           )}
-          
-          <button 
-            type="submit" 
+
+          <button
+            type="submit"
             className={`${styles.button} ${styles.primaryButton}`}
             disabled={loading}
           >
-            {loading ? 'Loading...' : 
-              isResetPassword ? 'Send Reset Instructions' : 
-              isSignUp ? 'Create Account' : 'Sign In'}
+            {loading ? 'Loading...' :
+              isResetPassword ? 'Send Reset Instructions' :
+                isSignUp ? 'Create Account' : 'Sign In'}
           </button>
-          
+
           {!isResetPassword && (
             <>
               <div className={styles.divider}>
                 <span>or</span>
               </div>
-              
-              <button 
-                type="button" 
+
+              <button
+                type="button"
                 onClick={handleGoogleLogin}
                 className={`${styles.button} ${styles.googleButton}`}
                 disabled={loading}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>
+                  <path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z" />
                 </svg>
                 Continue with Google
               </button>
             </>
           )}
         </form>
-        
+
         <div className={styles.switchMode}>
           {isResetPassword ? (
             <p>Remember your password? <button onClick={resetView} className={styles.switchButton}>Back to Sign In</button></p>
           ) : isSignUp ? (
             <>
               <p>Already have an account? <button onClick={() => setIsSignUp(false)} className={styles.switchButton}>Sign In</button></p>
-              <p className={styles.resetLink}>Forgot password? <button onClick={() => {setIsResetPassword(true); setIsSignUp(false);}} className={styles.switchButton}>Reset Password</button></p>
+              <p className={styles.resetLink}>Forgot password? <button onClick={() => { setIsResetPassword(true); setIsSignUp(false); }} className={styles.switchButton}>Reset Password</button></p>
             </>
           ) : (
             <>
@@ -362,7 +362,7 @@ export default function Login() {
           )}
         </div>
       </div>
-      
+
       <div className={styles.imageContainer}>
         <div className={styles.imageOverlay}></div>
         <div className={styles.imageContent}>

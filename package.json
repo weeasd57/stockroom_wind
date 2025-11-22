@@ -1,6 +1,6 @@
 {
   "name": "sharkszone",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -11,8 +11,7 @@
     "clean": "rimraf .next && next clean",
     "telegram:setup": "node scripts/setup-telegram-domain.js",
     "telegram:test": "node scripts/setup-telegram-domain.js --test",
-    "paypal:test": "node scripts/test-paypal-credentials.js",
-    "prepare:codecanyon": "node scripts/prepare-codecanyon.js"
+    "paypal:test": "node scripts/test-paypal-credentials.js"
   },
   "dependencies": {
     "@paypal/paypal-server-sdk": "^1.0.4",

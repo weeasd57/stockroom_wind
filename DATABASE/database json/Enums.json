@@ -1,0 +1,332 @@
+[
+  {
+    "enum_schema": "auth",
+    "enum_name": "aal_level",
+    "enum_value": "aal1"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "aal_level",
+    "enum_value": "aal2"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "aal_level",
+    "enum_value": "aal3"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "code_challenge_method",
+    "enum_value": "s256"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "code_challenge_method",
+    "enum_value": "plain"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "factor_status",
+    "enum_value": "unverified"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "factor_status",
+    "enum_value": "verified"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "factor_type",
+    "enum_value": "totp"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "factor_type",
+    "enum_value": "webauthn"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "factor_type",
+    "enum_value": "phone"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "oauth_authorization_status",
+    "enum_value": "pending"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "oauth_authorization_status",
+    "enum_value": "approved"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "oauth_authorization_status",
+    "enum_value": "denied"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "oauth_authorization_status",
+    "enum_value": "expired"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "oauth_client_type",
+    "enum_value": "public"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "oauth_client_type",
+    "enum_value": "confidential"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "oauth_registration_type",
+    "enum_value": "dynamic"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "oauth_registration_type",
+    "enum_value": "manual"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "oauth_response_type",
+    "enum_value": "code"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "one_time_token_type",
+    "enum_value": "confirmation_token"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "one_time_token_type",
+    "enum_value": "reauthentication_token"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "one_time_token_type",
+    "enum_value": "recovery_token"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "one_time_token_type",
+    "enum_value": "email_change_token_new"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "one_time_token_type",
+    "enum_value": "email_change_token_current"
+  },
+  {
+    "enum_schema": "auth",
+    "enum_name": "one_time_token_type",
+    "enum_value": "phone_change_token"
+  },
+  {
+    "enum_schema": "pgsodium",
+    "enum_name": "key_status",
+    "enum_value": "default"
+  },
+  {
+    "enum_schema": "pgsodium",
+    "enum_name": "key_status",
+    "enum_value": "valid"
+  },
+  {
+    "enum_schema": "pgsodium",
+    "enum_name": "key_status",
+    "enum_value": "invalid"
+  },
+  {
+    "enum_schema": "pgsodium",
+    "enum_name": "key_status",
+    "enum_value": "expired"
+  },
+  {
+    "enum_schema": "pgsodium",
+    "enum_name": "key_type",
+    "enum_value": "aead-ietf"
+  },
+  {
+    "enum_schema": "pgsodium",
+    "enum_name": "key_type",
+    "enum_value": "aead-det"
+  },
+  {
+    "enum_schema": "pgsodium",
+    "enum_name": "key_type",
+    "enum_value": "hmacsha512"
+  },
+  {
+    "enum_schema": "pgsodium",
+    "enum_name": "key_type",
+    "enum_value": "hmacsha256"
+  },
+  {
+    "enum_schema": "pgsodium",
+    "enum_name": "key_type",
+    "enum_value": "auth"
+  },
+  {
+    "enum_schema": "pgsodium",
+    "enum_name": "key_type",
+    "enum_value": "shorthash"
+  },
+  {
+    "enum_schema": "pgsodium",
+    "enum_name": "key_type",
+    "enum_value": "generichash"
+  },
+  {
+    "enum_schema": "pgsodium",
+    "enum_name": "key_type",
+    "enum_value": "kdf"
+  },
+  {
+    "enum_schema": "pgsodium",
+    "enum_name": "key_type",
+    "enum_value": "secretbox"
+  },
+  {
+    "enum_schema": "pgsodium",
+    "enum_name": "key_type",
+    "enum_value": "secretstream"
+  },
+  {
+    "enum_schema": "pgsodium",
+    "enum_name": "key_type",
+    "enum_value": "stream_xchacha20"
+  },
+  {
+    "enum_schema": "public",
+    "enum_name": "broadcast_audience_enum",
+    "enum_value": "all"
+  },
+  {
+    "enum_schema": "public",
+    "enum_name": "broadcast_audience_enum",
+    "enum_value": "premium_only"
+  },
+  {
+    "enum_schema": "public",
+    "enum_name": "broadcast_audience_enum",
+    "enum_value": "free_only"
+  },
+  {
+    "enum_schema": "public",
+    "enum_name": "post_type",
+    "enum_value": "GENERAL"
+  },
+  {
+    "enum_schema": "public",
+    "enum_name": "post_type",
+    "enum_value": "PURCHASE_RECOMMENDATION"
+  },
+  {
+    "enum_schema": "public",
+    "enum_name": "reaction_type",
+    "enum_value": "LIKE"
+  },
+  {
+    "enum_schema": "public",
+    "enum_name": "reaction_type",
+    "enum_value": "DISLIKE"
+  },
+  {
+    "enum_schema": "public",
+    "enum_name": "reaction_type",
+    "enum_value": "BUY"
+  },
+  {
+    "enum_schema": "public",
+    "enum_name": "reaction_type",
+    "enum_value": "SELL"
+  },
+  {
+    "enum_schema": "public",
+    "enum_name": "subscription_tier_enum",
+    "enum_value": "free"
+  },
+  {
+    "enum_schema": "public",
+    "enum_name": "subscription_tier_enum",
+    "enum_value": "premium"
+  },
+  {
+    "enum_schema": "realtime",
+    "enum_name": "action",
+    "enum_value": "INSERT"
+  },
+  {
+    "enum_schema": "realtime",
+    "enum_name": "action",
+    "enum_value": "UPDATE"
+  },
+  {
+    "enum_schema": "realtime",
+    "enum_name": "action",
+    "enum_value": "DELETE"
+  },
+  {
+    "enum_schema": "realtime",
+    "enum_name": "action",
+    "enum_value": "TRUNCATE"
+  },
+  {
+    "enum_schema": "realtime",
+    "enum_name": "action",
+    "enum_value": "ERROR"
+  },
+  {
+    "enum_schema": "realtime",
+    "enum_name": "equality_op",
+    "enum_value": "eq"
+  },
+  {
+    "enum_schema": "realtime",
+    "enum_name": "equality_op",
+    "enum_value": "neq"
+  },
+  {
+    "enum_schema": "realtime",
+    "enum_name": "equality_op",
+    "enum_value": "lt"
+  },
+  {
+    "enum_schema": "realtime",
+    "enum_name": "equality_op",
+    "enum_value": "lte"
+  },
+  {
+    "enum_schema": "realtime",
+    "enum_name": "equality_op",
+    "enum_value": "gt"
+  },
+  {
+    "enum_schema": "realtime",
+    "enum_name": "equality_op",
+    "enum_value": "gte"
+  },
+  {
+    "enum_schema": "realtime",
+    "enum_name": "equality_op",
+    "enum_value": "in"
+  },
+  {
+    "enum_schema": "storage",
+    "enum_name": "buckettype",
+    "enum_value": "STANDARD"
+  },
+  {
+    "enum_schema": "storage",
+    "enum_name": "buckettype",
+    "enum_value": "ANALYTICS"
+  },
+  {
+    "enum_schema": "storage",
+    "enum_name": "buckettype",
+    "enum_value": "VECTOR"
+  }
+]
