@@ -17,6 +17,7 @@ const CheckoutPage = () => {
   const [error, setError] = useState('');
   const [planType, setPlanType] = useState('monthly');
   const paypalInitialized = useRef(false);
+  const [cspNonce, setCspNonce] = useState('');
 
   // Get plan type from URL params
   useEffect(() => {
@@ -60,8 +61,15 @@ const CheckoutPage = () => {
 
   // PayPal SDK configuration
   const paypalClientId = process.env.NODE_ENV === 'production' 
-    ? process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID_LIVE
+    ? (process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID_LIVE || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID)
     : (process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID_SANDBOX || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID);
+
+  useEffect(() => {
+    try {
+      const n = typeof window !== 'undefined' && window.__CSP_NONCE__ ? String(window.__CSP_NONCE__) : '';
+      setCspNonce(n);
+    } catch (_) {}
+  }, []);
 
   const initializePayPal = () => {
     if (!window.paypal || paypalInitialized.current) return;
@@ -174,6 +182,8 @@ const CheckoutPage = () => {
         src={`https://www.paypal.com/sdk/js?client-id=${paypalClientId}&components=buttons&intent=capture&commit=true`}
         strategy="afterInteractive"
         onLoad={initializePayPal}
+        nonce={cspNonce || undefined}
+        data-csp-nonce={cspNonce || undefined}
       />
 
       <div className={styles.checkoutCard}>
