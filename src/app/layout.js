@@ -97,15 +97,25 @@ export default function RootLayout({ children }) {
         {/* Google Analytics Consent Management */}
         <Script id="gtag-consent-init" strategy="beforeInteractive" nonce={cspNonce || undefined}>
           {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            window.gtag = gtag;
-            
-            // Set default consent state (denied until user accepts)
-            gtag('consent', 'default', {
-              analytics_storage: 'denied',
-              ad_storage: 'denied',
-            });
+            try {
+              // Check if we can access cookies (will throw SecurityError in sandbox)
+              var cookieEnabled = navigator.cookieEnabled;
+              // Try accessing document.cookie to be sure
+              var testCookie = document.cookie;
+              
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              window.gtag = gtag;
+              
+              // Set default consent state (denied until user accepts)
+              gtag('consent', 'default', {
+                analytics_storage: 'denied',
+                ad_storage: 'denied',
+              });
+            } catch (e) {
+              console.warn('Cookie access denied (sandbox mode). Analytics disabled.');
+              window.gtag = function() {}; // No-op function to prevent errors
+            }
           `}
         </Script>
 

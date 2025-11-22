@@ -12,30 +12,49 @@ export default function CookieConsent() {
     setIsMounted(true);
 
     // Check if user has already made a choice
-    const consent = localStorage.getItem('cookie-consent');
-    if (!consent) {
-      setIsVisible(true);
+    try {
+      const consent = localStorage.getItem('cookie-consent');
+      if (!consent) {
+        setIsVisible(true);
+      }
+    } catch (e) {
+      // If localStorage is not available (e.g. sandbox), don't show consent banner
+      // or show it but don't try to save (depending on requirements).
+      // For now, we'll just suppress the error.
+      console.warn('LocalStorage access denied (sandbox mode).');
     }
   }, []);
 
   const acceptAll = () => {
-    localStorage.setItem('cookie-consent', 'accepted');
+    try {
+      localStorage.setItem('cookie-consent', 'accepted');
+    } catch (e) {
+      console.warn('LocalStorage access denied (sandbox mode).');
+    }
     setIsVisible(false);
     // Enable Google Analytics/AdSense if needed
-    gtag('consent', 'update', {
-      analytics_storage: 'granted',
-      ad_storage: 'granted',
-    });
+    if (typeof window.gtag === 'function') {
+      gtag('consent', 'update', {
+        analytics_storage: 'granted',
+        ad_storage: 'granted',
+      });
+    }
   };
 
   const rejectAll = () => {
-    localStorage.setItem('cookie-consent', 'rejected');
+    try {
+      localStorage.setItem('cookie-consent', 'rejected');
+    } catch (e) {
+      console.warn('LocalStorage access denied (sandbox mode).');
+    }
     setIsVisible(false);
     // Disable tracking
-    gtag('consent', 'update', {
-      analytics_storage: 'denied',
-      ad_storage: 'denied',
-    });
+    if (typeof window.gtag === 'function') {
+      gtag('consent', 'update', {
+        analytics_storage: 'denied',
+        ad_storage: 'denied',
+      });
+    }
   };
 
   if (!isMounted || !isVisible) return null;
