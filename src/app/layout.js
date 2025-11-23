@@ -41,8 +41,140 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata = {
-  title: 'SharksZone — Social Trading Platform',
+  // Basic Metadata
+  title: {
+    default: 'SharksZone — Social Trading Platform',
+    template: '%s | SharksZone',
+  },
   description: 'Share stock ideas, connect with traders, and build a community around trading insights. Discuss market opportunities and follow successful traders.',
+  applicationName: 'SharksZone',
+  authors: [{ name: 'SharksZone Team' }],
+  generator: 'Next.js',
+  keywords: ['trading', 'stocks', 'social trading', 'market analysis', 'trading community', 'stock ideas', 'traders', 'investment', 'finance'],
+  referrer: 'origin-when-cross-origin',
+  creator: 'SharksZone Team',
+  publisher: 'SharksZone',
+  
+  // Robots & Indexing
+  robots: {
+    index: true,
+    follow: true,
+    nocache: false,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  
+  // Icons
+  icons: {
+    icon: [
+      { url: '/favicon_io/favicon.ico' },
+      { url: '/favicon_io/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon_io/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/favicon_io/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+    other: [
+      {
+        rel: 'mask-icon',
+        url: '/favicon_io/safari-pinned-tab.svg',
+      },
+    ],
+  },
+  
+  // Manifest
+  manifest: '/favicon_io/site.webmanifest',
+  
+  // Theme Color
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' },
+  ],
+  
+  // Viewport (redundant with meta tag in head but good practice)
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  },
+  
+  // OpenGraph
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: 'https://sharkszone.com',
+    siteName: 'SharksZone',
+    title: 'SharksZone — Social Trading Platform',
+    description: 'Share stock ideas, connect with traders, and build a community around trading insights. Discuss market opportunities and follow successful traders.',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'SharksZone Social Trading Platform',
+      },
+    ],
+  },
+  
+  // Twitter
+  twitter: {
+    card: 'summary_large_image',
+    title: 'SharksZone — Social Trading Platform',
+    description: 'Share stock ideas, connect with traders, and build a community around trading insights. Discuss market opportunities and follow successful traders.',
+    creator: '@sharkszone',
+    site: '@sharkszone',
+    images: ['/twitter-image.png'],
+  },
+  
+  // Verification (Google, Bing, etc.)
+  verification: {
+    // google: 'your-google-verification-code',
+    // yandex: 'your-yandex-verification-code',
+    // bing: 'your-bing-verification-code',
+  },
+  
+  // App Links (for mobile deep linking)
+  appLinks: {
+    web: {
+      url: 'https://sharkszone.com',
+      should_fallback: true,
+    },
+  },
+  
+  // Alternates (for multi-language support and canonical URLs)
+  alternates: {
+    canonical: 'https://sharkszone.com',
+    languages: {
+      'en-US': 'https://sharkszone.com',
+      // Add more languages as needed
+    },
+  },
+  
+  // Category
+  category: 'finance',
+  
+  // Classification
+  classification: 'Business',
+  
+  // Format Detection
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  
+  // Other
+  other: {
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'black-translucent',
+  },
 };
 
 export default function RootLayout({ children }) {
