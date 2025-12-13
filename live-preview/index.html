@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Complete Social Trading Platform with PayPal subscriptions, Telegram integration, and global stock markets">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://tradinghub-pro.vercel.app">
+    <title>TradingHub Pro - Social Trading Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            /* Performance optimizations */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 60px 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.3rem;
+            opacity: 0.95;
+        }
+
+        .badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 20px;
+            border-radius: 20px;
+            margin: 20px 10px 0;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .header-demo-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1rem;
+            margin-top: 25px;
+            transition: transform 0.3s, box-shadow 0.3s;
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .header-demo-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(40, 167, 69, 0.4);
+        }
+
+        .content {
+            padding: 60px 40px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .section {
+            margin-bottom: 50px;
+            padding: 0 10px;
+        }
+
+        .section h2 {
+            font-size: clamp(1.5rem, 4vw, 2rem);
+            margin-bottom: 25px;
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+            text-align: center;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-top: 30px;
+        }
+
+        .feature-card {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(102,126,234,0.2);
+            border-color: #667eea;
+        }
+
+        .feature-card h3 {
+            color: #764ba2;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .feature-card p {
+            color: #666;
+            line-height: 1.7;
+        }
+
+        .icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .tech-item {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 25px;
+            border-radius: 25px;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .demo-notice {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 30px 0;
+            text-align: center;
+        }
+
+        .demo-notice h3 {
+            color: #856404;
+            margin-bottom: 10px;
+            font-size: 1.3rem;
+        }
+
+        .demo-notice p {
+            color: #856404;
+            font-size: 1.1rem;
+        }
+
+        .cta-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 50px 40px;
+            text-align: center;
+            margin-top: 40px;
+            border-radius: 15px;
+        }
+
+        .cta-section h2 {
+            color: white;
+            border: none;
+            margin-bottom: 20px;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: white;
+            color: #667eea;
+            padding: 15px 40px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin: 10px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .cta-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            color: #667eea;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .screenshot-placeholder {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            padding: 80px 40px;
+            text-align: center;
+            color: #666;
+            margin: 20px 0;
+            border: 2px dashed #999;
+        }
+
+        .screenshot-placeholder p {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .screenshot {
+            width: 100%;
+            height: auto; /* natural height */
+            border-radius: 10px;
+            margin: 0;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.1);
+            border: none;
+            transition: transform 0.3s ease, box-shadow 0.3s ease, opacity 0.5s ease;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+            display: block;
+            object-fit: contain;
+            object-position: center;
+            max-width: 100%;
+        }
+        
+        /* Hover effect handled by container */
+        
+        .screenshot[data-loaded="false"] {
+            filter: blur(10px);
+            opacity: 0.6;
+        }
+        
+        .screenshot[data-loaded="true"] {
+            animation: fadeInImage 0.5s ease;
+        }
+        
+        @keyframes fadeInImage {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Staggered Grid Layout (Masonry via CSS Grid row spanning) */
+        .screenshots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 24px;
+            margin-top: 30px;
+            width: 100%;
+            /* Default: regular grid so content is visible before JS */
+        }
+        /* When JS is ready, enable masonry behavior */
+        .screenshots-grid.masonry-ready {
+            grid-auto-rows: 8px; /* base row height for masonry */
+            grid-auto-flow: dense;
+        }
+
+        /* Multi-column Masonry fallback (no JS needed) */
+        .screenshots-grid.columns-masonry {
+            display: block;               /* disable CSS grid */
+            column-gap: 24px;
+            column-fill: balance;
+            column-count: 1;
+        }
+        @media (min-width: 600px) {
+            .screenshots-grid.columns-masonry { column-count: 2; }
+        }
+        @media (min-width: 1200px) {
+            .screenshots-grid.columns-masonry { column-count: 3; }
+        }
+        @media (min-width: 1600px) {
+            .screenshots-grid.columns-masonry { column-count: 4; }
+        }
+        
+        .screenshot-container {
+            background: #ffffff;
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            break-inside: avoid;
+            page-break-inside: avoid;
+            border: 1px solid #e9ecef;
+            position: relative;
+            overflow: hidden;
+            display: inline-block;  /* needed for multi-column layout */
+            width: 100%;
+            margin: 0 0 24px;       /* space between items in columns */
+        }
+        
+        .screenshot-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.3s ease;
+        }
+        
+        .screenshot-container:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.25);
+            border-color: #667eea;
+        }
+        
+        .screenshot-container:hover::before {
+            transform: scaleX(1);
+        }
+        
+        /* Staggered animation delays */
+        .screenshot-container:nth-child(1) {
+            animation-delay: 0s;
+        }
+        
+        .screenshot-container:nth-child(2) {
+            animation-delay: 0.1s;
+        }
+        
+        .screenshot-container:nth-child(3) {
+            animation-delay: 0.2s;
+        }
+        
+        .screenshot-container:nth-child(4) {
+            animation-delay: 0.3s;
+        }
+        
+        .screenshot-container:nth-child(5) {
+            animation-delay: 0.4s;
+        }
+        
+        /* Optional: Uncomment for visual variety on large screens */
+        /* 
+        @media (min-width: 1200px) {
+            .screenshot-container:nth-child(1) {
+                grid-row: span 2;
+            }
+        }
+        */
+
+        .screenshot-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 12px;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: -0.01em;
+            text-transform: none;
+            flex-shrink: 0;
+        }
+        
+        .screenshot-title::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: linear-gradient(180deg, #667eea, #764ba2);
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+        
+        /* Image height is natural; no flex stretching */
+
+        /* Responsive Images - Mobile First */
+        @media (max-width: 599px) {
+            .screenshots-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+                margin-top: 20px;
+            }
+            
+            .screenshot {
+                border-radius: 8px;
+            }
+            
+            .screenshot-container {
+                padding: 12px;
+                border-radius: 12px;
+            }
+            
+            .screenshot-container:hover {
+                transform: translateY(-4px) scale(1);
+            }
+            
+            .screenshot-title {
+                font-size: 0.9rem;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .screenshots-grid {
+                grid-template-columns: 1fr;
+                gap: 18px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .header p {
+                font-size: 1.1rem;
+            }
+            
+            .content {
+                padding: 30px 16px;
+            }
+            
+            .section {
+                padding: 0 8px;
+                margin-bottom: 40px;
+            }
+            
+            .section h2 {
+                font-size: 1.5rem;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .feature-card {
+                padding: 25px;
+            }
+            
+            /* Reduce animations on mobile for better performance */
+            * {
+                animation-duration: 0.3s !important;
+                transition-duration: 0.3s !important;
+            }
+        }
+        
+        @media (min-width: 600px) and (max-width: 899px) {
+            .screenshots-grid {
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                gap: 20px;
+            }
+        }
+        
+        @media (min-width: 900px) and (max-width: 1199px) {
+            .screenshots-grid {
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                gap: 22px;
+            }
+            
+            .features-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (min-width: 1200px) {
+            .screenshots-grid {
+                grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+                gap: 28px;
+                max-width: 1400px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+        }
+        
+        @media (min-width: 1600px) {
+            .screenshots-grid {
+                grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+                gap: 30px;
+                max-width: 1600px;
+            }
+        }
+        
+        /* High DPI screens optimization */
+        @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+            .screenshot {
+                image-rendering: -webkit-optimize-contrast;
+                image-rendering: crisp-edges;
+            }
+        }
+        
+        /* Reduce motion for accessibility */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+            
+            .screenshot:hover {
+                transform: none;
+            }
+        }
+
+        .footer {
+            background: #2d3748;
+            color: white;
+            text-align: center;
+            padding: 30px 20px;
+        }
+
+        .footer p {
+            margin: 5px 0;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 TradingHub Pro</h1>
+            <p>Complete Social Trading Platform for Modern Traders</p>
+            <div>
+                <span class="badge">Next.js 14</span>
+                <span class="badge">React 18</span>
+                <span class="badge">PostgreSQL</span>
+                <span class="badge">PayPal Integration</span>
+            </div>
+            <div style="margin-top: 30px;">
+                <a href="https://tradinghub-pro.vercel.app/" class="header-demo-btn" target="_blank" rel="noopener noreferrer">
+                    🚀 Try Live Demo
+                </a>
+            </div>
+            
+            <div style="background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.4); border-radius: 15px; padding: 25px; margin: 30px auto; max-width: 650px; backdrop-filter: blur(10px); box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
+                <p style="font-size: 1.15rem; margin-bottom: 20px; font-weight: 700;">🔐 Try the Live Demo with these credentials:</p>
+                
+                <div style="text-align: left; margin: 0 auto; max-width: 500px;">
+                    <p style="margin: 12px 0 8px; font-size: 1.05rem; font-weight: 600;">👤 User Login:</p>
+                    <p style="margin: 5px 0; padding-left: 25px;">📧 userdemo@tradinghub.com | 🔑 12345678</p>
+                    
+                    <p style="margin: 18px 0 8px; font-size: 1.05rem; font-weight: 600;">👨‍💼 Admin Login:</p>
+                    <p style="margin: 5px 0; padding-left: 25px;">📧 admin@demo.com | 🔑 12345678</p>
+                    
+                    <p style="margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.15); border-radius: 8px; font-size: 0.95rem;">
+                        ⚡ <strong>Access Admin Panel:</strong> <a href="https://tradinghub-pro.vercel.app/admin" target="_blank" rel="noopener noreferrer" style="color: #fff; text-decoration: underline;">tradinghub-pro.vercel.app/admin</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="demo-notice">
+                <h3>📢 Live Preview Notice</h3>
+                <p>This is a presentation page. The full application requires installation with Node.js, PostgreSQL, and API keys.</p>
+                <p><strong>🚀 Want to try it live? Visit our <a href="https://tradinghub-pro.vercel.app/" target="_blank" rel="noopener noreferrer" style="color: #667eea; text-decoration: underline; font-weight: bold;">Live Demo</a></strong></p>
+                
+                <div style="background: rgba(102, 126, 234, 0.1); border-left: 4px solid #667eea; padding: 15px; margin: 20px 0; border-radius: 5px;">
+                    <p style="margin-bottom: 10px;"><strong>🔐 Demo Login Credentials:</strong></p>
+                    <p style="margin: 5px 0;"><strong>User:</strong> userdemo@tradinghub.com | <strong>Pass:</strong> 12345678</p>
+                    <p style="margin: 5px 0;"><strong>Admin:</strong> admin@demo.com | <strong>Pass:</strong> 12345678</p>
+                    <p style="margin-top: 10px; font-size: 0.9rem; opacity: 0.8;">
+                        <em>⚡ Admin Panel: <a href="https://tradinghub-pro.vercel.app/admin" target="_blank" rel="noopener noreferrer" style="color: #667eea; text-decoration: underline;">tradinghub-pro.vercel.app/admin</a></em>
+                    </p>
+                </div>
+                
+                <p><strong>Purchase includes complete source code, installation wizard, and comprehensive documentation!</strong></p>
+            </div>
+
+            <div class="section">
+                <h2>✨ Key Features</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <span class="icon">📊</span>
+                        <h3>Social Trading Posts</h3>
+                        <p>Create detailed posts with stock analysis, target prices, stop loss levels, and trading strategies. Share charts and technical analysis with the community.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="icon">🌍</span>
+                        <h3>Global Stock Markets</h3>
+                        <p>Real-time stock data from international markets. Search stocks across multiple exchanges with country flags and exchange information.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="icon">💳</span>
+                        <h3>PayPal Subscriptions</h3>
+                        <p>Complete subscription system with PayPal integration. Multiple pricing tiers, webhook handling, and automated billing management.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="icon">📱</span>
+                        <h3>Telegram Integration</h3>
+                        <p>Automated bot for notifications, subscription broadcasts, and contact form integration. Keep users engaged with real-time updates.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="icon">👥</span>
+                        <h3>Community Features</h3>
+                        <p>Follow traders, like and comment on posts, build reputation through successful predictions, and connect with like-minded investors.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="icon">🎨</span>
+                        <h3>Modern UI/UX</h3>
+                        <p>Beautiful responsive design with light/dark themes. Built with Tailwind CSS for a clean, professional appearance on all devices.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="icon">🔐</span>
+                        <h3>Secure Authentication</h3>
+                        <p>Supabase Auth with JWT tokens, profile management, role-based access control, and comprehensive security measures.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="icon">⚡</span>
+                        <h3>Installation Wizard</h3>
+                        <p>Professional step-by-step installation wizard. Configure environment, database, and integrations through intuitive UI - no manual editing required!</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>🛠️ Technology Stack</h2>
+                <div class="tech-stack">
+                    <span class="tech-item">Next.js 14</span>
+                    <span class="tech-item">React 18</span>
+                    <span class="tech-item">PostgreSQL</span>
+                    <span class="tech-item">Supabase</span>
+                    <span class="tech-item">Tailwind CSS</span>
+                    <span class="tech-item">PayPal SDK</span>
+                    <span class="tech-item">Telegram Bot API</span>
+                    <span class="tech-item">EODHD API</span>
+                    <span class="tech-item">Zustand</span>
+                    <span class="tech-item">TypeScript</span>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>📸 Application Screenshots</h2>
+                <p style="text-align: center; color: #666; margin-bottom: 20px;">Explore the beautiful interface and powerful features</p>
+                
+                <div class="screenshots-grid columns-masonry">
+                    <div class="screenshot-container">
+                        <p class="screenshot-title">📱 Landing Page</p>
+                        <img src="screenshot1.jpg" 
+                             alt="Landing Page - TradingHub Pro modern and professional interface" 
+                             class="screenshot lazy-image"
+                             loading="eager"
+                             decoding="async"
+                             width="1200"
+                             height="800"
+                             data-loaded="false">
+                    </div>
+                    
+                    <div class="screenshot-container">
+                        <p class="screenshot-title">🏠 Dashboard Feed</p>
+                        <img src="screenshot2.jpg" 
+                             alt="Dashboard showing trading posts feed with real-time updates" 
+                             class="screenshot lazy-image"
+                             loading="eager"
+                             decoding="async"
+                             width="1200"
+                             height="800"
+                             data-loaded="false">
+                    </div>
+                    
+                    <div class="screenshot-container">
+                        <p class="screenshot-title">✍️ Create Post</p>
+                        <img src="screenshot3.jpg" 
+                             alt="Create post form for stock analysis and trading signals" 
+                             class="screenshot lazy-image"
+                             loading="eager"
+                             decoding="async"
+                             width="1200"
+                             height="800"
+                             data-loaded="false">
+                    </div>
+                    
+                    <div class="screenshot-container">
+                        <p class="screenshot-title">📊 Post Details</p>
+                        <img src="screenshot5.jpg" 
+                             alt="Advanced post creation with target prices and stop loss" 
+                             class="screenshot lazy-image"
+                             loading="eager"
+                             decoding="async"
+                             width="1200"
+                             height="800"
+                             data-loaded="false">
+                    </div>
+                    
+                    <div class="screenshot-container">
+                        <p class="screenshot-title">💰 Pricing Plans</p>
+                        <img src="screenshot4.jpg" 
+                             alt="Pricing plans with PayPal subscription integration" 
+                             class="screenshot lazy-image"
+                             loading="eager"
+                             decoding="async"
+                             width="1200"
+                             height="800"
+                             data-loaded="false">
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>💰 How TradingHub Pro Helps You Earn</h2>
+                <p style="font-size: 1.1rem; color: #666; margin-bottom: 30px; text-align: center;">Turn your daily trading analysis into a recurring subscription business</p>
+                
+                <div class="features-grid">
+                    <div class="feature-card" style="background: linear-gradient(135deg, #667eea10 0%, #764ba220 100%); border-left: 4px solid #667eea;">
+                        <span class="icon">📊</span>
+                        <h3>Broker's Desk</h3>
+                        <p>Share structured stock analysis and trading signals with your community. Post detailed market insights, technical analysis, and investment recommendations that traders can follow.</p>
+                    </div>
+
+                    <div class="feature-card" style="background: linear-gradient(135deg, #28a74510 0%, #20c99720 100%); border-left: 4px solid #28a745;">
+                        <span class="icon">✈️</span>
+                        <h3>Premium Channel</h3>
+                        <p>Deliver instant alerts through TradingHub Pro and Telegram. Send real-time notifications to your subscribers about market opportunities, signal updates, and trading recommendations.</p>
+                    </div>
+
+                    <div class="feature-card" style="background: linear-gradient(135deg, #ffc10710 0%, #ff980020 100%); border-left: 4px solid #ffc107;">
+                        <span class="icon">💰</span>
+                        <h3>Earn from Users</h3>
+                        <p>Charge recurring subscriptions while we handle user management and access control. Set your pricing, manage subscribers, and earn passive income from your trading expertise.</p>
+                    </div>
+                </div>
+
+                <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 2px solid #dee2e6; border-radius: 15px; padding: 25px; margin-top: 40px; text-align: center;">
+                    <p style="font-size: 1rem; color: #495057; margin-bottom: 15px;">
+                        <strong>User management & payments powered by TradingHub Pro</strong>
+                    </p>
+                    <div style="font-size: 2rem; opacity: 0.7;">
+                        👤 💳
+                    </div>
+                </div>
+
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; padding: 40px; margin-top: 40px; color: white; text-align: center;">
+                    <h3 style="font-size: 1.8rem; margin-bottom: 20px;">💡 Build Your Trading Empire</h3>
+                    <p style="font-size: 1.15rem; line-height: 1.8; max-width: 800px; margin: 0 auto;">
+                        TradingHub Pro isn't just software—it's a complete business platform. Start with subscription revenue, scale with broker partnerships, and diversify with multiple income streams. Your success grows as your community grows.
+                    </p>
+                    <p style="font-size: 1.25rem; font-weight: 700; margin-top: 25px;">
+                        🚀 Launch Your Platform Today & Start Earning Tomorrow
+                    </p>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>�📦 What You Get</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <h3>Complete Source Code</h3>
+                        <p>Full Next.js application with all components, pages, API routes, and utilities. Clean, well-documented, and production-ready.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <h3>15+ Documentation Files</h3>
+                        <p>Installation guide, features docs, API documentation, deployment guide, troubleshooting, and more.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <h3>SQL Database Schemas</h3>
+                        <p>Complete database structure with tables, indexes, and relationships. Easy to set up and customize.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <h3>Installation Wizard</h3>
+                        <p>Professional UI-based setup process. Configure everything without touching code files.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <h3>6 Months Support</h3>
+                        <p>Get help with installation, configuration, and bugs. 24-48 hour response time included.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <h3>Free Updates</h3>
+                        <p>Lifetime updates for bug fixes, security patches, and compatibility improvements.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cta-section">
+                <h2>Ready to Start Your Trading Platform?</h2>
+                <p style="font-size: 1.2rem; margin-bottom: 30px;">Get TradingHub Pro today and launch your social trading community!</p>
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-number">15+</div>
+                        <div class="stat-label">Documentation Files</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">10</div>
+                        <div class="stat-label">Min Setup Time</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">100%</div>
+                        <div class="stat-label">Responsive Design</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">6</div>
+                        <div class="stat-label">Months Support</div>
+                    </div>
+                </div>
+                
+                <div style="background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.3); border-radius: 15px; padding: 20px; margin: 30px auto; max-width: 600px; backdrop-filter: blur(10px);">
+                    <p style="font-size: 1.1rem; margin-bottom: 15px; font-weight: 600;">🔐 Try the Live Demo with these credentials:</p>
+                    <div style="text-align: left; display: inline-block;">
+                        <p style="margin: 8px 0; font-size: 1rem;"><strong>👤 User Login:</strong></p>
+                        <p style="margin: 5px 0 15px 20px;">📧 userdemo@tradinghub.com | 🔑 12345678</p>
+                        <p style="margin: 8px 0; font-size: 1rem;"><strong>👨‍💼 Admin Login:</strong></p>
+                        <p style="margin: 5px 0 10px 20px;">📧 admin@demo.com | 🔑 12345678</p>
+                        <p style="margin-top: 10px; font-size: 0.95rem; opacity: 0.95;">
+                            <em>⚡ <strong>Admin Panel:</strong> <a href="https://tradinghub-pro.vercel.app/admin" target="_blank" rel="noopener noreferrer" style="color: #fff; text-decoration: underline;">tradinghub-pro.vercel.app/admin</a></em>
+                        </p>
+                    </div>
+                </div>
+                
+                <a href="#" class="cta-button">Purchase Now</a>
+                <a href="https://tradinghub-pro.vercel.app/" class="cta-button" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border: none;" target="_blank" rel="noopener noreferrer">🚀 Live Demo</a>
+                <a href="docs.html" class="cta-button" style="background: transparent; border: 2px solid white; color: white;" target="_blank">View Documentation</a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>TradingHub Pro</strong> - Social Trading Platform</p>
+            <p>Version 1.0.0 | Built with Next.js 14 & React 18</p>
+            <p>© 2025 All Rights Reserved</p>
+        </div>
+    </div>
+
+    <script>
+        // Performance-optimized script with requestIdleCallback
+        (function() {
+            'use strict';
+            
+            // Smooth scroll for anchor links
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                });
+            });
+
+            // Masonry (Staggered) helper using CSS Grid row spanning
+            const initMasonry = () => {
+                const grid = document.querySelector('.screenshots-grid');
+                if (!grid) return { recalcAll: () => {} };
+                // We'll enable masonry styles after first predictive pass
+
+                const getMetrics = () => {
+                    const styles = window.getComputedStyle(grid);
+                    const rowGap = parseFloat(styles.getPropertyValue('row-gap') || styles.getPropertyValue('grid-row-gap') || '0');
+                    const rowHeight = parseFloat(styles.getPropertyValue('grid-auto-rows') || '8');
+                    return { rowGap, rowHeight };
+                };
+
+                const resizeItem = (item) => {
+                    if (!item) return;
+                    const { rowGap, rowHeight } = getMetrics();
+                    // Use scrollHeight to measure full content height (not the clipped size)
+                    const height = item.scrollHeight;
+                    const span = Math.max(1, Math.ceil((height + rowGap) / (rowHeight + rowGap)));
+                    item.style.gridRowEnd = `span ${span}`;
+                };
+
+                const recalcAll = () => {
+                    grid.querySelectorAll('.screenshot-container').forEach(resizeItem);
+                };
+
+                // Predictive pass using intrinsic dimensions before images load
+                const predictAll = () => {
+                    const { rowGap, rowHeight } = getMetrics();
+                    grid.querySelectorAll('.screenshot-container').forEach(item => {
+                        const img = item.querySelector('img.screenshot');
+                        if (!img) return;
+                        const cs = getComputedStyle(item);
+                        const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+                        const title = item.querySelector('.screenshot-title');
+                        const titleH = title ? title.getBoundingClientRect().height : 0;
+                        const colWidth = item.clientWidth - (parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight));
+                        const wAttr = parseFloat(img.getAttribute('width')) || img.naturalWidth || colWidth;
+                        const hAttr = parseFloat(img.getAttribute('height')) || img.naturalHeight || colWidth * 0.6;
+                        const ratio = hAttr && wAttr ? hAttr / wAttr : 0.6;
+                        const predictedImgH = Math.max(1, Math.round(colWidth * ratio));
+                        const predictedItemH = predictedImgH + titleH + padY;
+                        const span = Math.max(1, Math.ceil((predictedItemH + rowGap) / (rowHeight + rowGap)));
+                        item.style.gridRowEnd = `span ${span}`;
+                    });
+                };
+
+                // Recalculate when images load
+                grid.querySelectorAll('img.screenshot').forEach(img => {
+                    if (img.complete) resizeItem(img.closest('.screenshot-container'));
+                    img.addEventListener('load', () => resizeItem(img.closest('.screenshot-container')));
+                    img.addEventListener('error', () => resizeItem(img.closest('.screenshot-container')));
+                });
+
+                // Recalculate on resize and fonts ready
+                window.addEventListener('resize', () => requestAnimationFrame(recalcAll));
+                if (document.fonts && document.fonts.ready) {
+                    document.fonts.ready.then(() => requestAnimationFrame(recalcAll));
+                }
+
+                // Initial predictive pass, then enable masonry mode and recalc precisely
+                predictAll();
+                grid.classList.add('masonry-ready');
+                grid.classList.remove('columns-masonry');
+                // After enabling masonry rows, do another predictive pass, then precise recalc
+                requestAnimationFrame(() => {
+                    predictAll();
+                    setTimeout(recalcAll, 60);
+                });
+                return { recalcAll };
+            };
+            const masonry = initMasonry();
+
+            // Smart Image Lazy Loading with Progressive Enhancement
+            const imageObserverOptions = {
+                threshold: 0.01,
+                rootMargin: '50px 0px 200px 0px' // Load images 200px before they enter viewport
+            };
+
+            const imageObserver = new IntersectionObserver(function(entries) {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        
+                        // Skip if already loaded
+                        if (img.dataset.loaded === 'true') return;
+                        
+                        // Add load event listener
+                        img.addEventListener('load', function() {
+                            img.dataset.loaded = 'true';
+                            img.style.filter = 'none';
+                            img.style.opacity = '1';
+                            // Update masonry span for this item
+                            if (masonry && masonry.recalcAll) {
+                                requestAnimationFrame(() => masonry.recalcAll());
+                            }
+                        }, { once: true });
+                        
+                        // Add error handling with visual feedback
+                        img.addEventListener('error', function() {
+                            console.warn('Failed to load image:', img.src);
+                            img.dataset.loaded = 'error';
+                            img.style.opacity = '0.5';
+                            img.style.filter = 'grayscale(100%)';
+                            
+                            // Add text indicator to screenshot title
+                            const container = img.closest('.screenshot-container');
+                            if (container) {
+                                const title = container.querySelector('.screenshot-title');
+                                if (title && !title.textContent.includes('⚠️')) {
+                                    title.textContent += ' ⚠️ (Image not available)';
+                                    title.style.color = '#dc3545';
+                                }
+                            }
+                            // Still recalc the layout to avoid gaps
+                            if (masonry && masonry.recalcAll) {
+                                requestAnimationFrame(() => masonry.recalcAll());
+                            }
+                        }, { once: true });
+                        
+                        // If image is cached, mark as loaded immediately
+                        if (img.complete) {
+                            img.dataset.loaded = 'true';
+                            img.style.filter = 'none';
+                            img.style.opacity = '1';
+                            if (masonry && masonry.recalcAll) {
+                                requestAnimationFrame(() => masonry.recalcAll());
+                            }
+                        }
+                        
+                        // Stop observing this image
+                        imageObserver.unobserve(img);
+                    }
+                });
+            }, imageObserverOptions);
+
+            // Observe all lazy images and handle already-cached ones
+            document.querySelectorAll('.lazy-image').forEach(img => {
+                imageObserver.observe(img);
+                if (img.complete) {
+                    img.dataset.loaded = 'true';
+                    img.style.filter = 'none';
+                    img.style.opacity = '1';
+                }
+            });
+
+            // Add animation on scroll for cards and sections
+            const animationObserverOptions = {
+                threshold: 0.1,
+                rootMargin: '0px 0px -50px 0px'
+            };
+
+            const animationObserver = new IntersectionObserver(function(entries) {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        // Use requestAnimationFrame for smooth animation
+                        requestAnimationFrame(() => {
+                            entry.target.style.opacity = '1';
+                            entry.target.style.transform = 'translateY(0)';
+                        });
+                        // Stop observing after animation
+                        animationObserver.unobserve(entry.target);
+                    }
+                });
+            }, animationObserverOptions);
+
+            // Apply animation to feature cards and sections
+            const scheduleAnimation = () => {
+                document.querySelectorAll('.feature-card, .section').forEach(el => {
+                    el.style.opacity = '0';
+                    el.style.transform = 'translateY(20px)';
+                    el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+                    animationObserver.observe(el);
+                });
+                if (masonry && masonry.recalcAll) {
+                    requestAnimationFrame(() => masonry.recalcAll());
+                }
+            };
+
+            // Use requestIdleCallback for non-critical animations
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(scheduleAnimation);
+            } else {
+                setTimeout(scheduleAnimation, 100);
+            }
+
+            // Preload critical resources on idle
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(() => {
+                    // Preload first screenshot for better UX
+                    const firstImg = document.querySelector('.screenshot');
+                    if (firstImg && firstImg.dataset.loaded === 'false') {
+                        const tempImg = new Image();
+                        tempImg.src = firstImg.src;
+                    }
+                });
+            }
+
+            // Performance monitoring (optional, can be removed in production)
+            if (window.performance && window.performance.timing) {
+                window.addEventListener('load', () => {
+                    setTimeout(() => {
+                        const perfData = window.performance.timing;
+                        const pageLoadTime = perfData.loadEventEnd - perfData.navigationStart;
+                        console.log(`⚡ Page loaded in ${pageLoadTime}ms`);
+                    }, 0);
+                });
+            }
+        })();
+    </script>
+</body>
+</html>

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from './admin.module.css';
 import { FiLock, FiMail, FiShield, FiEye, FiEyeOff } from 'react-icons/fi';
+import { useDemoMode } from '@/providers/DemoModeProvider';
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function AdminLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { setDemoAdminActive } = useDemoMode();
 
   // Check if already logged in
   useEffect(() => {
@@ -25,7 +27,7 @@ export default function AdminLogin() {
   }, [router]);
 
   // Demo mode - show credentials
-  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+  const isDemoMode = true;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,6 +35,28 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
+      const normalizedEmail = email.toLowerCase().trim();
+      const isDemoAdminLogin =
+        normalizedEmail === 'admin@demo.com' && password === '12345678';
+
+      if (isDemoAdminLogin) {
+        try {
+          // Store a synthetic demo admin email for header-based admin APIs if needed
+          const demoEmail = 'admin@demo.com';
+          localStorage.setItem('admin_email', demoEmail);
+          localStorage.setItem('admin_token', 'demo_admin_token');
+
+          // Activate demo admin mode in context/localStorage
+          setDemoAdminActive(true, demoEmail);
+
+          // Redirect directly to dashboard without hitting real auth API
+          router.push('/admin/dashboard');
+          return;
+        } finally {
+          setLoading(false);
+        }
+      }
+
       const response = await fetch('/api/admin/auth', {
         method: 'POST',
         headers: {
@@ -40,7 +64,7 @@ export default function AdminLogin() {
         },
         // API expects: { email, password }
         body: JSON.stringify({
-          email: email.toLowerCase().trim(),
+          email: normalizedEmail,
           password,
         }),
       });
@@ -49,8 +73,11 @@ export default function AdminLogin() {
 
       if (response.ok && data.success) {
         // Store admin session
-        localStorage.setItem('admin_email', email.toLowerCase().trim());
+        localStorage.setItem('admin_email', normalizedEmail);
         localStorage.setItem('admin_token', data.token || 'admin_authenticated');
+
+        // Disable any demo flags when using real admin login
+        setDemoAdminActive(false, null);
         
         // Redirect to admin dashboard
         router.push('/admin/dashboard');
@@ -79,11 +106,11 @@ export default function AdminLogin() {
             <FiShield className={styles.logoIcon} />
           </div>
           <h1 className={styles.title}>Admin Portal</h1>
-          <p className={styles.subtitle}>SharksZone Administration</p>
+          <p className={styles.subtitle}>TradingHub Pro Administration</p>
         </div>
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className={styles.form}>
+        <form onSubmit={handleSubmit} className={styles.form} noValidate>
           {error && (
             <div className={styles.error}>
               <span>{error}</span>
@@ -160,12 +187,12 @@ export default function AdminLogin() {
               <button
                 type="button"
                 className={styles.demoButton}
-                onClick={() => handleDemoLogin('admin@demo.com', 'Demo123!')}
+                onClick={() => handleDemoLogin('admin@demo.com', '12345678')}
               >
                 <FiShield />
                 <div>
-                  <div className={styles.demoRole}>Super Admin</div>
-                  <div className={styles.demoEmail}>admin@demo.com</div>
+                  <div className={styles.demoRole}>Demo Admin</div>
+                  <div className={styles.demoEmail}>admin@demo.com / 12345678</div>
                 </div>
               </button>
             </div>

@@ -3,7 +3,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background:
+    radial-gradient(circle at 15% 15%, hsla(var(--primary), 0.18), transparent 55%),
+    radial-gradient(circle at 85% 85%, hsla(var(--primary), 0.12), transparent 55%),
+    linear-gradient(135deg, hsl(var(--background)), hsl(var(--muted) / 0.4));
   padding: 2rem;
   position: relative;
   overflow: hidden;
@@ -12,7 +15,7 @@
 .loginBox {
   width: 100%;
   max-width: 450px;
-  background: white;
+  background: hsl(var(--card));
   border-radius: 20px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   padding: 3rem;
@@ -41,7 +44,7 @@
   width: 80px;
   height: 80px;
   margin: 0 auto 1rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.85));
   border-radius: 20px;
   display: flex;
   align-items: center;
@@ -56,13 +59,13 @@
 
 .title {
   font-size: 2rem;
-  color: #212529;
+  color: hsl(var(--foreground));
   margin-bottom: 0.5rem;
   font-weight: 700;
 }
 
 .subtitle {
-  color: #6c757d;
+  color: hsl(var(--muted-foreground));
   font-size: 1rem;
 }
 
@@ -88,31 +91,32 @@
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
-  color: #495057;
+  color: hsl(var(--muted-foreground));
   font-weight: 500;
   font-size: 0.95rem;
 }
 
 .labelIcon {
   font-size: 16px;
-  color: #667eea;
+  color: hsl(var(--primary));
 }
 
 .input {
   width: 100%;
   padding: 0.875rem 1rem;
-  border: 2px solid #e9ecef;
+  border: 2px solid hsl(var(--border));
   border-radius: 10px;
   font-size: 1rem;
   transition: all 0.3s ease;
-  background: #f8f9fa;
+  background: hsl(var(--input));
+  color: hsl(var(--foreground));
 }
 
 .input:focus {
   outline: none;
-  border-color: #667eea;
-  background: white;
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  border-color: hsl(var(--primary));
+  background: hsl(var(--background));
+  box-shadow: 0 0 0 4px hsla(var(--primary), 0.18);
 }
 
 .passwordWrapper {
@@ -142,7 +146,7 @@
 .submitButton {
   width: 100%;
   padding: 1rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.85));
   color: white;
   border: none;
   border-radius: 10px;

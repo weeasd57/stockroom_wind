@@ -6,10 +6,12 @@ import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { toast } from 'sonner';
 import styles from '@/styles/admin/users.module.css';
+import { useDemoMode } from '@/providers/DemoModeProvider';
 
 export default function UserManagement() {
   const { user, loading } = useSupabase();
   const router = useRouter();
+  const { isDemoAdmin } = useDemoMode();
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -21,6 +23,7 @@ export default function UserManagement() {
     plan: 'all', // all, free, pro, premium
     dateRange: 'all' // all, today, week, month
   });
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, userId: null, userEmail: '' });
 
   const hasLocalAdmin =
     typeof window !== 'undefined'
@@ -48,8 +51,54 @@ export default function UserManagement() {
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
+      if (isDemoAdmin) {
+        const demoUsers = [
+          {
+            id: 'demo-1',
+            username: 'demo_trader',
+            email: 'trader@example.com',
+            full_name: 'Demo Trader',
+            posts_count: 42,
+            subscription_plan: 'pro',
+            is_active: true,
+            is_banned: false,
+            created_at: new Date().toISOString(),
+            avatar_url: '/default-avatar.svg',
+          },
+          {
+            id: 'demo-2',
+            username: 'demo_investor',
+            email: 'investor@example.com',
+            full_name: 'Demo Investor',
+            posts_count: 18,
+            subscription_plan: 'free',
+            is_active: true,
+            is_banned: false,
+            created_at: new Date().toISOString(),
+            avatar_url: '/default-avatar.svg',
+          },
+          {
+            id: 'demo-3',
+            username: 'banned_user',
+            email: 'banned@example.com',
+            full_name: 'Banned Demo User',
+            posts_count: 5,
+            subscription_plan: 'free',
+            is_active: false,
+            is_banned: true,
+            created_at: new Date().toISOString(),
+            avatar_url: '/default-avatar.svg',
+          },
+        ];
+        setUsers(demoUsers);
+        setFilteredUsers(demoUsers);
+        setIsLoading(false);
+        return;
+      }
       
-      const response = await fetch('/api/admin/users');
+      // Get admin email from localStorage or user
+      const adminEmail = localStorage.getItem('admin_email') || user?.email || 'admin@ggg.com';
+      const response = await fetch(`/api/admin/users?admin_email=${encodeURIComponent(adminEmail)}`);
       if (response.ok) {
         const data = await response.json();
         setUsers(data.users || []);
@@ -154,6 +203,10 @@ export default function UserManagement() {
   };
 
   const handleUserAction = async (action, userIds) => {
+    if (isDemoAdmin) {
+      toast.info('Demo admin mode is read-only. No changes will be saved.');
+      return;
+    }
     try {
       const response = await fetch('/api/admin/users', {
         method: 'PATCH',
@@ -178,6 +231,10 @@ export default function UserManagement() {
   };
 
   const handleBulkAction = (action) => {
+    if (isDemoAdmin) {
+      toast.info('Demo admin mode is read-only. No changes will be saved.');
+      return;
+    }
     if (selectedUsers.size === 0) {
       toast.error('No users selected');
       return;
@@ -218,6 +275,66 @@ export default function UserManagement() {
       setSelectedUsers(new Set(filteredUsers.map(u => u.id)));
     }
   };
+
+  // Delete user and all their data
+  const openDeleteUserModal = (userId, userEmail) => {
+    if (isDemoAdmin) {
+      toast.info('Demo admin mode is read-only. No changes will be saved.');
+      return;
+    }
+    setDeleteModal({ isOpen: true, userId, userEmail });
+  };
+
+  const confirmDeleteUser = async () => {
+    if (isDemoAdmin) {
+      toast.info('Demo admin mode is read-only. No changes will be saved.');
+      return;
+    }
+
+    if (!deleteModal.userId) return;
+
+    try {
+      const adminEmail = localStorage.getItem('admin_email') || user?.email;
+      const response = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: deleteModal.userId,
+          admin_email: adminEmail,
+          delete_all_data: true
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        toast.success(`User ${deleteModal.userEmail} and all data deleted successfully`);
+        setUsers(prev => prev.filter(u => u.id !== deleteModal.userId));
+        setFilteredUsers(prev => prev.filter(u => u.id !== deleteModal.userId));
+      } else {
+        toast.error(data.error || 'Failed to delete user');
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast.error('Failed to delete user');
+    } finally {
+      setDeleteModal({ isOpen: false, userId: null, userEmail: '' });
+    }
+  };
+
+  const cancelDeleteUser = () => {
+    setDeleteModal({ isOpen: false, userId: null, userEmail: '' });
+  };
+
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && deleteModal.isOpen) {
+        cancelDeleteUser();
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [deleteModal.isOpen]);
 
   if (loading || isLoading) {
     return (
@@ -372,69 +489,62 @@ export default function UserManagement() {
             </tr>
           </thead>
           <tbody>
-            {filteredUsers.map((user) => (
+            {filteredUsers.map((userData) => (
               <tr 
-                key={user.id} 
-                className={selectedUsers.has(user.id) ? styles.selectedRow : ''}
+                key={userData.id} 
+                className={selectedUsers.has(userData.id) ? styles.selectedRow : ''}
               >
-                <td>
+                <td data-label="">
                   <input
                     type="checkbox"
-                    checked={selectedUsers.has(user.id)}
-                    onChange={() => toggleUserSelection(user.id)}
+                    checked={selectedUsers.has(userData.id)}
+                    onChange={() => toggleUserSelection(userData.id)}
                   />
                 </td>
-                <td className={styles.userCell}>
+                <td data-label="Username" className={styles.userCell}>
                   <div className={styles.userInfo}>
-                    {user.avatar_url && (
+                    {userData.avatar_url && (
                       <img 
-                        src={user.avatar_url} 
-                        alt={user.username}
+                        src={userData.avatar_url} 
+                        alt={userData.username}
                         className={styles.avatar}
                       />
                     )}
                     <span className={styles.username}>
-                      {user.username || 'Unknown'}
+                      {userData.username || 'Unknown'}
                     </span>
                   </div>
                 </td>
-                <td className={styles.emailCell}>{user.email}</td>
-                <td className={styles.numberCell}>{user.posts_count || 0}</td>
-                <td>
-                  <span className={`${styles.planBadge} ${styles[user.subscription_plan || 'free']}`}>
-                    {user.subscription_plan || 'free'}
+                <td data-label="Email" className={styles.emailCell}>{userData.email}</td>
+                <td data-label="Posts" className={styles.numberCell}>{userData.posts_count || 0}</td>
+                <td data-label="Plan">
+                  <span className={`${styles.planBadge} ${styles[userData.subscription_plan || 'free']}`}>
+                    {userData.subscription_plan || 'free'}
                   </span>
                 </td>
-                <td>
-                  <span className={user.is_active !== false ? styles.activeStatus : styles.inactiveStatus}>
-                    {user.is_active !== false ? '✅ Active' : '❌ Inactive'}
+                <td data-label="Status">
+                  <span className={userData.is_active !== false ? styles.activeStatus : styles.inactiveStatus}>
+                    {userData.is_active !== false ? '✅ Active' : '❌ Inactive'}
                   </span>
                 </td>
-                <td className={styles.dateCell}>
-                  {new Date(user.created_at).toLocaleDateString()}
+                <td data-label="Joined" className={styles.dateCell}>
+                  {new Date(userData.created_at).toLocaleDateString()}
                 </td>
-                <td className={styles.actionsCell}>
+                <td data-label="" className={styles.actionsCell}>
                   <div className={styles.actionButtons}>
                     <button 
-                      onClick={() => handleUserAction('view', user.id)}
+                      onClick={() => window.open(`/view-profile/${userData.id}`, '_blank')}
                       className={styles.viewBtn}
                       title="View Profile"
                     >
-                      👁️
+                      👁️ View
                     </button>
                     <button 
-                      onClick={() => handleUserAction('edit', user.id)}
-                      className={styles.editBtn}
-                      title="Edit User"
+                      onClick={() => openDeleteUserModal(userData.id, userData.email)}
+                      className={styles.deleteBtn}
+                      title="Delete User & All Data"
                     >
-                      ✏️
-                    </button>
-                    <button 
-                      onClick={() => handleUserAction('ban', user.id)}
-                      className={styles.banBtn}
-                      title="Ban User"
-                    >
-                      🚫
+                      🗑️ Delete
                     </button>
                   </div>
                 </td>
@@ -447,6 +557,52 @@ export default function UserManagement() {
       {filteredUsers.length === 0 && !isLoading && (
         <div className={styles.emptyState}>
           <p>📭 No users found matching your criteria</p>
+        </div>
+      )}
+      {deleteModal.isOpen && (
+        <div className={styles.modalOverlay} onClick={cancelDeleteUser}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalIcon}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 9V13M12 17H12.01M5.07183 19H18.9282C20.4678 19 21.4301 17.3333 20.6603 16L13.7321 4C12.9623 2.66667 11.0377 2.66667 10.2679 4L3.33975 16C2.56995 17.3333 3.53223 19 5.07183 19Z" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <h3 className={styles.modalTitle}>Delete User</h3>
+            <p className={styles.modalDescription}>
+              Are you sure you want to permanently delete this user and all related data?
+            </p>
+            <div className={styles.modalPostPreview}>
+              <strong>{deleteModal.userEmail}</strong>
+              <br />
+              <br />
+              This will permanently delete:
+              <br />• User account
+              <br />• All posts
+              <br />• All comments
+              <br />• Profile data
+              <br />• Subscription info
+            </div>
+            <p className={styles.modalWarning}>
+              ⚠️ This action cannot be undone.
+            </p>
+            <div className={styles.modalActions}>
+              <button 
+                onClick={cancelDeleteUser} 
+                className={styles.modalCancelBtn}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDeleteUser} 
+                className={styles.modalDeleteBtn}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M19 7L18.1327 19.1425C18.0579 20.1891 17.187 21 16.1378 21H7.86224C6.81296 21 5.94208 20.1891 5.86732 19.1425L5 7M10 11V17M14 11V17M15 7V4C15 3.44772 14.5523 3 14 3H10C9.44772 3 9 3.44772 9 4V7M4 7H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Delete User
+              </button>
+            </div>
+          </div>
         </div>
       )}
       </div>

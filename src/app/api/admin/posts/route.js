@@ -1,10 +1,45 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+
+// Create admin client with service role key to bypass RLS
+const createAdminClient = () => {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { persistSession: false } }
+  );
+};
+
+const extractStoragePathFromUrl = (imageUrl) => {
+  if (!imageUrl || typeof imageUrl !== 'string') return null;
+  try {
+    // Case 1: stored as bucket/path/in/storage
+    if (!imageUrl.startsWith('http')) {
+      const clean = imageUrl.replace(/^\/+/, '');
+      const [bucket, ...parts] = clean.split('/');
+      if (!bucket || parts.length === 0) return null;
+      return { bucket, path: parts.join('/') };
+    }
+
+    // Case 2: full Supabase public URL
+    const url = new URL(imageUrl);
+    const marker = '/storage/v1/object/public/';
+    const idx = url.pathname.indexOf(marker);
+    if (idx === -1) return null;
+    const relativePath = decodeURIComponent(
+      url.pathname.slice(idx + marker.length)
+    );
+    const [bucket, ...parts] = relativePath.split('/');
+    if (!bucket || parts.length === 0) return null;
+    return { bucket, path: parts.join('/') };
+  } catch {
+    return null;
+  }
+};
 
 export async function GET() {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = createAdminClient();
 
     // Fetch all posts with profile information
     const { data: posts, error } = await supabase
@@ -69,7 +104,7 @@ export async function PATCH(request) {
       );
     }
 
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = createAdminClient();
 
     let result;
 
@@ -162,7 +197,42 @@ export async function DELETE(request) {
       );
     }
 
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = createAdminClient();
+
+    // Collect images to delete from storage before deleting posts
+    const { data: postsToDelete, error: fetchError } = await supabase
+      .from('posts')
+      .select('id, image_url')
+      .in('id', post_ids);
+
+    if (fetchError) {
+      console.error('Error fetching posts for image deletion:', fetchError);
+    } else if (postsToDelete && postsToDelete.length > 0) {
+      const filesByBucket = {};
+      for (const post of postsToDelete) {
+        const info = extractStoragePathFromUrl(post.image_url);
+        if (!info) continue;
+        const { bucket, path } = info;
+        if (!filesByBucket[bucket]) {
+          filesByBucket[bucket] = new Set();
+        }
+        filesByBucket[bucket].add(path);
+      }
+
+      for (const [bucket, pathsSet] of Object.entries(filesByBucket)) {
+        const paths = Array.from(pathsSet);
+        if (!paths.length) continue;
+        const { error: storageError } = await supabase.storage
+          .from(bucket)
+          .remove(paths);
+        if (storageError) {
+          console.error(
+            `Error deleting storage files for bucket ${bucket}:`,
+            storageError
+          );
+        }
+      }
+    }
 
     // Delete related records first
     await supabase

@@ -1,0 +1,1960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradingHub Pro - Documentation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --dark-bg: #1a1a2e;
+            --dark-card: #252538;
+            --dark-text: #f0f0f0;
+            --light-bg: #f8f9fa;
+            --light-card: #ffffff;
+            --light-text: #212529;
+            --border: #e9ecef;
+            --dark-border: #3a3a4e;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--light-text);
+            background: var(--light-bg);
+            transition: all 0.3s ease;
+        }
+
+        body.dark {
+            background: var(--dark-bg);
+            color: var(--dark-text);
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 2rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .theme-toggle {
+            background: rgba(255,255,255,0.2);
+            border: 2px solid white;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.05);
+        }
+
+        /* Container */
+        .container {
+            display: flex;
+            max-width: 1400px;
+            margin: 0 auto;
+            min-height: calc(100vh - 80px);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--light-card);
+            border-right: 1px solid var(--border);
+            padding: 2rem 0;
+            position: sticky;
+            top: 80px;
+            height: calc(100vh - 80px);
+            overflow-y: auto;
+            transition: all 0.3s ease;
+        }
+
+        body.dark .sidebar {
+            background: var(--dark-card);
+            border-right-color: var(--dark-border);
+        }
+
+        .nav-section {
+            margin-bottom: 2rem;
+            padding: 0 1rem;
+        }
+
+        .nav-title {
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .nav-link {
+            display: block;
+            padding: 0.5rem 1rem;
+            color: inherit;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            margin-bottom: 0.25rem;
+        }
+
+        .nav-link:hover {
+            background: var(--primary);
+            color: white;
+            transform: translateX(5px);
+        }
+
+        .nav-link.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Content */
+        .content {
+            flex: 1;
+            padding: 3rem;
+            max-width: 900px;
+        }
+
+        .section {
+            margin-bottom: 4rem;
+            scroll-margin-top: 100px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin: 2rem 0 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        body.dark h2 {
+            border-bottom-color: var(--dark-border);
+        }
+
+        h3 {
+            font-size: 1.5rem;
+            margin: 1.5rem 0 1rem;
+            color: var(--secondary);
+        }
+
+        p {
+            margin-bottom: 1rem;
+            line-height: 1.8;
+        }
+
+        /* Code Blocks */
+        pre {
+            background: #1e1e2e;
+            color: #f0f0f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        code {
+            background: rgba(102, 126, 234, 0.1);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: var(--primary);
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: var(--light-card);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        body.dark table {
+            background: var(--dark-card);
+        }
+
+        th {
+            background: var(--primary);
+            color: white;
+            padding: 1rem;
+            text-align: left;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        body.dark td {
+            border-bottom-color: var(--dark-border);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Alert Boxes */
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            border-left: 4px solid;
+        }
+
+        .alert-info {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: #3b82f6;
+            color: #3b82f6;
+        }
+
+        .alert-warning {
+            background: rgba(245, 158, 11, 0.1);
+            border-color: #f59e0b;
+            color: #f59e0b;
+        }
+
+        .alert-success {
+            background: rgba(34, 197, 94, 0.1);
+            border-color: #22c55e;
+            color: #22c55e;
+        }
+
+        .alert-danger {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        /* Mobile Menu Toggle */
+        .menu-toggle {
+            display: none;
+            background: rgba(255,255,255,0.2);
+            border: 2px solid white;
+            color: white;
+            padding: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: static;
+                display: none;
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .sidebar.active {
+                display: block;
+            }
+
+            .content {
+                padding: 2rem 1rem;
+            }
+
+            .menu-toggle {
+                display: block;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            h2 {
+                font-size: 1.5rem;
+            }
+        }
+
+        /* Smooth Scroll */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Copy Button for Code Blocks */
+        .code-container {
+            position: relative;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+        }
+
+        .copy-btn:hover {
+            background: var(--secondary);
+            transform: scale(1.05);
+        }
+
+        .copy-btn.copied {
+            background: #22c55e;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                📚 TradingHub Pro Documentation
+            </div>
+            <div>
+                <button class="menu-toggle" onclick="toggleMenu()">☰ Menu</button>
+                <button class="theme-toggle" onclick="toggleTheme()">🌙 Dark Mode</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar" id="sidebar">
+            <div class="nav-section">
+                <div class="nav-title">Getting Started</div>
+                <a href="#introduction" class="nav-link active">Introduction</a>
+                <a href="#demo-accounts" class="nav-link">Demo Accounts</a>
+                <a href="#app-overview" class="nav-link">Application Overview</a>
+                <a href="#installation" class="nav-link">Installation</a>
+                <a href="#configuration" class="nav-link">Configuration</a>
+                <a href="#quick-start" class="nav-link">Quick Start</a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-title">Features</div>
+                <a href="#posts" class="nav-link">Trading Posts</a>
+                <a href="#subscriptions" class="nav-link">Subscriptions</a>
+                <a href="#telegram" class="nav-link">Telegram Integration</a>
+                <a href="#payments" class="nav-link">Payment System</a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-title">API Reference</div>
+                <a href="#api-auth" class="nav-link">Authentication</a>
+                <a href="#api-posts" class="nav-link">Posts API</a>
+                <a href="#api-users" class="nav-link">Users API</a>
+                <a href="#api-webhooks" class="nav-link">Webhooks</a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-title">Database</div>
+                <a href="#database-folder" class="nav-link">Database Folder Structure</a>
+                <a href="#database-schema-generator" class="nav-link">Schema Generator</a>
+                <a href="#script-generate-public-schema" class="nav-link">Generate Public Schema Script</a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-title">Scripts</div>
+                <a href="#script-check-telegram-webhook" class="nav-link">Telegram Webhook Diagnostic</a>
+                <a href="#script-setup-telegram-domain" class="nav-link">Telegram Domain Setup</a>
+                <a href="#script-test-paypal-credentials" class="nav-link">PayPal Credentials Test</a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-title">Deployment</div>
+                <a href="#deploy-vercel" class="nav-link">Deploy to Vercel</a>
+                <a href="#deploy-vps" class="nav-link">Deploy to VPS</a>
+                <a href="#deploy-docker" class="nav-link">Docker Setup</a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-title">Admin</div>
+                <a href="#admin-panel" class="nav-link">Admin Panel</a>
+                <a href="#admin-users" class="nav-link">User Management</a>
+                <a href="#admin-settings" class="nav-link">Settings</a>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Introduction Section -->
+            <section id="introduction" class="section">
+                <h1>Welcome to TradingHub Pro</h1>
+                <p>TradingHub Pro is a comprehensive social trading platform that enables traders to share insights, connect with investors, and monetize their expertise through premium subscriptions.</p>
+                
+                <div class="alert alert-info">
+                    <strong>Version 1.0.0</strong> - This documentation covers the complete setup and usage of TradingHub Pro.
+                </div>
+
+                <h2>Key Features</h2>
+                <ul>
+                    <li><strong>Social Trading Posts</strong> - Share trading ideas with rich content</li>
+                    <li><strong>Premium Subscriptions</strong> - Monetize expertise with Pro and Broker plans</li>
+                    <li><strong>Telegram Integration</strong> - Broadcast signals to followers</li>
+                    <li><strong>Real-time Analytics</strong> - Track performance and engagement</li>
+                    <li><strong>PayPal Payments</strong> - Secure payment processing</li>
+                    <li><strong>Dark/Light Theme</strong> - Beautiful UI with theme support</li>
+                </ul>
+            </section>
+
+            <!-- Demo Accounts Section -->
+            <section id="demo-accounts" class="section">
+                <h2>Demo Accounts (Admin & User)</h2>
+                <p>
+                    TradingHub Pro ships with built-in demo accounts that allow you to showcase the platform without
+                    connecting to a real database or payment system. These accounts are designed for previews
+                    (for example, on marketplaces like CodeCanyon) and for local testing.
+                </p>
+
+                <h3>Demo Admin Account</h3>
+                <ul>
+                    <li><strong>Login URL:</strong> <code>/admin</code></li>
+                    <li><strong>Email field:</strong> <code>admin</code> <em>or</em> <code>admin@demo.com</code></li>
+                    <li><strong>Password:</strong> <code>12345678</code></li>
+                </ul>
+                <div class="alert alert-warning">
+                    <strong>Important:</strong> When logged in as the demo admin, all changes in the admin panel
+                    (users, posts, settings) are for demonstration only and are not persisted to the real database.
+                    A modern banner appears in the admin layout to clearly indicate that you are in demo mode.
+                </div>
+
+                <h3>Demo User Account</h3>
+                <ul>
+                    <li><strong>Login URL:</strong> <code>/login</code></li>
+                    <li><strong>Email:</strong> <code>userdemo@tradinghub.com</code></li>
+                    <li><strong>Password:</strong> <code>12345678</code></li>
+                </ul>
+                <div class="alert alert-info">
+                    <strong>Note:</strong> This account is provided for preview and testing in the live demo.
+                    You can use it immediately after deployment to explore the user experience. For production
+                    environments, replace or remove this user in your own database and create real customer
+                    accounts instead.
+                </div>
+
+                <div class="alert alert-success">
+                    <strong>Tip:</strong> You can keep demo accounts enabled for previews and disable them in production
+                    if you prefer to restrict access to real users only.
+                </div>
+            </section>
+
+            <!-- Application Overview Section -->
+            <section id="app-overview" class="section">
+                <h2>Application Overview</h2>
+                <p>
+                    This section gives a high-level overview of the main areas of TradingHub Pro and how they fit
+                    together for both regular users and administrators.
+                </p>
+
+                <h3>User-facing Pages</h3>
+                <ul>
+                    <li><strong>Home / Feed</strong> (<code>/</code>) – Global trading feed showing public posts with filters and sorting.</li>
+                    <li><strong>Login / Signup</strong> (<code>/login</code>) – Email/password and OAuth authentication (plus demo user login).</li>
+                    <li><strong>Traders Directory</strong> (<code>/traders</code>) – Discover traders, view stats and follow/unfollow.</li>
+                    <li><strong>Profile</strong> (<code>/profile</code>) – Manage your profile, posts, strategies, Telegram bot, and premium plan.</li>
+                    <li><strong>Post Details</strong> (<code>/posts/[id]</code>) – Full analysis page with price history, status, and comments.</li>
+                </ul>
+
+                <h3>Admin Panel</h3>
+                <ul>
+                    <li><strong>Admin Login</strong> (<code>/admin</code>) – Admin authentication (plus demo admin login).</li>
+                    <li><strong>Dashboard</strong> (<code>/admin/dashboard</code>) – Overview of key metrics and platform health.</li>
+                    <li><strong>Users Management</strong> (<code>/admin/users</code>) – View, activate/deactivate, ban and delete users.</li>
+                    <li><strong>Posts Moderation</strong> (<code>/admin/posts</code>) – Approve, reject, feature and delete posts.</li>
+                    <li><strong>System Settings</strong> (<code>/admin/settings</code>) – Configure core system, payments, limits and security.</li>
+                </ul>
+
+                <h3>Integrations & Services</h3>
+                <ul>
+                    <li><strong>Supabase</strong> – Authentication, profiles, posts, and analytics storage.</li>
+                    <li><strong>PayPal</strong> – Subscription and payments integration for Pro / Broker plans.</li>
+                    <li><strong>Telegram Bot</strong> – Optional integration to broadcast trading signals.</li>
+                    <li><strong>Theming</strong> – Dark/Light mode with CSS variables shared across app and admin.
+                </ul>
+            </section>
+
+            <!-- Installation Section -->
+            <section id="installation" class="section">
+                <h2>Installation</h2>
+                <p>Follow these steps to install TradingHub Pro on your server.</p>
+
+                <h3>Requirements</h3>
+                <ul>
+                    <li>Node.js 18.0.0 or higher</li>
+                    <li>NPM 8.0.0 or higher</li>
+                    <li>PostgreSQL 14 or higher</li>
+                    <li>500MB disk space minimum</li>
+                </ul>
+
+                <h3>Quick Installation</h3>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code># Extract the downloaded files
+unzip tradinghub-pro.zip
+cd tradinghub-pro
+
+# Install dependencies
+npm install
+
+# Run the installation wizard
+npm run install:wizard
+
+# Start the application
+npm run dev</code></pre>
+                </div>
+
+                <h3>Installation Wizard</h3>
+                <p>The installation wizard will guide you through:</p>
+                <ol>
+                    <li>System requirements check</li>
+                    <li>Database configuration</li>
+                    <li>Supabase authentication setup</li>
+                    <li>PayPal payment integration</li>
+                    <li>Email and Telegram configuration</li>
+                    <li>Admin account creation</li>
+                    <li>Environment file generation</li>
+                </ol>
+
+                <div class="alert alert-warning">
+                    <strong>Important:</strong> After installation, remove the /install route from public access for security.
+                </div>
+            </section>
+
+            <!-- Configuration Section -->
+            <section id="configuration" class="section">
+                <h2>Configuration</h2>
+                <p>Configure your application by setting up the environment variables.</p>
+
+                <h3>Environment Variables</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Variable</th>
+                            <th>Description</th>
+                            <th>Required</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>DATABASE_URL</code></td>
+                            <td>PostgreSQL connection string</td>
+                            <td>Yes</td>
+                        </tr>
+                        <tr>
+                            <td><code>NEXT_PUBLIC_SUPABASE_URL</code></td>
+                            <td>Supabase project URL</td>
+                            <td>Yes</td>
+                        </tr>
+                        <tr>
+                            <td><code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code></td>
+                            <td>Supabase anonymous key</td>
+                            <td>Yes</td>
+                        </tr>
+                        <tr>
+                            <td><code>NEXT_PUBLIC_PAYPAL_CLIENT_ID</code></td>
+                            <td>PayPal client ID</td>
+                            <td>Yes</td>
+                        </tr>
+                        <tr>
+                            <td><code>PAYPAL_CLIENT_SECRET</code></td>
+                            <td>PayPal client secret</td>
+                            <td>Yes</td>
+                        </tr>
+                        <tr>
+                            <td><code>TELEGRAMBOT_TOKEN</code></td>
+                            <td>Telegram bot token</td>
+                            <td>No</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Example .env.local</h3>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code># Database
+DATABASE_URL="postgresql://user:password@localhost:5432/tradinghub"
+
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key"
+
+# PayPal
+NEXT_PUBLIC_PAYPAL_CLIENT_ID="your-client-id"
+PAYPAL_CLIENT_SECRET="your-client-secret"
+
+# Application
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+NEXT_PUBLIC_APP_NAME="TradingHub Pro"</code></pre>
+                </div>
+            </section>
+
+            <!-- Quick Start Section -->
+            <section id="quick-start" class="section">
+                <h2>Quick Start</h2>
+                <p>Get up and running with TradingHub Pro in minutes.</p>
+
+                <h3>1. Clone and Install</h3>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>npm install</code></pre>
+                </div>
+
+                <h3>2. Configure Environment</h3>
+                <p>Copy the example environment file and update with your values:</p>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>cp .env.example .env.local</code></pre>
+                </div>
+
+                <h3>3. Run Database Migrations</h3>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>npm run db:migrate</code></pre>
+                </div>
+
+                <h3>4. Start Development Server</h3>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>npm run dev</code></pre>
+                </div>
+
+                <div class="alert alert-success">
+                    Your application is now running at <strong>http://localhost:3000</strong>
+                </div>
+            </section>
+
+            <!-- Trading Posts Feature Section -->
+            <section id="posts" class="section">
+                <h2>Trading Posts</h2>
+                <p>
+                    Trading posts are the core content of TradingHub Pro. Traders can publish ideas with symbols,
+                    entry/target/stop prices, sentiment, and rich analysis. Posts appear in the global feed,
+                    traders directory, and profile pages.
+                </p>
+                <ul>
+                    <li>Create posts from the home/profile pages using the <strong>Create Post</strong> dialog.</li>
+                    <li>Each post tracks price history, target/stop status, and performance metrics.</li>
+                    <li>Posts can be public or premium-only depending on the author subscription.</li>
+                </ul>
+            </section>
+
+            <!-- Subscriptions Feature Section -->
+            <section id="subscriptions" class="section">
+                <h2>Subscriptions</h2>
+                <p>
+                    Subscriptions allow traders to monetize their content. Users can subscribe to premium plans
+                    (for example Pro or Broker plans) using PayPal, unlocking premium posts and additional limits.
+                </p>
+                <ul>
+                    <li>Pricing and plans are exposed via the pricing page and subscription APIs.</li>
+                    <li>Subscription state is cached in the app and checked before accessing premium content.</li>
+                    <li>PayPal webhooks are used to keep subscription status in sync with payments.</li>
+                </ul>
+            </section>
+
+            <!-- Telegram Integration Feature Section -->
+            <section id="telegram" class="section">
+                <h2>Telegram Integration</h2>
+                <p>
+                    TradingHub Pro can broadcast trading signals to Telegram using a dedicated bot. Traders configure
+                    their bot token and channel settings from the profile Telegram tab.
+                </p>
+                <ul>
+                    <li>Enable Telegram by providing <code>TELEGRAMBOT_TOKEN</code> and related env variables.</li>
+                    <li>When enabled, new posts or signals can be pushed automatically to Telegram channels.</li>
+                    <li>The integration is optional and can be disabled without affecting the core app.</li>
+                </ul>
+            </section>
+
+            <!-- Payment System Feature Section -->
+            <section id="payments" class="section">
+                <h2>Payment System (PayPal)</h2>
+                <p>
+                    The payment system is built on top of PayPal REST APIs. It powers recurring subscriptions and
+                    one-time payments depending on your configuration.
+                </p>
+                <ul>
+                    <li>Uses <code>NEXT_PUBLIC_PAYPAL_CLIENT_ID</code> and <code>PAYPAL_CLIENT_SECRET</code> from <code>.env.local</code>.</li>
+                    <li>Supports sandbox and live modes via the <code>PAYPAL_MODE</code> variable.</li>
+                    <li>Includes a diagnostic script <code>scripts/test-paypal-credentials.js</code> to verify credentials.</li>
+                </ul>
+                <div class="alert alert-info">
+                    <strong>Note:</strong> Always use sandbox credentials for testing and switch to live credentials
+                    only in production environments.
+                </div>
+            </section>
+
+            <!-- API Authentication Section -->
+            <section id="api-auth" class="section">
+                <h2>Authentication API</h2>
+                <p>Handle user authentication and authorization.</p>
+
+                <h3>Login</h3>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>POST /api/auth/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "password123"
+}</code></pre>
+                </div>
+
+                <h3>Register</h3>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>POST /api/auth/register
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "password123",
+  "username": "trader123"
+}</code></pre>
+                </div>
+
+                <h3>Response</h3>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>{
+  "user": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "username": "trader123"
+  },
+  "session": {
+    "access_token": "jwt_token",
+    "refresh_token": "refresh_token"
+  }
+}</code></pre>
+                </div>
+            </section>
+
+            <!-- Posts API Section -->
+            <section id="api-posts" class="section">
+                <h2>Posts API</h2>
+                <p>
+                    The Posts API is used by the frontend to list, create and fetch individual trading posts. In a
+                    typical setup you will interact with it indirectly through the application UI, but you can also
+                    call the endpoints from your own backend scripts or integrations.
+                </p>
+
+                <h3>Common Endpoints</h3>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>GET    /api/posts           # List posts (supports query filters)
+GET    /api/posts/[id]     # Fetch a single post by id (public data)
+POST   /api/posts          # Create a new post (requires authenticated user)
+PATCH  /api/posts/[id]     # Update a post (owner or admin only)
+DELETE /api/posts/[id]     # Delete a post (owner or admin only)</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <strong>Note:</strong> Exact routes and payloads may change between versions. Always check the
+                    implemented handlers under <code>src/app/api</code> in your copy of the source code.
+                </div>
+            </section>
+
+            <!-- Users API Section -->
+            <section id="api-users" class="section">
+                <h2>Users API</h2>
+                <p>
+                    The Users API exposes basic read operations for user profiles and is primarily used by the
+                    traders directory, profile pages and admin tools.
+                </p>
+
+                <h3>Common Endpoints</h3>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>GET  /api/users            # List users (supports pagination and filters)
+GET  /api/users/[id]      # Fetch a single user profile
+PATCH /api/users/[id]     # Update profile (owner) or perform admin actions</code></pre>
+                </div>
+
+                <div class="alert alert-info">
+                    <strong>Security:</strong> Write operations should always be protected by authentication and
+                    role checks. Never expose raw user data to the public without proper filtering.
+                </div>
+            </section>
+
+            <!-- Webhooks API Section -->
+            <section id="api-webhooks" class="section">
+                <h2>Webhooks</h2>
+                <p>
+                    Webhooks are used to receive asynchronous events from external services such as PayPal. They keep
+                    subscription and payment state in sync with TradingHub Pro.
+                </p>
+
+                <h3>PayPal Webhook</h3>
+                <p>
+                    Configure a webhook URL in your PayPal developer dashboard that points to your deployment, for
+                    example:
+                </p>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>POST https://your-domain.com/api/webhooks/paypal</code></pre>
+                </div>
+                <p>
+                    The handler should verify the event signature, then update subscription status in your database
+                    based on the incoming event type (created, renewed, cancelled, etc.).
+                </p>
+            </section>
+
+            <!-- Admin Panel Section -->
+            <section id="admin-panel" class="section">
+                <h2>Admin Panel</h2>
+                <p>Manage your platform through the comprehensive admin panel.</p>
+
+                <h3>Accessing Admin Panel</h3>
+                <p>Navigate to <code>/admin</code> and login with your admin credentials.</p>
+
+                <h3>Features</h3>
+                <ul>
+                    <li><strong>Dashboard</strong> - Overview of platform statistics</li>
+                    <li><strong>User Management</strong> - View, edit, and manage users</li>
+                    <li><strong>Post Moderation</strong> - Approve, reject, or delete posts</li>
+                    <li><strong>Settings</strong> - Configure platform settings</li>
+                    <li><strong>Analytics</strong> - View detailed analytics and reports</li>
+                </ul>
+
+                <div class="alert alert-danger">
+                    <strong>Security:</strong> Admin routes are protected and require authentication. Never expose admin API endpoints publicly.
+                </div>
+            </section>
+
+            <!-- Admin User Management Section -->
+            <section id="admin-users" class="section">
+                <h2>User Management</h2>
+                <p>
+                    The User Management area of the admin panel allows you to review and manage all registered
+                    accounts on the platform.
+                </p>
+                <h3>Key Capabilities</h3>
+                <ul>
+                    <li>Search and filter users by email, role, status or creation date.</li>
+                    <li>View basic profile information, subscription status and recent activity.</li>
+                    <li>Activate, deactivate or ban accounts when necessary.</li>
+                    <li>Promote trusted accounts to elevated roles according to your business rules.</li>
+                </ul>
+                <div class="alert alert-warning">
+                    <strong>Tip:</strong> Always limit access to this section to trusted administrators only and
+                    avoid performing destructive operations on live data in a demo environment.
+                </div>
+            </section>
+
+            <!-- Admin Settings Section -->
+            <section id="admin-settings" class="section">
+                <h2>Settings</h2>
+                <p>
+                    The Settings area centralizes configuration for branding, email, payments and integrations.
+                    Use it after the initial installation to fine-tune how TradingHub Pro behaves in production.
+                </p>
+
+                <h3>Typical Tabs</h3>
+                <ul>
+                    <li><strong>General</strong> – Application name, public URL, logo and basic branding.</li>
+                    <li><strong>Email</strong> – SMTP sender details and notification toggles.</li>
+                    <li><strong>Payments</strong> – PayPal mode (sandbox/live), client ID and secret.</li>
+                    <li><strong>Limits &amp; Security</strong> – Rate limits, posting limits and safety switches.</li>
+                    <li><strong>Integrations</strong> – Optional services such as Telegram or analytics tools.</li>
+                </ul>
+
+                <div class="alert alert-info">
+                    <strong>Important:</strong> After changing critical settings (such as payment or authentication
+                    providers) make sure to redeploy or restart your application if required by your hosting
+                    environment.
+                </div>
+            </section>
+
+            <!-- Deployment Section -->
+            <section id="deploy-vercel" class="section">
+                <h2>Deploy to Vercel</h2>
+                <p>Deploy your TradingHub Pro application to Vercel in minutes.</p>
+
+                <h3>Steps</h3>
+                <ol>
+                    <li>Push your code to a Git repository</li>
+                    <li>Import project to Vercel</li>
+                    <li>Configure environment variables</li>
+                    <li>Deploy</li>
+                </ol>
+
+                <h3>Environment Variables in Vercel</h3>
+                <p>Add all required environment variables in the Vercel dashboard:</p>
+                <ul>
+                    <li>Go to Project Settings</li>
+                    <li>Navigate to Environment Variables</li>
+                    <li>Add each variable from your .env.local</li>
+                    <li>Redeploy for changes to take effect</li>
+                </ul>
+            </section>
+
+            <!-- Deploy to VPS Section -->
+            <section id="deploy-vps" class="section">
+                <h2>Deploy to VPS</h2>
+                <p>
+                    You can deploy TradingHub Pro to any modern Linux VPS (for example Ubuntu 22.04) that supports
+                    Node.js. The exact steps depend on your provider, but the general flow is:
+                </p>
+                <ol>
+                    <li>Provision a VPS and point your domain DNS to its IP address.</li>
+                    <li>Install Node.js LTS, Git and a process manager such as <code>pm2</code>.</li>
+                    <li>Clone your TradingHub Pro repository to the server.</li>
+                    <li>Create an <code>.env.local</code> file on the VPS with the same values you use locally.</li>
+                    <li>Run <code>npm install</code>, then <code>npm run build</code> and finally
+                        <code>npm run start</code> (or use <code>pm2 start</code>).</li>
+                    <li>Configure a reverse proxy such as Nginx or Caddy to serve the app over HTTPS.</li>
+                </ol>
+                <div class="alert alert-success">
+                    <strong>Tip:</strong> Use separate environments (staging vs production) with different databases
+                    and API keys to keep test data isolated from real traders.
+                </div>
+            </section>
+
+            <!-- Docker Setup Section -->
+            <section id="deploy-docker" class="section">
+                <h2>Docker Setup</h2>
+                <p>
+                    If you prefer containers, you can run TradingHub Pro inside Docker. The following example shows a
+                    minimal Dockerfile that you can adapt to your own CI/CD pipeline:
+                </p>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install --production
+
+COPY . .
+
+RUN npm run build
+
+EXPOSE 3000
+
+CMD ["npm", "run", "start"]</code></pre>
+                </div>
+                <p>
+                    You can then build and run the image with:
+                </p>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>docker build -t tradinghub-pro .
+docker run -p 3000:3000 --env-file .env.local tradinghub-pro</code></pre>
+                </div>
+            </section>
+
+            <!-- Database Schema Generator Section -->
+            <section id="database-schema-generator" class="section">
+                <h2>Database Schema Generator</h2>
+                <p>
+                    This utility script generates SQL for the public schema from Supabase JSON metadata. 
+                    It's useful for recreating your database structure or migrating to a new Supabase project.
+                </p>
+
+                <h3>Usage</h3>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>node scripts/generate_public_schema_sql.js</code></pre>
+                </div>
+
+                <h3>Features</h3>
+                <ul>
+                    <li><strong>Enum Types</strong> - Recreates all custom enum types</li>
+                    <li><strong>Tables</strong> - Creates tables with proper foreign key relationships</li>
+                    <li><strong>Functions</strong> - Includes all database functions</li>
+                    <li><strong>RLS Policies</strong> - Row Level Security policies</li>
+                </ul>
+
+                <div class="alert alert-info">
+                    <strong>Location:</strong> The script is located at <code>scripts/generate_public_schema_sql.js</code>
+                    and generates SQL from your Supabase metadata JSON files.
+                </div>
+
+                <h3>Required JSON Files</h3>
+                <p>The script expects these JSON metadata files in the <code>DATABASE/database json/</code> directory:</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Purpose</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>Enums.json</code></td>
+                            <td>Custom enum types and their values</td>
+                        </tr>
+                        <tr>
+                            <td><code>tables.json</code></td>
+                            <td>Table structures, columns, and data types</td>
+                        </tr>
+                        <tr>
+                            <td><code>type (table_view).json</code></td>
+                            <td>Classification between tables and views</td>
+                        </tr>
+                        <tr>
+                            <td><code>Indexes.json</code></td>
+                            <td>Database index definitions</td>
+                        </tr>
+                        <tr>
+                            <td><code>functions.json</code></td>
+                            <td>Database function definitions</td>
+                        </tr>
+                        <tr>
+                            <td><code>Triggers.json</code></td>
+                            <td>Database trigger configurations</td>
+                        </tr>
+                        <tr>
+                            <td><code>RLS Policies.json</code></td>
+                            <td>Row Level Security policies</td>
+                        </tr>
+                        <tr>
+                            <td><code>permissions.json</code></td>
+                            <td>Database permissions and grants</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Key Functions</h3>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>// Main utility functions in the script:
+
+function loadJson(relativePath) {
+  // Loads JSON metadata files safely
+}
+
+function quoteIdent(name) {
+  // Properly quotes SQL identifiers when needed
+}
+
+function getForeignKeyReference(columnName, tableName) {
+  // Maps foreign key relationships
+  const fkMap = {
+    'user_id': 'auth.users',
+    'post_id': 'public.posts',
+    'comment_id': 'public.comments',
+    // ... more mappings
+  };
+}
+
+function sortTablesByDependencies(tableNames, tableColumns) {
+  // Sorts tables by dependency order for proper creation
+}</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <strong>Important:</strong> This script focuses only on the public schema. 
+                    System schemas like auth, storage, and realtime are not included in the output.
+                </div>
+            </section>
+
+            <!-- Database: Folder Structure -->
+            <section id="database-folder" class="section">
+                <h2>Database Folder Structure</h2>
+                <p>This is the layout of the <code>DATABASE</code> directory used by the schema generator.</p>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>DATABASE/
+├─ database json/
+│  ├─ Enums.json
+│  ├─ tables.json
+│  ├─ type (table_view).json
+│  ├─ Indexes.json
+│  ├─ functions.json
+│  ├─ Triggers.json
+│  ├─ RLS Policies.json
+│  └─ permissions.json
+└─ SQL _database/
+   └─ generated_public_schema.sql</code></pre>
+                </div>
+            </section>
+
+            <!-- Database: Generate Public Schema Script -->
+            <section id="script-generate-public-schema" class="section">
+                <h2>Generate Public Schema Script</h2>
+                <p>
+                    Utility script that builds SQL for the <code>public</code> schema from Supabase JSON metadata.
+                    Location: <code>scripts/generate_public_schema_sql.js</code>
+                </p>
+                <h3>Usage</h3>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code># From the scripts/ directory
+node generate_public_schema_sql.js
+
+# Output file (created/overwritten):
+scripts/generated_public_schema.sql</code></pre>
+                </div>
+                <h3>Representative Code (excerpt)</h3>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>// Utility script to generate SQL for the public schema from Supabase JSON metadata
+// Usage:
+//   node generate_public_schema_sql.js
+
+const fs = require('fs');
+const path = require('path');
+
+function loadJson(relativePath) {
+  const fullPath = path.join(__dirname, relativePath);
+  const raw = fs.readFileSync(fullPath, 'utf8');
+  return JSON.parse(raw);
+}
+
+function addEnumsSection(out, enumRows) { /* ... */ }
+function addTablesSection(out, tableColumns, tableTypeMap) { /* ... */ }
+function addIndexesSection(out, indexRows, tableTypeMap) { /* ... */ }
+function addFunctionsSection(out, functions) { /* ... */ }
+async function addViewsSection(out, tableColumns, tableTypes) { /* ... */ }
+function addRlsSection(out, policies, tableTypeMap) { /* ... */ }
+function addGrantsSection(out, grants, tableTypeMap) { /* ... */ }
+
+async function main() {
+  const enums = loadJson('../DATABASE/database json/Enums.json');
+  const tables = loadJson('../DATABASE/database json/tables.json');
+  const tableTypes = loadJson('../DATABASE/database json/type (table_view).json');
+  const indexes = loadJson('../DATABASE/database json/Indexes.json');
+  const policies = loadJson('../DATABASE/database json/RLS Policies.json');
+  const permissions = loadJson('../DATABASE/database json/permissions.json');
+  const functions = loadJson('../DATABASE/database json/functions.json');
+  const triggers = loadJson('../DATABASE/database json/Triggers.json');
+
+  const out = [];
+  // Sections building...
+  // addEnumsSection(out, enums);
+  // addTablesSection(out, tableColumns, tableTypeMap);
+  // addIndexesSection(out, indexes, tableTypeMap);
+  // addFunctionsSection(out, functions);
+  // await addViewsSection(out, tableColumns, tableTypes);
+  // addRlsSection(out, policies, tableTypeMap);
+  // addGrantsSection(out, permissions, tableTypeMap);
+
+  const outputPath = path.join(__dirname, 'generated_public_schema.sql');
+  fs.writeFileSync(outputPath, out.join('\n'), 'utf8');
+  console.log('Generated', outputPath);
+}
+
+main().catch((e) => {
+  console.error('Error generating SQL:', e);
+  process.exitCode = 1;
+});</code></pre>
+                </div>
+                <div class="alert alert-info">
+                    Full source is available at <code>scripts/generate_public_schema_sql.js</code>.
+                </div>
+            </section>
+
+            <!-- Scripts: Telegram Webhook Diagnostic -->
+            <section id="script-check-telegram-webhook" class="section">
+                <h2>Telegram Webhook Diagnostic Script</h2>
+                <p>
+                    Checks and fixes Telegram webhook configuration. Also validates endpoint reachability and prints bot info.
+                    Usage: <code>node scripts/check-telegram-webhook.js</code>
+                </p>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>/**
+ * Telegram Webhook Diagnostic Script
+ * Checks and fixes webhook configuration
+ * 
+ * Usage: node scripts/check-telegram-webhook.js
+ */
+const fs = require('fs');
+const path = require('path');
+const https = require('https');
+
+function httpRequest(url, options = {}) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(url, {
+      method: options.method || 'GET',
+      headers: options.headers || {}
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          resolve({ status: res.statusCode, json: () => JSON.parse(data) });
+        } catch {
+          resolve({ status: res.statusCode, json: () => ({}) });
+        }
+      });
+    });
+    req.on('error', reject);
+    if (options.body) req.write(typeof options.body === 'string' ? options.body : JSON.stringify(options.body));
+    req.end();
+  });
+}
+
+// Load .env.local
+try {
+  const envPath = path.join(__dirname, '..', '.env.local');
+  const envContent = fs.readFileSync(envPath, 'utf-8');
+  envContent.split('\n').forEach(line => {
+    const match = line.match(/^([^=]+)=(.*)$/);
+    if (match) {
+      const key = match[1].trim();
+      const value = match[2].trim().replace(/^["']|["']$/g, '');
+      process.env[key] = value;
+    }
+  });
+} catch (err) {
+  console.warn('⚠️  Could not load .env.local:', err.message);
+}
+
+async function checkWebhook() {
+  const token = process.env.TELEGRAMBOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
+  
+  if (!token) {
+    console.error('❌ TELEGRAMBOT_TOKEN not found in .env.local');
+    return;
+  }
+
+  console.log('🔍 Checking webhook status...\n');
+
+  try {
+    // Get current webhook info
+    const infoRes = await httpRequest(`https://api.telegram.org/bot${token}/getWebhookInfo`);
+    const info = await infoRes.json();
+    
+    console.log('📡 Current Webhook Info:');
+    console.log(JSON.stringify(info.result, null, 2));
+    console.log('');
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+    const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    
+    if (!appUrl) {
+      console.error('❌ NEXT_PUBLIC_APP_URL not set in .env.local');
+      console.log('💡 Add: NEXT_PUBLIC_APP_URL=https://your-ngrok-url.ngrok-free.app\n');
+      return;
+    }
+
+    if (!webhookSecret) {
+      console.error('⚠️  TELEGRAM_WEBHOOK_SECRET not set in .env.local');
+      console.log('💡 Add: TELEGRAM_WEBHOOK_SECRET=your-secret-token-here');
+      console.log('💡 You can use: ' + require('crypto').randomBytes(32).toString('hex') + '\n');
+    }
+
+    const targetUrl = `${appUrl}/api/telegram/webhook`;
+    console.log('🎯 Target webhook URL:', targetUrl);
+    console.log('🔐 Secret token:', webhookSecret ? '✓ Set' : '✗ Not set');
+    console.log('');
+
+    // Check if webhook needs update
+    if (info.result.url !== targetUrl) {
+      console.log('⚙️  Webhook URL mismatch, updating...\n');
+      
+      const setRes = await httpRequest(`https://api.telegram.org/bot${token}/setWebhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: targetUrl,
+          secret_token: webhookSecret || '',
+          allowed_updates: ['message', 'callback_query']
+        })
+      });
+      
+      const setResult = await setRes.json();
+      
+      if (setResult.ok) {
+        console.log('✅ Webhook updated successfully!');
+        console.log(JSON.stringify(setResult.result, null, 2));
+      } else {
+        console.error('❌ Failed to update webhook:', setResult.description);
+      }
+    } else {
+      console.log('✅ Webhook URL is correct');
+    }
+
+    // Test webhook URL accessibility
+    console.log('\n🧪 Testing webhook endpoint...');
+    try {
+      const testRes = await httpRequest(targetUrl, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Telegram-Bot-Api-Secret-Token': webhookSecret || 'test'
+        },
+        body: JSON.stringify({ test: true })
+      });
+      console.log('Response status:', testRes.status);
+      if (testRes.status === 401) {
+        console.log('⚠️  401 Unauthorized - Secret token validation working');
+      } else if (testRes.status === 200) {
+        console.log('✅ Webhook endpoint accessible');
+      } else {
+        console.log('⚠️  Unexpected status:', testRes.status);
+      }
+    } catch (err) {
+      console.error('❌ Cannot reach webhook endpoint:', err.message);
+      console.log('💡 Make sure ngrok/tunnel is running and NEXT_PUBLIC_APP_URL is correct');
+    }
+
+    // Get bot info
+    console.log('\n🤖 Bot Info:');
+    const botRes = await httpRequest(`https://api.telegram.org/bot${token}/getMe`);
+    const botInfo = await botRes.json();
+    if (botInfo.ok) {
+      console.log('  Username: @' + botInfo.result.username);
+      console.log('  Name:', botInfo.result.first_name);
+      console.log('  ID:', botInfo.result.id);
+    }
+
+    console.log('\n📋 Next Steps:');
+    console.log('1. Open Telegram and search for @' + (botInfo.result?.username || 'your_bot'));
+    console.log('2. Send /start command');
+    console.log('3. Check Next.js terminal for webhook logs: [webhook] POST received');
+    console.log('4. Check Supabase telegram_subscribers table for new row\n');
+
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+  }
+}
+
+checkWebhook();
+</code></pre>
+                </div>
+            </section>
+            <!-- Scripts: Telegram Domain Setup -->
+            <section id="script-setup-telegram-domain" class="section">
+                <h2>Telegram Domain Setup Script</h2>
+                <p>
+                    Sets Telegram webhook to your public domain (or tunnel) and verifies configuration.
+                    Usage: <code>npm run telegram:setup</code> or <code>node scripts/setup-telegram-domain.js</code>
+                </p>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>#!/usr/bin/env node
+
+/**
+ * Telegram Domain Setup Script
+ * npm run telegram:setup
+ * Sets up Telegram bot webhook with domain configuration
+ */
+
+const https = require('https');
+const { URL } = require('url');
+const path = require('path');
+const fs = require('fs');
+
+// Load environment variables from .env.local
+function loadEnvFile() {
+  const envPath = path.join(__dirname, '..', '.env.local');
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    const lines = envContent.split('\n');
+    
+    lines.forEach(line => {
+      line = line.trim();
+      if (line && !line.startsWith('#')) {
+        const [key, ...valueParts] = line.split('=');
+        if (key && valueParts.length > 0) {
+          const value = valueParts.join('=');
+          process.env[key] = value;
+        }
+      }
+    });
+    console.log('✅ Loaded environment variables from .env.local');
+  } else {
+    console.log('⚠️ No .env.local file found');
+  }
+}
+
+// Load env file first
+loadEnvFile();
+
+// Configuration
+const config = {
+  botToken: process.env.TELEGRAM_BOT_TOKEN || process.env.TELEGRAMBOT_TOKEN,
+  domain: process.env.NEXT_PUBLIC_APP_URL || process.argv[2],
+  webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET,
+};
+
+// Colors for console output
+const colors = {
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  reset: '\x1b[0m'
+};
+
+function log(message, color = colors.reset) {
+  console.log(`${color}${message}${colors.reset}`);
+}
+
+// Validate inputs
+function validateConfig() {
+  if (!config.botToken) {
+    log('❌ Bot Token is required', colors.red);
+    log('Set TELEGRAM_BOT_TOKEN or TELEGRAMBOT_TOKEN in .env.local', colors.yellow);
+    process.exit(1);
+  }
+
+  if (!config.domain) {
+    log('❌ Domain is required', colors.red);
+    log('Usage: node setup-telegram-domain.js https://yourdomain.com', colors.yellow);
+    log('Or set NEXT_PUBLIC_APP_URL in .env.local', colors.yellow);
+    process.exit(1);
+  }
+
+  // Ensure domain has https://
+  if (!config.domain.startsWith('http')) {
+    config.domain = `https://${config.domain}`;
+  }
+
+  try {
+    new URL(config.domain);
+  } catch (error) {
+    log('❌ Invalid domain URL', colors.red);
+    process.exit(1);
+  }
+
+  log('✅ Configuration validated', colors.green);
+}
+
+// Make HTTPS request
+function makeRequest(url, data = null) {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || 443,
+      path: urlObj.pathname + urlObj.search,
+      method: data ? 'POST' : 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Telegram-Domain-Setup-Script'
+      }
+    };
+
+    if (data) {
+      const postData = JSON.stringify(data);
+      options.headers['Content-Length'] = Buffer.byteLength(postData);
+    }
+
+    const req = https.request(options, (res) => {
+      let responseData = '';
+      res.on('data', (chunk) => {
+        responseData += chunk;
+      });
+      res.on('end', () => {
+        try {
+          const parsedData = JSON.parse(responseData);
+          resolve(parsedData);
+        } catch (error) {
+          reject(new Error(`Invalid JSON response: ${responseData}`));
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      reject(error);
+    });
+
+    if (data) {
+      req.write(JSON.stringify(data));
+    }
+
+    req.end();
+  });
+}
+
+// Test bot token
+async function testBotToken() {
+  log('🤖 Testing bot token...', colors.blue);
+  
+  try {
+    const response = await makeRequest(`https://api.telegram.org/bot${config.botToken}/getMe`);
+    
+    if (response.ok) {
+      log(`✅ Bot token is valid!`, colors.green);
+      log(`🤖 Bot name: ${response.result.first_name}`, colors.blue);
+      log(`📝 Bot username: @${response.result.username}`, colors.blue);
+      return true;
+    } else {
+      log('❌ Invalid bot token', colors.red);
+      log(`Error: ${response.description}`, colors.red);
+      return false;
+    }
+  } catch (error) {
+    log('❌ Failed to test bot token', colors.red);
+    log(`Error: ${error.message}`, colors.red);
+    return false;
+  }
+}
+
+// Set webhook
+async function setWebhook() {
+  const webhookUrl = `${config.domain}/api/webhooks/telegram`;
+  log(`🔗 Setting webhook: ${webhookUrl}`, colors.blue);
+
+  const webhookData = {
+    url: webhookUrl,
+    allowed_updates: ['message', 'callback_query', 'inline_query'],
+    drop_pending_updates: true
+  };
+
+  if (config.webhookSecret) {
+    webhookData.secret_token = config.webhookSecret;
+  }
+
+  try {
+    const response = await makeRequest(
+      `https://api.telegram.org/bot${config.botToken}/setWebhook`,
+      webhookData
+    );
+
+    if (response.ok) {
+      log('✅ Webhook set successfully!', colors.green);
+      log(`Description: ${response.description}`, colors.blue);
+      return true;
+    } else {
+      log('❌ Failed to set webhook', colors.red);
+      log(`Error: ${response.description}`, colors.red);
+      return false;
+    }
+  } catch (error) {
+    log('❌ Failed to set webhook', colors.red);
+    log(`Error: ${error.message}`, colors.red);
+    return false;
+  }
+}
+
+// Verify webhook
+async function verifyWebhook() {
+  log('🔍 Verifying webhook...', colors.blue);
+
+  try {
+    const response = await makeRequest(`https://api.telegram.org/bot${config.botToken}/getWebhookInfo`);
+
+    if (response.ok) {
+      const info = response.result;
+      log('✅ Webhook info retrieved:', colors.green);
+      log(`📍 URL: ${info.url}`, colors.blue);
+      log(`📊 Pending updates: ${info.pending_update_count}`, colors.blue);
+      log(`🕒 Last error date: ${info.last_error_date ? new Date(info.last_error_date * 1000).toISOString() : 'None'}`, colors.blue);
+      
+      if (info.last_error_message) {
+        log(`⚠️ Last error: ${info.last_error_message}`, colors.yellow);
+      }
+
+      const expectedUrl = `${config.domain}/api/webhooks/telegram`;
+      if (info.url === expectedUrl) {
+        log('✅ Webhook URL matches expected URL', colors.green);
+        return true;
+      } else {
+        log('⚠️ Webhook URL mismatch!', colors.yellow);
+        log(`Expected: ${expectedUrl}`, colors.yellow);
+        log(`Actual: ${info.url}`, colors.yellow);
+        return false;
+      }
+    } else {
+      log('❌ Failed to get webhook info', colors.red);
+      log(`Error: ${response.description}`, colors.red);
+      return false;
+    }
+  } catch (error) {
+    log('❌ Failed to verify webhook', colors.red);
+    log(`Error: ${error.message}`, colors.red);
+    return false;
+  }
+}
+
+// Test webhook endpoint
+async function testWebhookEndpoint() {
+  const webhookUrl = `${config.domain}/api/webhooks/telegram`;
+  log(`🧪 Testing webhook endpoint: ${webhookUrl}`, colors.blue);
+
+  try {
+    const response = await makeRequest(webhookUrl);
+    log('✅ Webhook endpoint is reachable', colors.green);
+    return true;
+  } catch (error) {
+    if (error.code === 'ENOTFOUND') {
+      log('❌ Domain not found - check DNS configuration', colors.red);
+    } else if (error.code === 'ECONNREFUSED') {
+      log('❌ Connection refused - server may be down', colors.red);
+    } else {
+      log(`⚠️ Endpoint test result: ${error.message}`, colors.yellow);
+      log('Note: This may be normal if the endpoint expects POST requests', colors.yellow);
+    }
+    return false;
+  }
+}
+
+// Generate environment variables
+function generateEnvVars() {
+  log('\n📄 Environment Variables:', colors.blue);
+  console.log(`TELEGRAM_BOT_TOKEN=${config.botToken}`);
+  console.log(`TELEGRAM_WEBHOOK_URL=${config.domain}/api/webhooks/telegram`);
+  console.log(`NEXT_PUBLIC_APP_URL=${config.domain}`);
+  
+  if (config.webhookSecret) {
+    console.log(`TELEGRAM_WEBHOOK_SECRET=${config.webhookSecret}`);
+  }
+
+  log('\n💡 Add these to your .env.local or deployment environment', colors.yellow);
+}
+
+// Main function
+async function main() {
+  log('🚀 Telegram Domain Setup Script', colors.blue);
+  log('================================', colors.blue);
+
+  // Validate configuration
+  validateConfig();
+
+  log(`\n🔧 Configuration:`, colors.blue);
+  log(`Domain: ${config.domain}`, colors.blue);
+  log(`Bot Token: ${config.botToken.substring(0, 10)}...`, colors.blue);
+  log(`Webhook Secret: ${config.webhookSecret ? 'Set' : 'Not set'}`, colors.blue);
+
+  // Test bot token
+  const botValid = await testBotToken();
+  if (!botValid) {
+    process.exit(1);
+  }
+
+  // Set webhook
+  const webhookSet = await setWebhook();
+  if (!webhookSet) {
+    process.exit(1);
+  }
+
+  // Verify webhook
+  await verifyWebhook();
+
+  // Test endpoint
+  await testWebhookEndpoint();
+
+  // Generate env vars
+  generateEnvVars();
+
+  log('\n🎉 Telegram domain setup completed!', colors.green);
+  log('\n📋 Next Steps:', colors.blue);
+  log('1. Deploy your application with the webhook API route', colors.yellow);
+  log('2. Test the bot by sending a message', colors.yellow);
+  log('3. Monitor webhook calls in your application logs', colors.yellow);
+}
+
+// Handle errors
+process.on('unhandledRejection', (error) => {
+  log(`❌ Unhandled error: ${error.message}`, colors.red);
+  process.exit(1);
+});
+
+// Run main function
+if (require.main === module) {
+  main().catch((error) => {
+    log(`❌ Script failed: ${error.message}`, colors.red);
+    process.exit(1);
+  });
+}
+
+module.exports = { main, testBotToken, setWebhook, verifyWebhook };
+</code></pre>
+                </div>
+            </section>
+            <!-- Scripts: PayPal Credentials Diagnostic -->
+            <section id="script-test-paypal-credentials" class="section">
+                <h2>PayPal Credentials Diagnostic Script</h2>
+                <p>
+                    Verifies your PayPal REST API credentials (sandbox or live) by fetching an access token.
+                    Usage: <code>node scripts/test-paypal-credentials.js</code>
+                </p>
+                <div class="code-container">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre><code>/**
+ * PayPal Credentials Diagnostic Script
+ * Tests if PayPal credentials are valid and can authenticate
+ */
+const fs = require('fs');
+const path = require('path');
+
+// Load .env.local manually
+try {
+  const envPath = path.join(__dirname, '..', '.env.local');
+  const envContent = fs.readFileSync(envPath, 'utf8');
+  envContent.split('\n').forEach(line => {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const [key, ...valueParts] = trimmed.split('=');
+      if (key && valueParts.length > 0) {
+        let value = valueParts.join('=').trim();
+        // Strip wrapping quotes like KEY="value" to behave like dotenv
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith('\'') && value.endsWith('\''))) {
+          value = value.slice(1, -1);
+        }
+        process.env[key.trim()] = value;
+      }
+    }
+  });
+} catch (err) {
+  console.error('Could not load .env.local:', err.message);
+}
+
+const PAYPAL_MODE = ((process.env.PAYPAL_MODE || process.env.NEXT_PUBLIC_PAYPAL_MODE || 'sandbox').toLowerCase() === 'live') ? 'live' : 'sandbox';
+const PAYPAL_BASE = PAYPAL_MODE === 'live'
+  ? 'https://api-m.paypal.com'
+  : 'https://api-m.sandbox.paypal.com';
+
+function getCredentials() {
+  const isLive = PAYPAL_MODE === 'live';
+  const clientId = isLive
+    ? (process.env.PAYPAL_LIVE_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID_LIVE || process.env.PAYPAL_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID)
+    : (process.env.PAYPAL_SANDBOX_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID_SANDBOX || process.env.PAYPAL_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID);
+  const clientSecret = isLive
+    ? (process.env.PAYPAL_LIVE_CLIENT_SECRET || process.env.PAYPAL_CLIENT_SECRET)
+    : (process.env.PAYPAL_SANDBOX_CLIENT_SECRET || process.env.PAYPAL_CLIENT_SECRET);
+  return { clientId, clientSecret };
+}
+
+async function testPayPalAuth() {
+  console.log('🔍 Testing PayPal Credentials...\n');
+  
+  const { clientId, clientSecret } = getCredentials();
+  
+  console.log('📋 Configuration:');
+  console.log(`   Mode: ${PAYPAL_MODE}`);
+  console.log(`   Base URL: ${PAYPAL_BASE}`);
+  console.log(`   Client ID: ${clientId ? `${clientId.substring(0, 20)}...` : '❌ MISSING'}`);
+  console.log(`   Client Secret: ${clientSecret ? `${clientSecret.substring(0, 10)}...` : '❌ MISSING'}\n`);
+  
+  if (!clientId || !clientSecret) {
+    console.error('❌ ERROR: Missing credentials!');
+    console.log('\n📝 Please set the following in .env.local:');
+    console.log('   NEXT_PUBLIC_PAYPAL_CLIENT_ID=<your-client-id>');
+    console.log('   PAYPAL_CLIENT_SECRET=<your-client-secret>');
+    console.log('   PAYPAL_MODE=sandbox\n');
+    process.exit(1);
+  }
+  
+  console.log('🔐 Attempting to authenticate with PayPal...\n');
+  
+  const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+  
+  try {
+    const response = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'grant_type=client_credentials',
+    });
+    
+    const responseText = await response.text();
+    
+    if (!response.ok) {
+      console.error('❌ AUTHENTICATION FAILED!\n');
+      console.log('HTTP Status:', response.status, response.statusText);
+      
+      try {
+        const errorData = JSON.parse(responseText);
+        console.log('Error Response:', JSON.stringify(errorData, null, 2));
+        
+        if (response.status === 401) {
+          console.log('\n💡 Solution:');
+          console.log('   1. Your Client ID or Secret is incorrect');
+          console.log('   2. Get new credentials from PayPal Dashboard:');
+          console.log('      👉 https://developer.paypal.com/dashboard/');
+          console.log('   3. Make sure you are in Sandbox mode');
+          console.log('   4. Copy both Client ID and Secret from the SAME app');
+          console.log('   5. Update .env.local with the new credentials');
+          console.log('   6. Restart your dev server\n');
+          
+          console.log('📖 Full guide: PAYPAL_CREDENTIALS_SETUP.md\n');
+        }
+      } catch (e) {
+        console.log('Raw Error:', responseText);
+      }
+      
+      process.exit(1);
+    }
+    
+    const data = JSON.parse(responseText);
+    
+    console.log('✅ AUTHENTICATION SUCCESSFUL!\n');
+    console.log('Access Token:', data.access_token.substring(0, 30) + '...');
+    console.log('Token Type:', data.token_type);
+    console.log('Expires In:', data.expires_in, 'seconds');
+    console.log('App ID:', data.app_id || 'N/A');
+    console.log('\n🎉 Your PayPal credentials are working correctly!');
+    console.log('✅ You can now use PayPal checkout in your app.\n');
+    
+  } catch (error) {
+    console.error('❌ NETWORK ERROR:', error.message);
+    console.log('\n💡 Possible causes:');
+    console.log('   - No internet connection');
+    console.log('   - PayPal API is down');
+    console.log('   - Firewall blocking the request\n');
+    process.exit(1);
+  }
+}
+
+// Run the test
+testPayPalAuth().catch(err => {
+  console.error('Unexpected error:', err);
+  process.exit(1);
+});
+</code></pre>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // Theme Toggle
+        function toggleTheme() {
+            const body = document.body;
+            const btn = document.querySelector('.theme-toggle');
+            
+            if (body.classList.contains('dark')) {
+                body.classList.remove('dark');
+                btn.textContent = '🌙 Dark Mode';
+                localStorage.setItem('theme', 'light');
+            } else {
+                body.classList.add('dark');
+                btn.textContent = '☀️ Light Mode';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+
+        // Load saved theme
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('theme');
+            const btn = document.querySelector('.theme-toggle');
+            
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark');
+                btn.textContent = '☀️ Light Mode';
+            }
+
+            // Set active nav link based on scroll
+            const sections = document.querySelectorAll('.section');
+            const navLinks = document.querySelectorAll('.nav-link');
+
+            window.addEventListener('scroll', () => {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    const sectionHeight = section.clientHeight;
+                    if (scrollY >= (sectionTop - 200)) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').slice(1) === current) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+        });
+
+        // Mobile Menu Toggle
+        function toggleMenu() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('active');
+        }
+
+        // Copy Code Function
+        function copyCode(btn) {
+            const codeBlock = btn.parentElement.querySelector('pre code');
+            const text = codeBlock.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                    btn.classList.remove('copied');
+                }, 2000);
+            });
+        }
+
+        // Smooth scroll for navigation links
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href').slice(1);
+                const targetSection = document.getElementById(targetId);
+                
+                if (targetSection) {
+                    targetSection.scrollIntoView({ behavior: 'smooth' });
+                    
+                    // Close mobile menu if open
+                    const sidebar = document.getElementById('sidebar');
+                    if (window.innerWidth <= 768) {
+                        sidebar.classList.remove('active');
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

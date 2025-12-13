@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 // Debug flag to reduce noisy logs in production
 const DEBUG = process.env.PRICE_CHECK_DEBUG === '1' || process.env.PRICE_CHECK_DEBUG === 'true';
 
@@ -17,15 +18,22 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 // Create client function to be called when needed
 const createSupabaseClient = (accessToken) => {
-  return createClient(supabaseUrl || '', supabaseAnonKey || '', {
+  const key = supabaseServiceRoleKey || supabaseAnonKey || '';
+  const options = {
     auth: {
       autoRefreshToken: false,
       persistSession: false
-    },
-    global: {
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
     }
-  });
+  };
+  
+  // If we have an access token and NO service role key, use it
+  if (accessToken && !supabaseServiceRoleKey) {
+    options.global = {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    };
+  }
+  
+  return createClient(supabaseUrl || '', key, options);
 };
 
 // Admin client is created lazily inside the POST handler to avoid build-time env errors

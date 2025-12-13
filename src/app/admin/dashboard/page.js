@@ -4,12 +4,15 @@ import { useState, useEffect } from 'react';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/admin/AdminLayout';
+import AdminLoadingPage from '@/components/admin/AdminLoadingPage';
 import { toast } from 'sonner';
 import styles from '@/styles/admin/dashboard.module.css';
+import { useDemoMode } from '@/providers/DemoModeProvider';
 
 export default function AdminDashboard() {
   const { user, loading } = useSupabase();
   const router = useRouter();
+  const { isDemoAdmin } = useDemoMode();
   const [dashboardData, setDashboardData] = useState({
     users: { total: 0, active: 0, new: 0, banned: 0 },
     posts: { total: 0, pending: 0, featured: 0, today: 0 },
@@ -50,6 +53,30 @@ export default function AdminDashboard() {
   const fetchDashboardData = async () => {
     try {
       setIsLoading(true);
+      if (isDemoAdmin) {
+        setDashboardData({
+          users: { total: 1240, active: 1180, new: 32, banned: 28 },
+          posts: { total: 9800, pending: 21, featured: 45, today: 120 },
+          revenue: { monthly: 12500, yearly: 98000, total: 245000 },
+          activity: [
+            {
+              timestamp: new Date().toISOString(),
+              message: 'Demo: New user registered',
+            },
+            {
+              timestamp: new Date().toISOString(),
+              message: 'Demo: Subscription payment processed',
+            },
+          ],
+          systemStatus: {
+            database: 'healthy',
+            storage: 'healthy',
+            api: 'healthy',
+          },
+        });
+        setIsLoading(false);
+        return;
+      }
       
       // Fetch dashboard statistics
       const response = await fetch('/api/admin/dashboard');
@@ -66,14 +93,7 @@ export default function AdminDashboard() {
   };
 
   if (loading || isLoading) {
-    return (
-      <div className={styles.adminLayout}>
-        <div className={styles.loading}>
-          <div className={styles.spinner}></div>
-          <p>Loading Admin Dashboard...</p>
-        </div>
-      </div>
-    );
+    return <AdminLoadingPage message="Loading Admin Dashboard" />;
   }
 
   if ((!user || !isAdmin(user)) && !hasLocalAdmin) {

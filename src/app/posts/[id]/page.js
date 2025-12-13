@@ -9,8 +9,6 @@ import { COUNTRY_ISO_CODES } from '@/models/CurrencyData';
 import { getCountryForExchange } from '@/models/ExchangeData';
 import 'flag-icons/css/flag-icons.min.css';
 import { useSupabase } from '@/providers/SimpleSupabaseProvider';
-import { useProfile } from '@/providers/ProfileProvider';
-import { CommentProvider } from '@/providers/CommentProvider';
 import dynamic from 'next/dynamic';
 
 // Dynamic Imports للمكونات الثقيلة في صفحة المنشور
@@ -72,7 +70,6 @@ export default function PostDetailsPage() {
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [showCalculationInfo, setShowCalculationInfo] = useState(false);
   const { user } = useSupabase();
-  const { profile } = useProfile();
   
   // Get country code for flag display
   const getCountryCode = (post) => {
@@ -262,6 +259,7 @@ export default function PostDetailsPage() {
     async function fetchPost() {
       try {
         setLoading(true);
+
         const { data, error } = await getPostById(id);
         
         if (error) {
@@ -657,24 +655,17 @@ export default function PostDetailsPage() {
         {/* Community Interactions: Buy/Sell, Sentiment, and Comments */}
         <div className={styles.section}>
           <h3 className={styles.sectionTitle}>Community</h3>
-          <CommentProvider>
-            <PostActions 
-              postId={post.id}
-              initialBuyCount={post.buy_count || 0}
-              initialSellCount={post.sell_count || 0}
-              autoSubscribe={true}
-            />
-            <PostSentiment 
-              postId={post.id}
-              buyCount={post.buy_count || 0}
-              sellCount={post.sell_count || 0}
-            />
-            <Comments 
-              postId={post.id}
-              initialCommentCount={post.comment_count || 0}
-              autoFetchOnMount={true}
-            />
-          </CommentProvider>
+          <PostActions 
+            postId={post.id}
+            initialBuyCount={post.buy_count || 0}
+            initialSellCount={post.sell_count || 0}
+          />
+          <PostSentiment postId={post.id} />
+          <Comments 
+            postId={post.id} 
+            initialCommentCount={post.comment_count || 0}
+            autoFetchOnMount={true}
+          />
         </div>
         
         <div className={styles.footer}>

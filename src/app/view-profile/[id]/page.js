@@ -721,8 +721,8 @@ if (error) {
         </div>
       </div>
       
-      {/* Premium Stats Section - Show if broker has premium plan setup */}
-      {profileData?.is_broker && (
+      {/* Premium Stats Section - Show if broker has ACTIVE premium plan */}
+      {profileData?.is_broker && premiumPlanData && (
         <div id="premium-broker" className={styles.premiumStatsSection} style={{
           marginTop: '2rem',
           padding: '1.5rem',

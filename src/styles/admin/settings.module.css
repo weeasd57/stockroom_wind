@@ -324,3 +324,105 @@
 :global(.dark) .saveBtn:hover {
   box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
 }
+
+/* Clock Settings Specific Styles */
+.infoBox {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  border: 1px solid #3b82f6;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  display: flex;
+  gap: 1rem;
+}
+
+.infoIcon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.infoContent h3 {
+  margin: 0 0 0.5rem;
+  color: #1e40af;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.infoContent p {
+  margin: 0 0 1rem;
+  color: #1e3a8a;
+  line-height: 1.6;
+}
+
+.infoContent ul {
+  margin: 0;
+  padding-left: 1.5rem;
+  color: #1e3a8a;
+}
+
+.infoContent li {
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
+
+.previewBox {
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-top: 2rem;
+}
+
+.previewBox h4 {
+  margin: 0 0 1rem;
+  color: hsl(var(--foreground));
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.timePreview {
+  text-align: center;
+}
+
+.timeDisplay {
+  background: hsl(var(--card));
+  border: 2px solid hsl(var(--primary));
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.currentTime {
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  color: hsl(var(--primary));
+}
+
+.previewNote {
+  margin: 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+/* Dark Mode for Clock Settings */
+:global(.dark) .infoBox {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+  border-color: #3b82f6;
+}
+
+:global(.dark) .infoContent h3,
+:global(.dark) .infoContent p,
+:global(.dark) .infoContent li {
+  color: #dbeafe;
+}
+
+:global(.dark) .timeDisplay {
+  background: hsl(var(--background));
+  border-color: hsl(var(--primary));
+}
+
+:global(.dark) .currentTime {
+  color: hsl(var(--primary));
+}

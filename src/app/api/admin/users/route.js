@@ -80,12 +80,16 @@ export async function GET(request) {
  */
 export async function DELETE(request) {
   try {
-    const { admin_email, user_ids } = await request.json();
+    const body = await request.json();
+    const { admin_email, user_id, user_ids: userIdsArray, delete_all_data } = body;
+    
+    // Support both single user_id and array user_ids
+    const user_ids = userIdsArray || (user_id ? [user_id] : []);
 
     // Validate input
-    if (!admin_email || !user_ids || !Array.isArray(user_ids) || user_ids.length === 0) {
+    if (!admin_email || user_ids.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Admin email and user IDs array required' },
+        { success: false, error: 'Admin email and user ID(s) required' },
         { status: 400 }
       );
     }

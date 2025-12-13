@@ -4,11 +4,11 @@ import { NextResponse } from 'next/server';
 // In production, these would be stored in database
 let systemSettings = {
   general: {
-    siteName: 'SharksZone',
-    siteUrl: 'https://sharkszone.com',
+    siteName: 'TradingHub Pro',
+    siteUrl: 'https://tradinghub.com',
     siteDescription: 'Professional Trading Platform',
-    contactEmail: 'contact@sharkszone.com',
-    supportEmail: 'support@sharkszone.com',
+    contactEmail: 'contact@tradinghub.com',
+    supportEmail: 'support@tradinghub.com',
     timezone: 'UTC',
     language: 'en',
     maintenanceMode: false,
@@ -20,8 +20,8 @@ let systemSettings = {
     smtpUser: process.env.SMTP_USER || '',
     smtpPassword: process.env.SMTP_PASSWORD || '',
     smtpSecure: process.env.SMTP_SECURE === 'true',
-    fromName: process.env.EMAIL_FROM_NAME || 'SharksZone',
-    fromEmail: process.env.EMAIL_FROM || 'noreply@sharkszone.com',
+    fromName: process.env.EMAIL_FROM_NAME || 'TradingHub',
+    fromEmail: process.env.EMAIL_FROM || 'noreply@tradinghub.com',
     emailEnabled: process.env.EMAIL_ENABLED === 'true'
   },
   paypal: {
@@ -41,6 +41,23 @@ let systemSettings = {
     googleAnalyticsId: process.env.NEXT_PUBLIC_GA_ID || '',
     recaptchaSiteKey: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '',
     recaptchaSecretKey: process.env.RECAPTCHA_SECRET_KEY || ''
+  },
+  auth: {
+    google: {
+      enabled: false,
+      clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      allowedDomains: ''
+    }
+  },
+  clock: {
+    clockEnabled: true,
+    timezone: 'UTC',
+    showTimezone: true,
+    use24HourFormat: true,
+    syncWithServer: true,
+    autoDetectTimezone: false,
+    displayFormat: 'full'
   },
   features: {
     registrationEnabled: true,
@@ -126,7 +143,7 @@ export async function GET(request) {
 
     // Remove sensitive data before sending to client
     const clientSettings = JSON.parse(JSON.stringify(systemSettings));
-
+    
     // Mask sensitive fields
     if (clientSettings.email.smtpPassword) {
       clientSettings.email.smtpPassword = '********';
@@ -139,6 +156,9 @@ export async function GET(request) {
     }
     if (clientSettings.api.recaptchaSecretKey) {
       clientSettings.api.recaptchaSecretKey = '********';
+    }
+    if (clientSettings.auth?.google?.clientSecret) {
+      clientSettings.auth.google.clientSecret = '********';
     }
 
     return NextResponse.json({
@@ -176,17 +196,21 @@ export async function POST(request) {
 
     // Don't update masked fields
     const updatedSettings = { ...systemSettings };
-
+    
     // Update only non-sensitive fields or fields that have changed
     Object.keys(settings).forEach(section => {
-      Object.keys(settings[section]).forEach(key => {
-        const value = settings[section][key];
+      if (!updatedSettings[section]) {
+        updatedSettings[section] = {};
+      }
 
+      Object.keys(settings[section] || {}).forEach(key => {
+        const value = settings[section][key];
+        
         // Skip masked values
         if (value === '********' || (typeof value === 'string' && value.endsWith('...'))) {
           return;
         }
-
+        
         updatedSettings[section][key] = value;
       });
     });

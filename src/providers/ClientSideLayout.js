@@ -10,7 +10,9 @@ export function ClientSideLayout({ children }) {
 
   // Define pages that don't need the navbar
   const pagesWithoutNavbar = ['/landing'];
-  const shouldShowNavbar = !pagesWithoutNavbar.includes(pathname);
+  // Hide navbar for admin pages
+  const isAdminPage = pathname?.startsWith('/admin');
+  const shouldShowNavbar = !pagesWithoutNavbar.includes(pathname) && !isAdminPage;
 
   useEffect(() => {
     // Set mounted state once the component is on the client

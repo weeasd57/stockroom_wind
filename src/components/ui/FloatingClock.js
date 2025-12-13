@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { Clock, Settings, Eye, EyeOff, Move } from 'lucide-react';
 import styles from '@/styles/floating-clock.module.css';
 
 export default function FloatingClock() {
+  const pathname = usePathname();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isVisible, setIsVisible] = useState(true);
   const [position, setPosition] = useState('bottom-right');
@@ -14,6 +16,9 @@ export default function FloatingClock() {
   const [showSettings, setShowSettings] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  // Hide clock on admin pages
+  const isAdminPage = pathname?.startsWith('/admin');
 
   // Load settings from localStorage
   useEffect(() => {
@@ -141,6 +146,11 @@ export default function FloatingClock() {
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isDragging, dragOffset]);
+
+  // Don't render on admin pages
+  if (isAdminPage) {
+    return null;
+  }
 
   if (!isVisible) {
     return (

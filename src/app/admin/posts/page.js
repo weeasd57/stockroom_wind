@@ -6,16 +6,19 @@ import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { toast } from 'sonner';
 import styles from '@/styles/admin/posts.module.css';
+import { useDemoMode } from '@/providers/DemoModeProvider';
 
 export default function PostModeration() {
   const { user, loading } = useSupabase();
   const router = useRouter();
+  const { isDemoAdmin } = useDemoMode();
   const [posts, setPosts] = useState([]);
   const [filteredPosts, setFilteredPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPosts, setSelectedPosts] = useState(new Set());
   const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' });
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, postId: null, postContent: '' });
   const [filterConfig, setFilterConfig] = useState({
     status: 'all', // all, pending, approved, rejected, featured
     dateRange: 'all', // all, today, week, month
@@ -48,6 +51,47 @@ export default function PostModeration() {
   const fetchPosts = async () => {
     try {
       setIsLoading(true);
+      if (isDemoAdmin) {
+        const now = new Date().toISOString();
+        const demoPosts = [
+          {
+            id: 'demo-post-1',
+            content: 'Demo analysis on AAPL stock.',
+            stock_symbol: 'AAPL.US',
+            status: 'pending',
+            is_featured: false,
+            image_url: '',
+            likes_count: 12,
+            comments_count: 3,
+            views_count: 140,
+            created_at: now,
+            profile: {
+              username: 'demo_trader',
+              avatar_url: '/default-avatar.svg',
+            },
+          },
+          {
+            id: 'demo-post-2',
+            content: 'Demo trade idea on TSLA with clear risk management.',
+            stock_symbol: 'TSLA.US',
+            status: 'approved',
+            is_featured: true,
+            image_url: '',
+            likes_count: 34,
+            comments_count: 8,
+            views_count: 320,
+            created_at: now,
+            profile: {
+              username: 'demo_investor',
+              avatar_url: '/default-avatar.svg',
+            },
+          },
+        ];
+        setPosts(demoPosts);
+        setFilteredPosts(demoPosts);
+        setIsLoading(false);
+        return;
+      }
       
       const response = await fetch('/api/admin/posts');
       if (response.ok) {
@@ -156,22 +200,43 @@ export default function PostModeration() {
   };
 
   const handlePostAction = async (action, postIds) => {
+    if (isDemoAdmin) {
+      toast.info('Demo admin mode is read-only. No changes will be saved.');
+      return;
+    }
+    
+    const idsArray = Array.isArray(postIds) ? postIds : [postIds];
+    
     try {
       const response = await fetch('/api/admin/posts', {
-        method: 'PATCH',
+        method: action === 'delete' ? 'DELETE' : 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action,
-          post_ids: Array.isArray(postIds) ? postIds : [postIds]
+          post_ids: idsArray
         })
       });
 
       if (response.ok) {
-        toast.success(`Posts ${action}d successfully`);
-        fetchPosts();
+        // Update local state instead of fetching all posts
+        if (action === 'delete') {
+          setPosts(prev => prev.filter(post => !idsArray.includes(post.id)));
+          setFilteredPosts(prev => prev.filter(post => !idsArray.includes(post.id)));
+          toast.success(`${idsArray.length} post(s) deleted successfully! 🗑️`);
+        } else {
+          toast.success(`Posts ${action}d successfully`);
+          // For non-delete actions, update local state
+          setPosts(prev => prev.map(post => {
+            if (idsArray.includes(post.id)) {
+              return { ...post, status: action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : post.status };
+            }
+            return post;
+          }));
+        }
         setSelectedPosts(new Set());
       } else {
-        toast.error(`Failed to ${action} posts`);
+        const errorData = await response.json();
+        toast.error(errorData.error || `Failed to ${action} posts`);
       }
     } catch (error) {
       console.error(`Error ${action}ing posts:`, error);
@@ -179,7 +244,42 @@ export default function PostModeration() {
     }
   };
 
+  // Delete single post with confirmation
+  const handleDeletePost = (postId, postContent) => {
+    if (isDemoAdmin) {
+      toast.info('Demo admin mode is read-only. No changes will be saved.');
+      return;
+    }
+    setDeleteModal({ isOpen: true, postId, postContent });
+  };
+
+  const confirmDelete = () => {
+    if (deleteModal.postId) {
+      handlePostAction('delete', deleteModal.postId);
+    }
+    setDeleteModal({ isOpen: false, postId: null, postContent: '' });
+  };
+
+  const cancelDelete = () => {
+    setDeleteModal({ isOpen: false, postId: null, postContent: '' });
+  };
+
+  // Close modal with ESC key
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && deleteModal.isOpen) {
+        cancelDelete();
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [deleteModal.isOpen]);
+
   const handleBulkAction = (action) => {
+    if (isDemoAdmin) {
+      toast.info('Demo admin mode is read-only. No changes will be saved.');
+      return;
+    }
     if (selectedPosts.size === 0) {
       toast.error('No posts selected');
       return;
@@ -315,24 +415,6 @@ export default function PostModeration() {
             </span>
             <div className={styles.bulkButtons}>
               <button 
-                onClick={() => handleBulkAction('approve')}
-                className={styles.approveBtn}
-              >
-                ✅ Approve
-              </button>
-              <button 
-                onClick={() => handleBulkAction('reject')}
-                className={styles.rejectBtn}
-              >
-                ❌ Reject
-              </button>
-              <button 
-                onClick={() => handleBulkAction('feature')}
-                className={styles.featureBtn}
-              >
-                ⭐ Feature
-              </button>
-              <button 
                 onClick={() => handleBulkAction('delete')}
                 className={styles.deleteBtn}
               >
@@ -402,32 +484,11 @@ export default function PostModeration() {
 
               <div className={styles.postActions}>
                 <button 
-                  onClick={() => handlePostAction('approve', post.id)}
-                  className={styles.actionBtn}
-                  title="Approve"
+                  onClick={() => handleDeletePost(post.id, post.content)}
+                  className={styles.deleteBtn}
+                  title="Delete Post"
                 >
-                  ✅
-                </button>
-                <button 
-                  onClick={() => handlePostAction('reject', post.id)}
-                  className={styles.actionBtn}
-                  title="Reject"
-                >
-                  ❌
-                </button>
-                <button 
-                  onClick={() => handlePostAction('feature', post.id)}
-                  className={styles.actionBtn}
-                  title="Feature"
-                >
-                  ⭐
-                </button>
-                <button 
-                  onClick={() => handlePostAction('delete', post.id)}
-                  className={styles.actionBtn}
-                  title="Delete"
-                >
-                  🗑️
+                  🗑️ Delete
                 </button>
               </div>
             </div>
@@ -437,6 +498,46 @@ export default function PostModeration() {
         {filteredPosts.length === 0 && !isLoading && (
           <div className={styles.emptyState}>
             <p>📭 No posts found matching your criteria</p>
+          </div>
+        )}
+
+        {/* Modern Delete Confirmation Modal */}
+        {deleteModal.isOpen && (
+          <div className={styles.modalOverlay} onClick={cancelDelete}>
+            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.modalIcon}>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 9V13M12 17H12.01M5.07183 19H18.9282C20.4678 19 21.4301 17.3333 20.6603 16L13.7321 4C12.9623 2.66667 11.0377 2.66667 10.2679 4L3.33975 16C2.56995 17.3333 3.53223 19 5.07183 19Z" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <h3 className={styles.modalTitle}>Delete Post</h3>
+              <p className={styles.modalDescription}>
+                Are you sure you want to delete this post?
+              </p>
+              <div className={styles.modalPostPreview}>
+                "{deleteModal.postContent?.substring(0, 80)}{deleteModal.postContent?.length > 80 ? '...' : ''}"
+              </div>
+              <p className={styles.modalWarning}>
+                ⚠️ This action cannot be undone.
+              </p>
+              <div className={styles.modalActions}>
+                <button 
+                  onClick={cancelDelete} 
+                  className={styles.modalCancelBtn}
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmDelete} 
+                  className={styles.modalDeleteBtn}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M19 7L18.1327 19.1425C18.0579 20.1891 17.187 21 16.1378 21H7.86224C6.81296 21 5.94208 20.1891 5.86732 19.1425L5 7M10 11V17M14 11V17M15 7V4C15 3.44772 14.5523 3 14 3H10C9.44772 3 9 3.44772 9 4V7M4 7H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Delete Post
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
