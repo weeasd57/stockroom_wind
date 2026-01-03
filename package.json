@@ -6,12 +6,17 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
+    "lint:count": "node scripts/lint-summary.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "setup-db": "node setup.js",
     "clean": "rimraf .next && next clean",
     "telegram:setup": "node scripts/setup-telegram-domain.js",
     "telegram:test": "node scripts/setup-telegram-domain.js --test",
-    "paypal:test": "node scripts/test-paypal-credentials.js"
+    "paypal:test": "node scripts/test-paypal-credentials.js",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\""
   },
   "dependencies": {
     "@paypal/paypal-server-sdk": "^1.0.4",
@@ -44,12 +49,23 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/jest": "^29.5.14",
     "@types/node": "^20",
     "eslint": "^8.56.0",
     "eslint-config-next": "14.1.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-security": "^3.0.1",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
     "postcss": "^8",
+    "prettier": "^3.7.4",
     "rimraf": "^5.0.5",
-    "tailwindcss": "^3.4.1"
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3"
   },
   "engines": {
     "node": ">=20"

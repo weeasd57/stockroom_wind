@@ -1,0 +1,28 @@
+# SharksZone
+
+SharksZone is a social trading platform where traders share stock ideas, follow each other, and interact through comments and sentiment actions.
+
+## Key pages
+- https://sharkszone.com/landing
+- https://sharkszone.com/traders
+- https://sharkszone.com/pricing
+- https://sharkszone.com/how-it-works
+- https://sharkszone.com/contact
+- https://sharkszone.com/terms
+- https://sharkszone.com/privacy
+- https://sharkszone.com/disclaimer
+
+## Core features (implemented)
+- Social trading posts with symbols, targets, and stop-loss
+- Following traders and a traders directory
+- Buy/Sell sentiment actions and comments
+- Profile analytics (charts, table/calendar views, exports)
+- Premium subscriptions (Pro) and premium broker subscriptions
+- Telegram notifications and broadcasts
+
+## Notes for crawlers
+- The core app experience requires login for personalized feeds.
+- Public informational pages are crawlable.
+
+## Contact
+- https://sharkszone.com/contact

@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+Disallow: /api/
+Disallow: /test-paypal.html
+Disallow: /test-service-key.js
+Disallow: /test-subscription-browser.html
+Disallow: /docs.html
+
+Sitemap: https://sharkszone.com/sitemap.xml

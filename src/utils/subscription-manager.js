@@ -127,6 +127,13 @@ export async function cancelSubscription({
   shouldCancelPayPal = true,
   metadata = {}
 }) {
+  if (!userId) {
+    return {
+      success: false,
+      error: 'userId is required',
+      message: 'Failed to cancel subscription'
+    };
+  }
   try {
     console.log(`[Subscription] Starting cancellation for user ${userId}`, {
       reason,

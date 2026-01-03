@@ -41,6 +41,7 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata = {
+  metadataBase: new URL('https://sharkszone.com'),
   // Basic Metadata
   title: {
     default: 'SharksZone — Social Trading Platform',
@@ -114,9 +115,9 @@ export const metadata = {
     description: 'Share stock ideas, connect with traders, and build a community around trading insights. Discuss market opportunities and follow successful traders.',
     images: [
       {
-        url: '/og-image.png',
-        width: 1200,
-        height: 630,
+        url: '/favicon_io/android-chrome-512x512.png',
+        width: 512,
+        height: 512,
         alt: 'SharksZone Social Trading Platform',
       },
     ],
@@ -129,7 +130,7 @@ export const metadata = {
     description: 'Share stock ideas, connect with traders, and build a community around trading insights. Discuss market opportunities and follow successful traders.',
     creator: '@sharkszone',
     site: '@sharkszone',
-    images: ['/twitter-image.png'],
+    images: ['/favicon_io/android-chrome-512x512.png'],
   },
   
   // Verification (Google, Bing, etc.)

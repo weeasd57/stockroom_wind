@@ -116,3 +116,56 @@ alwaysApply: true
 - **Cross-browser compatibility** testing for frontend features
 - **Load testing** for backend functions under stress
 - **Security testing** for authentication and authorization flows
+
+🌳 WordPress Theme & ThemeForest Standards
+- **Code Quality Check (PHPCS):**
+    - Always use `WordPress-Extra` standard.
+    - Zero tolerance for Errors (`E`) or Warnings (`W`).
+    - Use `./local-phpcs.bat` to scan and `./vendor/bin/phpcbf` to auto-fix.
+- **Security & Escaping:**
+    - **Output:** NEVER use `echo $var` directly. MUST use escaping functions:
+        - `esc_html()` for plain text.
+        - `esc_attr()` for HTML attributes.
+        - `esc_url()` for URLs.
+        - `wp_kses_post()` for allowed HTML.
+    - **Input:** ALWAYS sanitize inputs using `sanitize_text_field()`, `absint()`, etc.
+    - **Nonces:** ALL forms and AJAX requests MUST be secured with nonces.
+- **Plugin Territory Rule:**
+    - Themes MUST NOT register Custom Post Types (CPTs).
+    - Themes MUST NOT register Custom Taxonomies.
+    - Themes MUST NOT add Shortcodes.
+    - *Action:* Move these to a separate plugin (e.g., `inc/plugins-source/autocompare-core`).
+- **Naming Conventions:**
+    - ALL functions, classes, and global variables MUST have a unique prefix (e.g., `autocompare_`).
+    - No generic names like `get_posts()` or `render_view()`.
+- **Internationalization (i18n):**
+    - `text_domain` MUST match the theme slug exactly (`autocompare`).
+    - ALL strings must be translatable (`__('Text', 'autocompare')`, `_e(...)`, `esc_html_e(...)`).
+
+    
+### ✅ CodeCanyon Code Quality Standards (Next.js Edition)
+
+**1. Linting & Formatting:**
+- **Strict ESLint:** Must use `next/core-web-vitals` + `plugin:security/recommended` + `plugin:jsx-a11y/recommended`.
+- **Prettier:** All files must be formatted using Prettier.
+- **Zero Errors:** Run `npm run lint` and `npm run lint:count`. Must have **0 Errors** before submission.
+- **TypeScript:** Use officially supported TypeScript versions (pinned to `5.3.3` to avoid tool conflicts).
+
+**2. Security Requirement:**
+- **npm audit:** Must be clean of high/critical vulnerabilities.
+- **Input Validation:** Sanitize all user inputs (though React handles XSS by default, validate API inputs).
+- **Environment Variables:** Never commit `.env` files. using `.env.local` / `.env.example`.
+
+**3. Performance & Best Practices:**
+- **Image Optimization:** Use `next/image` for all images.
+- **Lazy Loading:** Use `next/dynamic` for heavy components.
+- **Accessibility:** Must pass `jsx-a11y` rules (Alt text, ARIA labels).
+
+**4. Project Structure:**
+- **No Unused Files:** Clean up unused components/pages before zipping.
+- **Documentation:** `README.md` must be clear and detailed.
+
+- **Files & Assets:**
+    - Use `wp_enqueue_script` / `wp_enqueue_style` for all assets.
+    - NO hardcoded `<script>` or `<style>` tags in templates.
+    - NO development files (`node_modules`, `composer.json`, `phpcs.xml`) in the production zip.

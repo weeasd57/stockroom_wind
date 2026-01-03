@@ -97,45 +97,45 @@ export default function LandingPage() {
   const features = [
     {
       id: 1,
-      title: 'Broker Ranking Engine',
+      title: 'Stock Search & Global Coverage',
       description:
-        'Continuously ranks brokers by execution quality, fees, reliability, and slippage to route actions to the best option.',
-      icon: '🏆',
+        'Search stocks across multiple countries and exchanges, with clear country coverage and symbol discovery built-in.',
+      icon: '🔎',
     },
     {
       id: 2,
-      title: 'Auto Buy Bot (Signals)',
+      title: 'Social Trading Posts',
       description:
-        'Automation-ready buy signals on successful posts, with safe guardrails for losing signals to minimize risk.',
-      icon: '🤖',
+        'Create structured trading ideas with symbols, targets, stop-loss levels, images, and clear bullish/bearish context.',
+      icon: '📝',
     },
     {
       id: 3,
-      title: 'Telegram Bot Integration',
+      title: 'Follow Traders & Discover Brokers',
       description:
-        'Receive instant notifications for new posts, target achievements, and price updates directly in Telegram. Stay connected to the market wherever you are.',
-      icon: '✈️',
+        'Follow traders you trust, explore the Traders directory, and keep up with new posts from accounts you follow.',
+      icon: '👥',
     },
     {
       id: 4,
-      title: 'Signal Trust Score',
+      title: 'Community Interaction',
       description:
-        'Weights author track record and post performance to prioritize higher-confidence ideas for the bot.',
-      icon: '⭐',
+        'Engage with posts using buy/sell sentiment actions and comments, and track engagement across the platform.',
+      icon: '💬',
     },
     {
       id: 5,
-      title: 'Risk Controls & Limits',
+      title: 'Profile Analytics & Performance',
       description:
-        'Configurable max allocation, cool-downs, and stop-loss/take-profit presets to protect capital.',
-      icon: '🛡️',
+        'Analyze performance with charts, table view, calendar view, and export options for serious tracking and review.',
+      icon: '📊',
     },
     {
       id: 6,
-      title: 'Multi‑Broker Fallback',
+      title: 'Telegram Notifications',
       description:
-        'Supports multiple brokers with health checks and automatic failover when a provider is degraded.',
-      icon: '🔗',
+        'Subscribe to trader updates and receive notifications directly in Telegram for important activity and broadcasts.',
+      icon: '✈️',
     },
 
   ];
@@ -253,7 +253,7 @@ export default function LandingPage() {
                 />
               </div>
               <h1 className={styles.title} style={{ margin: '0.75rem 0 0' }}>
-                <span className={styles.brandSharks}>Trading</span>Hub Pro — Stock Analysis & Social Trading
+                <span className={styles.brandSharks}>Sharks</span>Zone — Stock Analysis & Social Trading
               </h1>
             </div>
             <p className={styles.subtitle}>
