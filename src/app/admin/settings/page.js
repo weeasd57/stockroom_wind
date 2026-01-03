@@ -23,7 +23,7 @@ export default function SystemSettings() {
   // Settings state
   const [settings, setSettings] = useState({
     general: {
-      siteName: 'TradingHub Pro',
+      siteName: 'Sharks Zone',
       siteUrl: 'https://tradinghub.com',
       siteDescription: 'Professional Trading Platform',
       contactEmail: 'contact@tradinghub.com',

@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 // In production, these would be stored in database
 let systemSettings = {
   general: {
-    siteName: 'TradingHub Pro',
+    siteName: 'Sharks Zone',
     siteUrl: 'https://tradinghub.com',
     siteDescription: 'Professional Trading Platform',
     contactEmail: 'contact@tradinghub.com',

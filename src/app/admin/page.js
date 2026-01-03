@@ -106,7 +106,7 @@ export default function AdminLogin() {
             <FiShield className={styles.logoIcon} />
           </div>
           <h1 className={styles.title}>Admin Portal</h1>
-          <p className={styles.subtitle}>TradingHub Pro Administration</p>
+          <p className={styles.subtitle}>Sharks Zone Administration</p>
         </div>
 
         {/* Login Form */}

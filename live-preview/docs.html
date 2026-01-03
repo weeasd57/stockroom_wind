@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TradingHub Pro - Documentation</title>
+    <title>Sharks Zone - Documentation</title>
     <style>
         * {
             margin: 0;
@@ -365,7 +365,7 @@
     <header class="header">
         <div class="header-content">
             <div class="logo">
-                📚 TradingHub Pro Documentation
+                📚 Sharks Zone Documentation
             </div>
             <div>
                 <button class="menu-toggle" onclick="toggleMenu()">☰ Menu</button>
@@ -437,11 +437,11 @@
         <main class="content">
             <!-- Introduction Section -->
             <section id="introduction" class="section">
-                <h1>Welcome to TradingHub Pro</h1>
-                <p>TradingHub Pro is a comprehensive social trading platform that enables traders to share insights, connect with investors, and monetize their expertise through premium subscriptions.</p>
+                <h1>Welcome to Sharks Zone</h1>
+                <p>Sharks Zone is a comprehensive social trading platform that enables traders to share insights, connect with investors, and monetize their expertise through premium subscriptions.</p>
                 
                 <div class="alert alert-info">
-                    <strong>Version 1.0.0</strong> - This documentation covers the complete setup and usage of TradingHub Pro.
+                    <strong>Version 1.0.0</strong> - This documentation covers the complete setup and usage of Sharks Zone.
                 </div>
 
                 <h2>Key Features</h2>
@@ -459,7 +459,7 @@
             <section id="demo-accounts" class="section">
                 <h2>Demo Accounts (Admin & User)</h2>
                 <p>
-                    TradingHub Pro ships with built-in demo accounts that allow you to showcase the platform without
+                    Sharks Zone ships with built-in demo accounts that allow you to showcase the platform without
                     connecting to a real database or payment system. These accounts are designed for previews
                     (for example, on marketplaces like CodeCanyon) and for local testing.
                 </p>
@@ -499,7 +499,7 @@
             <section id="app-overview" class="section">
                 <h2>Application Overview</h2>
                 <p>
-                    This section gives a high-level overview of the main areas of TradingHub Pro and how they fit
+                    This section gives a high-level overview of the main areas of Sharks Zone and how they fit
                     together for both regular users and administrators.
                 </p>
 
@@ -533,7 +533,7 @@
             <!-- Installation Section -->
             <section id="installation" class="section">
                 <h2>Installation</h2>
-                <p>Follow these steps to install TradingHub Pro on your server.</p>
+                <p>Follow these steps to install Sharks Zone on your server.</p>
 
                 <h3>Requirements</h3>
                 <ul>
@@ -641,14 +641,14 @@ PAYPAL_CLIENT_SECRET="your-client-secret"
 
 # Application
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
-NEXT_PUBLIC_APP_NAME="TradingHub Pro"</code></pre>
+NEXT_PUBLIC_APP_NAME="Sharks Zone"</code></pre>
                 </div>
             </section>
 
             <!-- Quick Start Section -->
             <section id="quick-start" class="section">
                 <h2>Quick Start</h2>
-                <p>Get up and running with TradingHub Pro in minutes.</p>
+                <p>Get up and running with Sharks Zone in minutes.</p>
 
                 <h3>1. Clone and Install</h3>
                 <div class="code-container">
@@ -684,7 +684,7 @@ NEXT_PUBLIC_APP_NAME="TradingHub Pro"</code></pre>
             <section id="posts" class="section">
                 <h2>Trading Posts</h2>
                 <p>
-                    Trading posts are the core content of TradingHub Pro. Traders can publish ideas with symbols,
+                    Trading posts are the core content of Sharks Zone. Traders can publish ideas with symbols,
                     entry/target/stop prices, sentiment, and rich analysis. Posts appear in the global feed,
                     traders directory, and profile pages.
                 </p>
@@ -713,7 +713,7 @@ NEXT_PUBLIC_APP_NAME="TradingHub Pro"</code></pre>
             <section id="telegram" class="section">
                 <h2>Telegram Integration</h2>
                 <p>
-                    TradingHub Pro can broadcast trading signals to Telegram using a dedicated bot. Traders configure
+                    Sharks Zone can broadcast trading signals to Telegram using a dedicated bot. Traders configure
                     their bot token and channel settings from the profile Telegram tab.
                 </p>
                 <ul>
@@ -840,7 +840,7 @@ PATCH /api/users/[id]     # Update profile (owner) or perform admin actions</cod
                 <h2>Webhooks</h2>
                 <p>
                     Webhooks are used to receive asynchronous events from external services such as PayPal. They keep
-                    subscription and payment state in sync with TradingHub Pro.
+                    subscription and payment state in sync with Sharks Zone.
                 </p>
 
                 <h3>PayPal Webhook</h3>
@@ -905,7 +905,7 @@ PATCH /api/users/[id]     # Update profile (owner) or perform admin actions</cod
                 <h2>Settings</h2>
                 <p>
                     The Settings area centralizes configuration for branding, email, payments and integrations.
-                    Use it after the initial installation to fine-tune how TradingHub Pro behaves in production.
+                    Use it after the initial installation to fine-tune how Sharks Zone behaves in production.
                 </p>
 
                 <h3>Typical Tabs</h3>
@@ -927,7 +927,7 @@ PATCH /api/users/[id]     # Update profile (owner) or perform admin actions</cod
             <!-- Deployment Section -->
             <section id="deploy-vercel" class="section">
                 <h2>Deploy to Vercel</h2>
-                <p>Deploy your TradingHub Pro application to Vercel in minutes.</p>
+                <p>Deploy your Sharks Zone application to Vercel in minutes.</p>
 
                 <h3>Steps</h3>
                 <ol>
@@ -951,13 +951,13 @@ PATCH /api/users/[id]     # Update profile (owner) or perform admin actions</cod
             <section id="deploy-vps" class="section">
                 <h2>Deploy to VPS</h2>
                 <p>
-                    You can deploy TradingHub Pro to any modern Linux VPS (for example Ubuntu 22.04) that supports
+                    You can deploy Sharks Zone to any modern Linux VPS (for example Ubuntu 22.04) that supports
                     Node.js. The exact steps depend on your provider, but the general flow is:
                 </p>
                 <ol>
                     <li>Provision a VPS and point your domain DNS to its IP address.</li>
                     <li>Install Node.js LTS, Git and a process manager such as <code>pm2</code>.</li>
-                    <li>Clone your TradingHub Pro repository to the server.</li>
+                    <li>Clone your Sharks Zone repository to the server.</li>
                     <li>Create an <code>.env.local</code> file on the VPS with the same values you use locally.</li>
                     <li>Run <code>npm install</code>, then <code>npm run build</code> and finally
                         <code>npm run start</code> (or use <code>pm2 start</code>).</li>
@@ -973,7 +973,7 @@ PATCH /api/users/[id]     # Update profile (owner) or perform admin actions</cod
             <section id="deploy-docker" class="section">
                 <h2>Docker Setup</h2>
                 <p>
-                    If you prefer containers, you can run TradingHub Pro inside Docker. The following example shows a
+                    If you prefer containers, you can run Sharks Zone inside Docker. The following example shows a
                     minimal Dockerfile that you can adapt to your own CI/CD pipeline:
                 </p>
                 <div class="code-container">
